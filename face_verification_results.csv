@@ -1,0 +1,97 @@
+Folder,Is Same Person,Error
+1,True,
+2,,Error processing images: Exception while processing img1_path
+3,False,
+4,,Error processing images: Exception while processing img1_path
+5,True,
+6,True,
+7,True,
+8,,Error processing images: Exception while processing img1_path
+9,True,
+10,,Error processing images: Exception while processing img1_path
+11,,Error processing images: Exception while processing img1_path
+12,False,
+13,False,
+14,,Error processing images: Exception while processing img2_path
+15,True,
+16,,Error processing images: Exception while processing img2_path
+17,,Error processing images: Exception while processing img1_path
+18,True,
+19,True,
+20,False,
+21,,Error processing images: Exception while processing img2_path
+22,,Error processing images: Exception while processing img1_path
+23,True,
+24,,Error processing images: Exception while processing img2_path
+25,,Error processing images: Exception while processing img1_path
+26,True,
+27,True,
+28,False,
+29,False,
+30,True,
+31,False,
+32,False,
+33,True,
+34,,Error processing images: Exception while processing img1_path
+35,,Error processing images: Exception while processing img2_path
+36,,"Expected 2 images, found 3"
+37,False,
+38,False,
+39,,"Expected 2 images, found 1"
+40,,Error processing images: Exception while processing img2_path
+41,,Error processing images: Exception while processing img2_path
+42,,Error processing images: Exception while processing img2_path
+43,True,
+44,,Error processing images: Exception while processing img1_path
+45,True,
+46,True,
+47,False,
+48,True,
+49,False,
+50,,Error processing images: Exception while processing img2_path
+51,True,
+52,,Error processing images: Exception while processing img1_path
+53,,Error processing images: Exception while processing img1_path
+54,,Error processing images: Exception while processing img1_path
+55,True,
+56,True,
+57,False,
+58,,Error processing images: Exception while processing img1_path
+59,,Error processing images: Exception while processing img1_path
+60,True,
+61,False,
+62,True,
+63,True,
+64,True,
+65,True,
+66,True,
+67,True,
+68,False,
+69,True,
+70,,Error processing images: Exception while processing img2_path
+71,,Error processing images: Exception while processing img2_path
+72,True,
+73,True,
+74,,Error processing images: Exception while processing img2_path
+75,,Error processing images: Exception while processing img2_path
+76,True,
+77,True,
+78,,Error processing images: Exception while processing img1_path
+79,True,
+80,,Error processing images: Exception while processing img1_path
+81,True,
+82,True,
+83,,Error processing images: Exception while processing img2_path
+84,,Error processing images: Exception while processing img1_path
+85,False,
+86,True,
+87,True,
+88,,Error processing images: Exception while processing img1_path
+89,,Error processing images: Exception while processing img1_path
+90,,Error processing images: Exception while processing img1_path
+91,,Error processing images: Exception while processing img1_path
+92,,Error processing images: Exception while processing img1_path
+93,False,
+94,,Error processing images: Exception while processing img1_path
+95,,Error processing images: Exception while processing img1_path
+96,True,
