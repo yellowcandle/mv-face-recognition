@@ -1,42 +1,48 @@
-import instaloader
-import os
-from itertools import islice
+ import os
+import requests
+from bs4 import BeautifulSoup
+from tqdm import tqdm  # Import tqdm for progress bar
+import time
 
-ig_profiles = ['taniackc', 'yokhyo_', 'hsiaksueudidi', '10.09.c', 'yannyhaha']
-POSTS_TO_DOWNLOAD = 3  # Number of posts to download per profile
-
-def download_photo(username, output_path):
-    L = instaloader.Instaloader(
-        download_pictures=True,
-        download_videos=False,
-        download_video_thumbnails=False,
-        download_geotags=False,
-        download_comments=False,
-        save_metadata=False,
-        compress_json=False
-    )
-    
+def download_photo(url, filename, album_dir):
     try:
-        profile = instaloader.Profile.from_username(L.context, username)
-        posts = profile.get_posts()
-        
-        for post in islice(posts, POSTS_TO_DOWNLOAD):
-            try:
-                L.download_post(post, target=output_path)
-                print(f"Downloaded post from {username}")
-            except Exception as e:
-                print(f"Failed to download post from {username}: {str(e)}")
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        filepath = os.path.join(album_dir, filename)
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
+        print(f"Downloaded: {filename} to {album_dir}")
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err} - {url}")
+    except Exception as err:
+        print(f"Other error occurred: {err} - {url}")
+
+def extract_photos_from_html_files(html_files):
+    # Base directory for all photos
+    base_photo_dir = './source/photo/raw'
+    os.makedirs(base_photo_dir, exist_ok=True)
     
-    except instaloader.exceptions.ProfileNotExistsException:
-        print(f"Profile {username} does not exist")
-    except Exception as e:
-        print(f"An error occurred while processing {username}: {str(e)}")
+    for html_file in html_files:
+        # Derive album name from the HTML file name (e.g., 'album1.html' -> 'album1')
+        album_name = os.path.splitext(os.path.basename(html_file))[0]
+        album_dir = os.path.join(base_photo_dir, album_name)
+        os.makedirs(album_dir, exist_ok=True)
+        
+        with open(html_file, 'r', encoding='utf-8') as file:
+            content = file.read()
+        
+        soup = BeautifulSoup(content, 'html.parser')
+        # Find all img tags
+        image_tags = soup.find_all('img')
+        for img in tqdm(image_tags, desc=f"Downloading photos from {album_name}"):
+            image_url = img.get('src')
+            if image_url:
+                # Remove query parameters from filename
+                filename = image_url.split('/')[-1].split('?')[0]
+                download_photo(image_url, filename, album_dir)
 
-# Create the base output directory
-base_output_dir = os.path.join('source', 'photos')
-os.makedirs(base_output_dir, exist_ok=True)
+# HTML files path
+html_files = ['album1.html', 'album2.html']
 
-for profile in ig_profiles:
-    output_path = os.path.join(base_output_dir, profile)
-    os.makedirs(output_path, exist_ok=True)
-    download_photo(profile, output_path)
+# Extract photos from the HTML files
+extract_photos_from_html_files(html_files)
