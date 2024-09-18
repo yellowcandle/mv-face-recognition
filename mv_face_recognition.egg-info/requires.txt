@@ -1,0 +1,4 @@
+yt-dlp
+instaloader
+requests
+beautifulsoup4
