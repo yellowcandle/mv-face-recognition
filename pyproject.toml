@@ -9,4 +9,9 @@ dependencies = [
     "instaloader",
     "requests",
     "beautifulsoup4",
+    "facebook-scraper>=0.2.59",
+    "lxml-html-clean>=0.2.2",
+    "tqdm>=4.66.5",
+    "selenium>=4.24.0",
+    "webdriver-manager>=4.0.2",
 ]
