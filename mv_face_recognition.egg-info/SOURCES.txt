@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+mv_face_recognition.egg-info/PKG-INFO
+mv_face_recognition.egg-info/SOURCES.txt
+mv_face_recognition.egg-info/dependency_links.txt
+mv_face_recognition.egg-info/requires.txt
+mv_face_recognition.egg-info/top_level.txt
