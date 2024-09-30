@@ -8,8 +8,8 @@ from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 
 # Define constants
-DISTANCE_THRESHOLD = 0.35
-FRAME_SKIP = 10  # Process every nth frame
+DISTANCE_THRESHOLD = 0.4
+FRAME_SKIP = 30  # Process every nth frame
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
