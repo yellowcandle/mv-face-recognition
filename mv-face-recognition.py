@@ -1,18 +1,5 @@
 import os
 import cv2
-<<<<<<< HEAD
-from deepface import DeepFace
-# from deepface.commons import distance as dst
-import pandas as pd
-from tqdm import tqdm
-from deepface.modules import verification
-
-distance = verification.find_euclidean_distance(x, y)
-
-# Define constants
-MODEL_NAME = 'Facenet'
-DETECTOR_BACKEND = 'opencv'
-=======
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -20,9 +7,9 @@ from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 
 # Define constants
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
-DISTANCE_THRESHOLD = 0.4
-FRAME_SKIP = 30  # Process every nth frame
+# User input for distance threshold and frame skip
+DISTANCE_THRESHOLD = float(input("Enter the distance threshold (e.g., 0.4): "))
+FRAME_SKIP = int(input("Enter the frame skip value (e.g., 5): "))
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -31,59 +18,34 @@ project_root = os.path.dirname(current_script_path)
 # Directory paths
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
 videos_dir = os.path.join(project_root, "source/videos")
-<<<<<<< HEAD
-=======
 contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 
 # Initialize InsightFace
 app = FaceAnalysis(providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 app.prepare(ctx_id=0, det_size=(640, 640))
 
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 
 def get_image_paths(contestant_path):
     """Retrieve image paths for a contestant."""
     return [
         os.path.join(contestant_path, f)
         for f in os.listdir(contestant_path)
-<<<<<<< HEAD
-        if f.lower().endswith(('.jpg', '.png'))
-    ]
-
-=======
         if f.lower().endswith((".jpg", ".png"))
     ]
 
 
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 def compute_embeddings(image_paths):
     """Compute embeddings for a list of image paths."""
     embeddings = []
     for img_path in image_paths:
         try:
-<<<<<<< HEAD
-            embedding_objs = DeepFace.represent(
-                img_path=img_path,
-                model_name=MODEL_NAME,
-                enforce_detection=False
-            )
-            embeddings.extend([obj["embedding"] for obj in embedding_objs])
-=======
             img = cv2.imread(img_path)
             faces = app.get(img)
             embeddings.extend([face.normed_embedding for face in faces])
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
         except Exception as e:
             print(f"Error processing {img_path}: {e}")
     return embeddings
 
-<<<<<<< HEAD
-def get_known_faces_embeddings(contestants_dir, selected_contestants):
-    """Load and compute embeddings for selected contestants."""
-    known_embeddings = {}
-    for contestant_name in selected_contestants:
-        contestant_path = os.path.join(contestants_dir, contestant_name)
-=======
 
 def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
     """Load and compute embeddings for selected contestants."""
@@ -93,16 +55,11 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
             contestant_info["暱稱"] == contestant_name, "編號"
         ].values[0]
         contestant_path = os.path.join(contestants_dir, str(contestant_number))
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
         if os.path.isdir(contestant_path):
             image_paths = get_image_paths(contestant_path)
             embeddings = compute_embeddings(image_paths)
             if embeddings:
                 known_embeddings[contestant_name] = embeddings
-<<<<<<< HEAD
-    return known_embeddings
-
-=======
         else:
             print(
                 f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
@@ -110,18 +67,10 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
     return known_embeddings
 
 
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 def match_face(face_embedding, known_embeddings):
     """Compare a face embedding against known embeddings."""
     for name, embeddings_list in known_embeddings.items():
         for known_embedding in embeddings_list:
-<<<<<<< HEAD
-            distance = dst.findCosineDistance(face_embedding, known_embedding)
-            if distance <= DISTANCE_THRESHOLD:
-                return name
-    return None
-
-=======
             known_embedding = (
                 known_embedding.flatten()
             )  # {{ Ensure known_embedding is 1D }}
@@ -139,45 +88,20 @@ def match_face(face_embedding, known_embeddings):
     return None
 
 
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 def process_frame(frame, known_embeddings):
     """Detect faces in a frame and recognize known faces."""
     matches = []
     try:
-<<<<<<< HEAD
-        faces = DeepFace.extract_faces(
-            img_path=frame,
-            detector_backend=DETECTOR_BACKEND,
-            enforce_detection=False
-        )
-        for face in faces:
-            face_img = face["face"]
-            embedding_objs = DeepFace.represent(
-                img_path=face_img,
-                model_name=MODEL_NAME,
-                enforce_detection=False
-            )
-            for obj in embedding_objs:
-                face_embedding = obj["embedding"]
-                matched_name = match_face(face_embedding, known_embeddings)
-                if matched_name:
-                    matches.append(matched_name)
-=======
         faces = app.get(frame)
         for face in faces:
             face_embedding = face.normed_embedding
             matched_name = match_face(face_embedding, known_embeddings)
             if matched_name:
                 matches.append((face, matched_name))
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
     except Exception as e:
         print(f"Error processing frame: {e}")
     return matches
 
-<<<<<<< HEAD
-def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
-    """Recognize faces in selected videos."""
-=======
 
 def draw_utf8_text(img, text, pos, font_size, color):
     """Draw UTF-8 text on the image using Pillow."""
@@ -263,7 +187,6 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
 
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
     results = []
     for video_file in tqdm(selected_videos, desc="Processing videos"):
         video_path = os.path.join(videos_dir, video_file)
@@ -276,9 +199,6 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
         frame_count = 0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-<<<<<<< HEAD
-        with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
-=======
         output_dir = os.path.join(project_root, "output_frames", video_file)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -287,7 +207,6 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
         with tqdm(
             total=total_frames, desc=f"Frames in {video_file}", leave=False
         ) as pbar:
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -296,18 +215,6 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                 pbar.update(1)
                 if frame_count % FRAME_SKIP == 0:
                     matches = process_frame(frame, known_embeddings)
-<<<<<<< HEAD
-                    for matched_name in matches:
-                        print(f"Found {matched_name} in {video_file} at frame {frame_count}")
-                        results.append({
-                            'Video': video_file,
-                            'Frame': frame_count,
-                            'Name': matched_name
-                        })
-        cap.release()
-    save_results(results, project_root)
-
-=======
                     if matches:
                         frame_with_boxes = draw_boxes_and_labels(frame, matches)
                         output_frame_path = os.path.join(
@@ -331,64 +238,21 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
     save_results(results, project_root)
 
 
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 def save_results(results, project_root):
     """Save recognition results to a CSV file."""
     if results:
         df = pd.DataFrame(results)
-<<<<<<< HEAD
-        output_csv = os.path.join(project_root, 'video_recognition_results.csv')
-=======
         output_csv = os.path.join(project_root, "video_recognition_results.csv")
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
         df.to_csv(output_csv, index=False)
         print(f"\nResults saved to {output_csv}")
     else:
         print("No faces recognized in videos.")
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 def select_items(options, item_type):
     """Allow user to select items from a list."""
     print(f"\nAvailable {item_type}:")
     for idx, name in enumerate(options, 1):
         print(f"{idx}. {name}")
-<<<<<<< HEAD
-    indices = input(f"\nEnter the numbers of the {item_type} you want to select, separated by commas (e.g., 1,3,5): ")
-    selected_indices = [
-        int(i.strip()) - 1
-        for i in indices.split(",") if i.strip().isdigit()
-    ]
-    selected_items = [
-        options[i]
-        for i in selected_indices
-        if 0 <= i < len(options)
-    ]
-    return selected_items
-
-def main():
-    print("Face Recognition Script - Processing Videos")
-
-    # Select contestants
-    all_contestants = sorted([
-        name for name in os.listdir(contestants_dir)
-        if os.path.isdir(os.path.join(contestants_dir, name))
-    ])
-    selected_contestants = select_items(all_contestants, "contestants")
-
-    # Select videos
-    all_videos = sorted([
-        f for f in os.listdir(videos_dir)
-        if os.path.isfile(os.path.join(videos_dir, f))
-    ])
-    selected_videos = select_items(all_videos, "videos")
-
-    # Load embeddings
-    known_embeddings = get_known_faces_embeddings(contestants_dir, selected_contestants)
-    print(f"Loaded embeddings for {len(known_embeddings)} contestants.")
-=======
     print(f"{len(options) + 1}. Select all")
 
     indices = input(
@@ -474,15 +338,10 @@ def main():
             else:
                 print(f"Could not find image for {contestant}")
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
 
     # Process videos
     recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings)
 
-<<<<<<< HEAD
-if __name__ == '__main__':
-=======
 
 if __name__ == "__main__":
->>>>>>> 1a133fbbf851daf8fd8aa1727558be5751dcb891
     main()
