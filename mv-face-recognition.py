@@ -126,12 +126,12 @@ def draw_boxes_and_labels(frame, matches):
             bbox_enlarged = [bbox[0]-padding, bbox[1]-padding, bbox[2]+padding, bbox[3]+padding]
             # Draw enlarged rectangle
             draw.rectangle(bbox_enlarged, outline="green", width=3)
-            # Increase font size
-            larger_font = ImageFont.truetype(font_path, 40)
+            # Increase font size even more
+            larger_font = ImageFont.truetype(font_path, 60)  # Increased from 40 to 60
             # Draw text with increased size
-            text_bbox = draw.textbbox((bbox_enlarged[0], bbox_enlarged[1] - 45), name, font=larger_font)
+            text_bbox = draw.textbbox((bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font)  # Adjusted y-coordinate
             draw.rectangle(text_bbox, fill="green")
-            draw.text((bbox_enlarged[0], bbox_enlarged[1] - 45), name, font=larger_font, fill="white")
+            draw.text((bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font, fill="white")  # Adjusted y-coordinate
         
         # Convert back to OpenCV image (BGR)
         frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
