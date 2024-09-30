@@ -6,6 +6,7 @@ from tqdm import tqdm
 import insightface
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
+import imageio
 
 # Define constants
 DISTANCE_THRESHOLD = 0.4
@@ -140,8 +141,19 @@ def draw_boxes_and_labels(frame, matches):
         print(f"Error drawing boxes and labels: {e}")
         return frame  # Ensure frame is returned even if an error occurs
 
+def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
+    """Create a GIF from a list of frame paths."""
+    images = []
+    for frame_path in frame_paths:
+        img = Image.open(frame_path)
+        images.append(img)
+    
+    # Save the frames as an animated GIF
+    images[0].save(output_gif_path, save_all=True, append_images=images[1:], duration=duration*1000, loop=0)
+    print(f"GIF saved to {output_gif_path}")
+
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
-    """Recognize faces in selected videos."""
+    """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
     for video_file in tqdm(selected_videos, desc="Processing videos"):
         video_path = os.path.join(videos_dir, video_file)
@@ -157,6 +169,8 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
         output_dir = os.path.join(project_root, 'output_frames', video_file)
         os.makedirs(output_dir, exist_ok=True)
 
+        labeled_frames = []  # List to store paths of frames with labels
+
         with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
             while True:
                 ret, frame = cap.read()
@@ -169,7 +183,8 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                     if matches:
                         frame_with_boxes = draw_boxes_and_labels(frame, matches)
                         output_frame_path = os.path.join(output_dir, f"frame_{frame_count}.jpg")
-                        cv2.imwrite(output_frame_path, frame_with_boxes)  # Updated to use frame_with_boxes
+                        cv2.imwrite(output_frame_path, frame_with_boxes)
+                        labeled_frames.append(output_frame_path)
                         for _, matched_name in matches:
                             print(f"Found {matched_name} in {video_file} at frame {frame_count}")
                             results.append({
@@ -178,6 +193,13 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                                 'Name': matched_name
                             })
         cap.release()
+
+        # Create GIF for this video
+        if labeled_frames:
+            gif_output_path = os.path.join(project_root, 'output_gifs', f"{video_file}_labeled.gif")
+            os.makedirs(os.path.dirname(gif_output_path), exist_ok=True)
+            create_gif_from_frames(labeled_frames, gif_output_path)
+
     save_results(results, project_root)
 
 def save_results(results, project_root):
