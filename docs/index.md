@@ -41,5 +41,5 @@ source/photo/raw/album2_image_urls.txt
 
 ## Output images
 
-[output](../output_frames)
+[output_frames](https://github.com/yellowcandle/mv-face-recognition/tree/main/output_frames)
 
