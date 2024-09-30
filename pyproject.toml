@@ -16,4 +16,10 @@ dependencies = [
     "tf-keras>=2.17.0",
     "pandas>=2.1.1",
     "streamlit>=1.38.0",
+    "insightface>=0.7.3",
+    "onnxruntime>=1.19.2",
+    "opencv-utf-8>=0.0.5",
+    "freetype-py>=2.5.1",
+    "pillow>=10.4.0",
+    "ffmpeg-python>=0.2.0",
 ]
