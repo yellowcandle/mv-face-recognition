@@ -23,5 +23,5 @@
 
 ## Output images
 
-![output](./output_frames)
+[output](../output_frames)
 
