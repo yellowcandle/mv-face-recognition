@@ -1,20 +1,27 @@
 import os
-from deepface import DeepFace
+import cv2
+import numpy as np
 import pandas as pd
 import tqdm
+import insightface
+from insightface.app import FaceAnalysis
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
 project_root = os.path.join(os.path.dirname(os.path.dirname(current_script_path)), "mv-face-recognition")
 base_dir = os.path.join(project_root, "source", "photo", "contestants")
 
+# Initialize InsightFace
+app = FaceAnalysis(providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+app.prepare(ctx_id=0, det_size=(640, 640))
+
 # Function to detect face in an image
 def face_exists(img_path):
     try:
-        # Use extract_faces to detect faces
-        faces = DeepFace.extract_faces(img_path=img_path, enforce_detection=False)
+        img = cv2.imread(img_path)
+        faces = app.get(img)
         return len(faces) > 0
-    except ValueError as e:
+    except Exception as e:
         if "Face could not be detected" in str(e):
             return False
         else:
@@ -44,18 +51,30 @@ def verify_faces_in_folder(folder_path):
         return None, face1_exists, face2_exists, error_message
     
     try:
-        result = DeepFace.verify(img1_path=img1_path, img2_path=img2_path, enforce_detection=True)
-        print(f"Verification result for folder {folder_path}: {result['verified']}, Face 1 Exists: {face1_exists}, Face 2 Exists: {face2_exists}")
-        return result["verified"], face1_exists, face2_exists, None
-    except ValueError as e:
-        if "Face could not be detected" in str(e) or "Exception while processing" in str(e):
+        img1 = cv2.imread(img1_path)
+        img2 = cv2.imread(img2_path)
+        faces1 = app.get(img1)
+        faces2 = app.get(img2)
+        
+        if len(faces1) == 0 or len(faces2) == 0:
             error_message = "Face could not be detected in one or both images during verification."
             print(error_message)
             return None, face1_exists, face2_exists, error_message
-        else:
-            error_message = f"Error processing images: {str(e)}"
-            print(error_message)
-            return None, None, None, error_message
+        
+        # Use the first detected face for verification
+        face1 = faces1[0]
+        face2 = faces2[0]
+        
+        # Extract embeddings
+        embedding1 = face1.normed_embedding
+        embedding2 = face2.normed_embedding
+        
+        # Calculate cosine similarity
+        similarity = np.dot(embedding1, embedding2)
+        is_same_person = similarity > 0.5  # You can adjust the threshold as needed
+        
+        print(f"Verification result for folder {folder_path}: {is_same_person}, Face 1 Exists: {face1_exists}, Face 2 Exists: {face2_exists}")
+        return is_same_person, face1_exists, face2_exists, None
     except Exception as e:
         import traceback
         error_message = f"Error processing images: {str(e)}\n{traceback.format_exc()}"
@@ -68,8 +87,8 @@ def main():
 
     results = []
 
-    # Loop over folder numbers from 1 to 96
-    for folder_num in range(1, 97):
+    # Loop over folder numbers from 1 to 96 with tqdm progress bar
+    for folder_num in tqdm.tqdm(range(1, 97), desc="Processing folders"):
         folder_path = os.path.join(base_dir, str(folder_num))
         if os.path.exists(folder_path):
             is_same_person, face1_exists, face2_exists, error = verify_faces_in_folder(folder_path)
