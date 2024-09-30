@@ -20,3 +20,30 @@
 - 採用 OpenCV 進行影像處理
 - 利用 InsightFace 進行高精度人臉識別
 - 應用 Pandas 進行數據分析和報告生成
+
+## 使用方法
+
+1. Use `uv` to prepare the environment
+
+https://github.com/astral-sh/uv
+
+```bash
+uv venv
+```
+
+2. Install dependencies
+
+```bash
+uv sync
+```
+Note: you may need to install insightface manually
+
+```bash
+pip install insightface
+```
+
+3. Run the script
+
+```bash
+python mv-face-recognition.py
+```
