@@ -41,6 +41,16 @@ Note: you may need to install insightface manually
 ```bash
 pip install insightface
 ```
+use the following command to install insightface on macos if it fails to build
+
+```bash
+pip install insightface --only-binary :all:
+```
+same for opencv
+
+```bash
+pip install opencv-python --only-binary :all:
+```
 
 3. Run the script
 
