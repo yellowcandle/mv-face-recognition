@@ -8,7 +8,7 @@ from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 
 # Define constants
-DISTANCE_THRESHOLD = 0.4
+DISTANCE_THRESHOLD = 0.35
 FRAME_SKIP = 10  # Process every nth frame
 
 # Get the absolute path of the current script
