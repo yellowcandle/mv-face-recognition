@@ -2,7 +2,9 @@ import yt_dlp
 import os
 import subprocess
 import ffmpeg
+import platform
 
+# List of videos to download
 url_list = {
     'v1': 'https://www.youtube.com/watch?v=IpuMy0PcPAE',
     'v2': 'https://www.youtube.com/watch?v=2thpVqZsKHA',
@@ -24,9 +26,28 @@ def download_video(url, output_path):
     downloaded_file = output_path + '.webm'
     if os.path.exists(downloaded_file):
         mp4_file = output_path + '.mp4'
-        stream = ffmpeg.input(downloaded_file)
-        stream = ffmpeg.output(stream, mp4_file)
-        ffmpeg.run(stream)
+        
+        # Use videotoolbox if running on Apple Silicon
+        if platform.system() == 'Darwin' and platform.machine() == 'arm64':
+            stream = ffmpeg.input(downloaded_file)
+            stream = ffmpeg.output(stream, mp4_file, vcodec='h264_videotoolbox')
+            ffmpeg.run(stream)
+        elif platform.system() == 'Windows':
+            # Try to use NVIDIA GPU acceleration on Windows
+            try:
+                stream = ffmpeg.input(downloaded_file)
+                stream = ffmpeg.output(stream, mp4_file, vcodec='h264_nvenc')
+                ffmpeg.run(stream)
+            except ffmpeg.Error:
+                # If NVIDIA GPU acceleration fails, fall back to CPU encoding
+                stream = ffmpeg.input(downloaded_file)
+                stream = ffmpeg.output(stream, mp4_file)
+                ffmpeg.run(stream)
+        else:
+            stream = ffmpeg.input(downloaded_file)
+            stream = ffmpeg.output(stream, mp4_file)
+            ffmpeg.run(stream)
+        
         os.remove(downloaded_file)
         output_file = mp4_file
     else:

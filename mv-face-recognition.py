@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # Define constants
 DISTANCE_THRESHOLD = 0.4
-FRAME_SKIP = 30  # Process every nth frame
+FRAME_SKIP = 10  # Process every nth frame
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -63,6 +63,7 @@ def match_face(face_embedding, known_embeddings):
     """Compare a face embedding against known embeddings."""
     for name, embeddings_list in known_embeddings.items():
         for known_embedding in embeddings_list:
+            known_embedding = known_embedding.flatten()  # {{ Ensure known_embedding is 1D }}
             distance = np.dot(face_embedding, known_embedding)
             if isinstance(distance, np.ndarray):
                 if distance.size == 1:
@@ -120,14 +121,21 @@ def draw_boxes_and_labels(frame, matches):
         
         for face, name in matches:
             bbox = face.bbox.astype(int)
-            # Draw rectangle
-            draw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])], outline="green", width=2)
-            # Draw text
-            draw.text((bbox[0], bbox[1] - 10), name, font=font, fill="green")
+            # Increase rectangle size
+            padding = 10
+            bbox_enlarged = [bbox[0]-padding, bbox[1]-padding, bbox[2]+padding, bbox[3]+padding]
+            # Draw enlarged rectangle
+            draw.rectangle(bbox_enlarged, outline="green", width=3)
+            # Increase font size
+            larger_font = ImageFont.truetype(font_path, 40)
+            # Draw text with increased size
+            text_bbox = draw.textbbox((bbox_enlarged[0], bbox_enlarged[1] - 45), name, font=larger_font)
+            draw.rectangle(text_bbox, fill="green")
+            draw.text((bbox_enlarged[0], bbox_enlarged[1] - 45), name, font=larger_font, fill="white")
         
         # Convert back to OpenCV image (BGR)
-        frame[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-        return frame  # Added return statement
+        frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        return frame
     except Exception as e:
         print(f"Error drawing boxes and labels: {e}")
         return frame  # Ensure frame is returned even if an error occurs
