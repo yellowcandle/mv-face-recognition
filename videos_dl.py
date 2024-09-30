@@ -17,41 +17,16 @@ os.makedirs(download_dir, exist_ok=True)  # Ensure the directory exists
 def download_video(url, output_path):
     ydl_opts = {
         'outtmpl': output_path + '.%(ext)s',
-        'format': 'bestvideo+bestaudio/best',  # This will select the best video and audio quality
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # This will select the best video quality with highest bitrate
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
     
-    # Check if the downloaded file is webm and convert to mp4 if needed
-    downloaded_file = output_path + '.webm'
-    if os.path.exists(downloaded_file):
-        mp4_file = output_path + '.mp4'
-        
-        # Use videotoolbox if running on Apple Silicon
-        if platform.system() == 'Darwin' and platform.machine() == 'arm64':
-            stream = ffmpeg.input(downloaded_file)
-            stream = ffmpeg.output(stream, mp4_file, vcodec='h264_videotoolbox')
-            ffmpeg.run(stream)
-        elif platform.system() == 'Windows':
-            # Try to use NVIDIA GPU acceleration on Windows
-            try:
-                stream = ffmpeg.input(downloaded_file)
-                stream = ffmpeg.output(stream, mp4_file, vcodec='h264_nvenc')
-                ffmpeg.run(stream)
-            except ffmpeg.Error:
-                # If NVIDIA GPU acceleration fails, fall back to CPU encoding
-                stream = ffmpeg.input(downloaded_file)
-                stream = ffmpeg.output(stream, mp4_file)
-                ffmpeg.run(stream)
-        else:
-            stream = ffmpeg.input(downloaded_file)
-            stream = ffmpeg.output(stream, mp4_file)
-            ffmpeg.run(stream)
-        
-        os.remove(downloaded_file)
-        output_file = mp4_file
-    else:
-        output_file = output_path + '.mp4'
+    output_file = output_path + '.mp4'
     
     # Automatically add and commit the downloaded video to Git
     subprocess.run(["git", "add", output_file])
