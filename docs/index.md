@@ -20,3 +20,8 @@
 - 採用 OpenCV 進行影像處理
 - 利用 InsightFace 進行高精度人臉識別
 - 應用 Pandas 進行數據分析和報告生成
+
+## Output images
+
+![output](./output_frames)
+
