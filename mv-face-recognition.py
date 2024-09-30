@@ -194,12 +194,6 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                             })
         cap.release()
 
-        # Create GIF for this video
-        if labeled_frames:
-            gif_output_path = os.path.join(project_root, 'output_gifs', f"{video_file}_labeled.gif")
-            os.makedirs(os.path.dirname(gif_output_path), exist_ok=True)
-            create_gif_from_frames(labeled_frames, gif_output_path)
-
     save_results(results, project_root)
 
 def save_results(results, project_root):
