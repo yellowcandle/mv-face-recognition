@@ -1,97 +1,97 @@
 Folder,Is Same Person,Face 1 Exists,Face 2 Exists,Error
 1,True,True,True,
-2,,True,True,Face could not be detected in one or both images during verification.
-3,False,True,True,
-4,,True,True,Face could not be detected in one or both images during verification.
-5,True,True,True,
-6,True,True,True,
-7,True,True,True,
-8,,True,True,Face could not be detected in one or both images during verification.
+2,False,True,True,
+3,True,True,True,
+4,True,True,True,
+5,False,True,True,
+6,False,True,True,
+7,False,True,True,
+8,True,True,True,
 9,True,True,True,
-10,,True,True,Face could not be detected in one or both images during verification.
-11,,True,True,Face could not be detected in one or both images during verification.
-12,False,True,True,
-13,False,True,True,
-14,,True,True,Face could not be detected in one or both images during verification.
+10,True,True,True,
+11,True,True,True,
+12,True,True,True,
+13,True,True,True,
+14,True,True,True,
 15,True,True,True,
-16,,True,True,Face could not be detected in one or both images during verification.
-17,,True,True,Face could not be detected in one or both images during verification.
+16,True,True,True,
+17,True,True,True,
 18,True,True,True,
 19,True,True,True,
-20,False,True,True,
-21,,True,True,Face could not be detected in one or both images during verification.
-22,,True,True,Face could not be detected in one or both images during verification.
+20,True,True,True,
+21,,False,True,Face could not be detected in one or both images.
+22,True,True,True,
 23,True,True,True,
-24,,True,True,Face could not be detected in one or both images during verification.
-25,,True,True,Face could not be detected in one or both images during verification.
-26,True,True,True,
+24,True,True,True,
+25,False,True,True,
+26,False,True,True,
 27,True,True,True,
-28,False,True,True,
+28,True,True,True,
 29,False,True,True,
 30,True,True,True,
-31,False,True,True,
-32,False,True,True,
+31,True,True,True,
+32,True,True,True,
 33,True,True,True,
-34,,True,True,Face could not be detected in one or both images during verification.
-35,,True,True,Face could not be detected in one or both images during verification.
-36,,True,True,Face could not be detected in one or both images during verification.
-37,False,True,True,
-38,False,True,True,
-39,True,True,True,
-40,,True,True,Face could not be detected in one or both images during verification.
-41,,True,True,Face could not be detected in one or both images during verification.
-42,,True,True,Face could not be detected in one or both images during verification.
+34,True,True,True,
+35,True,True,True,
+36,True,True,True,
+37,True,True,True,
+38,True,True,True,
+39,False,True,True,
+40,False,True,True,
+41,True,True,True,
+42,True,True,True,
 43,True,True,True,
-44,,True,True,Face could not be detected in one or both images during verification.
+44,True,True,True,
 45,True,True,True,
 46,True,True,True,
-47,False,True,True,
+47,True,True,True,
 48,True,True,True,
-49,False,True,True,
-50,,True,True,Face could not be detected in one or both images during verification.
-51,True,True,True,
-52,,True,True,Face could not be detected in one or both images during verification.
-53,,True,True,Face could not be detected in one or both images during verification.
-54,,True,True,Face could not be detected in one or both images during verification.
+49,True,True,True,
+50,False,True,True,
+51,False,True,True,
+52,False,True,True,
+53,True,True,True,
+54,True,True,True,
 55,True,True,True,
-56,True,True,True,
+56,False,True,True,
 57,False,True,True,
-58,,True,True,Face could not be detected in one or both images during verification.
-59,,True,True,Face could not be detected in one or both images during verification.
+58,True,True,True,
+59,True,True,True,
 60,True,True,True,
 61,False,True,True,
 62,True,True,True,
 63,True,True,True,
 64,True,True,True,
 65,True,True,True,
-66,True,True,True,
+66,False,True,True,
 67,True,True,True,
 68,False,True,True,
-69,True,True,True,
-70,,True,True,Face could not be detected in one or both images during verification.
-71,,True,True,Face could not be detected in one or both images during verification.
-72,True,True,True,
+69,False,True,True,
+70,False,True,True,
+71,True,True,True,
+72,,False,True,Face could not be detected in one or both images.
 73,True,True,True,
-74,,True,True,Face could not be detected in one or both images during verification.
-75,,True,True,Face could not be detected in one or both images during verification.
-76,True,True,True,
-77,True,True,True,
-78,,True,True,Face could not be detected in one or both images during verification.
+74,True,True,True,
+75,True,True,True,
+76,False,True,True,
+77,False,True,True,
+78,False,True,True,
 79,True,True,True,
-80,,True,True,Face could not be detected in one or both images during verification.
+80,True,True,True,
 81,True,True,True,
 82,True,True,True,
-83,,True,True,Face could not be detected in one or both images during verification.
-84,,True,True,Face could not be detected in one or both images during verification.
-85,False,True,True,
-86,True,True,True,
+83,True,True,True,
+84,False,True,True,
+85,True,True,True,
+86,False,True,True,
 87,True,True,True,
-88,,True,True,Face could not be detected in one or both images during verification.
-89,,True,True,Face could not be detected in one or both images during verification.
-90,,True,True,Face could not be detected in one or both images during verification.
-91,,True,True,Face could not be detected in one or both images during verification.
-92,,True,True,Face could not be detected in one or both images during verification.
+88,True,True,True,
+89,True,True,True,
+90,True,True,True,
+91,True,True,True,
+92,True,True,True,
 93,False,True,True,
-94,,True,True,Face could not be detected in one or both images during verification.
-95,,True,True,Face could not be detected in one or both images during verification.
+94,True,True,True,
+95,True,True,True,
 96,True,True,True,
