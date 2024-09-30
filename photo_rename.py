@@ -1,10 +1,11 @@
-import os
 from pathlib import Path
 import argparse
 
+
 def extract_xxx(filename):
-    parts = filename.split('_')
+    parts = filename.split("_")
     return int(parts[0])
+
 
 def rename_images(base_dir, dry_run=False):
     for folder_name in range(1, 97):
@@ -13,7 +14,7 @@ def rename_images(base_dir, dry_run=False):
             print(f"Folder {folder_name} not found")
             continue
 
-        images = list(folder_path.glob('*.[jp][pn]g'))
+        images = list(folder_path.glob("*.[jp][pn]g"))
         if len(images) != 2:
             print(f"Expected 2 images in folder {folder_name}, found {len(images)}")
             continue
@@ -29,14 +30,20 @@ def rename_images(base_dir, dry_run=False):
                 img.rename(folder_path / new_name)
                 print(f"Renamed {img.name} to {new_name}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Rename images in contestant folders.")
-    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without actually renaming files")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Perform a dry run without actually renaming files",
+    )
     args = parser.parse_args()
 
     base_dir = Path("source/photo/contestants")
     rename_images(base_dir, dry_run=args.dry_run)
     print("Image renaming complete." if not args.dry_run else "Dry run complete.")
+
 
 if __name__ == "__main__":
     main()
