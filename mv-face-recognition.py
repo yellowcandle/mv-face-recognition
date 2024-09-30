@@ -195,7 +195,13 @@ def select_items(options, item_type):
     print(f"\nAvailable {item_type}:")
     for idx, name in enumerate(options, 1):
         print(f"{idx}. {name}")
-    indices = input(f"\nEnter the numbers of the {item_type} you want to select, separated by commas (e.g., 1,3,5): ")
+    print(f"{len(options) + 1}. Select all")
+    
+    indices = input(f"\nEnter the numbers of the {item_type} you want to select, separated by commas (e.g., 1,3,5), or '{len(options) + 1}' to select all: ")
+    
+    if indices.strip() == str(len(options) + 1):
+        return options
+    
     selected_indices = [
         int(i.strip()) - 1
         for i in indices.split(",") if i.strip().isdigit()
