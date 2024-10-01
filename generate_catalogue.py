@@ -1,6 +1,7 @@
 import os
 import csv
 from collections import defaultdict
+import glob
 
 # Paths
 CSV_PATH = 'video_recognition_results.csv'
@@ -16,15 +17,33 @@ def load_recognition_results(csv_path):
         reader = csv.DictReader(csvfile)
         for row in reader:
             video = row['Video']
-            frame = row['Frame']
+            frame = int(row['Frame'])
             name = row['Name']
-            # Updated image filename and path to match new folder structure and naming convention
-            image_filename = f"frame_{int(frame):04d}.jpg"
-            image_path = os.path.join(OUTPUT_FRAMES_DIR, video, image_filename)
-            if os.path.exists(image_path):
-                contestants[name].append(image_path)
+            
+            # Generate the new filename pattern
+            frame_pattern = f"frame_*.jpg"
+            
+            # Get all frame files in the video directory
+            video_dir = os.path.join(OUTPUT_FRAMES_DIR, video)
+            all_frames = sorted(glob.glob(os.path.join(video_dir, frame_pattern)))
+            
+            if all_frames:
+                # Find the nearest frame
+                nearest_frame = min(all_frames, key=lambda x: abs(int(x.split('_')[-1].split('.')[0]) - frame))
+                
+                # Generate the new filename
+                new_frame_number = int(nearest_frame.split('_')[-1].split('.')[0])
+                new_image_filename = f"frame_{new_frame_number:04d}.jpg"
+                new_image_path = os.path.join(video_dir, new_image_filename)
+                
+                # Rename if necessary
+                if nearest_frame != new_image_path:
+                    os.rename(nearest_frame, new_image_path)
+                
+                contestants[name].append(new_image_path)
             else:
-                print(f"Warning: Image {image_path} does not exist.")
+                print(f"Warning: No frames found for video {video}")
+    
     return contestants
 
 def load_contestant_info(path):

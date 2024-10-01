@@ -19,14 +19,18 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 撈埋電視汁系列：
 - [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp)
 
+
+
 ## Project Aims
 
 1. To implement a modern AI-based face recognition pipeline to identify contestants in MV videos.
 2. To build a comprehensive database of contestants' photos and information.
 3. To automatically label contestants in MV videos.
 
-## Output Catalogue
 
+
+## Output Catalogue
+所有參賽者喺MV同埋BTS出現過，然後認到嘅畫面呢已經喺catalog入邊有㗎啦。
 [catalogue](catalogue.md)
 
 ## Challenges
