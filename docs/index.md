@@ -17,13 +17,17 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
 
 撈埋電視汁系列：
-- [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp) (本片未處理)  
+- [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp)
 
 ## Project Aims
 
 1. To implement a modern AI-based face recognition pipeline to identify contestants in MV videos.
 2. To build a comprehensive database of contestants' photos and information.
 3. To automatically label contestants in MV videos.
+
+## Output Catalogue
+
+[catalogue](catalogue.md)
 
 ## Challenges
 
@@ -38,7 +42,6 @@ source/photo/raw/album2_image_urls.txt
 
 ### tech stack and pipeline
 
-
 困難喺macOS同埋Windows set up嗰個python environment。
 因為唔知乜嘢緣故呢，insightface喺macOS度用 ```pip install``` 係會出事嘅，所以最後都係要用 ```--no-binary``` 去直接 build 嘅。
 
@@ -48,9 +51,9 @@ Refer to [project main page](https://github.com/yellowcandle/mv-face-recognition
 
 ## Technical Details
 
+TBC
 
-
-## Output images
+## Raw Output images
 
 [output_frames](https://github.com/yellowcandle/mv-face-recognition/tree/main/output_frames)
 
