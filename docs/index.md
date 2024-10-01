@@ -19,6 +19,15 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 撈埋電視汁系列：
 - [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp)
 
+## Rationale
+
+喺造星 IV 總共有 96 位參賽者，咁你用肉眼睇可能都要 rewind 好多次先睇到有邊幾個係有出現過喺 MV 入面。
+所以其實我哋可以透過 AI 去搵出嚟究竟邊幾個參賽者有出現過喺 MV 入面。
+而且人嘅記憶力有限，加上本人面盲，所以都係用電腦好啲⋯⋯
+
+## 答返個問題先
+
+
 
 
 ## Project Aims
