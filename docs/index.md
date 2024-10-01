@@ -1,15 +1,28 @@
-# 香港全民造星IV人臉識別項目
+# 全民造星IV MV 人臉識別
 
 本項目旨在對ViuTV的全民造星IV選秀節目影片進行人臉識別分析。我們使用先進的人工智能技術，自動識別和追蹤影片中出現的參賽者。
 
 ## Problem Definition
 
-如果你有聽過Lolly Talk嘅三分甜嘅話，你會發覺入邊有一句歌詞係
+如果你有聽過[Lolly Talk嘅三分甜](https://youtu.be/cTtBqzGI-HM?si=LGG1-lxP52m3lNPI)嘅話，你會發覺入邊有一句歌詞係
 
 > 狂奔過東壩的你  
 
 咁所以我哋嘅問題就係既然 Lolly Talk 嘅成員大部份都係造星 IV 嘅第二個 MV 入邊出現過，咁樣我哋可唔可以用 AI 去認返究竟邊幾個參賽者有去喺東壩度跑步呢？
 咁 generalize 咗呢一個嘅問題之後呢，我哋就可以用AI去嘗試回答呢個問題。
+
+Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：  
+1. [《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅](https://youtu.be/IpuMy0PcPAE?si=54EeV1wjap1IkEeW)  
+2. [《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅](https://youtu.be/2thpVqZsKHA?si=Vam2rSjE8sGh2cde)  
+3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
+
+
+
+## Project Aims
+
+1. To implement a modern AI-based face recognition pipeline to identify contestants in MV videos.
+2. To build a comprehensive database of contestants' photos and information.
+3. To automatically label contestants in MV videos.
 
 ## Challenges
 
@@ -22,24 +35,12 @@ source/photo/raw/album2_image_urls.txt
 困難喺macOS同埋Windows set up嗰個python environment。
 因為唔知乜嘢緣故呢，insightface喺macOS度用 ```pip install``` 係會出事嘅，所以最後都係要用 ```--no-binary``` 去直接 build 嘅。
 
-## 主要功能
+## Project Setup and Installation
 
-1. **影片下載**: 使用 `yt-dlp` 從 YouTube 自動下載指定的全民造星IV MV 影片。
+Refer to [project main page](https://github.com/yellowcandle/mv-face-recognition) for details.
 
-2. **人臉識別**: 運用 InsightFace 深度學習模型，對影片中的人臉進行識別。
+## Technical Details
 
-3. **參賽者資料庫**: 建立並維護一個包含全民造星IV參賽者照片和個人資訊的資料庫。
-
-4. **自動標記**: 在影片幀上自動標記識別出的參賽者，包括姓名和出現時間。
-
-5. **結果分析**: 生成詳細報告，顯示每位全民造星IV參賽者在影片中的出現頻率和時間點。
-
-## 技術細節
-
-- 使用 Python 作為主要編程語言
-- 採用 OpenCV 進行影像處理
-- 利用 InsightFace 進行高精度人臉識別
-- 應用 Pandas 進行數據分析和報告生成
 
 ## Output images
 
