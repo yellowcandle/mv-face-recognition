@@ -8,6 +8,7 @@ OUTPUT_FRAMES_DIR = 'output_frames'
 DOCS_DIR = 'docs'
 CATALOGUE_MD = os.path.join(DOCS_DIR, 'catalogue.md')
 CONTESTANT_INFO_PATH = 'contestant_info.csv'  # New path for contestant info
+IMAGE_URL_PREFIX = 'https://github.com/yellowcandle/mv-face-recognition/tree/main/output_frames'  # URL prefix for deep links
 
 def load_recognition_results(csv_path):
     contestants = defaultdict(list)
@@ -92,8 +93,9 @@ def generate_markdown(contestants, output_md, contestant_info):
             md_file.write(f'## {name}\n\n')
             md_file.write(f"**編號**: {number}, **姓名**: {full_name}\n\n")
             for image in images:
-                relative_path = os.path.relpath(image, DOCS_DIR)
-                md_file.write(f'![{name}]({relative_path})\n\n')
+                relative_path = os.path.relpath(image, OUTPUT_FRAMES_DIR)
+                image_url = f"{IMAGE_URL_PREFIX}/{relative_path}"
+                md_file.write(f'![{name}]({image_url})\n\n')
             md_file.write('---\n\n')
 
 def main():
