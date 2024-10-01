@@ -123,8 +123,8 @@ def draw_utf8_text(img, text, pos, font_size, color):
         print(f"Error drawing text: {e}")
 
 
-def draw_boxes_and_labels(frame, matches):
-    """Draw boxes and labels on the frame using Pillow."""
+def draw_boxes_and_labels(frame, matches, timestamp):
+    """Draw boxes, labels, and timestamp on the frame using Pillow."""
     try:
         # Convert OpenCV image (BGR) to PIL image (RGB)
         pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -158,6 +158,22 @@ def draw_boxes_and_labels(frame, matches):
                 font=larger_font,
                 fill="white",
             )  # Adjusted y-coordinate
+
+        # Define font size and color for timestamp
+        timestamp_font = ImageFont.truetype(font_path, 40)
+        timestamp_color = "yellow"
+
+        # Get image dimensions
+        img_width, img_height = pil_img.size
+
+        # Calculate position for timestamp (10 pixels from the bottom-right corner)
+        text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        position = (img_width - text_width - 10, img_height - text_height - 10)
+
+        # Draw the timestamp
+        draw.text(position, timestamp, font=timestamp_font, fill=timestamp_color)
 
         # Convert back to OpenCV image (BGR)
         frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
@@ -198,6 +214,7 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
         cap = cv2.VideoCapture(video_path)
         frame_count = 0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
 
         output_dir = os.path.join(project_root, "output_frames", video_file)
         os.makedirs(output_dir, exist_ok=True)
@@ -216,7 +233,9 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                 if frame_count % FRAME_SKIP == 0:
                     matches = process_frame(frame, known_embeddings)
                     if matches:
-                        frame_with_boxes = draw_boxes_and_labels(frame, matches)
+                        timestamp_seconds = frame_count / fps
+                        timestamp_formatted = "{:02}:{:02}".format(int(timestamp_seconds // 60), int(timestamp_seconds % 60))
+                        frame_with_boxes = draw_boxes_and_labels(frame, matches, timestamp_formatted)
                         output_frame_path = os.path.join(
                             output_dir, f"frame_{frame_count}.jpg"
                         )
