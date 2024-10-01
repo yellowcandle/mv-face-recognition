@@ -1,7 +1,11 @@
 .DS_Store
 
 # to prevent large files from being committed, run video_dl.py to download videos
+<<<<<<< HEAD
 source/videos/
+=======
+source/videos/**
+>>>>>>> 08d4160f1a495ba763fd8614ab6c6b69c4fae760
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -165,3 +169,4 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+git-filter-repo.py
