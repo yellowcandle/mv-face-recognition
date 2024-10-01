@@ -8,7 +8,7 @@ OUTPUT_FRAMES_DIR = 'output_frames'
 DOCS_DIR = 'docs'
 CATALOGUE_MD = os.path.join(DOCS_DIR, 'catalogue.md')
 CONTESTANT_INFO_PATH = 'contestant_info.csv'  # New path for contestant info
-IMAGE_URL_PREFIX = 'https://github.com/yellowcandle/mv-face-recognition/tree/main/output_frames'  # URL prefix for deep links
+IMAGE_URL_PREFIX = 'https://media.githubusercontent.com/media/yellowcandle/mv-face-recognition/refs/heads/main/output_frames'  # URL prefix for deep links
 
 def load_recognition_results(csv_path):
     contestants = defaultdict(list)
