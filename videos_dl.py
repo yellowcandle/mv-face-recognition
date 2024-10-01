@@ -7,6 +7,7 @@ url_list = {
     "v1": "https://www.youtube.com/watch?v=IpuMy0PcPAE",
     "v2": "https://www.youtube.com/watch?v=2thpVqZsKHA",
     "v3": "https://www.youtube.com/watch?v=O8MOUs0sz4U",
+    "v4": "https://www.youtube.com/watch?v=gizlTwFUL1M",
 }
 
 download_dir = "./source/videos"  # Directory to store downloaded videos
@@ -28,11 +29,6 @@ def download_video(url, output_path):
         ydl.download([url])
 
     output_file = output_path + ".mp4"
-
-    # Automatically add and commit the downloaded video to Git
-    subprocess.run(["git", "add", output_file])
-    subprocess.run(["git", "commit", "-m", f"Add video {output_file}"])
-
 
 for video_id, url in url_list.items():
     output_path = os.path.join(download_dir, video_id)
