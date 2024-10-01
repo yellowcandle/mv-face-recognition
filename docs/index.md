@@ -9,14 +9,15 @@
 > 狂奔過東壩的你  
 
 咁所以我哋嘅問題就係既然 Lolly Talk 嘅成員大部份都係造星 IV 嘅第二個 MV 入邊出現過，咁樣我哋可唔可以用 AI 去認返究竟邊幾個參賽者有去喺東壩度跑步呢？
-咁 generalize 咗呢一個嘅問題之後呢，我哋就可以用AI去嘗試回答呢個問題。
+咁 generalize 咗呢一個嘅問題之後呢，我哋就可以用AI去嘗試回答呢個問題啦。
 
 Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：  
 1. [《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅](https://youtu.be/IpuMy0PcPAE?si=54EeV1wjap1IkEeW)  
 2. [《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅](https://youtu.be/2thpVqZsKHA?si=Vam2rSjE8sGh2cde)  
 3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
 
-
+撈埋電視汁系列：
+- [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp) (本片未處理)  
 
 ## Project Aims
 
@@ -26,11 +27,17 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 
 ## Challenges
 
+其實可以分為技術層面嘅難度，同埋 data preprocessing 同埋 cleaning 嘅難度
+
+### data preprocessing & cleaning
 咁嗰個難度喺邊度呢？最主要係第一要蒐集到全部96位參賽者嘅相片啦，另外就係要去用現代嘅AI去做佢哋嘅面容嘅辨識啦。
 其實成個嘅動作唔困難嘅，第一個部份嘅相片其實可以喺ViuTV嘅Facebook album入邊搵到嘅。不過問題係因為Facebook嘅 user interface 係刻意寫到你好難去做呢啲 scraping， 咁所以最後呢要將成個嘅HTML File掹咗落嚟再喺入邊掹返晒所有static嘅相link嘅。
 咁相關嘅相 link 呢就已經喺以下呢一個嘅Path入面啦。
 source/photo/raw/album1_image_urls.txt
 source/photo/raw/album2_image_urls.txt
+
+### tech stack and pipeline
+
 
 困難喺macOS同埋Windows set up嗰個python environment。
 因為唔知乜嘢緣故呢，insightface喺macOS度用 ```pip install``` 係會出事嘅，所以最後都係要用 ```--no-binary``` 去直接 build 嘅。
@@ -40,6 +47,7 @@ source/photo/raw/album2_image_urls.txt
 Refer to [project main page](https://github.com/yellowcandle/mv-face-recognition) for details.
 
 ## Technical Details
+
 
 
 ## Output images
