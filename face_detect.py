@@ -29,6 +29,7 @@ def face_exists(img_path):
         else:
             raise e
 
+
 # Function to verify faces in a folder
 def verify_faces_in_folder(folder_path):
     img1_path_jpg = os.path.join(folder_path, f"{os.path.basename(folder_path)}-1.jpg")
