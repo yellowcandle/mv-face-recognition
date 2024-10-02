@@ -36,11 +36,8 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 2. To build a comprehensive database of contestants' photos and information.
 3. To automatically label contestants in MV videos.
 
-
-
 ## Output Catalogue
-所有參賽者喺MV同埋BTS出現過，然後認到嘅畫面呢已經喺catalog入邊有㗎啦。
-[catalogue](catalogue.md)
+所有參賽者喺MV同埋BTS出現過，然後認到嘅畫面呢已經喺*[呢個catalogue](catalogue.md)*入邊㗎啦。
 
 ## Challenges
 
