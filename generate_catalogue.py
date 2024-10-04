@@ -90,54 +90,28 @@ def generate_markdown(contestants, output_md, contestant_info):
         md_file.write("# Contestants Appearance Catalog\n\n")
         # Add Index section with a searchable and sortable table
         md_file.write("## Index\n\n")
-        md_file.write(
-            '<input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search for names..">\n'
-        )
-        md_file.write('<table id="contestantTable" class="sortable">\n')
-        md_file.write("  <thead>\n")
-        md_file.write("    <tr>\n")
-        md_file.write("      <th>編號</th>\n")
-        md_file.write("      <th>暱稱</th>\n")
-        md_file.write("    </tr>\n")
-        md_file.write("  </thead>\n")
-        md_file.write("  <tbody>\n")
-        for nickname, info in sorted(
-            contestant_info.items(), key=lambda x: int(x[1]["編號"])
-        ):
+        md_file.write("Use your browser's built-in search function (usually Ctrl+F or Cmd+F) to search for contestants.\n\n")
+        md_file.write("| 編號 | 暱稱 |\n")
+        md_file.write("|------|------|\n")
+        for nickname, info in sorted(contestant_info.items(), key=lambda x: int(x[1]["編號"])):
             number = info.get("編號", "N/A")
-            anchor = number
-            md_file.write(f"    <tr>\n")
-            md_file.write(f"      <td>{number}</td>\n")
-            md_file.write(f'      <td><a href="#{anchor}">{number}</a></td>\n')
-            md_file.write(f"    </tr>\n")
-        md_file.write("  </tbody>\n")
-        md_file.write("</table>\n\n")
-        md_file.write(
-            '<script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>\n'
-        )
-        md_file.write("<script>\n")
-        md_file.write("function searchTable() {\n")
-        md_file.write("  var input, filter, table, tr, td, i, txtValue;\n")
-        md_file.write('  input = document.getElementById("searchInput");\n')
-        md_file.write("  filter = input.value.toUpperCase();\n")
-        md_file.write('  table = document.getElementById("contestantTable");\n')
-        md_file.write('  tr = table.getElementsByTagName("tr");\n')
-        md_file.write("  for (i = 1; i < tr.length; i++) {\n")
-        md_file.write('    td = tr[i].getElementsByTagName("td")[1];\n')
-        md_file.write("    if (td) {\n")
-        md_file.write("      txtValue = td.textContent || td.innerText;\n")
-        md_file.write("      if (txtValue.toUpperCase().indexOf(filter) > -1) {\n")
-        md_file.write('        tr[i].style.display = "";\n')
-        md_file.write("      } else {\n")
-        md_file.write('        tr[i].style.display = "none";\n')
-        md_file.write("      }\n")
-        md_file.write("    }\n")
-        md_file.write("  }\n")
-        md_file.write("}\n")
-        md_file.write("</script>\n")
-        md_file.write(
-            "<noscript>You need to enable JavaScript to use the sortable and searchable tables.</noscript>\n"
-        )
+            md_file.write(f"| {number} | [{nickname}](#{number}) |\n")
+        md_file.write("\n")
+
+        # Generate the main catalogue
+        for nickname, info in sorted(contestant_info.items(), key=lambda x: int(x[1]["編號"])):
+            number = info.get("編號", "N/A")
+            full_name = info.get("姓名", "N/A")
+            md_file.write(f"## {number}. {nickname}\n\n")
+            md_file.write(f"**編號**: {number}, **姓名**: {full_name}\n\n")
+            if nickname in contestants:
+                for image in contestants[nickname]:
+                    relative_path = os.path.relpath(image, OUTPUT_FRAMES_DIR)
+                    image_url = f"{IMAGE_URL_PREFIX}/{relative_path}"
+                    md_file.write(f"![{nickname}]({image_url})\n\n")
+            else:
+                md_file.write("No images found for this contestant.\n\n")
+            md_file.write("---\n\n")
         for name, images in sorted(contestants.items(), key=lambda x: int(contestant_info.get(x[0], {}).get("編號", "999"))):
             info = contestant_info.get(name, {})
             number = info.get("編號", "N/A")
