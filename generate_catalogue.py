@@ -13,6 +13,14 @@ IMAGE_URL_PREFIX = "https://media.githubusercontent.com/media/yellowcandle/mv-fa
 
 
 def load_recognition_results(csv_path):
+    """Load recognition results from CSV.
+
+    Args:
+        csv_path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     contestants = defaultdict(list)
     with open(csv_path, newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -52,7 +60,14 @@ def load_recognition_results(csv_path):
 
 
 def load_contestant_info(path):
-    """Load contestant information from CSV."""
+    """_summary_
+
+    Args:
+        path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     contestant_info = {}
     with open(path, newline="", encoding="utf-8-sig") as csvfile:  # Updated encoding
         reader = csv.DictReader(csvfile)
@@ -64,6 +79,13 @@ def load_contestant_info(path):
 
 
 def generate_markdown(contestants, output_md, contestant_info):
+    """_summary_
+
+    Args:
+        contestants (_type_): _description_
+        output_md (_type_): _description_
+        contestant_info (_type_): _description_
+    """
     with open(output_md, "w", encoding="utf-8") as md_file:
         md_file.write("# Contestants Appearance Catalog\n\n")
         # Add Index section with a searchable and sortable table

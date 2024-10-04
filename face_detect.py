@@ -19,6 +19,17 @@ app.prepare(ctx_id=0, det_size=(640, 640))
 
 # Function to detect face in an image
 def face_exists(img_path):
+    """_summary_
+
+    Args:
+        img_path (_type_): _description_
+
+    Raises:
+        e: _description_
+
+    Returns:
+        _type_: _description_
+    """
     try:
         img = cv2.imread(img_path)
         faces = app.get(img)
@@ -32,6 +43,14 @@ def face_exists(img_path):
 
 # Function to verify faces in a folder
 def verify_faces_in_folder(folder_path):
+    """_summary_
+
+    Args:
+        folder_path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     img1_path_jpg = os.path.join(folder_path, f"{os.path.basename(folder_path)}-1.jpg")
     img2_path_jpg = os.path.join(folder_path, f"{os.path.basename(folder_path)}-2.jpg")
     img1_path_png = os.path.join(folder_path, f"{os.path.basename(folder_path)}-1.png")

@@ -26,7 +26,14 @@ app.prepare(ctx_id=0, det_size=(640, 640))
 
 
 def get_image_paths(contestant_path):
-    """Retrieve image paths for a contestant."""
+    """_summary_
+
+    Args:
+        contestant_path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return [
         os.path.join(contestant_path, f)
         for f in os.listdir(contestant_path)
@@ -35,7 +42,14 @@ def get_image_paths(contestant_path):
 
 
 def compute_embeddings(image_paths):
-    """Compute embeddings for a list of image paths."""
+    """_summary_
+
+    Args:
+        image_paths (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     embeddings = []
     for img_path in image_paths:
         try:
@@ -48,7 +62,16 @@ def compute_embeddings(image_paths):
 
 
 def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
-    """Load and compute embeddings for selected contestants."""
+    """_summary_
+
+    Args:
+        contestants_dir (_type_): _description_
+        selected_contestants (_type_): _description_
+        contestant_info (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     known_embeddings = {}
     for contestant_name in selected_contestants:
         contestant_number = contestant_info.loc[
@@ -68,7 +91,15 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
 
 
 def match_face(face_embedding, known_embeddings):
-    """Compare a face embedding against known embeddings."""
+    """_summary_
+
+    Args:
+        face_embedding (_type_): _description_
+        known_embeddings (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     for name, embeddings_list in known_embeddings.items():
         for known_embedding in embeddings_list:
             known_embedding = (
@@ -89,7 +120,15 @@ def match_face(face_embedding, known_embeddings):
 
 
 def process_frame(frame, known_embeddings):
-    """Detect faces in a frame and recognize known faces."""
+    """_summary_
+
+    Args:
+        frame (_type_): _description_
+        known_embeddings (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     matches = []
     try:
         faces = app.get(frame)
@@ -104,7 +143,15 @@ def process_frame(frame, known_embeddings):
 
 
 def draw_utf8_text(img, text, pos, font_size, color):
-    """Draw UTF-8 text on the image using Pillow."""
+    """_summary_
+
+    Args:
+        img (_type_): _description_
+        text (_type_): _description_
+        pos (_type_): _description_
+        font_size (_type_): _description_
+        color (_type_): _description_
+    """
     try:
         # Convert OpenCV image (BGR) to PIL image (RGB)
         pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -124,7 +171,13 @@ def draw_utf8_text(img, text, pos, font_size, color):
 
 
 def draw_boxes_and_labels(frame, matches, timestamp):
-    """Draw boxes, labels, and timestamp on the frame using Pillow."""
+    """_summary_
+
+    Args:
+        frame (_type_): _description_
+        matches (_type_): _description_
+        timestamp (_type_): _description_
+    """
     try:
         # Convert OpenCV image (BGR) to PIL image (RGB)
         pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -184,7 +237,13 @@ def draw_boxes_and_labels(frame, matches, timestamp):
 
 
 def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
-    """Create a GIF from a list of frame paths."""
+    """_summary_
+
+    Args:
+        frame_paths (_type_): _description_
+        output_gif_path (_type_): _description_
+        duration (int, optional): _description_. Defaults to 0.5.
+    """
     images = []
     for frame_path in frame_paths:
         img = Image.open(frame_path)
@@ -202,7 +261,13 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
 
 
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
-    """Recognize faces in selected videos and prepare frames for GIF creation."""
+    """Recognize faces in selected videos and prepare frames for GIF creation.
+
+    Args:
+        videos_dir (_type_): _description_
+        selected_videos (_type_): _description_
+        known_embeddings (_type_): _description_
+    """
     results = []
     for video_file in tqdm(selected_videos, desc="Processing videos"):
         video_path = os.path.join(videos_dir, video_file)
@@ -262,7 +327,12 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
 
 
 def save_results(results, project_root):
-    """Save recognition results to a CSV file."""
+    """Save recognition results to a CSV file.
+
+    Args:
+        results (_type_): _description_
+        project_root (_type_): _description_
+    """
     if results:
         df = pd.DataFrame(results)
         output_csv = os.path.join(project_root, "video_recognition_results.csv")
@@ -273,7 +343,15 @@ def save_results(results, project_root):
 
 
 def select_items(options, item_type):
-    """Allow user to select items from a list."""
+    """Allow user to select items from a list.
+
+    Args:
+        options (_type_): _description_
+        item_type (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     print(f"\nAvailable {item_type}:")
     for idx, name in enumerate(options, 1):
         print(f"{idx}. {name}")
@@ -294,7 +372,16 @@ def select_items(options, item_type):
 
 
 def get_contestant_image(contestants_dir, contestant, contestant_info):
-    """Retrieve the image path for a contestant."""
+    """Retrieve the image path for a contestant.
+
+    Args:
+        contestants_dir (_type_): _description_
+        contestant (_type_): _description_
+        contestant_info (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     contestant_number = contestant_info.loc[
         contestant_info["暱稱"] == contestant, "編號"
     ].values[0]
@@ -306,7 +393,14 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
 
 
 def compute_face_embedding(image_path):
-    """Compute the face embedding for a given image."""
+    """Compute the face embedding for a given image.
+
+    Args:
+        image_path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     img = cv2.imread(image_path)
     faces = app.get(img)
     if len(faces) > 0:
