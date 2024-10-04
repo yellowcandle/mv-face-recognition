@@ -1,5 +1,7 @@
 # 全民造星 IV 參賽者 MV 出場順序目錄
 
+[返回主頁](index.md)
+
 ## 目錄
 
 Use your browser's built-in search function (usually Ctrl+F or Cmd+F) to search for contestants.

@@ -88,6 +88,7 @@ def generate_markdown(contestants, output_md, contestant_info):
     """
     with open(output_md, "w", encoding="utf-8") as md_file:
         md_file.write("# 全民造星 IV 參賽者 MV 出場順序目錄\n\n")
+        md_file.write("[返回主頁](index.md)\n\n")
         # Add Index section with a searchable and sortable table
         md_file.write("## 目錄\n\n")
         md_file.write("Use your browser's built-in search function (usually Ctrl+F or Cmd+F) to search for contestants.\n\n")
