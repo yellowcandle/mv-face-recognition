@@ -108,7 +108,7 @@ def generate_markdown(contestants, output_md, contestant_info):
             anchor = nickname.lower().replace(" ", "-")
             md_file.write(f"    <tr>\n")
             md_file.write(f"      <td>{number}</td>\n")
-            md_file.write(f'      <td><a href="#{anchor}">{nickname}</a></td>\n')
+            md_file.write(f'      <td><a href="#{anchor}">{number}</a></td>\n')
             md_file.write(f"    </tr>\n")
         md_file.write("  </tbody>\n")
         md_file.write("</table>\n\n")
