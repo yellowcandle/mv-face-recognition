@@ -105,7 +105,7 @@ def generate_markdown(contestants, output_md, contestant_info):
             contestant_info.items(), key=lambda x: int(x[1]["編號"])
         ):
             number = info.get("編號", "N/A")
-            anchor = nickname.lower().replace(" ", "-")
+            anchor = number
             md_file.write(f"    <tr>\n")
             md_file.write(f"      <td>{number}</td>\n")
             md_file.write(f'      <td><a href="#{anchor}">{number}</a></td>\n')
