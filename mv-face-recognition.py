@@ -21,8 +21,19 @@ videos_dir = os.path.join(project_root, "source/videos")
 contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 
 # Initialize InsightFace
+print("Initializing InsightFace...")
 app = FaceAnalysis(providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
 app.prepare(ctx_id=0, det_size=(640, 640))
+print("InsightFace initialized successfully.")
+
+# Initialize progress bar for script setup
+setup_steps = ["Loading modules", "Setting up directories", "Initializing InsightFace"]
+with tqdm(total=len(setup_steps), desc="Initializing script") as pbar:
+    for step in setup_steps:
+        pbar.set_description(f"Initializing script: {step}")
+        pbar.update(1)
+
+print("Script initialization complete.")
 
 
 def get_image_paths(contestant_path):
@@ -306,7 +317,7 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                             frame, matches, timestamp_formatted
                         )
                         output_frame_path = os.path.join(
-                            output_dir, f"frame_{frame_count}.jpg"
+                            output_dir, f"frame_{frame_count:04d}.jpg"
                         )
                         cv2.imwrite(output_frame_path, frame_with_boxes)
                         labeled_frames.append(output_frame_path)
