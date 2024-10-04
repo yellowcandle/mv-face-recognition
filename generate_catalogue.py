@@ -138,7 +138,7 @@ def generate_markdown(contestants, output_md, contestant_info):
         md_file.write(
             "<noscript>You need to enable JavaScript to use the sortable and searchable tables.</noscript>\n"
         )
-        for name, images in sorted(contestants.items()):
+        for name, images in sorted(contestants.items(), key=lambda x: int(contestant_info.get(x[0], {}).get("編號", "999"))):
             info = contestant_info.get(name, {})
             number = info.get("編號", "N/A")
             full_name = info.get("姓名", "N/A")
