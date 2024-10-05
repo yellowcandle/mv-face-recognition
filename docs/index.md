@@ -27,19 +27,19 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 
 ## 答返個問題先
 
-仲寫緊
-
-<!--
 返返正題先，「狂奔過東壩的你」係第二個 MV 入面出現嘅片段嚟。
-喺 MV 入面嘅 00:48-00:55，02:10-02:13，02:39-02:40 02:49
+喺 MV 入面嘅 00:48-00:55，02:10-02:13，02:39-02:40 同埋 02:49
 都有剪輯到相關嘅片段，
 所以我哋就可以集中處理呢幾個片段入面嘅參賽者啦。
--->
+
+（其真係比我哋想像中要少嘅片段）
+
+但係喺條 BTS 入面我哋亦會搵到相關嘅片段，咁我哋可以一併處理呢啲片段。
 
 
 ## Project Aims
 
-1. To implement a modern AI-based face recognition pipeline to identify contestants in MV videos.
+1. To implement a modern AI / deep learning-based face recognition pipeline to identify contestants in MV videos of *King Maker IV*, a reality show from the Hon gKong.based TV station ViuTV.
 2. To build a comprehensive database of contestants' photos and information.
 3. To automatically label contestants in MV videos.
 
