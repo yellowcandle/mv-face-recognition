@@ -8,6 +8,7 @@ url_list = {
     "v2": "https://www.youtube.com/watch?v=2thpVqZsKHA",
     "v3": "https://www.youtube.com/watch?v=O8MOUs0sz4U",
     "v4": "https://www.youtube.com/watch?v=gizlTwFUL1M",
+    "v5": "https://www.youtube.com/watch?v=cTtBqzGI-HM",
 }
 
 download_dir = "./source/videos"  # Directory to store downloaded videos

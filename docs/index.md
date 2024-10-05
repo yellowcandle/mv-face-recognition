@@ -4,20 +4,21 @@
 
 ## Problem Definition
 
-如果你有聽過[Lolly Talk嘅三分甜](https://youtu.be/cTtBqzGI-HM?si=LGG1-lxP52m3lNPI)嘅話，你會發覺入邊有一句歌詞係
+如果你有聽過[Lolly Talk嘅三分甜](https://youtu.be/cTtBqzGI-HM)嘅話，你會發覺入邊有一句歌詞係
 
 > 狂奔過東壩的你  
 
-咁所以我哋嘅問題就係既然 Lolly Talk 嘅成員大部份都係造星 IV 嘅第二個 MV 入邊出現過，咁樣我哋可唔可以用 AI 去認返究竟邊幾個參賽者有去喺東壩度跑步呢？
-咁 generalize 咗呢一個嘅問題之後呢，我哋就可以用AI去嘗試回答呢個問題啦。
+咁所以我哋嘅問題就係：既然 Lolly Talk 嘅成員大部份都係造星 IV 嘅第二個 MV 入邊出現過，咁樣我哋可唔可以用 AI 去認返究竟邊幾個參賽者有去喺東壩度跑步呢？
+咁 generalize 咗個問題之後呢，我哋就可以用AI去嘗試回答呢個問題啦。
 
 Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：  
-1. [《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅](https://youtu.be/IpuMy0PcPAE?si=54EeV1wjap1IkEeW)  
-2. [《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅](https://youtu.be/2thpVqZsKHA?si=Vam2rSjE8sGh2cde)  
-3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
+1. [《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅](https://youtu.be/IpuMy0PcPAE)  
+2. [《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅](https://youtu.be/2thpVqZsKHA)  
+3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U)  
 
 撈埋電視汁系列：
-- [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp)
+- [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M)
+- [Lolly Talk 三分甜 MV](https://youtu.be/cTtBqzGI-HM) (呢條我哋當 bonus track run 埋佢，因為入面有好多造星 IV 嘅 cameo)
 
 ## Rationale
 
@@ -34,14 +35,32 @@ Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：
 
 （其真係比我哋想像中要少嘅片段）
 
-但係喺條 BTS 入面我哋亦會搵到相關嘅片段，咁我哋可以一併處理呢啲片段。
+但係喺條 BTS 入面我哋亦會搵到相關嘅片段，我哋會一併處理呢啲片段。
+
+### Shot 1 (00:50-00:55)
+
+首先係第一個出現嘅 shot，喺大約 MV 嘅 48 秒，即係入「想戰鬥 即戰鬥」果句果個 shot。一開始係只影到腳，所以未有人樣出現；但去到 50 秒嘅時候，我哋就終於見到「狂奔過東壩的第一批女仔」喇。  
+![sample1](./samples/frame_1260_2s.jpg)
+![sample2](./samples/frame_1275_2s.jpg)
+![sample3](./samples/frame_1280_2s.jpg)
+![sample4](./samples/frame_1290_2s.jpg)
+![sample5](./samples/frame_1300_2s.jpg)  
+
+有趣嘅係，同一個 shot 應該有喺 BTS 度出現過
+
+![sample](./samples/frame_2380_4s.jpg)  
+
+少少補充，唔知點解 Sinnie 只有喺 BTS 嘅大頭 shot 度出現，反而喺 MV 本身度係 detect 唔到佢，唔知點解。
+
+<!-- ### Shot 2 (02:10-02:13) -->
+
 
 
 ## Project Aims
 
-1. To implement a modern AI / deep learning-based face recognition pipeline to identify contestants in MV videos of *King Maker IV*, a reality show from the Hon gKong.based TV station ViuTV.
+1. To implement a modern AI / deep learning-based face recognition pipeline to identify contestants in MV videos of *King Maker IV*, a reality show from the Hong Kong-based TV station, ViuTV.
 2. To build a comprehensive database of contestants' photos and information.
-3. To automatically label contestants in MV videos.
+3. To automatically detect and label contestants in the MV videos.
 
 ## Output Catalogue
 所有參賽者喺MV同埋BTS出現過，然後認到嘅畫面呢已經喺**[呢個catalogue](catalogue.md)**入邊㗎啦。
