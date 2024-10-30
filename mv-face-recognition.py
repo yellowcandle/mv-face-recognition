@@ -5,11 +5,20 @@ import pandas as pd
 from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
+import mediapipe as mp
+import sys
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Define constants
 # User input for distance threshold and frame skip
-DISTANCE_THRESHOLD = float(input("Enter the distance threshold (e.g., 0.4): "))
-FRAME_SKIP = int(input("Enter the frame skip value (e.g., 5): "))
+try:
+    DISTANCE_THRESHOLD = float(input("Enter the distance threshold (e.g., 0.4): "))
+    FRAME_SKIP = int(input("Enter the frame skip value (e.g., 5): "))
+except ValueError as e:
+    print(f"Invalid input: {e}. Please enter numeric values.")
+    sys.exit(1)
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -22,9 +31,23 @@ contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 
 # Initialize InsightFace
 print("Initializing InsightFace...")
-app = FaceAnalysis(providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-app.prepare(ctx_id=0, det_size=(640, 640))
-print("InsightFace initialized successfully.")
+try:
+    print("Creating FaceAnalysis instance...")
+    app = FaceAnalysis(name='buffalo_l')
+    print("Preparing FaceAnalysis...")
+    app.prepare(ctx_id=-1, det_size=(640, 640), download=True, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    print("InsightFace initialized successfully.")
+except Exception as e:
+    print(f"Unexpected error during InsightFace initialization: {type(e)}: {str(e)}")
+    sys.exit(1)
+
+# Initialize MediaPipe pose estimation
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(
+    static_image_mode=True,
+    model_complexity=2,
+    min_detection_confidence=0.5
+)
 
 # Initialize progress bar for script setup
 setup_steps = ["Loading modules", "Setting up directories", "Initializing InsightFace"]
@@ -37,13 +60,13 @@ print("Script initialization complete.")
 
 
 def get_image_paths(contestant_path):
-    """_summary_
+    """Retrieve image paths from a contestant directory.
 
     Args:
-        contestant_path (_type_): _description_
+        contestant_path (str): Path to the contestant's directory.
 
     Returns:
-        _type_: _description_
+        list: List of image file paths.
     """
     return [
         os.path.join(contestant_path, f)
@@ -52,100 +75,145 @@ def get_image_paths(contestant_path):
     ]
 
 
-def compute_embeddings(image_paths):
-    """_summary_
-
+def get_pose_features(img):
+    """Extract pose landmarks from an image.
+    
     Args:
-        image_paths (_type_): _description_
-
+        img: Input image in BGR format
+        
     Returns:
-        _type_: _description_
+        numpy.ndarray: Normalized pose landmarks or None if no pose detected
     """
-    embeddings = []
-    for img_path in image_paths:
-        try:
-            img = cv2.imread(img_path)
-            faces = app.get(img)
-            embeddings.extend([face.normed_embedding for face in faces])
-        except Exception as e:
-            print(f"Error processing {img_path}: {e}")
-    return embeddings
-
-
-def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
-    """_summary_
-
-    Args:
-        contestants_dir (_type_): _description_
-        selected_contestants (_type_): _description_
-        contestant_info (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    known_embeddings = {}
-    for contestant_name in selected_contestants:
-        contestant_number = contestant_info.loc[
-            contestant_info["暱稱"] == contestant_name, "編號"
-        ].values[0]
-        contestant_path = os.path.join(contestants_dir, str(contestant_number))
-        if os.path.isdir(contestant_path):
-            image_paths = get_image_paths(contestant_path)
-            embeddings = compute_embeddings(image_paths)
-            if embeddings:
-                known_embeddings[contestant_name] = embeddings
-        else:
-            print(
-                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-            )
-    return known_embeddings
-
-
-def match_face(face_embedding, known_embeddings):
-    """_summary_
-
-    Args:
-        face_embedding (_type_): _description_
-        known_embeddings (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    for name, embeddings_list in known_embeddings.items():
-        for known_embedding in embeddings_list:
-            known_embedding = (
-                known_embedding.flatten()
-            )  # {{ Ensure known_embedding is 1D }}
-            distance = np.dot(face_embedding, known_embedding)
-            if isinstance(distance, np.ndarray):
-                if distance.size == 1:
-                    distance = distance.item()  # Convert single-element array to scalar
-                else:
-                    print(f"Unexpected distance array size for {name}: {distance.size}")
-                    distance = (
-                        distance.mean()
-                    )  # Handle multi-element arrays appropriately
-            if distance > DISTANCE_THRESHOLD:
-                return name
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = pose.process(img_rgb)
+    
+    if results.pose_landmarks:
+        landmarks = [[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]
+        return np.array(landmarks)
     return None
 
 
-def process_frame(frame, known_embeddings):
-    """_summary_
+def compute_embeddings(image_paths):
+    """Compute face and pose embeddings for given images.
+    
+    Args:
+        image_paths (list): List of image file paths
+        
+    Returns:
+        tuple: Lists of face and pose embeddings
+    """
+    face_embeddings = []
+    pose_embeddings = []
+    
+    for img_path in image_paths:
+        try:
+            img = cv2.imread(img_path)
+            if img is None:
+                print(f"Error reading image {img_path}. Skipping.")
+                continue
+            
+            # Get face embeddings
+            faces = app.get(img)
+            face_embeddings.extend([face.normed_embedding for face in faces])
+            
+            # Get pose embeddings
+            pose_embedding = get_pose_features(img)
+            if pose_embedding is not None:
+                pose_embeddings.append(pose_embedding)
+                
+        except Exception as e:
+            print(f"Error processing {img_path}: {e}")
+            
+    return face_embeddings, pose_embeddings
+
+
+def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
+    """Retrieve known face embeddings for selected contestants.
 
     Args:
-        frame (_type_): _description_
-        known_embeddings (_type_): _description_
+        contestants_dir (str): Directory containing contestant images.
+        selected_contestants (list): List of selected contestant names.
+        contestant_info (DataFrame): DataFrame containing contestant information.
 
     Returns:
-        _type_: _description_
+        dict: Dictionary of known embeddings.
+    """
+    known_embeddings = {}
+    for contestant_name in selected_contestants:
+        try:
+            contestant_number = contestant_info.loc[
+                contestant_info["暱稱"] == contestant_name, "編號"
+            ].values[0]
+            contestant_path = os.path.join(contestants_dir, str(contestant_number))
+            if os.path.isdir(contestant_path):
+                image_paths = get_image_paths(contestant_path)
+                embeddings = compute_embeddings(image_paths)
+                if embeddings:
+                    known_embeddings[contestant_name] = embeddings
+            else:
+                print(
+                    f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
+                )
+        except Exception as e:
+            print(f"Error retrieving embeddings for {contestant_name}: {e}")
+    return known_embeddings
+
+
+def match_face(face_embedding, pose_embedding, known_embeddings):
+    """Match face and pose embeddings against known embeddings.
+    
+    Args:
+        face_embedding: Face embedding to match
+        pose_embedding: Pose embedding to match
+        known_embeddings: Dictionary of known embeddings
+        
+    Returns:
+        str: Matched name or None
+    """
+    best_match = None
+    best_score = -1
+    
+    for name, (known_face_embeddings, known_pose_embeddings) in known_embeddings.items():
+        for known_face_emb in known_face_embeddings:
+            # Calculate face similarity
+            face_similarity = np.dot(face_embedding, known_face_emb)
+            
+            # Calculate pose similarity if available
+            pose_similarity = 0.0
+            if pose_embedding is not None and known_pose_embeddings:
+                for known_pose_emb in known_pose_embeddings:
+                    pose_similarity = max(pose_similarity, 
+                        np.dot(pose_embedding.flatten(), known_pose_emb.flatten()) / 
+                        (np.linalg.norm(pose_embedding) * np.linalg.norm(known_pose_emb)))
+            
+            # Combine similarities with weights
+            combined_score = 0.7 * face_similarity + 0.3 * pose_similarity
+            
+            if combined_score > best_score and combined_score > DISTANCE_THRESHOLD:
+                best_score = combined_score
+                best_match = name
+                
+    return best_match
+
+
+def process_frame(frame, known_embeddings):
+    """Process a video frame to detect and recognize faces with pose.
+    
+    Args:
+        frame: Video frame
+        known_embeddings: Dictionary of known embeddings
+        
+    Returns:
+        list: List of (face, name) tuples for matched faces
     """
     matches = []
     try:
         faces = app.get(frame)
+        pose_embedding = get_pose_features(frame)
+        
         for face in faces:
             face_embedding = face.normed_embedding
-            matched_name = match_face(face_embedding, known_embeddings)
+            matched_name = match_face(face_embedding, pose_embedding, known_embeddings)
             if matched_name:
                 matches.append((face, matched_name))
     except Exception as e:
@@ -154,14 +222,14 @@ def process_frame(frame, known_embeddings):
 
 
 def draw_utf8_text(img, text, pos, font_size, color):
-    """_summary_
+    """Draw UTF-8 text on an image.
 
     Args:
-        img (_type_): _description_
-        text (_type_): _description_
-        pos (_type_): _description_
-        font_size (_type_): _description_
-        color (_type_): _description_
+        img (ndarray): Image to draw on.
+        text (str): Text to draw.
+        pos (tuple): Position to draw the text.
+        font_size (int): Font size.
+        color (str): Color of the text.
     """
     try:
         # Convert OpenCV image (BGR) to PIL image (RGB)
@@ -182,12 +250,12 @@ def draw_utf8_text(img, text, pos, font_size, color):
 
 
 def draw_boxes_and_labels(frame, matches, timestamp):
-    """_summary_
+    """Draw bounding boxes and labels on the frame.
 
     Args:
-        frame (_type_): _description_
-        matches (_type_): _description_
-        timestamp (_type_): _description_
+        frame (ndarray): Frame to draw on.
+        matches (list): List of matches.
+        timestamp (str): Timestamp to display.
     """
     try:
         # Convert OpenCV image (BGR) to PIL image (RGB)
@@ -248,12 +316,12 @@ def draw_boxes_and_labels(frame, matches, timestamp):
 
 
 def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
-    """_summary_
+    """Create a GIF from a list of frame paths.
 
     Args:
-        frame_paths (_type_): _description_
-        output_gif_path (_type_): _description_
-        duration (int, optional): _description_. Defaults to 0.5.
+        frame_paths (list): List of frame file paths.
+        output_gif_path (str): Path to save the output GIF.
+        duration (int, optional): Duration for each frame in seconds. Defaults to 0.5.
     """
     images = []
     for frame_path in frame_paths:
@@ -275,9 +343,9 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
     """Recognize faces in selected videos and prepare frames for GIF creation.
 
     Args:
-        videos_dir (_type_): _description_
-        selected_videos (_type_): _description_
-        known_embeddings (_type_): _description_
+        videos_dir (str): Directory containing video files.
+        selected_videos (list): List of selected video file names.
+        known_embeddings (dict): Dictionary of known embeddings.
     """
     results = []
     for video_file in tqdm(selected_videos, desc="Processing videos"):
@@ -341,8 +409,8 @@ def save_results(results, project_root):
     """Save recognition results to a CSV file.
 
     Args:
-        results (_type_): _description_
-        project_root (_type_): _description_
+        results (list): List of recognition results.
+        project_root (str): Project root directory.
     """
     if results:
         df = pd.DataFrame(results)
@@ -357,11 +425,11 @@ def select_items(options, item_type):
     """Allow user to select items from a list.
 
     Args:
-        options (_type_): _description_
-        item_type (_type_): _description_
+        options (list): List of available options.
+        item_type (str): Type of items (e.g., "contestants", "videos").
 
     Returns:
-        _type_: _description_
+        list: List of selected items.
     """
     print(f"\nAvailable {item_type}:")
     for idx, name in enumerate(options, 1):
@@ -386,12 +454,12 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
     """Retrieve the image path for a contestant.
 
     Args:
-        contestants_dir (_type_): _description_
-        contestant (_type_): _description_
-        contestant_info (_type_): _description_
+        contestants_dir (str): Directory containing contestant images.
+        contestant (str): Contestant name.
+        contestant_info (DataFrame): DataFrame with contestant information.
 
     Returns:
-        _type_: _description_
+        str: Path to the contestant's image or None if not found.
     """
     contestant_number = contestant_info.loc[
         contestant_info["暱稱"] == contestant, "編號"
@@ -407,16 +475,42 @@ def compute_face_embedding(image_path):
     """Compute the face embedding for a given image.
 
     Args:
-        image_path (_type_): _description_
+        image_path (str): Path to the image.
 
     Returns:
-        _type_: _description_
+        ndarray: Face embedding or None if no face detected.
     """
     img = cv2.imread(image_path)
+    if img is None:
+        print(f"Error reading image {image_path}.")
+        return None
+    
     faces = app.get(img)
     if len(faces) > 0:
         return faces[0].normed_embedding
     return None
+
+
+def get_contestant_embeddings(contestants_dir, contestant, contestant_info):
+    """Get face and pose embeddings for a contestant.
+    
+    Args:
+        contestants_dir (str): Directory containing contestant images.
+        contestant (str): Contestant name.
+        contestant_info (DataFrame): DataFrame with contestant information.
+        
+    Returns:
+        tuple: Face and pose embeddings or (None, None) if not found.
+    """
+    contestant_number = contestant_info.loc[
+        contestant_info["暱稱"] == contestant, "編號"
+    ].values[0]
+    contestant_path = os.path.join(contestants_dir, str(contestant_number))
+    image_paths = get_image_paths(contestant_path)
+    
+    if image_paths:
+        return compute_embeddings(image_paths)
+    return None, None
 
 
 def main():
@@ -442,30 +536,26 @@ def main():
     # Load embeddings
     known_embeddings = {}
     for contestant in selected_contestants:
-        embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
-        if os.path.exists(embedding_file):
-            embedding = np.load(embedding_file, allow_pickle=True)
-            known_embeddings[contestant] = [
-                embedding
-            ]  # Ensure embeddings are stored as a list
+        face_embedding_file = os.path.join(contestants_dir, f"{contestant}_face_embedding.npy")
+        pose_embedding_file = os.path.join(contestants_dir, f"{contestant}_pose_embedding.npy")
+        
+        if os.path.exists(face_embedding_file) and os.path.exists(pose_embedding_file):
+            face_embeddings = np.load(face_embedding_file, allow_pickle=True)
+            pose_embeddings = np.load(pose_embedding_file, allow_pickle=True)
+            known_embeddings[contestant] = (face_embeddings, pose_embeddings)
         else:
-            print(f"Computing embedding for {contestant}...")
-            contestant_image = get_contestant_image(
+            print(f"Computing embeddings for {contestant}...")
+            face_embeddings, pose_embeddings = get_contestant_embeddings(
                 contestants_dir, contestant, contestant_info
             )
-            if contestant_image is not None:
-                embedding = compute_face_embedding(contestant_image)
-                if embedding is not None:
-                    known_embeddings[contestant] = [
-                        embedding
-                    ]  # Store embedding in a list
-                    np.save(
-                        embedding_file, [embedding]
-                    )  # Save as a list to maintain consistency
-                else:
-                    print(f"Could not compute embedding for {contestant}")
+            if face_embeddings is not None:
+                known_embeddings[contestant] = (face_embeddings, pose_embeddings)
+                np.save(face_embedding_file, face_embeddings)
+                if pose_embeddings is not None:
+                    np.save(pose_embedding_file, pose_embeddings)
             else:
-                print(f"Could not find image for {contestant}")
+                print(f"Could not compute embeddings for {contestant}")
+
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
 
     # Process videos

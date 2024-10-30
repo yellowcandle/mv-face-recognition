@@ -4,6 +4,15 @@ import numpy as np
 import pandas as pd
 import tqdm
 from insightface.app import FaceAnalysis
+import mediapipe as mp
+
+# Add MediaPipe initialization
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(
+    static_image_mode=True,
+    model_complexity=2,
+    min_detection_confidence=0.5
+)
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -13,8 +22,8 @@ project_root = os.path.join(
 base_dir = os.path.join(project_root, "source", "photo", "contestants")
 
 # Initialize InsightFace
-app = FaceAnalysis(providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-app.prepare(ctx_id=0, det_size=(640, 640))
+app = FaceAnalysis()
+app.prepare(ctx_id=0, det_size=(640, 640), download=True, providers=['CPUExecutionProvider'])
 
 
 # Function to detect face in an image
@@ -82,11 +91,13 @@ def verify_faces_in_folder(folder_path):
         img2 = cv2.imread(img2_path)
         faces1 = app.get(img1)
         faces2 = app.get(img2)
+        
+        # Get pose features
+        pose1 = get_pose_features(img1)
+        pose2 = get_pose_features(img2)
 
         if len(faces1) == 0 or len(faces2) == 0:
-            error_message = (
-                "Face could not be detected in one or both images during verification."
-            )
+            error_message = "Face could not be detected in one or both images during verification."
             print(error_message)
             return None, face1_exists, face2_exists, error_message
 
@@ -94,24 +105,63 @@ def verify_faces_in_folder(folder_path):
         face1 = faces1[0]
         face2 = faces2[0]
 
-        # Extract embeddings
+        # Extract face embeddings
         embedding1 = face1.normed_embedding
         embedding2 = face2.normed_embedding
 
-        # Calculate cosine similarity
-        similarity = np.dot(embedding1, embedding2)
-        is_same_person = similarity > 0.5  # You can adjust the threshold as needed
+        # Calculate face similarity
+        face_similarity = np.dot(embedding1, embedding2)
+        
+        # Calculate pose similarity if poses are detected
+        pose_similarity = 0.0
+        if pose1 is not None and pose2 is not None:
+            # Compute cosine similarity between pose vectors
+            pose1_flat = pose1.flatten()
+            pose2_flat = pose2.flatten()
+            pose_similarity = np.dot(pose1_flat, pose2_flat) / (
+                np.linalg.norm(pose1_flat) * np.linalg.norm(pose2_flat)
+            )
+        
+        # Combine face and pose similarities
+        # Weight face similarity more heavily than pose
+        combined_similarity = 0.7 * face_similarity + 0.3 * pose_similarity
+        is_same_person = combined_similarity > 0.5
 
         print(
-            f"Verification result for folder {folder_path}: {is_same_person}, Face 1 Exists: {face1_exists}, Face 2 Exists: {face2_exists}"
+            f"Verification result for folder {folder_path}:\n"
+            f"  Combined Similarity: {combined_similarity:.3f}\n"
+            f"  Face Similarity: {face_similarity:.3f}\n"
+            f"  Pose Similarity: {pose_similarity:.3f}\n"
+            f"  Is Same Person: {is_same_person}"
         )
+        
         return is_same_person, face1_exists, face2_exists, None
+        
     except Exception as e:
         import traceback
-
         error_message = f"Error processing images: {str(e)}\n{traceback.format_exc()}"
         print(error_message)
         return None, None, None, error_message
+
+
+def get_pose_features(img):
+    """Extract pose landmarks from the image.
+    
+    Args:
+        img: Input image in BGR format
+        
+    Returns:
+        List of normalized pose landmarks or None if no pose detected
+    """
+    # Convert BGR to RGB
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = pose.process(img_rgb)
+    
+    if results.pose_landmarks:
+        # Extract normalized landmarks
+        landmarks = [[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]
+        return np.array(landmarks)
+    return None
 
 
 def main():
