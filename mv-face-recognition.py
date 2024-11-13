@@ -5,9 +5,9 @@ import pandas as pd
 from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
-import mediapipe as mp
 import sys
 import logging
+from pose_recognition import PoseRecognition
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -41,13 +41,8 @@ except Exception as e:
     print(f"Unexpected error during InsightFace initialization: {type(e)}: {str(e)}")
     sys.exit(1)
 
-# Initialize MediaPipe pose estimation
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(
-    static_image_mode=True,
-    model_complexity=2,
-    min_detection_confidence=0.5
-)
+# Initialize PoseRecognition
+pose_recognizer = PoseRecognition()
 
 # Initialize progress bar for script setup
 setup_steps = ["Loading modules", "Setting up directories", "Initializing InsightFace"]
@@ -76,21 +71,15 @@ def get_image_paths(contestant_path):
 
 
 def get_pose_features(img):
-    """Extract pose landmarks from an image.
+    """Extract pose features from an image using enhanced pose recognition.
     
     Args:
         img: Input image in BGR format
         
     Returns:
-        numpy.ndarray: Normalized pose landmarks or None if no pose detected
+        numpy.ndarray: Enhanced pose features or None if no face detected
     """
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = pose.process(img_rgb)
-    
-    if results.pose_landmarks:
-        landmarks = [[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]
-        return np.array(landmarks)
-    return None
+    return pose_recognizer.get_pose_features(img)
 
 
 def compute_embeddings(image_paths):
@@ -116,7 +105,7 @@ def compute_embeddings(image_paths):
             faces = app.get(img)
             face_embeddings.extend([face.normed_embedding for face in faces])
             
-            # Get pose embeddings
+            # Get enhanced pose embeddings
             pose_embedding = get_pose_features(img)
             if pose_embedding is not None:
                 pose_embeddings.append(pose_embedding)
@@ -125,38 +114,6 @@ def compute_embeddings(image_paths):
             print(f"Error processing {img_path}: {e}")
             
     return face_embeddings, pose_embeddings
-
-
-def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
-    """Retrieve known face embeddings for selected contestants.
-
-    Args:
-        contestants_dir (str): Directory containing contestant images.
-        selected_contestants (list): List of selected contestant names.
-        contestant_info (DataFrame): DataFrame containing contestant information.
-
-    Returns:
-        dict: Dictionary of known embeddings.
-    """
-    known_embeddings = {}
-    for contestant_name in selected_contestants:
-        try:
-            contestant_number = contestant_info.loc[
-                contestant_info["暱稱"] == contestant_name, "編號"
-            ].values[0]
-            contestant_path = os.path.join(contestants_dir, str(contestant_number))
-            if os.path.isdir(contestant_path):
-                image_paths = get_image_paths(contestant_path)
-                embeddings = compute_embeddings(image_paths)
-                if embeddings:
-                    known_embeddings[contestant_name] = embeddings
-            else:
-                print(
-                    f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-                )
-        except Exception as e:
-            print(f"Error retrieving embeddings for {contestant_name}: {e}")
-    return known_embeddings
 
 
 def match_face(face_embedding, pose_embedding, known_embeddings):
@@ -182,12 +139,14 @@ def match_face(face_embedding, pose_embedding, known_embeddings):
             pose_similarity = 0.0
             if pose_embedding is not None and known_pose_embeddings:
                 for known_pose_emb in known_pose_embeddings:
+                    # Calculate similarity using enhanced pose features
                     pose_similarity = max(pose_similarity, 
-                        np.dot(pose_embedding.flatten(), known_pose_emb.flatten()) / 
+                        np.dot(pose_embedding, known_pose_emb) / 
                         (np.linalg.norm(pose_embedding) * np.linalg.norm(known_pose_emb)))
             
-            # Combine similarities with weights
-            combined_score = 0.7 * face_similarity + 0.3 * pose_similarity
+            # Combine similarities with adjusted weights
+            # Increased weight for pose similarity since it's more reliable now
+            combined_score = 0.6 * face_similarity + 0.4 * pose_similarity
             
             if combined_score > best_score and combined_score > DISTANCE_THRESHOLD:
                 best_score = combined_score
@@ -221,34 +180,6 @@ def process_frame(frame, known_embeddings):
     return matches
 
 
-def draw_utf8_text(img, text, pos, font_size, color):
-    """Draw UTF-8 text on an image.
-
-    Args:
-        img (ndarray): Image to draw on.
-        text (str): Text to draw.
-        pos (tuple): Position to draw the text.
-        font_size (int): Font size.
-        color (str): Color of the text.
-    """
-    try:
-        # Convert OpenCV image (BGR) to PIL image (RGB)
-        pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        draw = ImageDraw.Draw(pil_img)
-
-        # Load the font
-        font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
-        font = ImageFont.truetype(font_path, font_size)
-
-        # Draw the text
-        draw.text(pos, text, font=font, fill=color)
-
-        # Convert back to OpenCV image (BGR)
-        img[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-    except Exception as e:
-        print(f"Error drawing text: {e}")
-
-
 def draw_boxes_and_labels(frame, matches, timestamp):
     """Draw bounding boxes and labels on the frame.
 
@@ -277,19 +208,19 @@ def draw_boxes_and_labels(frame, matches, timestamp):
             ]
             # Draw enlarged rectangle
             draw.rectangle(bbox_enlarged, outline="green", width=3)
-            # Increase font size even more
-            larger_font = ImageFont.truetype(font_path, 60)  # Increased from 40 to 60
+            # Increase font size
+            larger_font = ImageFont.truetype(font_path, 60)
             # Draw text with increased size
             text_bbox = draw.textbbox(
                 (bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font
-            )  # Adjusted y-coordinate
+            )
             draw.rectangle(text_bbox, fill="green")
             draw.text(
                 (bbox_enlarged[0], bbox_enlarged[1] - 65),
                 name,
                 font=larger_font,
                 fill="white",
-            )  # Adjusted y-coordinate
+            )
 
         # Define font size and color for timestamp
         timestamp_font = ImageFont.truetype(font_path, 40)
@@ -298,7 +229,7 @@ def draw_boxes_and_labels(frame, matches, timestamp):
         # Get image dimensions
         img_width, img_height = pil_img.size
 
-        # Calculate position for timestamp (10 pixels from the bottom-right corner)
+        # Calculate position for timestamp
         text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
@@ -312,31 +243,7 @@ def draw_boxes_and_labels(frame, matches, timestamp):
         return frame
     except Exception as e:
         print(f"Error drawing boxes and labels: {e}")
-        return frame  # Ensure frame is returned even if an error occurs
-
-
-def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
-    """Create a GIF from a list of frame paths.
-
-    Args:
-        frame_paths (list): List of frame file paths.
-        output_gif_path (str): Path to save the output GIF.
-        duration (int, optional): Duration for each frame in seconds. Defaults to 0.5.
-    """
-    images = []
-    for frame_path in frame_paths:
-        img = Image.open(frame_path)
-        images.append(img)
-
-    # Save the frames as an animated GIF
-    images[0].save(
-        output_gif_path,
-        save_all=True,
-        append_images=images[1:],
-        duration=duration * 1000,
-        loop=0,
-    )
-    print(f"GIF saved to {output_gif_path}")
+        return frame
 
 
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
@@ -363,11 +270,9 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
         output_dir = os.path.join(project_root, "output_frames", video_file)
         os.makedirs(output_dir, exist_ok=True)
 
-        labeled_frames = []  # List to store paths of frames with labels
+        labeled_frames = []
 
-        with tqdm(
-            total=total_frames, desc=f"Frames in {video_file}", leave=False
-        ) as pbar:
+        with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -448,47 +353,6 @@ def select_items(options, item_type):
     ]
     selected_items = [options[i] for i in selected_indices if 0 <= i < len(options)]
     return selected_items
-
-
-def get_contestant_image(contestants_dir, contestant, contestant_info):
-    """Retrieve the image path for a contestant.
-
-    Args:
-        contestants_dir (str): Directory containing contestant images.
-        contestant (str): Contestant name.
-        contestant_info (DataFrame): DataFrame with contestant information.
-
-    Returns:
-        str: Path to the contestant's image or None if not found.
-    """
-    contestant_number = contestant_info.loc[
-        contestant_info["暱稱"] == contestant, "編號"
-    ].values[0]
-    contestant_path = os.path.join(contestants_dir, str(contestant_number))
-    image_paths = get_image_paths(contestant_path)
-    if image_paths:
-        return image_paths[0]
-    return None
-
-
-def compute_face_embedding(image_path):
-    """Compute the face embedding for a given image.
-
-    Args:
-        image_path (str): Path to the image.
-
-    Returns:
-        ndarray: Face embedding or None if no face detected.
-    """
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"Error reading image {image_path}.")
-        return None
-    
-    faces = app.get(img)
-    if len(faces) > 0:
-        return faces[0].normed_embedding
-    return None
 
 
 def get_contestant_embeddings(contestants_dir, contestant, contestant_info):
