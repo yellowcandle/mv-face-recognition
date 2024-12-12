@@ -1,6 +1,5 @@
 import yt_dlp
 import os
-import subprocess
 
 # List of videos to download
 url_list = {

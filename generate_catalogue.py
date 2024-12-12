@@ -30,7 +30,7 @@ def load_recognition_results(csv_path):
             name = row["Name"]
 
             # Generate the new filename pattern
-            frame_pattern = f"frame_*.jpg"
+            frame_pattern = "frame_*.jpg"
 
             # Get all frame files in the video directory
             video_dir = os.path.join(OUTPUT_FRAMES_DIR, video)

@@ -13,5 +13,12 @@ dependencies = [
     "numpy",
     "pandas>=2.1.1",
     "pillow>=10.4.0",
-    "tqdm>=4.66.5"
+    "tqdm>=4.66.5",
+    "segment-anything",
+    "torch",
+    "torchvision",
+    "supervision",
+    "ruff",
+    "yt-dlp",
+    "moviepy"
 ]
