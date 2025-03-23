@@ -1,0 +1,691 @@
+╭───────────────────────────────────────────────────────────────────────────────────── Face Recognition System ─────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                                                                                                   │
+│  Unified Face Recognition System                                                                                                                                                                  │
+│  Process videos to recognize faces                                                                                                                                                                │
+│                                                                                                                                                                                                   │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+/Users/swong/miniconda/lib/python3.12/site-packages/insightface/utils/transform.py:68: FutureWarning: `rcond` parameter will change to the default of machine precision times ``max(M, N)`` where M and N are the input matrix dimensions.
+To use the future default and silence this warning we advise to pass `rcond=None`, to keep using the old, explicitly pass `rcond=-1`.
+  P = np.linalg.lstsq(X_homo, Y)[0].T # Affine matrix. 3 x 4
+2025-03-23 15:27:45,987 - WARNING - Add of existing embedding ID: Ivy So_0
+2025-03-23 15:27:45,987 - WARNING - Add of existing embedding ID: 咖喱_0
+2025-03-23 15:27:45,987 - WARNING - Add of existing embedding ID: Marf_0
+2025-03-23 15:27:45,987 - WARNING - Add of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: 莎莎_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Hannah_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Catrina_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: 小砂_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Carmina_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Zoe_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Dru_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Sica_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Ashi_0
+2025-03-23 15:27:45,988 - WARNING - Add of existing embedding ID: Elka_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Carina_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 子涓_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 筠兒_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Karen_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ling_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 暐翹_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 陳祖_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ariel_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Emiko_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: WINKA_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Candy_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Emi_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Caca_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿杰_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Kay_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿妹_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: CK_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ana_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 精靈_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Puipui_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Gao_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Stella_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 芯駖_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Man C_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 2Ling_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Tengie_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ace_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Yanny_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Jolin_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Bubu_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Sinnie_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 丁丁_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Miko_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 舒文_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 米線_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ariels_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Kinki_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Win Win_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 燒賣_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 榛綦_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 露髀_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Vicky_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Sam_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Sarah_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿 J_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 東東_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 家琪_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ika_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Tania_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: So Ching_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: May May_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Winkie_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: TABI_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 馬欣_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 超酸_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 方方_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: Ash_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:45,989 - WARNING - Add of existing embedding ID: 何佩_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: VAL_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Michelle_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Yoyo_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Jackie_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 安希婷_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Christine_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Day_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Yanis_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Alice_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 3 妹_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ivy So_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 咖喱_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Marf_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 莎莎_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Hannah_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Catrina_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 小砂_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Carmina_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Zoe_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Dru_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Sica_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ashi_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Elka_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Carina_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 子涓_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 筠兒_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Karen_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ling_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 暐翹_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 陳祖_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ariel_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Emiko_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: WINKA_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Candy_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Emi_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Caca_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 阿杰_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Kay_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 阿妹_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: CK_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ana_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 精靈_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Puipui_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Gao_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Stella_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 芯駖_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Man C_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: 2Ling_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Tengie_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:45,990 - WARNING - Add of existing embedding ID: Ace_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Yanny_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Jolin_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Bubu_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Sinnie_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 丁丁_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Miko_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 舒文_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 米線_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ariels_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Kinki_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Win Win_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 燒賣_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 榛綦_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 露髀_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Vicky_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Sam_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Sarah_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿 J_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 東東_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 家琪_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ika_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Tania_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: So Ching_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: May May_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Winkie_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: TABI_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 馬欣_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 超酸_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 方方_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ash_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 何佩_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: VAL_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Michelle_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Yoyo_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Jackie_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 安希婷_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Christine_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Day_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Yanis_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Alice_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 3 妹_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ivy So_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 咖喱_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Marf_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 莎莎_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Hannah_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Catrina_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 小砂_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Carmina_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Zoe_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Dru_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Sica_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ashi_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Elka_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Carina_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 子涓_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 筠兒_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Karen_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ling_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 暐翹_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: 陳祖_0
+2025-03-23 15:27:45,991 - WARNING - Add of existing embedding ID: Ariel_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Emiko_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: WINKA_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Candy_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Emi_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Caca_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿杰_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Kay_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿妹_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: CK_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ana_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 精靈_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Puipui_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Gao_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Stella_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 芯駖_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Man C_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 2Ling_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Tengie_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ace_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Yanny_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Jolin_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Bubu_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Sinnie_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 丁丁_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Miko_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 舒文_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 米線_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ariels_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Kinki_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Win Win_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 燒賣_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 榛綦_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 露髀_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Vicky_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Sam_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Sarah_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿 J_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 東東_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 家琪_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ika_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Tania_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: So Ching_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: May May_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Winkie_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: TABI_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 馬欣_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 超酸_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 方方_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ash_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 何佩_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: VAL_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Michelle_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Yoyo_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Jackie_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 安希婷_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Christine_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Day_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Yanis_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Alice_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: 3 妹_0
+2025-03-23 15:27:45,992 - WARNING - Add of existing embedding ID: Ivy So_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 咖喱_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Marf_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 莎莎_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Hannah_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Catrina_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 小砂_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Carmina_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Zoe_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Dru_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Sica_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ashi_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Elka_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Carina_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 子涓_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 筠兒_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Karen_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ling_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 暐翹_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 陳祖_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ariel_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Emiko_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: WINKA_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Candy_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Emi_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Caca_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 阿杰_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Kay_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 阿妹_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: CK_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ana_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 精靈_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Puipui_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Gao_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Stella_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 芯駖_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Man C_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 2Ling_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Tengie_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ace_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Yanny_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Jolin_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Bubu_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Sinnie_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 丁丁_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Miko_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 舒文_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 米線_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ariels_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Kinki_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Win Win_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 燒賣_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 榛綦_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 露髀_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Vicky_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Sam_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Sarah_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 阿 J_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 東東_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: 家琪_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Ika_0
+2025-03-23 15:27:45,993 - WARNING - Add of existing embedding ID: Tania_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: So Ching_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: May May_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Winkie_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: TABI_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 馬欣_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 超酸_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 方方_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Ash_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 何佩_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: VAL_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Michelle_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Yoyo_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Jackie_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 安希婷_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Christine_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Day_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Yanis_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: Alice_0
+2025-03-23 15:27:45,994 - WARNING - Add of existing embedding ID: 3 妹_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Ivy So_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 咖喱_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Marf_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 莎莎_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Hannah_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Catrina_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 小砂_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Carmina_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Zoe_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Dru_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Sica_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Ashi_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Elka_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Carina_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 子涓_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 筠兒_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Karen_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: Ling_0
+2025-03-23 15:27:45,999 - WARNING - Add of existing embedding ID: 暐翹_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 陳祖_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ariel_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Emiko_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: WINKA_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Candy_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Emi_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Caca_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿杰_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Kay_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿妹_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: CK_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ana_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 精靈_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Puipui_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Gao_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Stella_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 芯駖_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Man C_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 2Ling_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Tengie_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ace_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Yanny_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Jolin_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Bubu_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Sinnie_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 丁丁_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Miko_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 舒文_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 米線_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ariels_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Kinki_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Win Win_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 燒賣_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 榛綦_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 露髀_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Vicky_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Sam_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Sarah_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿 J_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 東東_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 家琪_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ika_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Tania_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: So Ching_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: May May_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Winkie_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: TABI_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 馬欣_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 超酸_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 方方_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Ash_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 何佩_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: VAL_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Michelle_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Yoyo_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Jackie_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 安希婷_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Christine_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Day_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Yanis_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: Alice_0
+2025-03-23 15:27:46,000 - WARNING - Add of existing embedding ID: 3 妹_0
+2025-03-23 15:27:46,000 - WARNING - Insert of existing embedding ID: Ivy So_0
+2025-03-23 15:27:46,000 - WARNING - Insert of existing embedding ID: 咖喱_0
+2025-03-23 15:27:46,000 - WARNING - Insert of existing embedding ID: Marf_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 穎蕎_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 莎莎_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Hannah_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Catrina_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 小砂_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Carmina_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Zoe_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Dru_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Sica_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Ashi_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Elka_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Carina_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 子涓_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 阿蛋_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 蘇菲_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 筠兒_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Karen_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Ling_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 暐翹_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: 陳祖_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Ariel_0
+2025-03-23 15:27:46,001 - WARNING - Insert of existing embedding ID: Emiko_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: WINKA_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Ada 仔_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Candy_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Emi_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Caca_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: 阿杰_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Kay_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: 阿妹_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: CK_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Ana_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: 精靈_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Puipui_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Gao_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Stella_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: 芯駖_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Man C_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: 2Ling_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Tengie_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Mei Mei_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Jade Chan_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Chloe Au_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Ace_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Yanny_0
+2025-03-23 15:27:46,002 - WARNING - Insert of existing embedding ID: Jolin_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 鐵鐵_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Bubu_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Sinnie_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 丁丁_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Miko_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 舒文_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 米線_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Ariels_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Kinki_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 嘉嘉_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Win Win_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 燒賣_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 榛綦_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 露髀_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Vicky_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 阿 Wing_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Sam_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Sarah_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 阿 J_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 鉦貽_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 東東_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: 家琪_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Ika_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: Tania_0
+2025-03-23 15:27:46,003 - WARNING - Insert of existing embedding ID: So Ching_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: May May_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Winkie_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: TABI_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 馬欣_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 超酸_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 方方_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Ash_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 阿 Mic_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 何佩_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: VAL_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 阿 bee_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Michelle_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Yoyo_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Jackie_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 安希婷_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Christine_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Day_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 阿 Yo_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Liu 哥_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Yanis_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: Alice_0
+2025-03-23 15:27:46,004 - WARNING - Insert of existing embedding ID: 3 妹_0
+/Users/swong/miniconda/lib/python3.12/site-packages/insightface/utils/transform.py:68: FutureWarning: `rcond` parameter will change to the default of machine precision times ``max(M, N)`` where M and N are the input matrix dimensions.
+To use the future default and silence this warning we advise to pass `rcond=None`, to keep using the old, explicitly pass `rcond=-1`.
+  P = np.linalg.lstsq(X_homo, Y)[0].T # Affine matrix. 3 x 4
+Detection Backend: DetectorBackend.INSIGHTFACE
+Recognition Backend: RecognizerBackend.CHROMADB
+Distance Threshold: 0.4
+Frame Skip: 5
+Parallel Processing: Enabled
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+find model: /Users/swong/.insightface/models/buffalo_l/1k3d68.onnx landmark_3d_68 ['None', 3, 192, 192] 0.0 1.0
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+find model: /Users/swong/.insightface/models/buffalo_l/2d106det.onnx landmark_2d_106 ['None', 3, 192, 192] 0.0 1.0
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+find model: /Users/swong/.insightface/models/buffalo_l/det_10g.onnx detection [1, 3, '?', '?'] 127.5 128.0
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+find model: /Users/swong/.insightface/models/buffalo_l/genderage.onnx genderage ['None', 3, 96, 96] 0.0 1.0
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+find model: /Users/swong/.insightface/models/buffalo_l/w600k_r50.onnx recognition ['None', 3, 112, 112] 127.5 127.5
+set det-size: (320, 320)
+Initialized InsightFace detector with device: cpu
+Using model: arcface_r50.onnx
+Using specified model: /Users/swong/dev/mv-face-recognition/models/arcface_r50.onnx
+Available providers: ['CoreMLExecutionProvider', 'AzureExecutionProvider', 'CPUExecutionProvider']
+Applied providers: ['CPUExecutionProvider'], with options: {'CPUExecutionProvider': {}}
+Primary model failed, trying fallback model: /Users/swong/dev/mv-face-recognition/models/face_recognition_sface.onnx
+Initialized face recognition model: /Users/swong/dev/mv-face-recognition/models/face_recognition_sface.onnx
+Model input shape: [1, 3, 112, 112], using size: 112x112
+Loaded existing ChromaDB collection 'face_embeddings' with 96 embeddings
+Enabled in-memory match caching
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(uint8)) , expected: (tensor(float))
+Pre-warmed recognition model
+Preloading and optimizing cache...
+Pre-processing 2 test images...
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Processed: original.jpeg - found 2 faces
+No faces found in: result.jpeg
+Selected 96 contestants.
+Using ChromaDB for face recognition
+Loaded embeddings for 96 contestants
+Detected ChromaDB collection dimensionality: 128
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Selected 4 videos.
+Processing video: v1.mp4
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+Embedding dimension mismatch: embedding has 512 dims, collection requires 128
+Truncated embedding from 512 to 128 dimensions
+Error computing embedding: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))

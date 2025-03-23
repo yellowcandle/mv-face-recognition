@@ -26,41 +26,51 @@ export ARCHFLAGS="-arch arm64"
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
 
-# Try installing with a pre-built wheel first (avoiding compilation)
-echo "Trying to install insightface without compilation..."
-uv pip install --only-binary=:all: insightface
+# Detect Python version
+PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo "Detected Python version: $PYTHON_VERSION"
 
-# If that fails, install the dependencies first
+# Install dependencies first using pip directly for maximum compatibility
+echo "Installing core dependencies..."
+pip install -U pip
+pip install numpy==1.26.0 scipy scikit-learn scikit-image opencv-python-headless onnx
+
+# For macOS, we need regular onnxruntime (not GPU version) and a specific build for insightface
+echo "Installing onnxruntime for macOS..."
+pip install onnxruntime
+
+# Try installing insightface using pip directly
+echo "Installing insightface with pip..."
+pip install insightface
+
+# If that fails, try with specific version and build approach
 if [ $? -ne 0 ]; then
-    echo "Installing dependencies first..."
-    uv pip install numpy==1.26.0 scipy scikit-learn scikit-image opencv-python-headless
-    uv pip install onnxruntime
+    echo "First attempt failed. Trying with direct GitHub installation..."
+    pip install git+https://github.com/deepinsight/insightface.git@master
     
-    # Try installing an older version that might be more compatible
-    echo "Attempting to install insightface 0.6.0..."
-    uv pip install insightface==0.6.0
+    # If still failing, try an older version
+    if [ $? -ne 0 ]; then
+        echo "Trying older compatible version..."
+        pip install insightface==0.7.0
+    fi
 fi
 
-# If that fails, try using pip directly
-if [ $? -ne 0 ]; then
-    echo "Trying with system pip..."
-    pip install insightface==0.6.0
+# Try PP-compatible installation if available
+which python -m pip >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Trying installation with Python project (PP)..."
+    python -m pip install --compile insightface
 fi
 
-# If that also fails, try with a more specific approach
-if [ $? -ne 0 ]; then
-    echo "Trying alternative installation with modified build settings..."
-    pip install Cython
-    pip install --no-binary=:all: insightface==0.6.0
+# Check if we have uv available as a fallback
+which uv >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Trying installation with uv as fallback..."
+    uv pip install --build insightface
 fi
 
-# Last resort: try a minimal direct installation that skips some dependencies
-if [ $? -ne 0 ]; then
-    echo "Trying minimal installation..."
-    pip install --no-deps insightface==0.6.0
-    echo "Installing basic dependencies separately..."
-    pip install onnx opencv-python scikit-image
-fi
-
-echo "Installation attempt complete. Please check if insightface is now working."
-echo "If not, consider using a Conda environment which may handle the compilation issues better."
+# Verify installation
+echo "Verifying installation..."
+python -c "import insightface; print(f'Successfully installed insightface {insightface.__version__}')" && \
+  echo " Installation successful!" || \
+  echo "Installation verification failed. You may need to try a conda environment instead."

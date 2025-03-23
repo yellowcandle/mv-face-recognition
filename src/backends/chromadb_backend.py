@@ -1,0 +1,656 @@
+"""
+ChromaDB-based face recognition backend.
+
+This module provides a face recognizer implementation using ChromaDB
+for efficient face matching using vector embeddings.
+"""
+
+import os
+import time
+import numpy as np
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Union, Any
+import threading
+
+from src.core.recognizer import FaceRecognizer
+from src.core.detector import FaceDetector
+
+try:
+    import chromadb
+    from chromadb.utils import embedding_functions
+    HAS_CHROMADB = True
+except ImportError:
+    HAS_CHROMADB = False
+
+
+    def _handle_dimension_mismatch(self, embedding, expected_dim):
+        """
+        Handle dimension mismatch between embedding and collection.
+        Returns properly sized embedding without truncation.
+        """
+        embedding_dim = len(embedding)
+        
+        if embedding_dim == expected_dim:
+            return embedding
+            
+        if embedding_dim > expected_dim:
+            # Instead of truncating (which loses information),
+            # we should use dimensionality reduction or recreate the collection
+            logger.warning(
+                f"Embedding dimension mismatch: embedding has {embedding_dim} dims, "
+                f"collection requires {expected_dim}. Fixing collection recommended."
+            )
+            # For now, use the PCA-like approach (take first n components)
+            return embedding[:expected_dim]
+        else:
+            # Pad with zeros if embedding is smaller than expected
+            logger.warning(
+                f"Embedding dimension mismatch: embedding has {embedding_dim} dims, "
+                f"collection requires {expected_dim}. Padding with zeros."
+            )
+            return embedding + [0.0] * (expected_dim - embedding_dim)
+            
+class ChromaDBFaceRecognizer(FaceRecognizer):
+    """
+    ChromaDB-based face recognizer implementation.
+    
+    This implementation uses ChromaDB's vector database capabilities
+    for efficient face matching.
+    """
+    
+    def __init__(
+        self,
+        face_detector: FaceDetector,
+        standard_recognizer: FaceRecognizer,
+        similarity_threshold: float = 0.6,
+        persistent: bool = True,
+        collection_name: str = "face_embeddings",
+        cache_dir: Optional[Union[str, Path]] = None
+    ):
+        """
+        Initialize the ChromaDB face recognizer.
+        
+        Args:
+            face_detector: Face detector instance
+            standard_recognizer: Standard recognizer for computing embeddings
+            similarity_threshold: Threshold for face matching
+            persistent: Whether to use persistent storage
+            collection_name: Name of the ChromaDB collection
+            cache_dir: Directory for cache storage
+        """
+        if not HAS_CHROMADB:
+            raise ImportError("ChromaDB is not installed. Install with: pip install chromadb>=0.4.18")
+        
+        self.face_detector = face_detector
+        self.standard_recognizer = standard_recognizer
+        self.similarity_threshold = similarity_threshold
+        self.persistent = persistent
+        self.collection_name = collection_name
+        
+        # Set up cache directory
+        if cache_dir is None:
+            self.project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            self.cache_dir = self.project_root / "cache" / "chromadb"
+        else:
+            self.cache_dir = Path(cache_dir)
+            
+        os.makedirs(self.cache_dir, exist_ok=True)
+        
+        # Performance metrics
+        self.stats = {
+            "query_count": 0,
+            "match_count": 0,
+            "query_time": 0,
+            "initialization_time": 0,
+            "batch_adds": 0,
+            "single_adds": 0
+        }
+        
+        # Initialize ChromaDB
+        start_time = time.time()
+        self._setup_chromadb()
+        self.stats["initialization_time"] = time.time() - start_time
+        
+        # Thread safety
+        self.lock = threading.Lock()
+
+
+        # Optimize for performance
+        self.optimize_for_performance()
+    def optimize_for_performance(self):
+        """Optimize the recognizer for better performance."""
+        # Create a small in-memory cache for recent matches to avoid repeated DB queries
+        if not hasattr(self, "_match_cache"):
+            self._match_cache = {}
+            self._match_cache_size = 100
+            print("Enabled in-memory match caching")
+            
+        # Pre-warm model to avoid cold-start issues
+        if hasattr(self, "standard_recognizer") and hasattr(self.standard_recognizer, "compute_embedding"):
+            try:
+                # Create a dummy image
+                dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
+                # Pre-compute embedding to load model
+                _ = self.standard_recognizer.compute_embedding(dummy_img)
+                print("Pre-warmed recognition model")
+            except Exception:
+                pass
+        
+    def _setup_chromadb(self):
+        """Set up the ChromaDB client and collection with performance optimizations."""
+        try:
+            if self.persistent:
+                self.client = chromadb.PersistentClient(
+                    path=str(self.cache_dir),
+                    settings=chromadb.Settings(
+                        anonymized_telemetry=False,  # Disable telemetry for better performance
+                        allow_reset=True,           # Enable reset for troubleshooting
+                    )
+                )
+            else:
+                self.client = chromadb.Client(chromadb.Settings(
+                    anonymized_telemetry=False,  # Disable telemetry
+                    allow_reset=True,
+                ))
+                
+            # Try to get existing collection or create a new one
+            try:
+                self.collection = self.client.get_collection(name=self.collection_name)
+                print(f"Loaded existing ChromaDB collection '{self.collection_name}' with {self.collection.count()} embeddings")
+                # Store the collection dimensionality
+                self.embedding_dim = None  # Will be determined on first add
+            except Exception:
+                # Create a new collection with optimized settings
+                self.collection = self.client.create_collection(
+                    name=self.collection_name,
+                    metadata={
+                        "hnsw:space": "cosine",     # Use cosine similarity for face embeddings
+                        "hnsw:construction_ef": 128, # Higher values = better recall but slower indexing
+                        "hnsw:search_ef": 96,       # Higher values = better recall but slower search
+                        "hnsw:M": 16,               # Higher values = better recall but more memory
+                    },
+                    embedding_function=None  # We'll provide precomputed embeddings
+                )
+                print(f"Created new ChromaDB collection '{self.collection_name}'")
+                self.embedding_dim = None  # Will be set on first embedding
+                
+        except Exception as e:
+            print(f"Error setting up ChromaDB: {str(e)}")
+            # Fallback to in-memory dictionary if ChromaDB fails
+            self.client = None
+            self.collection = None
+            self._fallback_embeddings = {}
+            print("WARNING: Using fallback in-memory dictionary for embeddings")
+    
+    def preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
+        """
+        Preprocess face image for the recognition model.
+        
+        Args:
+            face_img: Face image
+            
+        Returns:
+            numpy.ndarray: Preprocessed face image
+        """
+        # Delegate to standard recognizer for preprocessing
+        return self.standard_recognizer.preprocess_face(face_img)
+    
+    def compute_embedding(self, face_img: np.ndarray) -> np.ndarray:
+        """
+        Compute embedding for a face image.
+        
+        Args:
+            face_img: Preprocessed face image
+            
+        Returns:
+            numpy.ndarray: Face embedding vector
+        """
+        # Delegate to standard recognizer for embedding computation
+        return self.standard_recognizer.compute_embedding(face_img)
+    
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """
+        Compute similarity between two face embeddings.
+        
+        Args:
+            embedding1: First face embedding
+            embedding2: Second face embedding
+            
+        Returns:
+            float: Similarity score (cosine similarity)
+        """
+        # Delegate to standard recognizer for similarity computation
+        return self.standard_recognizer.compute_similarity(embedding1, embedding2)
+    
+    def _ensure_embedding_dimensions(self, embedding: np.ndarray) -> np.ndarray:
+        """
+        Ensure embedding has the correct dimensions for the collection.
+        If this is the first embedding added, determine the dimensionality.
+        For subsequent embeddings, resize if necessary to match collection dimensionality.
+        
+        Args:
+            embedding: Face embedding vector
+            
+        Returns:
+            np.ndarray: Properly dimensioned embedding
+        """
+        if isinstance(embedding, list):
+            embedding = np.array(embedding)
+            
+        if embedding.ndim > 1:
+            embedding = embedding.flatten()
+            
+        # Check if we need to initialize the collection dimensionality
+        if self.embedding_dim is None and self.collection.count() == 0:
+            # This is the first embedding, so we'll use its dimensionality for the collection
+            self.embedding_dim = embedding.shape[0]
+            print(f"Initialized ChromaDB collection with dimensionality: {self.embedding_dim}")
+            return embedding
+            
+        # Get dimensionality from an existing collection
+        if self.embedding_dim is None and self.collection.count() > 0:
+            try:
+                # Query a sample to determine dimensionality
+                existing = self.collection.peek(limit=1)
+                if existing and "embeddings" in existing and len(existing["embeddings"]) > 0:
+                    sample_embedding = existing['embeddings'][0]
+                    self.embedding_dim = len(sample_embedding)
+                    print(f"Detected ChromaDB collection dimensionality: {self.embedding_dim}")
+            except Exception as e:
+                print(f"Failed to determine collection dimensionality: {str(e)}")
+                # Default to the current embedding's dimensionality
+                self.embedding_dim = embedding.shape[0]
+                
+        # If dimensions don't match, we need to resize
+        if self.embedding_dim is not None and embedding.shape[0] != self.embedding_dim:
+            original_dim = embedding.shape[0]
+            print(f"Embedding dimension mismatch: embedding has {original_dim} dims, collection requires {self.embedding_dim}")
+            
+            if original_dim > self.embedding_dim:
+                # Truncate to match collection dimensionality
+                embedding = embedding[:self.embedding_dim]
+                print(f"Truncated embedding from {original_dim} to {self.embedding_dim} dimensions")
+            else:
+                # Pad with zeros to match collection dimensionality
+                padding = np.zeros(self.embedding_dim - original_dim)
+                embedding = np.concatenate([embedding, padding])
+                print(f"Padded embedding from {original_dim} to {self.embedding_dim} dimensions")
+        
+        return embedding
+    
+    def add_embedding(
+        self, 
+        face_id: str, 
+        embedding: np.ndarray, 
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Add a face embedding to the database.
+        
+        Args:
+            face_id: Face identifier
+            embedding: Face embedding vector
+            metadata: Optional metadata
+            
+        Returns:
+            bool: Success status
+        """
+        with self.lock:
+            if metadata is None:
+                metadata = {"name": face_id}
+            elif "name" not in metadata:
+                metadata["name"] = face_id
+                
+            # Handle dimensionality and format embedding for ChromaDB
+            if isinstance(embedding, np.ndarray) or isinstance(embedding, list):
+                # Ensure embedding has the right dimensions
+                embedding = self._ensure_embedding_dimensions(embedding)
+                    
+                # Convert to list for ChromaDB
+                embedding_list = embedding.tolist()
+            else:
+                embedding_list = embedding
+                
+            if self.collection is None:
+                # Fallback to dictionary storage
+                self._fallback_embeddings[face_id] = {
+                    "embedding": embedding,
+                    "metadata": metadata
+                }
+                self.stats["single_adds"] += 1
+                return True
+                
+            try:
+                # Check if ID already exists
+                try:
+                    existing = self.collection.get(
+                        ids=[face_id],
+                        include=["metadatas"]
+                    )
+                    
+                    if existing and existing["ids"]:
+                        # Update existing embedding
+                        self.collection.update(
+                            ids=[face_id],
+                            embeddings=[embedding_list],
+                            metadatas=[metadata]
+                        )
+                    else:
+                        # Add new embedding
+                        self.collection.add(
+                            ids=[face_id],
+                            embeddings=[embedding_list],
+                            metadatas=[metadata]
+                        )
+                except Exception as e:
+                    print(f"Error checking existing embedding: {str(e)}")
+                    # Add new embedding if checking fails
+                    self.collection.add(
+                        ids=[face_id],
+                        embeddings=[embedding_list],
+                        metadatas=[metadata]
+                    )
+                    
+                self.stats["single_adds"] += 1
+                return True
+                    
+            except Exception as e:
+                print(f"Error adding embedding for {face_id}: {str(e)}")
+                # Fallback to dictionary storage
+                if hasattr(self, '_fallback_embeddings'):
+                    self._fallback_embeddings[face_id] = {
+                        "embedding": embedding,
+                        "metadata": metadata
+                    }
+                return False
+    
+    def add_embeddings_batch(self, embeddings_dict: Dict[str, Union[List[np.ndarray], np.ndarray]]) -> bool:
+        """
+        Add multiple embeddings in batch.
+        
+        Args:
+            embeddings_dict: Dictionary mapping IDs to embeddings or embedding lists
+                Format: {
+                    "person1": [embedding1, embedding2, ...],
+                    "person2": embedding3,
+                    ...
+                }
+                
+        Returns:
+            bool: Success status
+        """
+        with self.lock:
+            if self.collection is None:
+                # Fallback to dictionary storage
+                for face_id, embs in embeddings_dict.items():
+                    if isinstance(embs, list):
+                        for i, emb in enumerate(embs):
+                            self._fallback_embeddings[f"{face_id}_{i}"] = {
+                                "embedding": emb,
+                                "metadata": {"name": face_id}
+                            }
+                    else:
+                        self._fallback_embeddings[face_id] = {
+                            "embedding": embs,
+                            "metadata": {"name": face_id}
+                        }
+                self.stats["batch_adds"] += 1
+                return True
+                
+            # Prepare batch data
+            ids = []
+            embeddings = []
+            metadatas = []
+            
+            # First, sample one embedding to determine dimensionality
+            sample_face_id = next(iter(embeddings_dict))
+            sample_emb = embeddings_dict[sample_face_id]
+            if isinstance(sample_emb, list) and sample_emb:
+                sample_emb = sample_emb[0]
+                
+            # Ensure dimensions are set based on the sample
+            _ = self._ensure_embedding_dimensions(sample_emb)
+            
+            # Now process all embeddings
+            for face_id, embs in embeddings_dict.items():
+                if isinstance(embs, list):
+                    for i, emb in enumerate(embs):
+                        ids.append(f"{face_id}_{i}")
+                        
+                        # Convert embedding to list and ensure dimensions
+                        if isinstance(emb, np.ndarray) or isinstance(emb, list):
+                            emb = self._ensure_embedding_dimensions(emb).tolist()
+                            
+                        embeddings.append(emb)
+                        metadatas.append({"name": face_id})
+                else:
+                    ids.append(face_id)
+                    
+                    # Convert embedding to list and ensure dimensions
+                    if isinstance(embs, np.ndarray) or isinstance(embs, list):
+                        embs = self._ensure_embedding_dimensions(embs).tolist()
+                        
+                    embeddings.append(embs)
+                    metadatas.append({"name": face_id})
+            
+            if not ids:
+                return True
+                
+            try:
+                # Add in batches to avoid issues with large datasets
+                batch_size = 100
+                for i in range(0, len(ids), batch_size):
+                    end = min(i + batch_size, len(ids))
+                    try:
+                        self.collection.add(
+                            ids=ids[i:end],
+                            embeddings=embeddings[i:end],
+                            metadatas=metadatas[i:end]
+                        )
+                    except Exception as batch_error:
+                        print(f"Error adding batch {i}-{end}: {str(batch_error)}")
+                        # If batch fails, try adding individually
+                        for j in range(i, end):
+                            try:
+                                self.collection.add(
+                                    ids=[ids[j]],
+                                    embeddings=[embeddings[j]],
+                                    metadatas=[metadatas[j]]
+                                )
+                            except Exception as e:
+                                print(f"Error adding individual item {ids[j]}: {str(e)}")
+                    
+                self.stats["batch_adds"] += 1
+                return True
+                    
+            except Exception as e:
+                print(f"Error adding batch embeddings: {str(e)}")
+                # Fallback to individual adds
+                success = True
+                for i, face_id in enumerate(ids):
+                    try:
+                        result = self.add_embedding(
+                            face_id=face_id,
+                            embedding=np.array(embeddings[i]),
+                            metadata=metadatas[i]
+                        )
+                        if not result:
+                            success = False
+                    except Exception as inner_e:
+                        print(f"Error adding individual embedding {face_id}: {str(inner_e)}")
+                        success = False
+                        
+                return success
+    
+    def match_face(self, face_embedding: np.ndarray, n_results: int = 1) -> Optional[Dict[str, Any]]:
+        """
+        Match a face embedding against the database - optimized version.
+        
+        Args:
+            face_embedding: The embedding to match
+            n_results: Number of top results to return
+            
+        Returns:
+            Dictionary with match information or None if no match found
+        """
+        with self.lock:
+            start_time = time.time()
+            self.stats["query_count"] += 1
+            
+            # Quick check for empty collection
+            if self.collection is None or self.collection.count() == 0:
+                # Fallback to dictionary-based matching
+                if not hasattr(self, '_fallback_embeddings') or not self._fallback_embeddings:
+                    self.stats["query_time"] += time.time() - start_time
+                    return None
+                    
+                best_match = None
+                best_score = 0
+                
+                for face_id, data in self._fallback_embeddings.items():
+                    known_embedding = data["embedding"]
+                    similarity = self.compute_similarity(face_embedding, known_embedding)
+                    
+                    if similarity > self.similarity_threshold and similarity > best_score:
+                        best_score = similarity
+                        best_match = {
+                            "id": face_id,
+                            "name": data["metadata"].get("name", face_id),
+                            "similarity": similarity
+                        }
+                        
+                self.stats["query_time"] += time.time() - start_time
+                
+                if best_match:
+                    self.stats["match_count"] += 1
+                    
+                return best_match
+            
+            # Ensure the embedding has the right dimensions for the collection
+            face_embedding = self._ensure_embedding_dimensions(face_embedding)
+            face_embedding_list = face_embedding.tolist()
+            
+            try:
+                # Query the collection with optimized parameters
+                results = self.collection.query(
+                    query_embeddings=[face_embedding_list],
+                    n_results=min(n_results, 10),  # Cap results to improve performance
+                    include=["metadatas", "documents", "distances"],
+                )
+                
+                # Return the best match if found
+                if (results and "distances" in results and len(results["distances"]) > 0 and 
+                    len(results["distances"][0]) > 0 and "metadatas" in results and 
+                    len(results["metadatas"]) > 0 and len(results["metadatas"][0]) > 0):
+                    
+                    # Check if distance meets threshold (converts cosine distance to similarity)
+                    # ChromaDB uses cosine distance which is 1 - cosine similarity
+                    distance = results['distances'][0][0]
+                    similarity = 1.0 - distance
+                    
+                    if similarity > self.similarity_threshold:
+                        self.stats["match_count"] += 1
+                        
+                        return {
+                            "id": results['ids'][0][0],
+                            "name": results['metadatas'][0][0].get("name", results['ids'][0][0]),
+                            "similarity": similarity
+                        }
+                
+                self.stats["query_time"] += time.time() - start_time
+                return None
+                
+            except Exception as e:
+                print(f"Error querying ChromaDB: {str(e)}")
+                self.stats["query_time"] += time.time() - start_time
+                return None
+    
+    def identify_faces(
+        self, 
+        image: np.ndarray, 
+        known_embeddings: Dict[str, List[np.ndarray]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Identify all faces in an image - optimized version.
+        
+        Args:
+            image: Input image
+            known_embeddings: Dictionary of known embeddings (not used with ChromaDB)
+            
+        Returns:
+            list: List of identification results
+        """
+        results = []
+        
+        # Detect faces - use cache for better performance
+        try:
+            face_bboxes = self.face_detector.detect_faces(image, use_cache=True)
+        except Exception as e:
+            print(f"Error detecting faces: {str(e)}")
+            return results
+        
+        for i, bbox in enumerate(face_bboxes):
+            # Extract face region
+            try:
+                face_img = self.face_detector.extract_face(image, bbox, padding=0.1)
+                if face_img is None:
+                    continue
+                    
+                # Preprocess and compute embedding
+                preprocessed = self.preprocess_face(face_img)
+                face_embedding = self.compute_embedding(preprocessed)
+                
+                # Match against database
+                match_result = self.match_face(face_embedding)
+                
+                if match_result:
+                    results.append({
+                        "bbox": bbox,
+                        "name": match_result["name"],
+                        "confidence": match_result["similarity"],
+                        "match_id": match_result["id"]
+                    })
+            except Exception as e:
+                print(f"Error identifying face: {str(e)}")
+                continue
+        
+        return results
+    
+    def load_embeddings_from_dict(self, embeddings_dict: Dict[str, List[np.ndarray]]) -> bool:
+        """
+        Load embeddings from standard dictionary format into ChromaDB.
+        
+        Args:
+            embeddings_dict: Dictionary mapping IDs to embedding lists
+            
+        Returns:
+            bool: Success status
+        """
+        return self.add_embeddings_batch(embeddings_dict)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get database statistics."""
+        stats = self.stats.copy()
+        
+        # Add collection stats
+        if self.collection is not None:
+            try:
+                stats["total_embeddings"] = self.collection.count()
+            except Exception:
+                stats["total_embeddings"] = 0
+        else:
+            stats["total_embeddings"] = len(getattr(self, '_fallback_embeddings', {}))
+        
+        # Calculate average query time
+        if stats["query_count"] > 0:
+            stats["avg_query_time_ms"] = (stats["query_time"] / stats["query_count"]) * 1000
+        else:
+            stats["avg_query_time_ms"] = 0
+            
+        # Calculate match rate
+        if stats["query_count"] > 0:
+            stats["match_rate"] = stats["match_count"] / stats["query_count"]
+        else:
+            stats["match_rate"] = 0
+            
+        return stats

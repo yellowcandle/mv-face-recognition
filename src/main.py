@@ -1,349 +1,565 @@
-from config.config import Config, DetectionConfig, SegmentationConfig, RecognitionConfig
-from detection.face_detector import FaceDetector
-from recognition.face_recognizer import FaceRecognizer
-from utils.image_utils import load_image
+#!/usr/bin/env python
+"""
+Unified Face Recognition System
+
+This is the main entry point for the face recognition system.
+It combines the best features from all implementations:
+- Original face recognition system
+- Optimized implementation
+- ChromaDB vector database integration
+- Rich UI and visualization
+
+Usage:
+    python -m src.main [OPTIONS]
+
+Example:
+    python -m src.main --use-chromadb --save-video
+"""
+
 import os
+import sys
+import time
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional, Union, Any
 import pandas as pd
-import cv2
 import numpy as np
-from tqdm import tqdm
+import cv2
+import argparse
+import typer
+from enum import Enum
+import threading
 
-def select_items(items, item_type):
-    """
-    Allow user to select specific items from a list.
-    
-    Args:
-        items (list): List of items to select from
-        item_type (str): Type of items (for display purposes)
-        
-    Returns:
-        list: Selected items
-    """
-    if not items:
-        print(f"No {item_type} found.")
-        return []
-        
-    print(f"\nAvailable {item_type}:")
-    for i, item in enumerate(items, 1):
-        print(f"{i}. {item}")
-        
-    while True:
-        try:
-            selection = input(f"\nEnter numbers of {item_type} to process (comma-separated, or 'all'): ").strip()
-            if selection.lower() == 'all':
-                return items
-                
-            indices = [int(x.strip()) - 1 for x in selection.split(',')]
-            selected = [items[i] for i in indices if 0 <= i < len(items)]
-            
-            if not selected:
-                print("No valid selections made. Please try again.")
-                continue
-                
-            return selected
-            
-        except (ValueError, IndexError):
-            print("Invalid input. Please enter comma-separated numbers or 'all'.")
+# Set up project root and importable path
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-def validate_video_file(video_path):
-    """
-    Validate if a video file can be opened and read properly.
-    
-    Args:
-        video_path: Path to video file
-        
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        return False, "Failed to open video file"
-        
-    # Read first frame to verify video stream
-    ret, frame = cap.read()
-    cap.release()
-    
-    if not ret:
-        return False, "Failed to read video stream"
-        
-    return True, None
+# Import core components
+from src.core.detector import FaceDetector
+from src.core.recognizer import StandardFaceRecognizer
+from src.core.video_processor import VideoProcessor
+from src.utils.visualization import (
+    display_banner, display_table, display_results, display_stats,
+    display_selection_menu, StatusDisplay
+)
 
-def annotate_image(image_path, face_recognizer, known_embeddings, config):
-    """
-    Annotate faces in a single image.
-    
-    Args:
-        image_path: Path to the image file
-        face_recognizer: Initialized FaceRecognizer instance
-        known_embeddings: Dictionary of known face embeddings
-        config: Configuration object
-        
-    Returns:
-        Annotated image with detected faces
-    """
-    try:
-        # Load and process image
-        image = load_image(image_path)
-        faces = face_recognizer.detect_and_embed(image)
-        
-        # Create copy for annotation
-        annotated_image = image.copy()
-        
-        # Process each detected face
-        results = []
-        for face_embedding, bbox in faces:
-            best_match = None
-            best_confidence = -1
-            
-            # Compare with known embeddings
-            for nickname, known_embs in known_embeddings.items():
-                for known_emb in known_embs:
-                    confidence = face_recognizer.compute_similarity(
-                        face_embedding,
-                        known_emb
-                    )
-                    if confidence > config.recognition.similarity_threshold:
-                        if confidence > best_confidence:
-                            best_match = nickname
-                            best_confidence = confidence
-            
-            # Draw bounding box and label if match found
-            if best_match:
-                x1, y1, x2, y2 = bbox
-                cv2.rectangle(
-                    annotated_image,
-                    (int(x1), int(y1)),
-                    (int(x2), int(y2)),
-                    (0, 255, 0),
-                    2
-                )
-                cv2.putText(
-                    annotated_image,
-                    f"{best_match} ({best_confidence:.2f})",
-                    (int(x1), int(y1) - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
-                    2
-                )
-                results.append({
-                    'nickname': best_match,
-                    'confidence': best_confidence,
-                    'bbox': bbox
-                })
-        
-        return annotated_image, results
-    except Exception as e:
-        print(f"Error processing image {image_path}: {str(e)}")
-        return None, []
+# Import backends
+from src.backends.standard_backend import StandardBackend
 
-def main():
-    # Initialize paths - go up one level from src directory
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    contestants_dir = os.path.join(project_root, "source", "photo", "contestants")
-    images_dir = os.path.join(project_root, "source", "images")
-    contestant_info_path = os.path.join(project_root, "contestant_info.csv")
-    
-    # Create images directory if it doesn't exist
-    os.makedirs(images_dir, exist_ok=True)
+# Check for ChromaDB availability
+try:
+    from src.backends.chromadb_backend import ChromaDBFaceRecognizer
+    HAS_CHROMADB = True
+except ImportError:
+    HAS_CHROMADB = False
 
+# Check for Rich availability
+try:
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+    from rich.prompt import Confirm
+    from rich import print as rich_print
+    HAS_RICH = True
+    console = Console()
+except ImportError:
+    HAS_RICH = False
+    console = None
+
+
+# Define detector backend options (keeping only InsightFace)
+class DetectorBackend(str, Enum):
+    INSIGHTFACE = "insightface"
+
+
+# Define recognizer backend options (keeping only ChromaDB)
+class RecognizerBackend(str, Enum):
+    CHROMADB = "chromadb"
+
+
+# Create Typer app with rich formatting
+app = typer.Typer(rich_markup_mode="rich")
+
+
+@app.command()
+def main(
+    # Backend selection (simplified to only InsightFace and ChromaDB)
+    detector_backend: DetectorBackend = typer.Option(
+        DetectorBackend.INSIGHTFACE,
+        "--detector-backend",
+        "-d",
+        help="Face detection backend (InsightFace only)",
+    ),
+    recognizer_backend: RecognizerBackend = typer.Option(
+        RecognizerBackend.CHROMADB,
+        "--recognizer-backend",
+        "-r",
+        help="Face recognition backend (ChromaDB only)",
+    ),
+    
+    # Recognition parameters
+    distance_threshold: float = typer.Option(
+        0.4,
+        "--distance-threshold",
+        "-t",
+        help="Similarity threshold for face matching (default: 0.4)",
+    ),
+    frame_skip: int = typer.Option(
+        5,
+        "--frame-skip",
+        "-s",
+        help="Number of frames to skip between processing (default: 5)",
+    ),
+    
+    # Performance options
+    use_tracking: bool = typer.Option(
+        False,
+        "--use-tracking",
+        help="Use face tracking between frames",
+    ),
+    parallel: bool = typer.Option(
+        True,
+        "--parallel/--no-parallel",
+        help="Use parallel processing where possible",
+    ),
+    max_workers: int = typer.Option(
+        4,
+        "--max-workers",
+        "-w",
+        help="Maximum number of worker threads",
+    ),
+    
+    # Output options
+    save_frames: bool = typer.Option(
+        False,
+        "--save-frames",
+        help="Save annotated frames",
+    ),
+    save_video: bool = typer.Option(
+        False,
+        "--save-video",
+        help="Save annotated video",
+    ),
+    
+    # ChromaDB options
+    in_memory_db: bool = typer.Option(
+        False,
+        "--in-memory-db",
+        help="Use in-memory ChromaDB (faster but not persistent)",
+    ),
+    
+    # High-level options
+    optimize_cache: bool = typer.Option(
+        False,
+        "--optimize-cache",
+        help="Preload and optimize cache for faster processing",
+    ),
+    optimize_performance: bool = typer.Option(
+        True,
+        "--optimize-performance/--no-optimize-performance",
+        help="Apply performance optimizations for faster processing",
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Print debug information",
+    ),
+    interactive: bool = typer.Option(
+        True,
+        "--interactive/--non-interactive",
+        help="Use interactive mode for selection",
+    ),
+    all_contestants: bool = typer.Option(
+        False,
+        "--all-contestants",
+        help="Select all contestants automatically",
+    ),
+    all_videos: bool = typer.Option(
+        False,
+        "--all-videos",
+        help="Select all videos automatically",
+    ),
+    specific_contestants: Optional[str] = typer.Option(
+        None,
+        "--specific-contestants",
+        help="Comma-separated list of contestant names",
+    ),
+    specific_videos: Optional[str] = typer.Option(
+        None,
+        "--specific-videos",
+        help="Comma-separated list of video filenames",
+    ),
+):
+    """
+    [bold cyan]Unified Face Recognition System[/bold cyan]
+    
+    Process videos to recognize contestants' faces.
+    """
+    # Display banner
+    if HAS_RICH:
+        display_banner(
+            "Unified Face Recognition System",
+            "Process videos to recognize faces"
+        )
+    else:
+        print("\n=== Unified Face Recognition System ===")
+        print("Process videos to recognize faces\n")
+    
+    # Show configuration
+    print(f"Detection Backend: {detector_backend}")
+    print(f"Recognition Backend: {recognizer_backend}")
+    print(f"Distance Threshold: {distance_threshold}")
+    print(f"Frame Skip: {frame_skip}")
+    print(f"Parallel Processing: {'Enabled' if parallel else 'Disabled'}")
+    
+    # Check if ChromaDB is available
+    if not HAS_CHROMADB:
+        print("ERROR: ChromaDB is not installed but is required.")
+        print("Install it with: pip install chromadb>=0.4.18")
+        return
+    
+    # Initialize paths
+    paths = initialize_paths()
+    
+    # Create cache directories
+    os.makedirs(paths["cache_dir"], exist_ok=True)
+    os.makedirs(paths["frames_dir"], exist_ok=True)
+    os.makedirs(paths["outputs_dir"], exist_ok=True)
+    
+    # Initialize components with InsightFace and ChromaDB only
+    detector, recognizer, backend = initialize_components(
+        similarity_threshold=distance_threshold,
+        use_tracking=use_tracking,
+        skip_frames=frame_skip,
+        parallel=parallel,
+        max_workers=max_workers,
+        in_memory_db=in_memory_db,
+        cache_dir=paths["cache_dir"],
+        optimize_performance=optimize_performance
+)
+    # If optimize-cache option is enabled, preload and optimize cache
+    if optimize_cache:
+        print("Preloading and optimizing cache...")
+        preload_cache(detector, recognizer, paths["cache_dir"])
+    
     # Load contestant information
     try:
-        contestant_info = pd.read_csv(contestant_info_path)
+        contestant_info = pd.read_csv(paths["contestant_info_path"])
         # Ensure 編號 is string type for directory matching
         contestant_info['編號'] = contestant_info['編號'].astype(str)
     except Exception as e:
         print(f"Error reading contestant info CSV: {e}")
         return
-
-    # Initialize configuration with model paths
-    config = Config(
-        detection=DetectionConfig(
-            model_path=os.path.join(project_root, "models", "face_detection_yunet.onnx")
-        ),
-        segmentation=SegmentationConfig(model_path=""),  # Not used currently
-        recognition=RecognitionConfig(model_path="")  # Using pre-computed embeddings
-    )
     
-    # Initialize components
-    face_detector = FaceDetector(
-        confidence_threshold=config.detection.confidence_threshold
-    )
+    # Select contestants
+    all_contestants = contestant_info["暱稱"].tolist()
     
-    face_recognizer = FaceRecognizer(
-        recognition_model_path="",
-        face_detector=face_detector,
-        similarity_threshold=0.15  # Lower threshold for HOG-based embeddings
-    )
-
-    # Load pre-computed contestant embeddings
-    known_embeddings = {}
-    for _, contestant in contestant_info.iterrows():
-        nickname = contestant['暱稱']
-        embedding = face_recognizer.get_embedding(nickname)
-        if embedding is not None:
-            known_embeddings[nickname] = [embedding]  # Keep list format for compatibility
-
-    print(f"Successfully loaded embeddings for {len(known_embeddings)} contestants")
+    if specific_contestants:
+        selected_contestants = specific_contestants.split(',')
+    elif all_contestants:
+        selected_contestants = all_contestants
+    else:
+        if interactive:
+            selected_contestants = display_selection_menu(all_contestants, "contestants")
+        else:
+            selected_contestants = all_contestants
     
-    # Allow user to select specific videos to process
-    videos_dir = os.path.join(project_root, "source", "videos")
-    os.makedirs(videos_dir, exist_ok=True)
-    
-    video_files = [f for f in os.listdir(videos_dir) if f.lower().endswith(('.mp4', '.avi'))]
-    if not video_files:
-        print(f"No video files found in {videos_dir}")
+    if not selected_contestants:
+        print("No contestants selected, exiting.")
         return
-        
-    selected_videos = select_items(video_files, "videos")
+    
+    print(f"Selected {len(selected_contestants)} contestants.")
+    
+    # Load contestant embeddings
+    known_embeddings = load_embeddings(
+        backend=backend,
+        contestants_dir=paths["contestants_dir"],
+        contestant_info=contestant_info,
+        selected_contestants=selected_contestants
+    )
+    
+    # Select videos
+    all_videos = sorted([
+        f for f in os.listdir(paths["videos_dir"])
+        if os.path.isfile(os.path.join(paths["videos_dir"], f))
+        and f.lower().endswith(('.mp4', '.avi', '.mov'))
+    ])
+    
+    if not all_videos:
+        print(f"No video files found in {paths['videos_dir']}")
+        return
+    
+    if specific_videos:
+        selected_videos = specific_videos.split(',')
+    elif all_videos:
+        selected_videos = all_videos
+    else:
+        if interactive:
+            selected_videos = display_selection_menu(all_videos, "videos")
+        else:
+            selected_videos = all_videos
+    
     if not selected_videos:
-        print("No videos selected for processing")
+        print("No videos selected, exiting.")
         return
-
-    # Create output directories
-    frames_dir = os.path.join(project_root, "output_frames")
-    videos_dir_out = os.path.join(project_root, "output_mp4s")
-    os.makedirs(frames_dir, exist_ok=True)
-    os.makedirs(videos_dir_out, exist_ok=True)
-
-    all_results = []
     
-    for video_file in selected_videos:
-        print(f"\nProcessing video: {video_file}")
-        video_path = os.path.join(videos_dir, video_file)
+    print(f"Selected {len(selected_videos)} videos.")
+    
+    # Initialize status display
+    status_display = StatusDisplay() if HAS_RICH else None
+    if status_display:
+        status_display.start(videos_total=len(selected_videos))
+    
+    # Process videos
+    all_results = []
+    for video_idx, video_file in enumerate(selected_videos):
+        video_path = os.path.join(paths["videos_dir"], video_file)
         
-        # Create output directory for frames
-        video_frames_dir = os.path.join(frames_dir, video_file.split('.')[0])
-        os.makedirs(video_frames_dir, exist_ok=True)
+        # Create output paths
+        video_basename = os.path.splitext(video_file)[0]
+        frames_output_dir = paths["frames_dir"] / video_basename if save_frames else None
+        video_output_path = paths["outputs_dir"] / f"{video_basename}_labeled.mp4" if save_video else None
         
+        # Process the video
         try:
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                print(f"Failed to open video: {video_file}")
-                continue
-                
-            # Get video properties
-            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # Create processor with appropriate callbacks
+            processor = VideoProcessor(
+                detector_fn=detector.detect_faces,
+                recognition_fn=lambda frame: backend.identify_faces(frame, known_embeddings),
+                frame_skip=frame_skip,
+                buffer_size=10,
+                save_frames=save_frames,
+                max_workers=max_workers
+            )
             
-            # Create video writer for annotated video
-            output_video_path = os.path.join(videos_dir_out, f"{video_file}_labeled.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+            # Define progress callback
+            def update_progress(progress: float, info: Dict[str, Any]):
+                if status_display:
+                    status_display.update(
+                        frames_processed=info["frames_processed"],
+                        faces_detected=info["faces_detected"],
+                        faces_recognized=info["faces_recognized"],
+                        current_video=video_file,
+                        videos_completed=video_idx
+                    )
             
-            frame_count = 0
-            with tqdm(total=total_frames, desc="Processing frames") as pbar:
-                while True:
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                        
-                    frame_count += 1
-                    pbar.update(1)
-                    
-                    # Process every 5th frame
-                    if frame_count % 5 == 0:
-                        try:
-                            # Get face embeddings from current frame
-                            faces = face_recognizer.detect_and_embed(frame)
-                            
-                            # Create copy for annotation
-                            frame_with_boxes = frame.copy()
-                            
-                            # Process each detected face
-                            frame_results = []
-                            for face_embedding, bbox in faces:
-                                best_match = None
-                                best_confidence = -1
-                                
-                                # Compare with known embeddings
-                                for nickname, known_embs in known_embeddings.items():
-                                    for known_emb in known_embs:
-                                        confidence = face_recognizer.compute_similarity(
-                                            face_embedding,
-                                            known_emb
-                                        )
-                                        # Print similarity scores for debugging
-                                        print(f"\nSimilarity with {nickname}: {confidence:.4f}")
-                                        if confidence > config.recognition.similarity_threshold:
-                                            if confidence > best_confidence:
-                                                best_match = nickname
-                                                best_confidence = confidence
-                                
-                                # Always draw bounding box and label
-                                x1, y1, x2, y2 = bbox
-                                cv2.rectangle(
-                                    frame_with_boxes,
-                                    (int(x1), int(y1)),
-                                    (int(x2), int(y2)),
-                                    (0, 255, 0),
-                                    2
-                                )
-                                label = f"{best_match} ({best_confidence:.2f})" if best_match else "Unknown"
-                                cv2.putText(
-                                    frame_with_boxes,
-                                    label,
-                                    (int(x1), int(y1) - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    1.0,  # Increased font size
-                                    (0, 255, 0),
-                                    2
-                                )
-                                
-                                # Print detection in terminal
-                                print(f"\nFrame {frame_count}: Detected {label} at coordinates ({int(x1)}, {int(y1)}, {int(x2)}, {int(y2)})")
-                                if best_match:
-                                    frame_results.append({
-                                        'nickname': best_match,
-                                        'confidence': best_confidence,
-                                        'bbox': bbox
-                                    })
-                            
-                            # Save annotated frame
-                            frame_path = os.path.join(video_frames_dir, f"frame_{frame_count:04d}.jpg")
-                            cv2.imwrite(frame_path, frame_with_boxes)
-                            
-                            # Add results to overall results
-                            timestamp = frame_count / fps
-                            for result in frame_results:
-                                all_results.append({
-                                    'video': video_file,
-                                    'frame': frame_count,
-                                    'timestamp': timestamp,
-                                    'nickname': result['nickname'],
-                                    'confidence': result['confidence']
-                                })
-                        except Exception as e:
-                            print(f"\nError processing frame {frame_count}: {str(e)}")
-                            continue
-                    
-                    # Write frame to output video
-                    out.write(frame_with_boxes if 'frame_with_boxes' in locals() else frame)
+            # Process the video
+            results = processor.process_video(
+                video_path=video_path,
+                output_path=video_output_path,
+                frames_dir=frames_output_dir,
+                display_progress=update_progress
+            )
             
-            cap.release()
-            out.release()
+            all_results.extend(results)
             
         except Exception as e:
             print(f"Error processing video {video_file}: {str(e)}")
-            if 'cap' in locals():
-                cap.release()
-            if 'out' in locals():
-                out.release()
+            if debug:
+                import traceback
+                traceback.print_exc()
             continue
     
-    # Save results to CSV if any faces were detected
+    # Stop status display
+    if status_display:
+        status_display.stop()
+    
+    # Save results
     if all_results:
         results_df = pd.DataFrame(all_results)
-        output_csv = os.path.join(project_root, "video_recognition_results.csv")
+        output_csv = paths["project_root"] / "video_recognition_results.csv"
         results_df.to_csv(output_csv, index=False)
         print(f"\nResults saved to {output_csv}")
         
-        # Print summary
-        print("\nRecognition Summary:")
-        summary = results_df.groupby(['video', 'nickname']).size().unstack(fill_value=0)
-        print(summary)
+        # Display results
+        if HAS_RICH:
+            display_results(all_results, show_summary=True)
+        else:
+            # Simple summary
+            summary = results_df.groupby(['video', 'nickname' if 'nickname' in results_df.columns else 'person_id']).size().unstack(fill_value=0)
+            print("\nRecognition Summary:")
+            print(summary)
+    else:
+        print("No faces recognized in videos.")
+    
+    # Display stats
+    if HAS_RICH:
+        # Combine statistics from different components
+        stats = {}
+        stats.update(detector.get_stats())
+        stats.update(recognizer.get_stats())
+        if hasattr(backend, 'get_stats'):
+            backend_stats = backend.get_stats()
+            for key, value in backend_stats.items():
+                stats[f"backend_{key}"] = value
+        
+        display_stats(stats)
+    
+    print("\nProcessing complete!")
 
+
+def initialize_paths() -> Dict[str, Path]:
+    """Initialize paths for the system."""
+    project_root = PROJECT_ROOT
+    
+    paths = {
+        "project_root": project_root,
+        "contestants_dir": project_root / "source" / "photo" / "contestants",
+        "videos_dir": project_root / "source" / "videos",
+        "contestant_info_path": project_root / "contestant_info.csv",
+        "outputs_dir": project_root / "output_mp4s",
+        "frames_dir": project_root / "output_frames",
+        "cache_dir": project_root / "cache",
+    }
+    
+    return paths
+
+
+def initialize_components(
+    similarity_threshold: float,
+    use_tracking: bool,
+    skip_frames: int,
+    parallel: bool,
+    max_workers: int,
+    in_memory_db: bool,
+    cache_dir: Path,
+    optimize_performance: bool = True,
+) -> Tuple[FaceDetector, StandardFaceRecognizer, ChromaDBFaceRecognizer]:
+    """Initialize detector, recognizer, and backend components with optimized settings."""
+    # Initialize InsightFace detector with performance optimizations
+    detector = FaceDetector(
+        backend="insightface",
+        confidence_threshold=0.3 if not optimize_performance else 0.4,  # Higher threshold = fewer detections but faster
+        model_size=(320, 320),
+        tracking_method=FaceDetector.TRACKING_KCF if use_tracking else FaceDetector.TRACKING_NONE,
+        tracking_duration=30 if use_tracking else 0,
+        skip_frames=skip_frames if use_tracking else min(2, skip_frames),  # Always skip at least 2 frames for performance
+        cache_enabled=True,  # Always enable caching for performance
+        max_workers=max_workers
+    )
+    
+    # Initialize standard recognizer with performance optimizations
+    recognizer = StandardFaceRecognizer(
+        face_detector=detector,
+        similarity_threshold=similarity_threshold,
+        use_batch_processing=parallel,
+        use_quantized_model=True,  # Always use quantized model for performance
+        cache_dir=str(cache_dir),
+        max_workers=max_workers,
+        embedding_cache_size=1024 if optimize_performance else 512  # Larger cache if optimizing
+    )
+    
+    # Initialize ChromaDB backend with performance optimizations
+    backend = ChromaDBFaceRecognizer(
+        face_detector=detector,
+        standard_recognizer=recognizer,
+        similarity_threshold=similarity_threshold,
+        persistent=not in_memory_db,
+        collection_name="face_embeddings",
+        cache_dir=cache_dir / "chromadb"
+    )
+    
+    return detector, recognizer, backend
+
+
+def preload_cache(
+    detector: FaceDetector,
+    recognizer: StandardFaceRecognizer,
+    cache_dir: Path,
+    optimize_performance: bool = True
+):
+    """Preload and optimize cache."""
+    # Look for test images
+    test_images_dir = PROJECT_ROOT / "source" / "images" / "test"
+    if not test_images_dir.exists():
+        print(f"Test images directory not found: {test_images_dir}")
+        return
+    
+    # Find all test images
+    test_files = []
+    for ext in ['.jpg', '.jpeg', '.png']:
+        test_files.extend(list(test_images_dir.glob(f'*{ext}')))
+    
+    if not test_files:
+        print("No test images found")
+        return
+    
+    print(f"Pre-processing {len(test_files)} test images...")
+    
+    # Process each test image
+    for img_path in test_files:
+        try:
+            # Load image
+            img = cv2.imread(str(img_path))
+            if img is None:
+                print(f"Failed to load test image: {img_path}")
+                continue
+            
+            # Generate a stable ID for this test image
+            img_id = f"test_{img_path.stem}"
+            
+            # Detect faces
+            faces = detector.detect_faces(img, use_cache=True)
+            
+            if not faces:
+                print(f"No faces found in: {img_path.name}")
+                continue
+            
+            # Process each face
+            for i, bbox in enumerate(faces):
+                # Extract face
+                face_img = detector.extract_face(img, bbox, padding=0.1)
+                if face_img is None:
+                    continue
+                
+                # Compute embedding
+                face_id = f"{img_id}_face_{i}"
+                preprocessed = recognizer.preprocess_face(face_img)
+                embedding = recognizer.compute_embedding(preprocessed)
+                
+                # Save embedding
+                recognizer.save_embedding(face_id, embedding)
+            
+            print(f"Processed: {img_path.name} - found {len(faces)} faces")
+            
+        except Exception as e:
+            print(f"Error processing test image {img_path}: {str(e)}")
+
+
+def load_embeddings(
+    backend: ChromaDBFaceRecognizer,
+    contestants_dir: Path,
+    contestant_info: pd.DataFrame,
+    selected_contestants: List[str]
+) -> Dict[str, List[np.ndarray]]:
+    """Load embeddings for selected contestants using ChromaDB."""
+    print("Using ChromaDB for face recognition")
+    
+    # First load embeddings in standard format
+    from src.backends.standard_backend import StandardBackend
+    std_backend = StandardBackend(backend.standard_recognizer)
+    embeddings_dict = std_backend.load_embeddings(
+        contestant_dir=contestants_dir,
+        contestant_info=contestant_info,
+        selected_contestants=selected_contestants
+    )
+    
+    # Then load into ChromaDB
+    backend.load_embeddings_from_dict(embeddings_dict)
+    
+    # Return empty dict since ChromaDB doesn't need it
+    return {}
+
+
+# Main entry point
 if __name__ == "__main__":
-    main()
+    try:
+        app()
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        if "--debug" in sys.argv:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)

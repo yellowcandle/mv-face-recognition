@@ -1,4 +1,7 @@
 .DS_Store
+.cache/
+*cache*/
+*.cache
 
 # to prevent large files from being committed, run video_dl.py to download videos
 # Video files

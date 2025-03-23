@@ -1,0 +1,625 @@
+"""
+Unified face detector with optimizations for video processing.
+
+This module provides a configurable face detector that supports multiple
+detection methods and optimization strategies.
+"""
+
+import os
+import cv2
+import numpy as np
+import time
+import threading
+from functools import lru_cache
+from pathlib import Path
+from typing import List, Tuple, Dict, Any, Optional, Union
+from concurrent.futures import ThreadPoolExecutor
+
+try:
+    from insightface.app import FaceAnalysis
+    HAS_INSIGHTFACE = True
+except ImportError:
+    HAS_INSIGHTFACE = False
+
+try:
+    import mediapipe as mp
+    HAS_MEDIAPIPE = True
+except ImportError:
+    HAS_MEDIAPIPE = False
+
+
+class FaceDetector:
+    """
+    Unified face detector with multiple backends and optimizations.
+    
+    Features:
+    - Multiple detection backends (OpenCV, InsightFace, MediaPipe)
+    - Face tracking between frames
+    - Caching for improved performance
+    - Parallel processing for batch detection
+    - Support for different model sizes and performance profiles
+    """
+    
+    # Detector backends
+    BACKEND_OPENCV = "opencv"
+    BACKEND_INSIGHTFACE = "insightface"
+    BACKEND_MEDIAPIPE = "mediapipe"
+    
+    # Tracking modes
+    TRACKING_NONE = "none"
+    TRACKING_KCF = "kcf"
+    TRACKING_CSRT = "csrt"
+    
+    def __init__(
+        self,
+        backend: str = BACKEND_OPENCV,
+        confidence_threshold: float = 0.5,
+        model_size: Tuple[int, int] = (320, 320),
+        tracking_method: str = TRACKING_KCF,
+        tracking_duration: int = 30,
+        skip_frames: int = 0,
+        cache_enabled: bool = True,
+        max_workers: int = 4,
+        device: str = "auto"
+    ):
+        """
+        Initialize the face detector.
+        
+        Args:
+            backend: Detection backend to use
+            confidence_threshold: Detection confidence threshold
+            model_size: Input size for face detector model
+            tracking_method: Face tracking method
+            tracking_duration: How long to track faces before re-detecting (in frames)
+            skip_frames: Number of frames to skip between full detections
+            cache_enabled: Whether to enable detection caching for static images
+            max_workers: Number of worker threads for parallel processing
+            device: Device to use (auto, cpu, cuda)
+        """
+        self.backend = backend
+        self.confidence_threshold = confidence_threshold
+        self.model_size = model_size
+        self.tracking_method = tracking_method
+        self.tracking_duration = tracking_duration
+        self.skip_frames = skip_frames
+        self.cache_enabled = cache_enabled
+        self.max_workers = max_workers
+        
+        # Check device availability
+        self.device = self._resolve_device(device)
+        
+        # Initialize tracking variables
+        self.frame_count = 0
+        self.last_detection_time = 0
+        self.trackers = []
+        self.tracker_lock = threading.Lock()
+        
+        # Set up thread pool for parallel processing
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        
+        # Set up cache
+        self.face_cache = {}
+        self.cache_size_limit = 200
+        self.cache_hits = 0
+        self.cache_misses = 0
+        
+        # Statistics
+        self.stats = {
+            "detections": 0,
+            "detection_time": 0.0,
+            "avg_faces_per_frame": 0.0,
+            "frames_processed": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+        }
+        
+        # Initialize backend
+        self._init_backend()
+    
+    def _resolve_device(self, device: str) -> str:
+        """Resolve device based on availability."""
+        if device == "auto":
+            # Check for CUDA
+            try:
+                count = cv2.cuda.getCudaEnabledDeviceCount()
+                if count > 0:
+                    return "cuda"
+            except:
+                pass
+            
+            return "cpu"
+        
+        return device.lower()
+    
+    def _init_backend(self):
+        """Initialize the detection backend."""
+        if self.backend == self.BACKEND_OPENCV:
+            self._init_opencv_detector()
+        elif self.backend == self.BACKEND_INSIGHTFACE:
+            self._init_insightface_detector()
+        elif self.backend == self.BACKEND_MEDIAPIPE:
+            self._init_mediapipe_detector()
+        else:
+            raise ValueError(f"Unsupported backend: {self.backend}")
+    
+    def _init_opencv_detector(self):
+        """Initialize OpenCV YuNet face detector."""
+        # Try to find model in common locations
+        # 1. Check in models/ directory within the project
+        project_root = Path(__file__).parent.parent.parent
+        model_path = project_root / "models" / "face_detection_yunet.onnx"
+        
+        if not model_path.exists():
+            # 2. Check in directory containing this file
+            model_path = Path(__file__).parent / "face_detection_yunet.onnx"
+            
+        if not model_path.exists():
+            # 3. Use OpenCV's sample path if model not found locally
+            model_path = os.path.join(
+                os.path.dirname(cv2.__file__),
+                "data",
+                "face_detection_yunet_2022mar.onnx"
+            )
+            
+        if not os.path.exists(str(model_path)):
+            raise FileNotFoundError(
+                "Face detection model not found. Please download it to models/face_detection_yunet.onnx"
+            )
+            
+        # Initialize detector with model
+        self.detector = cv2.FaceDetectorYN.create(
+            str(model_path),
+            "",
+            self.model_size,
+            self.confidence_threshold,
+            0.3,  # NMS threshold
+            5000  # Top K
+        )
+        
+        print(f"Initialized OpenCV YuNet face detector with model: {model_path}")
+    
+    def _init_insightface_detector(self):
+        """Initialize InsightFace detector."""
+        if not HAS_INSIGHTFACE:
+            raise ImportError(
+                "InsightFace is not installed. Install with: pip install insightface>=0.7.3"
+            )
+            
+        # Initialize with appropriate providers
+        providers = []
+        if self.device == "cuda":
+            providers.append("CUDAExecutionProvider")
+        providers.append("CPUExecutionProvider")
+        
+        self.detector = FaceAnalysis(providers=providers)
+        
+        # Determine ctx_id based on device
+        ctx_id = 0 if self.device == "cuda" else -1
+        self.detector.prepare(ctx_id=ctx_id, det_size=self.model_size)
+        
+        print(f"Initialized InsightFace detector with device: {self.device}")
+    
+    def _init_mediapipe_detector(self):
+        """Initialize MediaPipe face detector."""
+        if not HAS_MEDIAPIPE:
+            raise ImportError(
+                "MediaPipe is not installed. Install with: pip install mediapipe>=0.10.0"
+            )
+            
+        # Initialize MediaPipe face detection
+        self.mp_face_detection = mp.solutions.face_detection
+        
+        # Adjust model selection based on model_size
+        # 0 = short range, 1 = full range
+        model_selection = 1 if max(self.model_size) >= 480 else 0
+        
+        self.detector = self.mp_face_detection.FaceDetection(
+            model_selection=model_selection,
+            min_detection_confidence=self.confidence_threshold
+        )
+        
+        print(f"Initialized MediaPipe face detector with model selection: {model_selection}")
+    
+    def detect_faces(
+        self, 
+        image: np.ndarray, 
+        force_detection: bool = False,
+        use_cache: bool = True
+    ) -> List[List[float]]:
+        """
+        Detect faces in an image.
+        
+        Args:
+            image: Input image
+            force_detection: Whether to force full detection (ignore tracking)
+            use_cache: Whether to use face cache for static images
+            
+        Returns:
+            list: List of bounding boxes in format [x1, y1, x2, y2]
+        """
+        start_time = time.time()
+        self.frame_count += 1
+        self.stats["frames_processed"] += 1
+
+        # Check if image is in cache for static test images
+        if use_cache and self.cache_enabled:
+            img_hash = self._compute_image_hash(image)
+            if img_hash in self.face_cache:
+                self.cache_hits += 1
+                self.stats["cache_hits"] += 1
+                return self.face_cache[img_hash]
+            self.cache_misses += 1
+            self.stats["cache_misses"] += 1
+        
+        # Ensure image is in correct format
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            
+        height, width = image.shape[:2]
+        
+        # Calculate downscaled image size if image is large
+        scale_factor = 1.0
+        max_dimension = max(self.model_size)
+        
+        if max(height, width) > max_dimension:
+            scale_factor = max_dimension / max(height, width)
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+            resized_image = cv2.resize(image, (new_width, new_height))
+        else:
+            resized_image = image
+            
+        # Decide whether to run detection or tracking
+        use_tracking = (
+            not force_detection and 
+            self.tracking_method != self.TRACKING_NONE and
+            self.frame_count % self.skip_frames != 0 and
+            time.time() - self.last_detection_time < self.tracking_duration and
+            self.trackers
+        )
+        
+        if use_tracking:
+            # Use existing trackers for faster processing
+            bboxes = self._track_faces(image)
+        else:
+            # Run full face detection
+            bboxes = self._detect_faces_with_backend(resized_image, scale_factor)
+            self.last_detection_time = time.time()
+            
+            # Update trackers if tracking is enabled
+            if self.tracking_method != self.TRACKING_NONE:
+                self._update_trackers(image, bboxes)
+        
+        # Cache the results for static test images
+        if use_cache and self.cache_enabled and bboxes:
+            img_hash = self._compute_image_hash(image)
+            self.face_cache[img_hash] = bboxes
+            
+            # Clean cache if it gets too large
+            if len(self.face_cache) > self.cache_size_limit:
+                # Remove 25% of oldest entries
+                remove_count = self.cache_size_limit // 4
+                for _ in range(remove_count):
+                    if self.face_cache:
+                        self.face_cache.pop(next(iter(self.face_cache)))
+        
+        # Update statistics
+        detection_time = time.time() - start_time
+        self.stats["detection_time"] += detection_time
+        self.stats["detections"] += len(bboxes)
+        
+        if self.stats["frames_processed"] > 0:
+            self.stats["avg_faces_per_frame"] = self.stats["detections"] / self.stats["frames_processed"]
+        
+        return bboxes
+    
+    def _detect_faces_with_backend(
+        self, 
+        image: np.ndarray, 
+        scale_factor: float = 1.0
+    ) -> List[List[float]]:
+        """
+        Detect faces using the configured backend.
+        
+        Args:
+            image: Input image
+            scale_factor: Scale factor to restore original coordinates
+            
+        Returns:
+            list: List of bounding boxes in format [x1, y1, x2, y2]
+        """
+        bboxes = []
+        
+        if self.backend == self.BACKEND_OPENCV:
+            # OpenCV YuNet detector
+            height, width = image.shape[:2]
+            
+            # Set input size
+            input_size = (width, height)
+            self.detector.setInputSize(input_size)
+            
+            # Detect faces
+            _, faces = self.detector.detect(image)
+            
+            if faces is not None:
+                for face in faces:
+                    if face[14] >= self.confidence_threshold:  # Check confidence
+                        x1, y1, w, h = face[0], face[1], face[2], face[3]
+                        
+                        # Rescale coordinates if needed
+                        if scale_factor != 1.0:
+                            x1 = int(x1 / scale_factor)
+                            y1 = int(y1 / scale_factor)
+                            w = int(w / scale_factor)
+                            h = int(h / scale_factor)
+                            
+                        bbox = [x1, y1, x1 + w, y1 + h]
+                        bboxes.append(bbox)
+        
+        elif self.backend == self.BACKEND_INSIGHTFACE:
+            # InsightFace detector
+            faces = self.detector.get(image)
+            
+            for face in faces:
+                bbox = face.bbox.astype(int)
+                
+                # Rescale coordinates if needed
+                if scale_factor != 1.0:
+                    bbox = [
+                        int(bbox[0] / scale_factor),
+                        int(bbox[1] / scale_factor),
+                        int(bbox[2] / scale_factor),
+                        int(bbox[3] / scale_factor)
+                    ]
+                    
+                bboxes.append(bbox.tolist())
+        
+        elif self.backend == self.BACKEND_MEDIAPIPE:
+            # MediaPipe detector
+            # Convert BGR to RGB for MediaPipe
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Process the image
+            results = self.detector.process(rgb_image)
+            
+            height, width = image.shape[:2]
+            
+            if results.detections:
+                for detection in results.detections:
+                    if detection.score[0] >= self.confidence_threshold:
+                        box = detection.location_data.relative_bounding_box
+                        
+                        # Convert relative coordinates to absolute
+                        x1 = int(box.xmin * width)
+                        y1 = int(box.ymin * height)
+                        w = int(box.width * width)
+                        h = int(box.height * height)
+                        
+                        # Rescale coordinates if needed
+                        if scale_factor != 1.0:
+                            x1 = int(x1 / scale_factor)
+                            y1 = int(y1 / scale_factor)
+                            w = int(w / scale_factor)
+                            h = int(h / scale_factor)
+                            
+                        bbox = [x1, y1, x1 + w, y1 + h]
+                        bboxes.append(bbox)
+        
+        return bboxes
+    
+    def _update_trackers(self, image: np.ndarray, bboxes: List[List[float]]):
+        """
+        Initialize trackers for the detected faces.
+        
+        Args:
+            image: Input image
+            bboxes: List of bounding boxes
+        """
+        # Clear existing trackers
+        with self.tracker_lock:
+            self.trackers = []
+            
+            # Create a new tracker for each face
+            for bbox in bboxes:
+                x1, y1, x2, y2 = map(int, bbox)
+                w = x2 - x1
+                h = y2 - y1
+                
+                # Create appropriate tracker type
+                if self.tracking_method == self.TRACKING_KCF:
+                    tracker = cv2.TrackerKCF_create()
+                elif self.tracking_method == self.TRACKING_CSRT:
+                    tracker = cv2.TrackerCSRT_create()
+                else:
+                    continue
+                    
+                # Initialize tracker with bbox
+                tracker.init(image, (x1, y1, w, h))
+                self.trackers.append(tracker)
+    
+    def _track_faces(self, image: np.ndarray) -> List[List[float]]:
+        """
+        Track faces using trackers.
+        
+        Args:
+            image: Input image
+            
+        Returns:
+            list: List of bounding boxes
+        """
+        bboxes = []
+        remaining_trackers = []
+        
+        # Thread-safe tracker update
+        with self.tracker_lock:
+            trackers_copy = self.trackers.copy()
+            
+        # Process trackers in parallel for large images
+        if len(trackers_copy) > 2 and image.shape[0] * image.shape[1] > 640*480:
+            futures = [self.executor.submit(self._update_tracker, tracker, image) for tracker in trackers_copy]
+            results = [future.result() for future in futures]
+            
+            for success, bbox, tracker in results:
+                if success:
+                    x, y, w, h = map(int, bbox)
+                    bboxes.append([x, y, x + w, y + h])
+                    remaining_trackers.append(tracker)
+        else:
+            # Sequential update for small images or few trackers
+            for tracker in trackers_copy:
+                success, bbox = tracker.update(image)
+                if success:
+                    x, y, w, h = map(int, bbox)
+                    bboxes.append([x, y, x + w, y + h])
+                    remaining_trackers.append(tracker)
+                
+        # Update trackers list thread-safely
+        with self.tracker_lock:
+            self.trackers = remaining_trackers
+            
+        return bboxes
+
+    def _update_tracker(self, tracker, image):
+        """Thread-safe tracker update helper"""
+        success, bbox = tracker.update(image)
+        return success, bbox, tracker
+    
+    def extract_face(
+        self, 
+        image: np.ndarray, 
+        bbox: List[float], 
+        padding: float = 0.0
+    ) -> Optional[np.ndarray]:
+        """
+        Extract face region from image using bbox.
+        
+        Args:
+            image: Input image
+            bbox: Bounding box in format [x1, y1, x2, y2]
+            padding: Padding around the face (percentage of face size)
+            
+        Returns:
+            numpy.ndarray: Extracted face region or None on error
+        """
+        try:
+            x1, y1, x2, y2 = map(int, bbox[:4])
+            
+            # Add padding
+            if padding > 0:
+                height, width = image.shape[:2]
+                pad_x = int((x2 - x1) * padding)
+                pad_y = int((y2 - y1) * padding)
+                
+                x1 = max(0, x1 - pad_x)
+                y1 = max(0, y1 - pad_y)
+                x2 = min(width, x2 + pad_x)
+                y2 = min(height, y2 + pad_y)
+            
+            # Get face region
+            face = image[y1:y2, x1:x2]
+            
+            # Ensure minimum size
+            if face.size == 0:  # Check if face region is empty
+                return None
+                
+            if face.shape[0] < 64 or face.shape[1] < 64:
+                scale = 64 / min(face.shape[0], face.shape[1])
+                face = cv2.resize(face, None, fx=scale, fy=scale)
+                
+            return face
+            
+        except Exception as e:
+            print(f"Error extracting face: {e}")
+            return None
+    
+    @staticmethod
+    def _compute_image_hash(image: np.ndarray) -> str:
+        """
+        Compute a simple hash for image caching.
+        
+        Args:
+            image: Input image
+            
+        Returns:
+            str: Image hash
+        """
+        # Simple and fast perceptual hash based on downsampled grayscale image
+        if image.ndim == 3 and image.shape[2] == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+        
+        small = cv2.resize(gray, (8, 8))
+        avg = small.mean()
+        diff = small > avg
+        # Convert boolean array to hash string
+        return ''.join('1' if x else '0' for x in diff.flatten())
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get detection statistics."""
+        stats = self.stats.copy()
+        
+        # Calculate average detection time
+        if stats["frames_processed"] > 0:
+            stats["avg_detection_time"] = stats["detection_time"] / stats["frames_processed"]
+        else:
+            stats["avg_detection_time"] = 0.0
+            
+        # Calculate cache efficiency
+        total_cache_requests = stats["cache_hits"] + stats["cache_misses"]
+        if total_cache_requests > 0:
+            stats["cache_hit_rate"] = stats["cache_hits"] / total_cache_requests
+        else:
+            stats["cache_hit_rate"] = 0.0
+            
+        return stats
+        
+    def batch_detect(
+        self, 
+        images: List[np.ndarray], 
+        use_parallel: bool = True
+    ) -> List[List[List[float]]]:
+        """
+        Detect faces in multiple images.
+        
+        Args:
+            images: List of input images
+            use_parallel: Whether to use parallel processing
+            
+        Returns:
+            list: List of detection results for each image
+        """
+        if not use_parallel or len(images) <= 1:
+            return [self.detect_faces(img) for img in images]
+            
+        # Process images in parallel using thread pool
+        futures = []
+        for img in images:
+            future = self.executor.submit(self.detect_faces, img)
+            futures.append(future)
+            
+        # Wait for all results
+        results = [future.result() for future in futures]
+        
+        return results
+    
+    def reset(self):
+        """Reset the detector state."""
+        self.frame_count = 0
+        self.last_detection_time = 0
+        
+        with self.tracker_lock:
+            self.trackers = []
+            
+        # Reset statistics
+        for key in self.stats:
+            self.stats[key] = 0
+    
+    def __del__(self):
+        """Cleanup resources."""
+        if hasattr(self, 'executor'):
+            self.executor.shutdown()
+            
+        # Clean up backend
+        if self.backend == self.BACKEND_MEDIAPIPE and hasattr(self, 'detector'):
+            self.detector.close()

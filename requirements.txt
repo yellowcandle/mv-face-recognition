@@ -1,8 +1,26 @@
+# Core dependencies for face recognition
 opencv-python>=4.8.0
-mediapipe>=0.10.0
 numpy>=1.24.0
 torch>=2.0.0
 insightface>=0.7.3
-onnx>=1.15.0
-onnxruntime>=1.16.0
+mediapipe>=0.10.20  # Updated to match pyproject.toml
 chromadb>=0.4.18
+
+# ONNX dependencies
+onnx>=1.15.0
+onnxruntime>=1.19.2; sys_platform == 'darwin'  # Updated to match pyproject.toml
+onnxruntime-gpu>=1.19.2; sys_platform == 'win32'  # Added from pyproject.toml
+
+# UI and visualization
+rich>=13.5.0
+typer>=0.9.0
+pillow>=10.4.0  # Updated to match pyproject.toml
+pandas>=2.1.1  # Updated to match pyproject.toml
+tqdm>=4.66.5  # Updated to match pyproject.toml
+matplotlib>=3.7.1  # Added from pyproject.toml
+
+# Video processing
+ffmpeg-python>=0.2.0  # Added from pyproject.toml
+
+# Development
+ruff>=0.6.8  # Added from pyproject.toml

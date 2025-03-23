@@ -1,111 +1,212 @@
-# ChromaDB Integration for Face Recognition
+# ChromaDB Face Recognition Debugging and Optimization Guide
 
-This branch (`dev-chromadb`) enhances the face recognition system by integrating ChromaDB, a vector database optimized for similarity search operations. ChromaDB provides significantly faster face matching compared to the standard linear search approach, particularly as the number of reference embeddings grows.
+This guide provides detailed information on debugging and optimizing the ChromaDB-based face recognition system.
 
-## Features
+## Table of Contents
+1. [Overview](#overview)
+2. [Running the System](#running-the-system)
+3. [Debugging Tools](#debugging-tools)
+4. [Optimization Tools](#optimization-tools)
+5. [Common Issues](#common-issues)
+6. [Performance Recommendations](#performance-recommendations)
 
-- **Faster Face Matching**: Uses approximate nearest neighbor algorithms instead of brute-force linear comparison
-- **Persistent Storage**: Embeddings can be stored persistently for faster startup in subsequent runs
-- **Performance Metrics**: Built-in statistics to measure query performance
-- **Backward Compatibility**: Falls back to standard dictionary-based approach if ChromaDB is not installed
+## Overview
 
-## Installation
+The face recognition system uses ChromaDB as a vector database backend for storing and retrieving face embeddings. ChromaDB provides efficient similarity search capabilities that are essential for high-performance face recognition.
 
-1. Add ChromaDB to your environment:
+The tools in this repository help you:
+- Run the system with ChromaDB enabled
+- Debug issues related to ChromaDB
+- Optimize ChromaDB performance
+- Fix database corruption or other issues
+
+## Running the System
+
+To run the face recognition system with ChromaDB backend:
 
 ```bash
-# Using uv (recommended)
-uv pip install chromadb>=0.4.18
+# Basic run with ChromaDB backend
+python -m src.main --recognizer-backend chromadb
 
-# Or using standard pip
+# Run with debug mode
+python -m src.main --recognizer-backend chromadb --debug
+
+# Run with performance optimizations
+python -m src.main --recognizer-backend chromadb --optimize-performance
+
+# Run with in-memory database (faster but not persistent)
+python -m src.main --recognizer-backend chromadb --in-memory-db
+```
+
+Or use the debug wrapper script for a comprehensive debugging session:
+
+```bash
+./debug_wrapper.sh
+```
+
+## Debugging Tools
+
+### Debug Wrapper (`debug_wrapper.sh`)
+
+A shell script that runs the face recognition system with debug options and captures output for analysis.
+
+```bash
+chmod +x debug_wrapper.sh
+./debug_wrapper.sh
+```
+
+Features:
+- Enables debug mode
+- Optimizes cache for better debugging
+- Captures all output to a timestamped log file
+- Extracts and displays errors from the log
+
+### ChromaDB Debugger (`debug_chromadb.py`)
+
+A Python script for diagnosing issues with the ChromaDB backend.
+
+```bash
+python debug_chromadb.py
+```
+
+This tool checks:
+1. ChromaDB installation and version
+2. Database connection
+3. Embedding storage and retrieval
+4. Collection integrity
+5. Query functionality
+
+### ChromaDB Fixer (`fix_chromadb.py`)
+
+A tool for fixing common ChromaDB issues.
+
+```bash
+# Show help
+python fix_chromadb.py --help
+
+# Verify database integrity
+python fix_chromadb.py verify
+
+# Export embeddings to a backup file
+python fix_chromadb.py export
+
+# Import embeddings from a backup file
+python fix_chromadb.py import
+
+# Rebuild the database (preserving data)
+python fix_chromadb.py rebuild
+
+# Reset the database (delete and recreate)
+python fix_chromadb.py reset
+```
+
+## Optimization Tools
+
+### ChromaDB Optimizer (`optimize_chromadb.py`)
+
+A Python script for optimizing ChromaDB performance.
+
+```bash
+python optimize_chromadb.py
+```
+
+This tool implements:
+1. Batch processing for embeddings
+2. Memory usage optimization
+3. Query performance enhancements
+4. Connection pooling and caching
+5. Disk space optimization
+
+## Common Issues
+
+### 1. Import and Dependency Issues
+
+**Symptoms:**
+- ImportError or ModuleNotFoundError
+- "ChromaDB is not installed but is required" error message
+
+**Solution:**
+```bash
 pip install chromadb>=0.4.18
 ```
 
-2. Update your environment with all dependencies:
+### 2. Database Connection Issues
 
-```bash
-uv sync
-```
+**Symptoms:**
+- "Failed to connect to ChromaDB" errors
+- Hanging or timing out when accessing ChromaDB
 
-## Usage
+**Solution:**
+1. Try with in-memory database: `--in-memory-db`
+2. Check ChromaDB cache directory permissions
+3. Reset database: `python fix_chromadb.py reset`
 
-### Using the ChromaDB-Enabled Script
+### 3. Recognition Problems
 
-We provide a ChromaDB-enabled version of the main script with additional command-line parameters:
+**Symptoms:**
+- Faces detected but not recognized
+- Wrong person identified
 
-```bash
-# Use ChromaDB for face matching
-python mv-face-recognition-chromadb.py --use-chromadb
+**Solution:**
+1. Adjust similarity threshold: `--distance-threshold 0.6`
+2. Verify embeddings: `python debug_chromadb.py`
+3. Rebuild database: `python fix_chromadb.py rebuild`
 
-# With custom parameters
-python mv-face-recognition-chromadb.py --use-chromadb --distance-threshold 0.5 --frame-skip 3
-```
+### 4. Performance Issues
 
-### Available Options
+**Symptoms:**
+- Very slow processing
+- High memory usage
 
-The ChromaDB-enabled script includes several additional options:
+**Solution:**
+1. Use in-memory database: `--in-memory-db`
+2. Optimize database: `python optimize_chromadb.py`
+3. Adjust worker count: `--max-workers 4`
 
-- `--use-chromadb`: Enable ChromaDB for face matching (default: False)
-- `--in-memory-db`: Use in-memory storage instead of persistent storage (default: False)
-- `--distance-threshold`: Similarity threshold for face matching (default: 0.4)
-- `--frame-skip`: Number of frames to skip between processing (default: 5)
+## Performance Recommendations
 
-### Using the Optimized Main Script
+1. **Hardware Requirements**
+   - CPU: 4+ cores recommended
+   - RAM: 8GB+ recommended
+   - SSD storage for database files
 
-An optimized version is also available with ChromaDB support:
+2. **Memory Optimization**
+   - Use in-memory database for best performance (but data won't persist)
+   - Adjust batch sizes to balance memory usage and performance
 
-```bash
-python src/optimized_main_chromadb.py --use-chromadb
-```
+3. **Parallel Processing**
+   - Set max-workers to match your CPU cores (default: 4)
+   - Enable parallel processing: `--parallel`
 
-## How It Works
+4. **Caching**
+   - Enable cache optimization: `--optimize-cache`
+   - Preprocess test images for faster recognition
 
-The ChromaDB integration works by:
+5. **ChromaDB Configuration**
+   - Use latest ChromaDB version (0.4.18+)
+   - Consider using a dedicated machine for large datasets
 
-1. **Initialization**: Creates a ChromaDB collection for face embeddings
-2. **Loading**: Loads pre-computed face embeddings into the collection
-3. **Matching**: Uses ChromaDB's optimized similarity search for matching new faces
-4. **Persistence**: Optionally stores the collection on disk for faster startup
+## Advanced Debugging
 
-Instead of comparing each face embedding against every known embedding with a linear search, ChromaDB uses approximate nearest neighbor algorithms (like HNSW) to find the most similar embeddings in sub-linear time.
+For persistent or complex issues, the debug plan provides a systematic approach:
 
-## Performance
+1. **Isolate the problem**
+   - Run with minimal inputs (one contestant, one short video)
+   - Use the debug wrapper script with debug flags enabled
 
-Typical performance improvements depend on dataset size:
+2. **Enable verbose logging**
+   - Use `--debug` flag to get detailed logs
+   - Check log files for patterns or recurring errors
 
-| Number of Reference Faces | Speedup Factor |
-|---------------------------|----------------|
-| 10-50                     | 2-5x           |
-| 100-500                   | 5-20x          |
-| 1000+                     | 20-100x        |
+3. **Step-by-step troubleshooting**
+   - Start with testing individual components
+   - Test face detection separately
+   - Test face recognition with known good images
+   - Test ChromaDB functionality independently
 
-The performance gap increases with the number of reference embeddings, making ChromaDB especially valuable as your database of faces grows.
+4. **Fix and validate**
+   - Make one change at a time
+   - Run tests after each change
+   - Document successful fixes
 
-## Benchmarking
-
-You can run performance benchmarks using the provided scripts:
-
-```bash
-# Synthetic benchmark
-python chromadb_synthetic_benchmark.py --embeddings 5000 --queries 100 --iterations 2
-
-# For more detailed benchmarks
-python benchmark_v2.py 
-```
-
-## Implementation Details
-
-The ChromaDB implementation uses the following key components:
-
-1. **`ChromaDBFaceDB` class**: Wraps ChromaDB functionality for face recognition
-2. **Embedding Storage**: Supports both in-memory and persistent storage options
-3. **Batch Processing**: Optimizes embedding insertion with batch operations
-4. **Performance Tracking**: Monitors query and match count for performance analysis
-
-## Future Improvements
-
-Potential areas for future enhancement:
-
-1. **Multi-face Embedding**: Support for multiple reference embeddings per contestant
-2. **Incremental Updates**: Ability to update embeddings without recreating the database
-3. **Confidence Scoring**: More sophisticated scoring and thresholding based on similarity
+For detailed debugging steps, see the `debug_plan.md` file.
