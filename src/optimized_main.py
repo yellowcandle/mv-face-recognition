@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple, Optional
 from src.detection.optimized_detector import OptimizedFaceDetector
 from src.recognition.optimized_recognizer import OptimizedFaceRecognizer
 from src.utils.performance import profile_execution, preprocess_frame, batch_process_frames
+from src.utils.test_image_optimizer import TestImageOptimizer
 from src.utils.image_utils import load_image
 
 def parse_arguments():
@@ -35,6 +36,10 @@ def parse_arguments():
     parser.add_argument("--debug", action="store_true",
                         help="Print debug information")
     
+    parser.add_argument("--test-images", action="store_true",
+        help="Process test images in source/images/test")
+    parser.add_argument("--optimize-cache", action="store_true",
+        help="Preload and optimize cache for faster processing")
     return parser.parse_args()
 
 def select_items(options, item_type):
@@ -137,6 +142,28 @@ def load_known_embeddings(
     
     print(f"Loaded embeddings for {len(known_embeddings)} contestants")
     return known_embeddings
+
+@profile_execution
+def process_test_images(
+    recognizer: OptimizedFaceRecognizer,
+    detector: OptimizedFaceDetector,
+    args
+) -> List[Dict]:
+    """
+    Process test images from source/images/test directory.
+    
+    Args:
+        recognizer: Face recognizer instance
+        detector: Face detector instance
+        args: Command line arguments
+        
+    Returns:
+        list: Test image processing results
+    """
+    optimizer = TestImageOptimizer(detector=detector, recognizer=recognizer)
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "test_images")
+    results = optimizer.process_test_images(output_dir=output_dir)
+    return results
 
 @profile_execution
 def process_video(
@@ -371,8 +398,22 @@ def main():
     recognizer = OptimizedFaceRecognizer(
         face_detector=detector,
         similarity_threshold=args.distance_threshold,
-        use_batch_processing=args.parallel
+        use_batch_processing=args.parallel,
+        use_quantized_model=True,
     )
+    
+    # If optimize-cache option is enabled, preload and optimize cache
+    if args.optimize_cache:
+        print("Preloading and optimizing cache...")
+        optimizer = TestImageOptimizer(detector=detector, recognizer=recognizer)
+        optimizer.preprocess_all_test_images()
+    
+    # If test-images option is enabled, process test images instead of videos
+    if args.test_images:
+        print("\nProcessing test images...")
+        test_results = process_test_images(recognizer, detector, args)
+        print(f"Processed {len(test_results)} test images")
+        return
     
     # Select contestants
     all_contestants = contestant_info["暱稱"].tolist()
