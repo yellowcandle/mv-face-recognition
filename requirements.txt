@@ -5,3 +5,4 @@ torch>=2.0.0
 insightface>=0.7.3
 onnx>=1.15.0
 onnxruntime>=1.16.0
+chromadb>=0.4.18
