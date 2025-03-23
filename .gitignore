@@ -11,6 +11,8 @@ source/images/test/*.mp4
 # Generated comparison and debug files
 comparison_results/
 debug_masks/
+recognized_frames/
+recognized_frames/recognized_faces.gif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
