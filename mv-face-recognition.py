@@ -63,6 +63,12 @@ def compute_embeddings(image_paths):
 
 
 def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
+    collection = get_contestant_collection()
+    return {
+        item['metadata']['name']: item['embedding']
+        for item in collection.get()
+        if item['metadata']['name'] in selected_contestants
+    }
     """Load and compute embeddings for selected contestants."""
     known_embeddings = {}
     for contestant_name in selected_contestants:
@@ -345,7 +351,27 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
     return None
 
 
+from chroma_db import get_contestant_collection
+
 def compute_face_embedding(image_path):
+    # Existing face detection logic
+    face = detect_face(image_path)  
+    
+    # Get embedding
+    embedding = face.embedding.tolist()
+    
+    # Store in ChromaDB
+    collection = get_contestant_collection()
+    contestant_id = os.path.basename(os.path.dirname(image_path))
+    contestant_name = os.path.basename(image_path).split('-')[0]
+    
+    collection.add(
+        embeddings=[embedding],
+        metadatas=[{"name": contestant_name}],
+        ids=[contestant_id]
+    )
+    
+    return embedding
     """Compute the face embedding for a given image."""
     img = cv2.imread(image_path)
     faces = app.get(img)
