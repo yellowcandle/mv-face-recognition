@@ -109,31 +109,52 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
 
 
 def match_face(face_embedding, known_embeddings, threshold=0.4):
-    """Compare a face embedding against known embeddings using ChromaDB."""
+    """Compare a face embedding against known embeddings."""
     try:
-        collection = get_contestant_collection()
-        results = collection.query(
-            query_embeddings=[face_embedding.tolist()],
-            n_results=3
-        )
-        
-        # Add comprehensive safety checks
-        if not results or not results.get('distances') or not results.get('metadatas'):
-            return "Unknown", 0.0
-        
-        if len(results['distances']) == 0 or len(results['distances'][0]) == 0:
-            return "Unknown", 0.0
+        # First try using ChromaDB
+        try:
+            collection = get_contestant_collection()
+            results = collection.query(
+                query_embeddings=[face_embedding.tolist()],
+                n_results=3
+            )
             
-        best_distance = results['distances'][0][0]
-        best_name = results['metadatas'][0][0].get('name', 'Unknown')
+            # Add comprehensive safety checks
+            if results and results.get('distances') and results.get('metadatas'):
+                if len(results['distances']) > 0 and len(results['distances'][0]) > 0:
+                    best_distance = results['distances'][0][0]
+                    best_name = results['metadatas'][0][0].get('name', 'Unknown')
+                    
+                    if best_distance < threshold:
+                        print(f"ChromaDB match: {best_name} with distance {best_distance}")
+                        return best_name, 1 - best_distance
+        except Exception as e:
+            print(f"ChromaDB matching error: {e}")
+            # Fall back to direct comparison if ChromaDB fails
+            
+        # Fall back to direct comparison with known_embeddings
+        best_match = "Unknown"
+        best_score = 0.0
         
-        if best_distance < threshold:
-            return best_name, 1 - best_distance
+        # Print known embeddings for debugging
+        print(f"Falling back to direct comparison with {len(known_embeddings)} known embeddings")
+        
+        for name, embeddings_list in known_embeddings.items():
+            for ref_embedding in embeddings_list:
+                # Calculate cosine similarity
+                similarity = np.dot(face_embedding, ref_embedding)
+                if similarity > 1 - threshold and similarity > best_score:
+                    best_match = name
+                    best_score = similarity
+                    print(f"Direct match found: {name} with similarity {similarity}")
+        
+        return best_match, best_score
+        
     except Exception as e:
         print(f"Error in match_face: {e}")
+        import traceback
+        print(traceback.format_exc())
         return "Unknown", 0.0
-    
-    return "Unknown", 0.0
 
 
 def process_frame(frame, known_embeddings):
@@ -458,7 +479,8 @@ def compute_face_embedding(image_path):
             return None
             
         print(f"Image shape: {img.shape}, detecting faces...")
-        faces = app.get(img)
+        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB for better face detection
+        faces = app.get(rgb_img)
         
         print(f"Found {len(faces)} faces in {image_path}")
         
@@ -466,16 +488,31 @@ def compute_face_embedding(image_path):
             face = faces[0]
             embedding = face.normed_embedding
             
+            # Get contestant name from path
+            path_parts = image_path.split('/')
+            contestant_id = path_parts[-2]  # Folder name (number)
+            
+            # Look up contestant name from contestant_info
+            try:
+                contestant_info = pd.read_csv(contestant_info_path)
+                contestant_row = contestant_info[contestant_info['編號'].astype(str) == contestant_id]
+                if not contestant_row.empty:
+                    contestant_name = contestant_row['暱稱'].iloc[0]
+                else:
+                    # Use filename as fallback
+                    contestant_name = os.path.basename(image_path).split('-')[0]
+            except Exception as e:
+                print(f"Error looking up contestant name: {e}")
+                contestant_name = os.path.basename(image_path).split('-')[0]
+            
             # Store in ChromaDB
             try:
                 collection = get_contestant_collection()
-                contestant_id = os.path.basename(os.path.dirname(image_path))
-                contestant_name = os.path.basename(image_path).split('-')[0]
                 
                 collection.add(
                     embeddings=[embedding.tolist()],
                     metadatas=[{"name": contestant_name}],
-                    ids=[contestant_id]
+                    ids=[f"{contestant_id}-{os.path.basename(image_path)}"]
                 )
                 print(f"Stored embedding for {contestant_name} in ChromaDB")
             except Exception as e:
@@ -553,30 +590,44 @@ def main():
     # Load embeddings
     known_embeddings = {}
     for contestant in selected_contestants:
+        # Try to find contestant in contestant_info
+        contestant_row = contestant_info[contestant_info["暱稱"] == contestant]
+        if contestant_row.empty:
+            print(f"Could not find contestant info for {contestant}")
+            continue
+            
+        contestant_number = contestant_row["編號"].values[0]
+        contestant_path = os.path.join(contestants_dir, str(contestant_number))
+        
+        # Check if we have embedding file
         embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
         if os.path.exists(embedding_file):
-            embedding = np.load(embedding_file, allow_pickle=True)
-            known_embeddings[contestant] = [
-                embedding
-            ]  # Ensure embeddings are stored as a list
-        else:
+            try:
+                embedding = np.load(embedding_file, allow_pickle=True)
+                known_embeddings[contestant] = embedding if isinstance(embedding, list) else [embedding]
+                print(f"Loaded embedding for {contestant} from file")
+            except Exception as e:
+                print(f"Error loading embedding for {contestant}: {e}")
+                
+        # If no embedding file or loading failed, try to compute from images
+        if contestant not in known_embeddings or not known_embeddings[contestant]:
             print(f"Computing embedding for {contestant}...")
-            contestant_image = get_contestant_image(
-                contestants_dir, contestant, contestant_info
-            )
-            if contestant_image is not None:
-                embedding = compute_face_embedding(contestant_image)
-                if embedding is not None:
-                    known_embeddings[contestant] = [
-                        embedding
-                    ]  # Store embedding in a list
-                    np.save(
-                        embedding_file, [embedding]
-                    )  # Save as a list to maintain consistency
+            if os.path.isdir(contestant_path):
+                image_paths = get_image_paths(contestant_path)
+                if image_paths:
+                    embedding = compute_face_embedding(image_paths[0])
+                    if embedding is not None:
+                        known_embeddings[contestant] = [embedding]
+                        # Save for future use
+                        np.save(embedding_file, [embedding])
+                        print(f"Computed and saved embedding for {contestant}")
+                    else:
+                        print(f"Could not compute embedding for {contestant}")
                 else:
-                    print(f"Could not compute embedding for {contestant}")
+                    print(f"No images found for {contestant} in {contestant_path}")
             else:
-                print(f"Could not find image for {contestant}")
+                print(f"Directory not found for contestant {contestant}: {contestant_path}")
+
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
     print(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
 
