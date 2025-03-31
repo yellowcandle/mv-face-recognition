@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 import argparse
 import torch
+import mediapipe as mp  # Add MediaPipe import
 
 # Configure environment before importing FaceAnalysis
 os.environ['ONNXRT_ENABLE_COREML'] = '0'  # Disable CoreML for ONNX runtime
@@ -116,7 +117,7 @@ def debug_embedding(name, embedding):
     else:
         print("Empty or invalid embedding")
 
-def match_face(face_embedding, known_embeddings, threshold=0.6):  # Increased threshold to 0.6
+def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted threshold
     """Compare a face embedding against known embeddings."""
     try:
         # First try using ChromaDB
@@ -144,28 +145,17 @@ def match_face(face_embedding, known_embeddings, threshold=0.6):  # Increased th
         best_match = "Unknown"
         best_score = 0.0
         
-        # Debug the face embedding
-        debug_embedding("Current face", face_embedding)
-        
-        # Print known embeddings for debugging
-        print(f"Falling back to direct comparison with {len(known_embeddings)} known embeddings")
-        
         # Ensure face_embedding is a 1D array
         face_emb_1d = face_embedding.flatten()
         
         for name, embeddings_list in known_embeddings.items():
             for i, ref_embedding in enumerate(embeddings_list):
                 if ref_embedding is None:
-                    print(f"Warning: None embedding for {name} at index {i}")
                     continue
                     
                 # Ensure ref_embedding is a 1D array
                 try:
                     ref_emb_1d = ref_embedding.flatten()
-                    
-                    # Debug first few comparisons
-                    if name in list(known_embeddings.keys())[:3]:
-                        debug_embedding(f"{name} (reference)", ref_emb_1d)
                     
                     # Calculate cosine similarity
                     norm_face = np.linalg.norm(face_emb_1d)
@@ -174,8 +164,8 @@ def match_face(face_embedding, known_embeddings, threshold=0.6):  # Increased th
                     if norm_face > 0 and norm_ref > 0:
                         similarity = np.dot(face_emb_1d, ref_emb_1d) / (norm_face * norm_ref)
                         
-                        # Print similarity for debugging
-                        if similarity > 0.5:  # Only print high similarities
+                        # Print similarity for debugging if it's high
+                        if similarity > 0.5:
                             print(f"Similarity with {name}: {similarity:.4f}")
                             
                         if similarity > 1 - threshold and similarity > best_score:
@@ -194,8 +184,26 @@ def match_face(face_embedding, known_embeddings, threshold=0.6):  # Increased th
         return "Unknown", 0.0
 
 
+def copy_face_object(face):
+    """Create a copy of a face object to avoid modifying the original."""
+    import copy
+    try:
+        # Try using the built-in copy method if available
+        if hasattr(face, 'copy'):
+            return face.copy()
+        
+        # Otherwise create a new object with the same attributes
+        new_face = copy.copy(face)
+        # Make a deep copy of the bbox to avoid modifying the original
+        new_face.bbox = face.bbox.copy()
+        return new_face
+    except Exception as e:
+        print(f"Error copying face object: {e}")
+        # If copying fails, return the original (not ideal but better than failing)
+        return face
+
 def process_frame(frame, known_embeddings):
-    """Detect faces in a frame and recognize known faces."""
+    """Detect faces in a frame and recognize known faces using segmentation first."""
     matches = []
     try:
         # Check if frame is valid
@@ -205,36 +213,72 @@ def process_frame(frame, known_embeddings):
             
         # Print frame shape and type for debugging
         print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
+        
+        # Step 1: Convert to RGB for consistent processing
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Step 2: Use MediaPipe for initial face detection (segmentation)
+        mp_face_detection = mp.solutions.face_detection
+        with mp_face_detection.FaceDetection(min_detection_confidence=0.5, model_selection=1) as face_detection:
+            results = face_detection.process(rgb_frame)
             
-        # Preprocessing optimizations - with error checking
-        try:
-            frame = cv2.resize(frame, (0,0), fx=0.67, fy=0.67)  # Reduce resolution
-            print(f"Resized frame shape: {frame.shape}")
-        except Exception as e:
-            print(f"Error during resize: {e}")
-            return matches
+            if not results.detections:
+                print("No faces detected with MediaPipe")
+                return matches
+                
+            print(f"MediaPipe detected {len(results.detections)} faces")
             
-        try:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        except Exception as e:
-            print(f"Error during color conversion: {e}")
-            return matches
-        
-        # Debug info
-        print(f"Detecting faces using InsightFace...")
-        
-        # Skip float16 conversion as it might be causing issues
-        # Use the original RGB frame instead
-        faces = app.get(rgb_frame)
-        
-        print(f"Found {len(faces)} faces in frame")
-        
-        for face in faces:
-            face_embedding = face.normed_embedding
-            matched_name, confidence = match_face(face_embedding, known_embeddings)
-            print(f"Match result: {matched_name} with confidence {confidence}")
-            if matched_name != "Unknown":
-                matches.append((face, matched_name))
+            # Step 3: For each detected face region, extract and process with InsightFace
+            for detection in results.detections:
+                # Get bounding box
+                bbox = detection.location_data.relative_bounding_box
+                ih, iw, _ = rgb_frame.shape
+                x, y, w, h = int(bbox.xmin * iw), int(bbox.ymin * ih), \
+                             int(bbox.width * iw), int(bbox.height * ih)
+                
+                # Add padding to the face region (20% on each side)
+                padding_x = int(w * 0.2)
+                padding_y = int(h * 0.2)
+                x1 = max(0, x - padding_x)
+                y1 = max(0, y - padding_y)
+                x2 = min(iw, x + w + padding_x)
+                y2 = min(ih, y + h + padding_y)
+                
+                # Extract face region
+                face_region = rgb_frame[y1:y2, x1:x2]
+                
+                # Save debug mask for visualization
+                debug_dir = os.path.join(project_root, "debug_masks")
+                os.makedirs(debug_dir, exist_ok=True)
+                cv2.imwrite(os.path.join(debug_dir, f"mask_{x1}.jpg"), face_region)
+                
+                # Process with InsightFace
+                try:
+                    faces = app.get(face_region)
+                    if faces:
+                        print(f"InsightFace found {len(faces)} faces in region")
+                        for face in faces:
+                            # Get the face embedding
+                            face_embedding = face.normed_embedding
+                            
+                            # Match face
+                            matched_name, confidence = match_face(face_embedding, known_embeddings)
+                            print(f"Match result: {matched_name} with confidence {confidence}")
+                            
+                            if matched_name != "Unknown":
+                                # Adjust bounding box coordinates to original frame
+                                adjusted_face = copy_face_object(face)
+                                adjusted_face.bbox[0] += x1
+                                adjusted_face.bbox[1] += y1
+                                adjusted_face.bbox[2] += x1
+                                adjusted_face.bbox[3] += y1
+                                matches.append((adjusted_face, matched_name))
+                    else:
+                        print("InsightFace found no faces in the region")
+                except Exception as e:
+                    print(f"Error processing face region: {e}")
+                    import traceback
+                    print(traceback.format_exc())
     except Exception as e:
         print(f"Error processing frame: {str(e)}")
         import traceback
