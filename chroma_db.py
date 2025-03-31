@@ -5,6 +5,7 @@ def get_chroma_client():
     return chromadb.PersistentClient(
         path=".chroma_db",
         settings=Settings(allow_reset=True)
+    )
 
 def get_contestant_collection():
     client = get_chroma_client()
