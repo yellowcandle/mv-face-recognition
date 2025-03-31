@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import argparse
+import sys
 import torch
 import mediapipe as mp  # Add MediaPipe import
 
@@ -43,7 +44,16 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true', 
                        help='Run in test mode with test_image.jpeg')
-    return parser.parse_args()
+    parser.add_argument('--threshold', type=float, default=0.5,
+                       help='Similarity threshold (0.0-1.0), default: 0.5')
+    args = parser.parse_args()
+    
+    # Validate threshold
+    if not 0.0 <= args.threshold <= 1.0:
+        print(f"Error: Threshold {args.threshold} is invalid. Must be between 0.0 and 1.0")
+        sys.exit(1)
+        
+    return args
 
 # Directory paths
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
@@ -139,7 +149,7 @@ def debug_embedding(name, embedding):
     else:
         print("Empty or invalid embedding")
 
-def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted threshold
+def match_face(face_embedding, known_embeddings, threshold=0.5):
     """Compare a face embedding against known embeddings."""
     try:
         # First try using ChromaDB if available
@@ -148,7 +158,8 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted thr
                 collection = get_contestant_collection()
                 results = collection.query(
                     query_embeddings=[face_embedding.tolist()],
-                    n_results=3
+                    n_results=3,
+                    where={"threshold": {"$gte": threshold}}  # Add threshold filter
                 )
                 
                 # Add comprehensive safety checks
@@ -227,7 +238,7 @@ def copy_face_object(face):
         # If copying fails, return the original (not ideal but better than failing)
         return face
 
-def process_frame(frame, known_embeddings):
+def process_frame(frame, known_embeddings, threshold):
     """Detect faces in a frame and recognize known faces using segmentation first."""
     matches = []
     try:
@@ -302,7 +313,7 @@ def process_frame(frame, known_embeddings):
                             face_embedding = face.normed_embedding
                             
                             # Match face
-                            matched_name, confidence = match_face(face_embedding, known_embeddings)
+                            matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
                             print(f"Match result: {matched_name} with confidence {confidence}")
                             
                             if matched_name != "Unknown":
@@ -458,7 +469,7 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
     print(f"GIF saved to {output_gif_path}")
 
 
-def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, test_mode=False):
+def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, threshold=0.5, test_mode=False):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
     console.print("[bold yellow]\nStarting video processing...[/bold yellow]")
@@ -531,7 +542,7 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, tes
                 frame_count += 1
                 pbar.update(1)
                 if frame_count % FRAME_SKIP == 0:
-                    matches = process_frame(frame, known_embeddings)
+                    matches = process_frame(frame, known_embeddings, threshold)
                     if matches:
                         timestamp_seconds = frame_count / fps
                         timestamp_formatted = "{:02}:{:02}".format(int(timestamp_seconds // 60), int(timestamp_seconds % 60))
@@ -681,6 +692,7 @@ def main():
     
     args = parse_args()
     TEST_MODE = args.test
+    SIMILARITY_THRESHOLD = args.threshold  # Get threshold from arguments
     
     if TEST_MODE:
         if not os.path.exists(TEST_IMAGE_PATH):
@@ -798,7 +810,8 @@ def main():
     print(f"Valid embeddings: {valid_embeddings}/{len(known_embeddings)}")
 
     # Process videos
-    recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, TEST_MODE)
+    recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, 
+                             threshold=SIMILARITY_THRESHOLD, test_mode=TEST_MODE)
 
 
 if __name__ == "__main__":
