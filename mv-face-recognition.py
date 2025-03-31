@@ -502,7 +502,7 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
             kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
             frame = cv2.filter2D(frame, -1, kernel)
                 
-            matches = process_frame(frame, known_embeddings)
+            matches = process_frame(frame, known_embeddings, threshold)
             if matches:
                 frame_with_boxes = draw_boxes_and_labels(frame, matches, "00:00")
                 output_path = os.path.join(project_root, "output_frames", "test_result.jpg")
