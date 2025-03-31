@@ -2,10 +2,9 @@ import chromadb
 from chromadb.config import Settings
 
 def get_chroma_client():
-    return chromadb.Client(Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=".chroma_db" 
-    ))
+    return chromadb.PersistentClient(
+        path=".chroma_db",
+        settings=Settings(allow_reset=True)
 
 def get_contestant_collection():
     client = get_chroma_client()
