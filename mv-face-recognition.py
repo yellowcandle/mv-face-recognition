@@ -53,12 +53,14 @@ contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 # Initialize FaceAnalysis with CPU-only detection
 app = FaceAnalysis(
     providers=[
-        "CPUExecutionProvider"  # Force CPU for detection model
+        "CUDAExecutionProvider" if torch.cuda.is_available() else "CPUExecutionProvider"
     ],
     allowed_modules=['detection', 'recognition'],
-    use_onnx=True
+    use_onnx=True,
+    det_thresh=0.3,  # Lower detection threshold
+    det_size=(800, 800)  # Larger detection size
 )
-app.prepare(ctx_id=0, det_size=(640, 640))  # Use standard detection size
+app.prepare(ctx_id=0, det_size=(800, 800))
 
 # Configure GPU optimizations
 if torch.backends.mps.is_available():
@@ -178,12 +180,14 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted thr
                 try:
                     ref_emb_1d = ref_embedding.flatten()
                     
-                    # Calculate cosine similarity
-                    norm_face = np.linalg.norm(face_emb_1d)
-                    norm_ref = np.linalg.norm(ref_emb_1d)
+                    # Convert and normalize embeddings
+                    face_emb_1d = face_emb_1d.astype(np.float32)
+                    ref_emb_1d = ref_emb_1d.astype(np.float32)
+                    face_emb_1d /= np.linalg.norm(face_emb_1d)
+                    ref_emb_1d /= np.linalg.norm(ref_emb_1d)
                     
-                    if norm_face > 0 and norm_ref > 0:
-                        similarity = np.dot(face_emb_1d, ref_emb_1d) / (norm_face * norm_ref)
+                    # Calculate cosine similarity
+                    similarity = np.dot(face_emb_1d, ref_emb_1d)
                         
                         # Print similarity for debugging if it's high
                         if similarity > 0.5:
@@ -240,11 +244,22 @@ def process_frame(frame, known_embeddings):
         
         # Step 2: Use MediaPipe for initial face detection (segmentation)
         mp_face_detection = mp.solutions.face_detection
-        with mp_face_detection.FaceDetection(min_detection_confidence=0.5, model_selection=1) as face_detection:
+        with mp_face_detection.FaceDetection(
+            min_detection_confidence=0.3,  # Lower threshold from 0.5
+            model_selection=0,  # Use short-range model
+            ) as face_detection:
             results = face_detection.process(rgb_frame)
             
             if not results.detections:
-                print("No faces detected with MediaPipe")
+                print("No MediaPipe detections, trying InsightFace directly")
+                faces = app.get(rgb_frame)
+                if faces:
+                    print(f"InsightFace found {len(faces)} faces in full frame")
+                    for face in faces:
+                        face_embedding = face.normed_embedding
+                        matched_name, confidence = match_face(face_embedding, known_embeddings)
+                        if matched_name != "Unknown":
+                            matches.append((face, matched_name))
                 return matches
                 
             print(f"MediaPipe detected {len(results.detections)} faces")
@@ -257,16 +272,20 @@ def process_frame(frame, known_embeddings):
                 x, y, w, h = int(bbox.xmin * iw), int(bbox.ymin * ih), \
                              int(bbox.width * iw), int(bbox.height * ih)
                 
-                # Add padding to the face region (20% on each side)
-                padding_x = int(w * 0.2)
-                padding_y = int(h * 0.2)
+                # Add padding to the face region (40% on each side)
+                padding = 0.4
+                padding_x = int(w * padding)
+                padding_y = int(h * padding)
                 x1 = max(0, x - padding_x)
                 y1 = max(0, y - padding_y)
                 x2 = min(iw, x + w + padding_x)
                 y2 = min(ih, y + h + padding_y)
                 
-                # Extract face region
+                # Extract face region with histogram equalization
                 face_region = rgb_frame[y1:y2, x1:x2]
+                face_region = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY)
+                face_region = cv2.equalizeHist(face_region)
+                face_region = cv2.cvtColor(face_region, cv2.COLOR_GRAY2RGB)
                 
                 # Save debug mask for visualization
                 debug_dir = os.path.join(project_root, "debug_masks")
@@ -453,11 +472,24 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, tes
         print(f"\nProcessing {'test image' if test_mode else 'video'}: {video_file}")
         
         if test_mode:
-            # For test image, just read it directly
+            # For test image, validate and preprocess
             frame = cv2.imread(video_path)
             if frame is None:
                 print(f"Could not read test image {video_path}")
                 continue
+                
+            # Check resolution
+            if frame.shape[0] < 512 or frame.shape[1] < 512:
+                print("Test image resolution too low (min 512x512 required)")
+                continue
+                
+            # Convert to 3 channels if needed
+            if frame.shape[2] == 4:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            
+            # Apply sharpening
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            frame = cv2.filter2D(frame, -1, kernel)
                 
             matches = process_frame(frame, known_embeddings)
             if matches:
