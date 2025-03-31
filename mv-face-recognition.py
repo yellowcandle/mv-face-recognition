@@ -110,24 +110,28 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
 
 def match_face(face_embedding, known_embeddings, threshold=0.4):
     """Compare a face embedding against known embeddings using ChromaDB."""
-    collection = get_contestant_collection()
-    results = collection.query(
-        query_embeddings=[face_embedding.tolist()],
-        n_results=3
-    )
-    
-    # Add comprehensive safety checks
-    if not results or not results.get('distances') or not results.get('metadatas'):
-        return "Unknown", 0.0
-    
     try:
+        collection = get_contestant_collection()
+        results = collection.query(
+            query_embeddings=[face_embedding.tolist()],
+            n_results=3
+        )
+        
+        # Add comprehensive safety checks
+        if not results or not results.get('distances') or not results.get('metadatas'):
+            return "Unknown", 0.0
+        
+        if len(results['distances']) == 0 or len(results['distances'][0]) == 0:
+            return "Unknown", 0.0
+            
         best_distance = results['distances'][0][0]
         best_name = results['metadatas'][0][0].get('name', 'Unknown')
-    except (IndexError, KeyError):
+        
+        if best_distance < threshold:
+            return best_name, 1 - best_distance
+    except Exception as e:
+        print(f"Error in match_face: {e}")
         return "Unknown", 0.0
-    
-    if best_distance < threshold:
-        return best_name, 1 - best_distance
     
     return "Unknown", 0.0
 
@@ -136,22 +140,37 @@ def process_frame(frame, known_embeddings):
     """Detect faces in a frame and recognize known faces."""
     matches = []
     try:
-        # Preprocessing optimizations
-        frame = cv2.resize(frame, (0,0), fx=0.67, fy=0.67)  # Reduce resolution
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Check if frame is valid
+        if frame is None or frame.size == 0:
+            print("Warning: Empty or invalid frame received")
+            return matches
+            
+        # Preprocessing optimizations - with error checking
+        try:
+            frame = cv2.resize(frame, (0,0), fx=0.67, fy=0.67)  # Reduce resolution
+        except Exception as e:
+            print(f"Error during resize: {e}")
+            return matches
+            
+        try:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        except Exception as e:
+            print(f"Error during color conversion: {e}")
+            return matches
         
-        # Use half precision for Apple GPU
-        if torch.backends.mps.is_available():
-            rgb_frame = (rgb_frame.astype('float32') / 255.0).astype('float16')
-        
+        # Skip float16 conversion as it might be causing issues
+        # Use the original RGB frame instead
         faces = app.get(rgb_frame)
+        
         for face in faces:
             face_embedding = face.normed_embedding
             matched_name, confidence = match_face(face_embedding, known_embeddings)
             if matched_name != "Unknown":
                 matches.append((face, matched_name))
     except Exception as e:
-        print(f"Error processing frame: {str(e)[:100]}")  # Truncate long errors
+        print(f"Error processing frame: {str(e)}")
+        import traceback
+        print(traceback.format_exc())  # Print full traceback for debugging
     return matches
 
 
@@ -178,61 +197,95 @@ def draw_utf8_text(img, text, pos, font_size, color):
 def draw_boxes_and_labels(frame, matches, timestamp):
     """Draw boxes, labels, and timestamp on the frame using Pillow."""
     try:
+        # Check if frame is valid
+        if frame is None or frame.size == 0:
+            print("Warning: Empty or invalid frame in draw_boxes_and_labels")
+            return frame
+            
         # Convert OpenCV image (BGR) to PIL image (RGB)
-        pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        try:
+            pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        except Exception as e:
+            print(f"Error converting frame to PIL image: {e}")
+            return frame
+            
         draw = ImageDraw.Draw(pil_img)
 
         # Load the font
         font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
+        if not os.path.exists(font_path):
+            print(f"Warning: Font file not found at {font_path}")
+            # Use a default font if the specified font is not available
+            larger_font = None
+            timestamp_font = None
+        else:
+            try:
+                larger_font = ImageFont.truetype(font_path, 60)
+                timestamp_font = ImageFont.truetype(font_path, 40)
+            except Exception as e:
+                print(f"Error loading font: {e}")
+                larger_font = None
+                timestamp_font = None
 
+        # Draw boxes and labels
         for face, name in matches:
-            bbox = face.bbox.astype(int)
-            # Increase rectangle size
-            padding = 10
-            bbox_enlarged = [
-                bbox[0] - padding,
-                bbox[1] - padding,
-                bbox[2] + padding,
-                bbox[3] + padding,
-            ]
-            # Draw enlarged rectangle
-            draw.rectangle(bbox_enlarged, outline="green", width=3)
-            # Increase font size even more
-            larger_font = ImageFont.truetype(font_path, 60)  # Increased from 40 to 60
-            # Draw text with increased size
-            text_bbox = draw.textbbox(
-                (bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font
-            )  # Adjusted y-coordinate
-            draw.rectangle(text_bbox, fill="green")
-            draw.text(
-                (bbox_enlarged[0], bbox_enlarged[1] - 65),
-                name,
-                font=larger_font,
-                fill="white",
-            )  # Adjusted y-coordinate
+            try:
+                bbox = face.bbox.astype(int)
+                # Increase rectangle size
+                padding = 10
+                bbox_enlarged = [
+                    max(0, bbox[0] - padding),
+                    max(0, bbox[1] - padding),
+                    bbox[2] + padding,
+                    bbox[3] + padding,
+                ]
+                # Draw enlarged rectangle
+                draw.rectangle(bbox_enlarged, outline="green", width=3)
+                
+                # Draw text with increased size
+                if larger_font:
+                    text_bbox = draw.textbbox(
+                        (bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font
+                    )
+                    draw.rectangle(text_bbox, fill="green")
+                    draw.text(
+                        (bbox_enlarged[0], bbox_enlarged[1] - 65),
+                        name,
+                        font=larger_font,
+                        fill="white",
+                    )
+            except Exception as e:
+                print(f"Error drawing box for face: {e}")
 
-        # Define font size and color for timestamp
-        timestamp_font = ImageFont.truetype(font_path, 40)
-        timestamp_color = "yellow"
+        # Draw timestamp
+        try:
+            # Get image dimensions
+            img_width, img_height = pil_img.size
 
-        # Get image dimensions
-        img_width, img_height = pil_img.size
+            if timestamp_font:
+                # Calculate position for timestamp
+                text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                position = (img_width - text_width - 10, img_height - text_height - 10)
 
-        # Calculate position for timestamp (10 pixels from the bottom-right corner)
-        text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        position = (img_width - text_width - 10, img_height - text_height - 10)
-
-        # Draw the timestamp
-        draw.text(position, timestamp, font=timestamp_font, fill=timestamp_color)
+                # Draw the timestamp
+                draw.text(position, timestamp, font=timestamp_font, fill="yellow")
+        except Exception as e:
+            print(f"Error drawing timestamp: {e}")
 
         # Convert back to OpenCV image (BGR)
-        frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        try:
+            frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            print(f"Error converting PIL image back to OpenCV: {e}")
+            
         return frame
     except Exception as e:
-        print(f"Error drawing boxes and labels: {e}")
-        return frame  # Ensure frame is returned even if an error occurs
+        print(f"Error in draw_boxes_and_labels: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return frame  # Return original frame if any error occurs
 
 
 def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
