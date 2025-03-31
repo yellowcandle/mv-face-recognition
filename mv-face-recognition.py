@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import argparse
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 
@@ -16,8 +17,13 @@ current_script_path = os.path.abspath(__file__)
 project_root = os.path.dirname(current_script_path)
 
 # Test mode configuration
-TEST_MODE = False
 TEST_IMAGE_PATH = os.path.join(project_root, "source", "images", "test", "test_image.jpeg")
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test', action='store_true', 
+                       help='Run in test mode with test_image.jpeg')
+    return parser.parse_args()
 
 # Directory paths
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
@@ -344,11 +350,15 @@ def compute_face_embedding(image_path):
 def main():
     print("Face Recognition Script - Processing Videos")
     
-    # Check for test mode
-    global TEST_MODE
-    if os.path.exists(TEST_IMAGE_PATH):
-        TEST_MODE = True
-        print("\nTest image found - running in test mode")
+    args = parse_args()
+    TEST_MODE = args.test
+    
+    if TEST_MODE:
+        if not os.path.exists(TEST_IMAGE_PATH):
+            print(f"\nError: Test image not found at {TEST_IMAGE_PATH}")
+            print("Please place your test image at that location or run without --test flag")
+            return
+        print("\nRunning in test mode")
         
     # Load contestant data
     contestant_info = pd.read_csv(contestant_info_path)
