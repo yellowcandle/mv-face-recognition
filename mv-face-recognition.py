@@ -211,7 +211,7 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
     print(f"GIF saved to {output_gif_path}")
 
 
-def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
+def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, test_mode=False):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
     for video_file in tqdm(selected_videos, desc="Processing videos"):
@@ -220,9 +220,9 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
             print(f"Video file {video_file} not found.")
             continue
 
-        print(f"\nProcessing {'test image' if TEST_MODE else 'video'}: {video_file}")
+        print(f"\nProcessing {'test image' if test_mode else 'video'}: {video_file}")
         
-        if TEST_MODE:
+        if test_mode:
             # For test image, just read it directly
             frame = cv2.imread(video_path)
             if frame is None:
@@ -410,7 +410,7 @@ def main():
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
 
     # Process videos
-    recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings)
+    recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, TEST_MODE)
 
 
 if __name__ == "__main__":
