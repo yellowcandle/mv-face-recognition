@@ -8,6 +8,15 @@ import argparse
 import torch
 import mediapipe as mp  # Add MediaPipe import
 
+# Check if ChromaDB is available
+CHROMA_AVAILABLE = False
+try:
+    from chroma_db import get_contestant_collection
+    CHROMA_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: ChromaDB import failed: {e}")
+    print("Face matching will use direct comparison only.")
+
 # Configure environment before importing FaceAnalysis
 os.environ['ONNXRT_ENABLE_COREML'] = '0'  # Disable CoreML for ONNX runtime
 os.environ['INSIGHTFACE_DISABLE_COREML'] = '1'  # Disable CoreML for InsightFace
@@ -84,12 +93,23 @@ def compute_embeddings(image_paths):
 
 
 def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant_info):
-    collection = get_contestant_collection()
-    return {
-        item['metadata']['name']: item['embedding']
-        for item in collection.get()
-        if item['metadata']['name'] in selected_contestants
-    }
+    """Load and compute embeddings for selected contestants."""
+    known_embeddings = {}
+    for contestant_name in selected_contestants:
+        contestant_number = contestant_info.loc[
+            contestant_info["暱稱"] == contestant_name, "編號"
+        ].values[0]
+        contestant_path = os.path.join(contestants_dir, str(contestant_number))
+        if os.path.isdir(contestant_path):
+            image_paths = get_image_paths(contestant_path)
+            embeddings = compute_embeddings(image_paths)
+            if embeddings:
+                known_embeddings[contestant_name] = embeddings
+        else:
+            print(
+                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
+            )
+    return known_embeddings
     """Load and compute embeddings for selected contestants."""
     known_embeddings = {}
     for contestant_name in selected_contestants:
@@ -120,28 +140,29 @@ def debug_embedding(name, embedding):
 def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted threshold
     """Compare a face embedding against known embeddings."""
     try:
-        # First try using ChromaDB
-        try:
-            collection = get_contestant_collection()
-            results = collection.query(
-                query_embeddings=[face_embedding.tolist()],
-                n_results=3
-            )
-            
-            # Add comprehensive safety checks
-            if results and results.get('distances') and results.get('metadatas'):
-                if len(results['distances']) > 0 and len(results['distances'][0]) > 0:
-                    best_distance = results['distances'][0][0]
-                    best_name = results['metadatas'][0][0].get('name', 'Unknown')
-                    
-                    if best_distance < threshold:
-                        print(f"ChromaDB match: {best_name} with distance {best_distance}")
-                        return best_name, 1 - best_distance
-        except Exception as e:
-            print(f"ChromaDB matching error: {e}")
-            # Fall back to direct comparison if ChromaDB fails
-            
-        # Fall back to direct comparison with known_embeddings
+        # First try using ChromaDB if available
+        if CHROMA_AVAILABLE:
+            try:
+                collection = get_contestant_collection()
+                results = collection.query(
+                    query_embeddings=[face_embedding.tolist()],
+                    n_results=3
+                )
+                
+                # Add comprehensive safety checks
+                if results and results.get('distances') and results.get('metadatas'):
+                    if len(results['distances']) > 0 and len(results['distances'][0]) > 0:
+                        best_distance = results['distances'][0][0]
+                        best_name = results['metadatas'][0][0].get('name', 'Unknown')
+                        
+                        if best_distance < threshold:
+                            print(f"ChromaDB match: {best_name} with distance {best_distance}")
+                            return best_name, 1 - best_distance
+            except Exception as e:
+                print(f"ChromaDB matching error: {e}")
+                print("Falling back to direct comparison")
+        
+        # Direct comparison with known_embeddings
         best_match = "Unknown"
         best_score = 0.0
         
@@ -547,7 +568,7 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
     return None
 
 
-from chroma_db import get_contestant_collection
+# ChromaDB import is now handled at the top of the file
 
 def compute_face_embedding(image_path):
     """Compute the face embedding for a given image."""
@@ -586,18 +607,20 @@ def compute_face_embedding(image_path):
                 print(f"Error looking up contestant name: {e}")
                 contestant_name = os.path.basename(image_path).split('-')[0]
             
-            # Store in ChromaDB
-            try:
-                collection = get_contestant_collection()
-                
-                collection.add(
-                    embeddings=[embedding.tolist()],
-                    metadatas=[{"name": contestant_name}],
-                    ids=[f"{contestant_id}-{os.path.basename(image_path)}"]
-                )
-                print(f"Stored embedding for {contestant_name} in ChromaDB")
-            except Exception as e:
-                print(f"Error storing in ChromaDB: {e}")
+            # Store in ChromaDB if available
+            if CHROMA_AVAILABLE:
+                try:
+                    collection = get_contestant_collection()
+                    
+                    collection.add(
+                        embeddings=[embedding.tolist()],
+                        metadatas=[{"name": contestant_name}],
+                        ids=[f"{contestant_id}-{os.path.basename(image_path)}"]
+                    )
+                    print(f"Stored embedding for {contestant_name} in ChromaDB")
+                except Exception as e:
+                    print(f"Error storing in ChromaDB: {e}")
+                    print("Continuing without ChromaDB storage")
             
             return embedding
         else:
