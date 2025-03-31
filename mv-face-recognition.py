@@ -188,12 +188,12 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):  # Adjusted thr
                     
                     # Calculate cosine similarity
                     similarity = np.dot(face_emb_1d, ref_emb_1d)
+                    
+                    # Print similarity for debugging if it's high
+                    if similarity > 0.5:
+                        print(f"Similarity with {name}: {similarity:.4f}")
                         
-                        # Print similarity for debugging if it's high
-                        if similarity > 0.5:
-                            print(f"Similarity with {name}: {similarity:.4f}")
-                            
-                        if similarity > 1 - threshold and similarity > best_score:
+                    if similarity > 1 - threshold and similarity > best_score:
                             best_match = name
                             best_score = similarity
                             print(f"Direct match found: {name} with similarity {similarity:.4f}")
