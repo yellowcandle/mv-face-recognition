@@ -298,8 +298,7 @@ def process_frame(frame, known_embeddings, threshold):
         mp_face_detection = mp.solutions.face_detection
         with mp_face_detection.FaceDetection(
             min_detection_confidence=0.1,  # Even more sensitive detection
-            model_selection=0,  # Use short-range model for closer faces
-            allow_feedback=False  # Disable feedback tensors
+            model_selection=0  # Use short-range model for closer faces
             ) as face_detection:
             results = face_detection.process(rgb_frame)
             
