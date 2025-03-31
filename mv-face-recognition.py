@@ -170,12 +170,12 @@ def verify_borderline_match(face_embedding, candidate_embedding, threshold):
     euclidean_dist = np.linalg.norm(face_emb - cand_emb)
     pearson_corr = np.corrcoef(face_emb, cand_emb)[0,1]
     
-    # Weighted combined score
-    combined_score = (0.6 * cosine_sim) + (0.3 * (1 - euclidean_dist)) + (0.1 * pearson_corr)
+    # Adjusted weights for better verification
+    combined_score = (0.5 * cosine_sim) + (0.3 * (1 - euclidean_dist)) + (0.2 * pearson_corr)
     
     print(f"Verification - Cosine: {cosine_sim:.3f}, Euclidean: {euclidean_dist:.3f}, Pearson: {pearson_corr:.3f}, Combined: {combined_score:.3f}")
     
-    return combined_score >= (threshold + 0.05)  # Slightly higher bar for verification
+    return combined_score >= threshold  # Use original threshold for verification
 
 def match_face(face_embedding, known_embeddings, threshold=0.5):
     """Compare a face embedding against known embeddings."""
@@ -294,8 +294,8 @@ def process_frame(frame, known_embeddings, threshold):
         # Step 2: Use MediaPipe for initial face detection (segmentation)
         mp_face_detection = mp.solutions.face_detection
         with mp_face_detection.FaceDetection(
-            min_detection_confidence=0.25,  # More sensitive detection
-            model_selection=1,  # Use full-range model
+            min_detection_confidence=0.2,  # Even more sensitive detection
+            model_selection=0,  # Use short-range model for closer faces
             ) as face_detection:
             results = face_detection.process(rgb_frame)
             
@@ -663,8 +663,10 @@ def compute_face_embedding(image_path):
             
         print(f"Image shape: {img.shape}, detecting faces...")
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB for better face detection
-        # Try detection with different sizes
+        # Try detection with different sizes with debug info
+        print(f"Attempting face detection with InsightFace...")
         for det_size in [(800, 800), (640, 640), (1024, 1024)]:
+            print(f"Trying detection size {det_size}")
             app.det_size = det_size
             faces = app.get(rgb_img)
             if faces:
