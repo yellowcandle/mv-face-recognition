@@ -1,4 +1,5 @@
 import os
+os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'  # Suppress albumentations update warning
 import shutil
 import cv2
 import numpy as np
@@ -101,7 +102,9 @@ def compute_embeddings(image_paths):
         try:
             img = cv2.imread(img_path)
             faces = app.get(img)
-            embeddings.extend([face.normed_embedding for face in faces])
+            for face in faces:
+                embedding = face.normed_embedding.flatten()  # Ensure 1D array
+                embeddings.append(embedding)
         except Exception as e:
             print(f"Error processing {img_path}: {e}")
     return embeddings
