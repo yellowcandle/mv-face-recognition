@@ -235,8 +235,8 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                         
                     if similarity >= threshold and similarity > best_score:
                         # Additional verification for borderline matches
-                        if threshold <= similarity < (threshold + 0.1):
-                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold):
+                        if threshold <= similarity < (threshold + 0.15):  # Wider verification band
+                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold * 0.95):  # Lower verification threshold
                                 best_match = name
                                 best_score = similarity
                                 print(f"Verified match: {name} with similarity {similarity:.4f}")
@@ -294,8 +294,8 @@ def process_frame(frame, known_embeddings, threshold):
         # Step 2: Use MediaPipe for initial face detection (segmentation)
         mp_face_detection = mp.solutions.face_detection
         with mp_face_detection.FaceDetection(
-            min_detection_confidence=0.3,  # Lower threshold from 0.5
-            model_selection=0,  # Use short-range model
+            min_detection_confidence=0.25,  # More sensitive detection
+            model_selection=1,  # Use full-range model
             ) as face_detection:
             results = face_detection.process(rgb_frame)
             
@@ -663,7 +663,12 @@ def compute_face_embedding(image_path):
             
         print(f"Image shape: {img.shape}, detecting faces...")
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB for better face detection
-        faces = app.get(rgb_img)
+        # Try detection with different sizes
+        for det_size in [(800, 800), (640, 640), (1024, 1024)]:
+            app.det_size = det_size
+            faces = app.get(rgb_img)
+            if faces:
+                break
         
         print(f"Found {len(faces)} faces in {image_path}")
         
@@ -790,12 +795,15 @@ def main():
         embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
         if os.path.exists(embedding_file):
             try:
-                embedding = np.load(embedding_file, allow_pickle=True)
+                embedding = np.load(embedding_file, allow_pickle=True).flatten()  # Ensure 1D array
                 print(f"Loaded embedding for {contestant} from file: {embedding_file}")
                 
                 # Debug the loaded embedding
                 if isinstance(embedding, np.ndarray):
                     print(f"  Shape: {embedding.shape}, Type: {type(embedding)}")
+                    if len(embedding.shape) > 1:
+                        embedding = embedding.flatten()
+                        print(f"  Flattened to shape: {embedding.shape}")
                 elif isinstance(embedding, list):
                     print(f"  List of {len(embedding)} embeddings")
                 else:
