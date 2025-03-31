@@ -354,10 +354,13 @@ from chroma_db import get_contestant_collection
 
 def compute_face_embedding(image_path):
     # Existing face detection logic
-    face = detect_face(image_path)  
-    
-    # Get embedding
-    embedding = face.embedding.tolist()
+    img = cv2.imread(image_path)
+    faces = app.get(img)
+    if not faces:
+        return None
+        
+    face = faces[0]
+    embedding = face.normed_embedding.tolist()
     
     # Store in ChromaDB
     collection = get_contestant_collection()
