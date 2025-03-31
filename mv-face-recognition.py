@@ -297,12 +297,15 @@ def process_frame(frame, known_embeddings, threshold):
         # Step 2: Use MediaPipe for initial face detection (segmentation)
         mp_face_detection = mp.solutions.face_detection
         with mp_face_detection.FaceDetection(
-            min_detection_confidence=0.2,  # Even more sensitive detection
+            min_detection_confidence=0.1,  # Even more sensitive detection
             model_selection=0,  # Use short-range model for closer faces
+            allow_feedback=False  # Disable feedback tensors
             ) as face_detection:
             results = face_detection.process(rgb_frame)
             
-            if not results.detections:
+            if results.detections:
+                print(f"MediaPipe detected {len(results.detections)} faces (confidence: {results.detections[0].score[0]:.2f})")
+            else:
                 print("No MediaPipe detections, trying InsightFace directly")
                 faces = app.get(rgb_frame)
                 if faces:
