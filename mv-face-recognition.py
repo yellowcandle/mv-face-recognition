@@ -170,12 +170,13 @@ def verify_borderline_match(face_embedding, candidate_embedding, threshold):
     euclidean_dist = np.linalg.norm(face_emb - cand_emb)
     pearson_corr = np.corrcoef(face_emb, cand_emb)[0,1]
     
-    # Adjusted weights for better verification
-    combined_score = (0.5 * cosine_sim) + (0.3 * (1 - euclidean_dist)) + (0.2 * pearson_corr)
+    # More lenient weights favoring cosine similarity
+    combined_score = (0.7 * cosine_sim) + (0.2 * (1 - euclidean_dist)) + (0.1 * pearson_corr)
     
     print(f"Verification - Cosine: {cosine_sim:.3f}, Euclidean: {euclidean_dist:.3f}, Pearson: {pearson_corr:.3f}, Combined: {combined_score:.3f}")
     
-    return combined_score >= threshold  # Use original threshold for verification
+    # More permissive verification threshold
+    return combined_score >= (threshold * 0.90)  # Allow 10% lower threshold for verification
 
 def match_face(face_embedding, known_embeddings, threshold=0.5):
     """Compare a face embedding against known embeddings."""
@@ -235,11 +236,13 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                         
                     if similarity >= threshold and similarity > best_score:
                         # Additional verification for borderline matches
-                        if threshold <= similarity < (threshold + 0.15):  # Wider verification band
-                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold * 0.95):  # Lower verification threshold
-                                best_match = name
-                                best_score = similarity
-                                print(f"Verified match: {name} with similarity {similarity:.4f}")
+                        if threshold <= similarity < (threshold + 0.20):  # Wider verification band
+                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold * 0.90):  # More lenient verification
+                                # Only update if this is the best match so far
+                                if similarity > best_score:
+                                    best_match = name
+                                    best_score = similarity
+                                    print(f"Verified match: {name} with similarity {similarity:.4f}")
                             else:
                                 print(f"Rejected borderline match: {name} {similarity:.4f}")
                         else:
