@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import argparse
+import torch
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
@@ -34,9 +35,22 @@ contestants_dir = os.path.join(project_root, "source/photo/contestants")
 videos_dir = os.path.join(project_root, "source/videos")
 contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 
-# Initialize InsightFace
-app = FaceAnalysis(providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-app.prepare(ctx_id=0, det_size=(640, 640))
+# Initialize InsightFace with Apple Silicon optimizations
+app = FaceAnalysis(
+    providers=[
+        "CoreMLExecutionProvider",  # Apple Silicon first
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+    ],
+    allowed_modules=['detection', 'recognition'],
+    use_onnx=True
+)
+app.prepare(ctx_id=0, det_size=(320, 320))  # Reduced detection size
+
+# Add GPU optimization after FaceAnalysis setup
+if torch.backends.mps.is_available():
+    torch.mps.set_per_process_memory_fraction(0.75)
+    torch.set_flush_denormal(True)
 
 
 def get_image_paths(contestant_path):
@@ -96,30 +110,42 @@ def match_face(face_embedding, known_embeddings, threshold=0.4):
         n_results=3
     )
     
-    if not results['distances']:
-        return None
+    # Add comprehensive safety checks
+    if not results or not results.get('distances') or not results.get('metadatas'):
+        return "Unknown", 0.0
     
-    best_match_idx = 0
-    best_distance = results['distances'][0][best_match_idx]
+    try:
+        best_distance = results['distances'][0][0]
+        best_name = results['metadatas'][0][0].get('name', 'Unknown')
+    except (IndexError, KeyError):
+        return "Unknown", 0.0
     
     if best_distance < threshold:
-        return results['metadatas'][0][best_match_idx]['name']
+        return best_name, 1 - best_distance
     
-    return None
+    return "Unknown", 0.0
 
 
 def process_frame(frame, known_embeddings):
     """Detect faces in a frame and recognize known faces."""
     matches = []
     try:
-        faces = app.get(frame)
+        # Preprocessing optimizations
+        frame = cv2.resize(frame, (0,0), fx=0.67, fy=0.67)  # Reduce resolution
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Use half precision for Apple GPU
+        if torch.backends.mps.is_available():
+            rgb_frame = (rgb_frame.astype('float32') / 255.0).astype('float16')
+        
+        faces = app.get(rgb_frame)
         for face in faces:
             face_embedding = face.normed_embedding
-            matched_name = match_face(face_embedding, known_embeddings)
-            if matched_name:
+            matched_name, confidence = match_face(face_embedding, known_embeddings)
+            if matched_name != "Unknown":
                 matches.append((face, matched_name))
     except Exception as e:
-        print(f"Error processing frame: {e}")
+        print(f"Error processing frame: {str(e)[:100]}")  # Truncate long errors
     return matches
 
 
@@ -383,6 +409,16 @@ def compute_face_embedding(image_path):
 
 
 def main():
+    # Add hardware acceleration
+    cv2.setUseOptimized(True)
+    cv2.ocl.setUseOpenCL(True)
+    
+    if torch.backends.mps.is_available():
+        print("🚀 Using Apple Silicon GPU acceleration")
+        os.environ['INSIGHTFACE_ENABLE_MPS'] = '1'
+    else:
+        print("⚠️ Running on CPU only")
+
     console.print("[bold green]\nMV Face Recognition System[/bold green]")
     console.print("[bold magenta]=======================[/bold magenta]\n")
     
