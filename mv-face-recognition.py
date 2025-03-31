@@ -158,8 +158,7 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                 collection = get_contestant_collection()
                 results = collection.query(
                     query_embeddings=[face_embedding.tolist()],
-                    n_results=3,
-                    where={"threshold": {"$gte": threshold}}  # Add threshold filter
+                    n_results=3
                 )
                 
                 # Add comprehensive safety checks
@@ -168,7 +167,9 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                         best_distance = results['distances'][0][0]
                         best_name = results['metadatas'][0][0].get('name', 'Unknown')
                         
-                        if best_distance < threshold:
+                        # Convert distance to similarity and compare with threshold
+                        similarity = 1 - best_distance
+                        if similarity >= threshold:
                             print(f"ChromaDB match: {best_name} with distance {best_distance}")
                             return best_name, 1 - best_distance
             except Exception as e:
@@ -204,7 +205,7 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                     if similarity > 0.5:
                         print(f"Similarity with {name}: {similarity:.4f}")
                         
-                    if similarity > 1 - threshold and similarity > best_score:
+                    if similarity >= threshold and similarity > best_score:
                             best_match = name
                             best_score = similarity
                             print(f"Direct match found: {name} with similarity {similarity:.4f}")
@@ -269,7 +270,7 @@ def process_frame(frame, known_embeddings, threshold):
                     for face in faces:
                         face_embedding = face.normed_embedding
                         matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
-                        if matched_name != "Unknown":
+                        if confidence >= threshold and matched_name != "Unknown":
                             matches.append((face, matched_name))
                 return matches
                 
