@@ -88,24 +88,23 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
     return known_embeddings
 
 
-def match_face(face_embedding, known_embeddings):
-    """Compare a face embedding against known embeddings."""
-    for name, embeddings_list in known_embeddings.items():
-        for known_embedding in embeddings_list:
-            known_embedding = (
-                known_embedding.flatten()
-            )  # {{ Ensure known_embedding is 1D }}
-            distance = np.dot(face_embedding, known_embedding)
-            if isinstance(distance, np.ndarray):
-                if distance.size == 1:
-                    distance = distance.item()  # Convert single-element array to scalar
-                else:
-                    print(f"Unexpected distance array size for {name}: {distance.size}")
-                    distance = (
-                        distance.mean()
-                    )  # Handle multi-element arrays appropriately
-            if distance > DISTANCE_THRESHOLD:
-                return name
+def match_face(face_embedding, known_embeddings, threshold=0.4):
+    """Compare a face embedding against known embeddings using ChromaDB."""
+    collection = get_contestant_collection()
+    results = collection.query(
+        query_embeddings=[face_embedding.tolist()],
+        n_results=3
+    )
+    
+    if not results['distances']:
+        return None
+    
+    best_match_idx = 0
+    best_distance = results['distances'][0][best_match_idx]
+    
+    if best_distance < threshold:
+        return results['metadatas'][0][best_match_idx]['name']
+    
     return None
 
 
