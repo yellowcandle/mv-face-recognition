@@ -268,7 +268,7 @@ def process_frame(frame, known_embeddings, threshold):
                     print(f"InsightFace found {len(faces)} faces in full frame")
                     for face in faces:
                         face_embedding = face.normed_embedding
-                        matched_name, confidence = match_face(face_embedding, known_embeddings)
+                        matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
                         if matched_name != "Unknown":
                             matches.append((face, matched_name))
                 return matches
