@@ -141,12 +141,20 @@ def match_face(face_embedding, known_embeddings, threshold=0.4):
         
         for name, embeddings_list in known_embeddings.items():
             for ref_embedding in embeddings_list:
+                # Ensure both embeddings are 1D arrays with shape (512,)
+                face_emb_1d = face_embedding.flatten()
+                ref_emb_1d = ref_embedding.flatten()
+                
                 # Calculate cosine similarity
-                similarity = np.dot(face_embedding, ref_embedding)
-                if similarity > 1 - threshold and similarity > best_score:
-                    best_match = name
-                    best_score = similarity
-                    print(f"Direct match found: {name} with similarity {similarity}")
+                try:
+                    similarity = np.dot(face_emb_1d, ref_emb_1d) / (np.linalg.norm(face_emb_1d) * np.linalg.norm(ref_emb_1d))
+                    if similarity > 1 - threshold and similarity > best_score:
+                        best_match = name
+                        best_score = similarity
+                        print(f"Direct match found: {name} with similarity {similarity}")
+                except Exception as e:
+                    print(f"Error calculating similarity: {e}")
+                    print(f"Face embedding shape: {face_emb_1d.shape}, Reference embedding shape: {ref_emb_1d.shape}")
         
         return best_match, best_score
         
@@ -604,7 +612,13 @@ def main():
         if os.path.exists(embedding_file):
             try:
                 embedding = np.load(embedding_file, allow_pickle=True)
-                known_embeddings[contestant] = embedding if isinstance(embedding, list) else [embedding]
+                # Ensure embeddings are in a list and have consistent shape
+                if isinstance(embedding, list):
+                    # Make sure each embedding is a 1D array
+                    known_embeddings[contestant] = [e.flatten() if e is not None else None for e in embedding]
+                else:
+                    # Single embedding, make sure it's a 1D array
+                    known_embeddings[contestant] = [embedding.flatten()]
                 print(f"Loaded embedding for {contestant} from file")
             except Exception as e:
                 print(f"Error loading embedding for {contestant}: {e}")
@@ -617,9 +631,10 @@ def main():
                 if image_paths:
                     embedding = compute_face_embedding(image_paths[0])
                     if embedding is not None:
-                        known_embeddings[contestant] = [embedding]
+                        # Ensure embedding is a 1D array
+                        known_embeddings[contestant] = [embedding.flatten()]
                         # Save for future use
-                        np.save(embedding_file, [embedding])
+                        np.save(embedding_file, [embedding.flatten()])
                         print(f"Computed and saved embedding for {contestant}")
                     else:
                         print(f"Could not compute embedding for {contestant}")
