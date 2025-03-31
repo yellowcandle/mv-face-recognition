@@ -145,9 +145,13 @@ def process_frame(frame, known_embeddings):
             print("Warning: Empty or invalid frame received")
             return matches
             
+        # Print frame shape and type for debugging
+        print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
+            
         # Preprocessing optimizations - with error checking
         try:
             frame = cv2.resize(frame, (0,0), fx=0.67, fy=0.67)  # Reduce resolution
+            print(f"Resized frame shape: {frame.shape}")
         except Exception as e:
             print(f"Error during resize: {e}")
             return matches
@@ -158,13 +162,19 @@ def process_frame(frame, known_embeddings):
             print(f"Error during color conversion: {e}")
             return matches
         
+        # Debug info
+        print(f"Detecting faces using InsightFace...")
+        
         # Skip float16 conversion as it might be causing issues
         # Use the original RGB frame instead
         faces = app.get(rgb_frame)
         
+        print(f"Found {len(faces)} faces in frame")
+        
         for face in faces:
             face_embedding = face.normed_embedding
             matched_name, confidence = match_face(face_embedding, known_embeddings)
+            print(f"Match result: {matched_name} with confidence {confidence}")
             if matched_name != "Unknown":
                 matches.append((face, matched_name))
     except Exception as e:
@@ -438,33 +448,48 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
 from chroma_db import get_contestant_collection
 
 def compute_face_embedding(image_path):
-    # Existing face detection logic
-    img = cv2.imread(image_path)
-    faces = app.get(img)
-    if not faces:
-        return None
-        
-    face = faces[0]
-    embedding = face.normed_embedding.tolist()
-    
-    # Store in ChromaDB
-    collection = get_contestant_collection()
-    contestant_id = os.path.basename(os.path.dirname(image_path))
-    contestant_name = os.path.basename(image_path).split('-')[0]
-    
-    collection.add(
-        embeddings=[embedding],
-        metadatas=[{"name": contestant_name}],
-        ids=[contestant_id]
-    )
-    
-    return embedding
     """Compute the face embedding for a given image."""
-    img = cv2.imread(image_path)
-    faces = app.get(img)
-    if len(faces) > 0:
-        return faces[0].normed_embedding
-    return None
+    try:
+        print(f"Reading image from {image_path}")
+        img = cv2.imread(image_path)
+        
+        if img is None:
+            print(f"Failed to read image: {image_path}")
+            return None
+            
+        print(f"Image shape: {img.shape}, detecting faces...")
+        faces = app.get(img)
+        
+        print(f"Found {len(faces)} faces in {image_path}")
+        
+        if len(faces) > 0:
+            face = faces[0]
+            embedding = face.normed_embedding
+            
+            # Store in ChromaDB
+            try:
+                collection = get_contestant_collection()
+                contestant_id = os.path.basename(os.path.dirname(image_path))
+                contestant_name = os.path.basename(image_path).split('-')[0]
+                
+                collection.add(
+                    embeddings=[embedding.tolist()],
+                    metadatas=[{"name": contestant_name}],
+                    ids=[contestant_id]
+                )
+                print(f"Stored embedding for {contestant_name} in ChromaDB")
+            except Exception as e:
+                print(f"Error storing in ChromaDB: {e}")
+            
+            return embedding
+        else:
+            print(f"No faces detected in {image_path}")
+            return None
+    except Exception as e:
+        print(f"Error computing embedding for {image_path}: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
 
 
 def main():
@@ -501,8 +526,22 @@ def main():
         test_video = "test_image.jpeg"
         selected_videos = [test_video]
         
+        # Check if test image exists
+        if not os.path.exists(TEST_IMAGE_PATH):
+            print(f"Test image not found at {TEST_IMAGE_PATH}")
+            return
+            
+        # Print test image info
+        test_img = cv2.imread(TEST_IMAGE_PATH)
+        if test_img is None:
+            print(f"Failed to read test image: {TEST_IMAGE_PATH}")
+            return
+            
+        print(f"Test image dimensions: {test_img.shape}")
+        
         # Copy test image to videos dir temporarily
         shutil.copy(TEST_IMAGE_PATH, os.path.join(videos_dir, test_video))
+        print(f"Copied test image to {os.path.join(videos_dir, test_video)}")
     else:
         # Normal mode - user selects contestants and videos
         selected_contestants = select_items(all_contestants, "contestants")
@@ -539,6 +578,7 @@ def main():
             else:
                 print(f"Could not find image for {contestant}")
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
+    print(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
 
     # Process videos
     recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, TEST_MODE)
