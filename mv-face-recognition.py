@@ -7,6 +7,10 @@ from tqdm import tqdm
 import argparse
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
+from rich.console import Console
+from rich.progress import track
+
+console = Console()
 
 # Define constants with defaults that can be overridden
 DISTANCE_THRESHOLD = 0.4  # Default threshold
@@ -47,7 +51,8 @@ def get_image_paths(contestant_path):
 def compute_embeddings(image_paths):
     """Compute embeddings for a list of image paths."""
     embeddings = []
-    for img_path in image_paths:
+    for img_path in track(image_paths, description="Processing images..."):
+        console.print(f"[green]Processed:[/green] {os.path.basename(img_path)}")
         try:
             img = cv2.imread(img_path)
             faces = app.get(img)
@@ -214,7 +219,9 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, test_mode=False):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
-    for video_file in tqdm(selected_videos, desc="Processing videos"):
+    console.print("[bold yellow]\nStarting video processing...[/bold yellow]")
+    for video_file in track(selected_videos, description="Processing videos"):
+        console.print(f"\n[bold]Processing video:[/bold] [cyan]{video_file}[/cyan]")
         video_path = os.path.join(videos_dir, video_file)
         if not os.path.isfile(video_path):
             print(f"Video file {video_file} not found.")
@@ -307,13 +314,13 @@ def save_results(results, project_root):
 
 def select_items(options, item_type):
     """Allow user to select items from a list."""
-    print(f"\nAvailable {item_type}:")
+    console.print(f"\n[bold yellow]Available {item_type}:[/bold yellow]")
     for idx, name in enumerate(options, 1):
-        print(f"{idx}. {name}")
-    print(f"{len(options) + 1}. Select all")
+        console.print(f"[cyan]{idx}.[/cyan] [green]{name}[/green]")
+    console.print(f"[cyan]{len(options) + 1}.[/cyan] [green]Select all[/green]")
 
-    indices = input(
-        f"\nEnter the numbers of the {item_type} you want to select, separated by commas (e.g., 1,3,5), or '{len(options) + 1}' to select all: "
+    indices = console.input(
+        f"\n[bold]Enter the numbers of the {item_type} you want to select, separated by commas (e.g., 1,3,5), or '{len(options) + 1}' to select all: [/bold]"
     )
 
     if indices.strip() == str(len(options) + 1):
@@ -348,7 +355,8 @@ def compute_face_embedding(image_path):
 
 
 def main():
-    print("Face Recognition Script - Processing Videos")
+    console.print("[bold green]\nMV Face Recognition System[/bold green]")
+    console.print("[bold magenta]=======================[/bold magenta]\n")
     
     args = parse_args()
     TEST_MODE = args.test
