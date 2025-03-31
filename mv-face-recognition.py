@@ -53,6 +53,9 @@ def parse_args():
         print(f"Error: Threshold {args.threshold} is invalid. Must be between 0.0 and 1.0")
         sys.exit(1)
         
+    if args.threshold < 0.6:
+        print(f"Warning: Low threshold ({args.threshold}) may produce false positives. Recommended minimum is 0.6")
+        
     return args
 
 # Directory paths
@@ -149,6 +152,28 @@ def debug_embedding(name, embedding):
     else:
         print("Empty or invalid embedding")
 
+def verify_borderline_match(face_embedding, candidate_embedding, threshold):
+    """Additional verification for matches between threshold and threshold+0.1"""
+    # Convert to float32 if needed
+    face_emb = face_embedding.astype(np.float32)
+    cand_emb = candidate_embedding.astype(np.float32)
+    
+    # Normalize
+    face_emb /= np.linalg.norm(face_emb)
+    cand_emb /= np.linalg.norm(cand_emb)
+    
+    # Calculate multiple similarity metrics
+    cosine_sim = np.dot(face_emb, cand_emb)
+    euclidean_dist = np.linalg.norm(face_emb - cand_emb)
+    pearson_corr = np.corrcoef(face_emb, cand_emb)[0,1]
+    
+    # Weighted combined score
+    combined_score = (0.6 * cosine_sim) + (0.3 * (1 - euclidean_dist)) + (0.1 * pearson_corr)
+    
+    print(f"Verification - Cosine: {cosine_sim:.3f}, Euclidean: {euclidean_dist:.3f}, Pearson: {pearson_corr:.3f}, Combined: {combined_score:.3f}")
+    
+    return combined_score >= (threshold + 0.05)  # Slightly higher bar for verification
+
 def match_face(face_embedding, known_embeddings, threshold=0.5):
     """Compare a face embedding against known embeddings."""
     try:
@@ -206,9 +231,18 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
                         print(f"Similarity with {name}: {similarity:.4f}")
                         
                     if similarity >= threshold and similarity > best_score:
-                            best_match = name
+                        # Additional verification for borderline matches
+                        if threshold <= similarity < (threshold + 0.1):
+                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold):
+                                best_match = name
+                                best_score = similarity
+                                print(f"Verified match: {name} with similarity {similarity:.4f}")
+                            else:
+                                print(f"Rejected borderline match: {name} {similarity:.4f}")
+                        else:
+                            best_match = name  
                             best_score = similarity
-                            print(f"Direct match found: {name} with similarity {similarity:.4f}")
+                            print(f"Strong match: {name} with similarity {similarity:.4f}")
                 except Exception as e:
                     print(f"Error comparing with {name}: {e}")
         
