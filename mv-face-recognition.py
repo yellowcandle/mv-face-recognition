@@ -108,7 +108,15 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
     return known_embeddings
 
 
-def match_face(face_embedding, known_embeddings, threshold=0.4):
+def debug_embedding(name, embedding):
+    """Print debug info about an embedding"""
+    print(f"Embedding for {name}: shape={embedding.shape}, type={type(embedding)}, min={np.min(embedding)}, max={np.max(embedding)}")
+    if isinstance(embedding, np.ndarray) and embedding.size > 0:
+        print(f"First 5 values: {embedding.flatten()[:5]}")
+    else:
+        print("Empty or invalid embedding")
+
+def match_face(face_embedding, known_embeddings, threshold=0.6):  # Increased threshold to 0.6
     """Compare a face embedding against known embeddings."""
     try:
         # First try using ChromaDB
@@ -136,25 +144,46 @@ def match_face(face_embedding, known_embeddings, threshold=0.4):
         best_match = "Unknown"
         best_score = 0.0
         
+        # Debug the face embedding
+        debug_embedding("Current face", face_embedding)
+        
         # Print known embeddings for debugging
         print(f"Falling back to direct comparison with {len(known_embeddings)} known embeddings")
         
+        # Ensure face_embedding is a 1D array
+        face_emb_1d = face_embedding.flatten()
+        
         for name, embeddings_list in known_embeddings.items():
-            for ref_embedding in embeddings_list:
-                # Ensure both embeddings are 1D arrays with shape (512,)
-                face_emb_1d = face_embedding.flatten()
-                ref_emb_1d = ref_embedding.flatten()
-                
-                # Calculate cosine similarity
+            for i, ref_embedding in enumerate(embeddings_list):
+                if ref_embedding is None:
+                    print(f"Warning: None embedding for {name} at index {i}")
+                    continue
+                    
+                # Ensure ref_embedding is a 1D array
                 try:
-                    similarity = np.dot(face_emb_1d, ref_emb_1d) / (np.linalg.norm(face_emb_1d) * np.linalg.norm(ref_emb_1d))
-                    if similarity > 1 - threshold and similarity > best_score:
-                        best_match = name
-                        best_score = similarity
-                        print(f"Direct match found: {name} with similarity {similarity}")
+                    ref_emb_1d = ref_embedding.flatten()
+                    
+                    # Debug first few comparisons
+                    if name in list(known_embeddings.keys())[:3]:
+                        debug_embedding(f"{name} (reference)", ref_emb_1d)
+                    
+                    # Calculate cosine similarity
+                    norm_face = np.linalg.norm(face_emb_1d)
+                    norm_ref = np.linalg.norm(ref_emb_1d)
+                    
+                    if norm_face > 0 and norm_ref > 0:
+                        similarity = np.dot(face_emb_1d, ref_emb_1d) / (norm_face * norm_ref)
+                        
+                        # Print similarity for debugging
+                        if similarity > 0.5:  # Only print high similarities
+                            print(f"Similarity with {name}: {similarity:.4f}")
+                            
+                        if similarity > 1 - threshold and similarity > best_score:
+                            best_match = name
+                            best_score = similarity
+                            print(f"Direct match found: {name} with similarity {similarity:.4f}")
                 except Exception as e:
-                    print(f"Error calculating similarity: {e}")
-                    print(f"Face embedding shape: {face_emb_1d.shape}, Reference embedding shape: {ref_emb_1d.shape}")
+                    print(f"Error comparing with {name}: {e}")
         
         return best_match, best_score
         
@@ -597,6 +626,7 @@ def main():
 
     # Load embeddings
     known_embeddings = {}
+    print("\nLoading contestant embeddings...")
     for contestant in selected_contestants:
         # Try to find contestant in contestant_info
         contestant_row = contestant_info[contestant_info["暱稱"] == contestant]
@@ -612,16 +642,31 @@ def main():
         if os.path.exists(embedding_file):
             try:
                 embedding = np.load(embedding_file, allow_pickle=True)
+                print(f"Loaded embedding for {contestant} from file: {embedding_file}")
+                
+                # Debug the loaded embedding
+                if isinstance(embedding, np.ndarray):
+                    print(f"  Shape: {embedding.shape}, Type: {type(embedding)}")
+                elif isinstance(embedding, list):
+                    print(f"  List of {len(embedding)} embeddings")
+                else:
+                    print(f"  Unexpected type: {type(embedding)}")
+                
                 # Ensure embeddings are in a list and have consistent shape
                 if isinstance(embedding, list):
                     # Make sure each embedding is a 1D array
-                    known_embeddings[contestant] = [e.flatten() if e is not None else None for e in embedding]
+                    processed_embeddings = []
+                    for e in embedding:
+                        if e is not None:
+                            processed_embeddings.append(e.flatten())
+                    known_embeddings[contestant] = processed_embeddings
                 else:
                     # Single embedding, make sure it's a 1D array
                     known_embeddings[contestant] = [embedding.flatten()]
-                print(f"Loaded embedding for {contestant} from file")
             except Exception as e:
                 print(f"Error loading embedding for {contestant}: {e}")
+                import traceback
+                print(traceback.format_exc())
                 
         # If no embedding file or loading failed, try to compute from images
         if contestant not in known_embeddings or not known_embeddings[contestant]:
@@ -634,7 +679,7 @@ def main():
                         # Ensure embedding is a 1D array
                         known_embeddings[contestant] = [embedding.flatten()]
                         # Save for future use
-                        np.save(embedding_file, [embedding.flatten()])
+                        np.save(embedding_file, embedding)
                         print(f"Computed and saved embedding for {contestant}")
                     else:
                         print(f"Could not compute embedding for {contestant}")
@@ -643,8 +688,15 @@ def main():
             else:
                 print(f"Directory not found for contestant {contestant}: {contestant_path}")
 
-    print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
+    print(f"\nLoaded/computed embeddings for {len(known_embeddings)} contestants.")
     print(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
+
+    # Verify embeddings are valid
+    valid_embeddings = 0
+    for name, embeddings in known_embeddings.items():
+        if embeddings and all(e is not None and isinstance(e, np.ndarray) for e in embeddings):
+            valid_embeddings += 1
+    print(f"Valid embeddings: {valid_embeddings}/{len(known_embeddings)}")
 
     # Process videos
     recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, TEST_MODE)
