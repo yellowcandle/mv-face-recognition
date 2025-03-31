@@ -6,6 +6,11 @@ import pandas as pd
 from tqdm import tqdm
 import argparse
 import torch
+
+# Configure environment before importing FaceAnalysis
+os.environ['ONNXRT_ENABLE_COREML'] = '0'  # Disable CoreML for ONNX runtime
+os.environ['INSIGHTFACE_DISABLE_COREML'] = '1'  # Disable CoreML for InsightFace
+
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
@@ -35,22 +40,23 @@ contestants_dir = os.path.join(project_root, "source/photo/contestants")
 videos_dir = os.path.join(project_root, "source/videos")
 contestant_info_path = os.path.join(project_root, "contestant_info.csv")
 
-# Initialize InsightFace with Apple Silicon optimizations
+# Initialize FaceAnalysis with CPU-only detection
 app = FaceAnalysis(
     providers=[
-        "CoreMLExecutionProvider",  # Apple Silicon first
-        "CUDAExecutionProvider",
-        "CPUExecutionProvider"
+        "CPUExecutionProvider"  # Force CPU for detection model
     ],
     allowed_modules=['detection', 'recognition'],
     use_onnx=True
 )
-app.prepare(ctx_id=0, det_size=(320, 320))  # Reduced detection size
+app.prepare(ctx_id=0, det_size=(640, 640))  # Use standard detection size
 
-# Add GPU optimization after FaceAnalysis setup
+# Configure GPU optimizations
 if torch.backends.mps.is_available():
+    # Enable Metal Performance Shaders for PyTorch operations
     torch.mps.set_per_process_memory_fraction(0.75)
     torch.set_flush_denormal(True)
+    # Use GPU-accelerated image processing
+    os.environ['OPENCV_OPENCL_DEVICE'] = 'Apple:GPU'
 
 
 def get_image_paths(contestant_path):
