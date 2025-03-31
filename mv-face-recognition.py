@@ -6,14 +6,17 @@ from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
 
-# Define constants
-# User input for distance threshold and frame skip
-DISTANCE_THRESHOLD = float(input("Enter the distance threshold (e.g., 0.4): "))
-FRAME_SKIP = int(input("Enter the frame skip value (e.g., 5): "))
+# Define constants with defaults that can be overridden
+DISTANCE_THRESHOLD = 0.4  # Default threshold
+FRAME_SKIP = 5            # Default frame skip
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
 project_root = os.path.dirname(current_script_path)
+
+# Test mode configuration
+TEST_MODE = False
+TEST_IMAGE_PATH = os.path.join(project_root, "source", "images", "test", "test_image.jpeg")
 
 # Directory paths
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
@@ -210,7 +213,35 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
             print(f"Video file {video_file} not found.")
             continue
 
-        print(f"\nProcessing video: {video_file}")
+        print(f"\nProcessing {'test image' if TEST_MODE else 'video'}: {video_file}")
+        
+        if TEST_MODE:
+            # For test image, just read it directly
+            frame = cv2.imread(video_path)
+            if frame is None:
+                print(f"Could not read test image {video_path}")
+                continue
+                
+            matches = process_frame(frame, known_embeddings)
+            if matches:
+                frame_with_boxes = draw_boxes_and_labels(frame, matches, "00:00")
+                output_path = os.path.join(project_root, "output_frames", "test_result.jpg")
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                cv2.imwrite(output_path, frame_with_boxes)
+                print(f"\nTest result saved to {output_path}")
+                
+                for _, matched_name in matches:
+                    print(f"Found {matched_name} in test image")
+                    results.append({
+                        "Video": "test_image.jpeg",
+                        "Frame": 0,
+                        "Name": matched_name
+                    })
+            else:
+                print("No matches found in test image")
+            continue
+                
+        # Normal video processing
         cap = cv2.VideoCapture(video_path)
         frame_count = 0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -311,23 +342,32 @@ def compute_face_embedding(image_path):
 
 def main():
     print("Face Recognition Script - Processing Videos")
-
+    
+    # Check for test mode
+    global TEST_MODE
+    if os.path.exists(TEST_IMAGE_PATH):
+        TEST_MODE = True
+        print("\nTest image found - running in test mode")
+        
     # Load contestant data
     contestant_info = pd.read_csv(contestant_info_path)
     all_contestants = contestant_info["暱稱"].tolist()
 
-    # Select contestants
-    selected_contestants = select_items(all_contestants, "contestants")
-
-    # Select videos
-    all_videos = sorted(
-        [
-            f
-            for f in os.listdir(videos_dir)
-            if os.path.isfile(os.path.join(videos_dir, f))
-        ]
-    )
-    selected_videos = select_items(all_videos, "videos")
+    if TEST_MODE:
+        # In test mode, use all contestants and just the test image
+        selected_contestants = all_contestants
+        test_video = "test_image.jpeg"
+        selected_videos = [test_video]
+        
+        # Copy test image to videos dir temporarily
+        shutil.copy(TEST_IMAGE_PATH, os.path.join(videos_dir, test_video))
+    else:
+        # Normal mode - user selects contestants and videos
+        selected_contestants = select_items(all_contestants, "contestants")
+        all_videos = sorted(
+            [f for f in os.listdir(videos_dir) if os.path.isfile(os.path.join(videos_dir, f))]
+        )
+        selected_videos = select_items(all_videos, "videos")
 
     # Load embeddings
     known_embeddings = {}
