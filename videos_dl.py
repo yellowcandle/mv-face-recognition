@@ -29,6 +29,7 @@ def download_video(url, output_path):
 
     output_path + ".mp4"
 
+
 for video_id, url in url_list.items():
     output_path = os.path.join(download_dir, video_id)
     download_video(url, output_path)

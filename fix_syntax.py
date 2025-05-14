@@ -9,9 +9,7 @@ Usage:
     python fix_syntax.py
 """
 
-import os
 import sys
-import time
 import shutil
 from pathlib import Path
 import logging
@@ -23,8 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger("chromadb_fix")
@@ -33,12 +30,14 @@ logger = logging.getLogger("chromadb_fix")
 CACHE_DIR = PROJECT_ROOT / "cache" / "chromadb"
 BACKENDS_DIR = PROJECT_ROOT / "src" / "backends"
 
+
 def print_section(title):
     """Print a section header."""
     width = 60
     print("\n" + "=" * width)
     print(f"{title.center(width)}")
     print("=" * width + "\n")
+
 
 def backup_file(file_path):
     """Create a backup of a file."""
@@ -47,10 +46,12 @@ def backup_file(file_path):
     logger.info(f"Backed up file to {backup_path}")
     return backup_path
 
+
 def check_chromadb_version():
     """Check the installed ChromaDB version."""
     try:
         import chromadb
+
         version = chromadb.__version__
         logger.info(f"ChromaDB version: {version}")
         return version
@@ -58,25 +59,26 @@ def check_chromadb_version():
         logger.error("ChromaDB is not installed")
         return None
 
+
 def fix_data_type_issues():
     """Apply patches to fix data type issues in the recognition code."""
     print_section("Fixing Data Type Issues")
-    
+
     try:
         # Path to the ChromaDB backend file
         chromadb_backend_path = BACKENDS_DIR / "chromadb_backend.py"
-        
+
         if not chromadb_backend_path.exists():
             logger.error(f"ChromaDB backend file not found: {chromadb_backend_path}")
             return False
-        
+
         # Read the current file
-        with open(chromadb_backend_path, 'r') as f:
+        with open(chromadb_backend_path, "r") as f:
             content = f.read()
-        
+
         # Back up the original file
         backup_file(chromadb_backend_path)
-        
+
         # Fix 1: Add data type conversion to ensure correct tensor types
         if "def compute_embedding(self, face_image):" in content:
             content = content.replace(
@@ -86,10 +88,10 @@ def fix_data_type_issues():
         import numpy as np
         if face_image is not None and face_image.dtype != np.float32:
             face_image = face_image.astype(np.float32)
-"""
+""",
             )
             logger.info("Added data type conversion in compute_embedding method")
-        
+
         # Fix 2: Ensure proper handling of dimension mismatch
         if "# Handle dimension mismatch" not in content:
             # Look for the point where we would need to handle dimension mismatch
@@ -132,36 +134,40 @@ def fix_data_type_issues():
             # Continue with original embedding
 """
                     # Insert the code after the method signature
-                    content = content[:insert_point] + insert_code + content[insert_point:]
-                    logger.info("Added dimension mismatch handling in query_embedding method")
-        
+                    content = (
+                        content[:insert_point] + insert_code + content[insert_point:]
+                    )
+                    logger.info(
+                        "Added dimension mismatch handling in query_embedding method"
+                    )
+
         # Write updated content back to file
-        with open(chromadb_backend_path, 'w') as f:
+        with open(chromadb_backend_path, "w") as f:
             f.write(content)
-        
+
         logger.info(f"Successfully updated {chromadb_backend_path}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Failed to fix data type issues: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def main():
     """Main function to fix ChromaDB issues."""
     print_section("CHROMADB FACE RECOGNITION FIX")
-    
+
     # Check ChromaDB version
     version = check_chromadb_version()
     if not version:
         return 1
-    
+
     # Apply fixes
-    fixes = [
-        ("Fix data type issues", fix_data_type_issues)
-    ]
-    
+    fixes = [("Fix data type issues", fix_data_type_issues)]
+
     success_count = 0
     for name, fix_fn in fixes:
         logger.info(f"Applying fix: {name}")
@@ -170,20 +176,21 @@ def main():
             success_count += 1
         else:
             logger.error(f"❌ Failed to apply: {name}")
-    
+
     # Print summary
     print_section("Summary")
     print(f"Applied {success_count}/{len(fixes)} fixes successfully")
-    
+
     if success_count == len(fixes):
         print("All fixes applied successfully! Try running the system again.")
     else:
         print(f"{len(fixes) - success_count} fixes failed to apply.")
-    
+
     print("\nTo test the fix, run:")
     print("  python -m src.main --recognizer-backend chromadb --debug")
-    
+
     return 0 if success_count == len(fixes) else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

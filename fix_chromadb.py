@@ -11,17 +11,14 @@ Usage:
     python fix_chromadb.py
 """
 
-import os
 import sys
 import shutil
 import logging
-import numpy as np
 from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger("chromadb_fix")
@@ -32,11 +29,13 @@ SRC_DIR = PROJECT_ROOT / "src"
 BACKENDS_DIR = SRC_DIR / "backends"
 CACHE_DIR = PROJECT_ROOT / "cache" / "chromadb"
 
+
 def print_header(title):
     """Print a section header."""
     print("\n" + "=" * 70)
     print(f" {title} ".center(70, "="))
     print("=" * 70)
+
 
 def backup_file(file_path):
     """Create a backup of a file."""
@@ -49,21 +48,22 @@ def backup_file(file_path):
         logger.error(f"File not found: {file_path}")
         return False
 
+
 def fix_data_types():
     """Fix the data type issue in compute_embedding method."""
     print_header("Fixing Data Type Issues")
-    
+
     # Path to file containing compute_embedding method
     chromadb_backend_path = BACKENDS_DIR / "chromadb_backend.py"
-    
+
     if not backup_file(chromadb_backend_path):
         return False
-    
+
     try:
         # Read file content
-        with open(chromadb_backend_path, 'r') as f:
+        with open(chromadb_backend_path, "r") as f:
             content = f.read()
-        
+
         # Fix the compute_embedding method
         if "def compute_embedding(self, face_image):" in content:
             # Replace the method with a fixed version
@@ -82,10 +82,10 @@ def fix_data_types():
         # Ensure image is in the correct range for the model
         if face_image.max() > 1.0 and face_image.dtype == np.float32:
             face_image = face_image / 255.0
-"""
+""",
             )
             logger.info("Fixed compute_embedding method with proper type conversion")
-        
+
         # Fix preprocess_face method to ensure correct output type
         if "def preprocess_face(self, face_image):" in content:
             content = content.replace(
@@ -108,10 +108,10 @@ def fix_data_types():
             elif face_image.dtype != np.uint8:
                 # Convert to uint8 if not already
                 face_image = face_image.astype(np.uint8)
-"""
+""",
             )
             logger.info("Fixed preprocess_face method with better type handling")
-        
+
         # Fix dimension mismatch issue
         dimension_handler = """
     def _handle_dimension_mismatch(self, embedding, collection_dim):
@@ -155,7 +155,7 @@ def fix_data_types():
             logger.warning(f"Padded embedding from {embedding_dim} to {collection_dim} dimensions")
             return new_embedding
 """
-        
+
         # Add the dimension handler method
         if "_handle_dimension_mismatch" not in content:
             # Insert the method at the beginning of the class
@@ -172,10 +172,17 @@ def fix_data_types():
                     first_line = content[next_line_start:next_line_end]
                     indentation = len(first_line) - len(first_line.lstrip())
                     # Add indentation to the dimension handler
-                    indented_handler = "\n".join(" " * indentation + line for line in dimension_handler.split("\n"))
-                    content = content[:insert_point] + indented_handler + content[insert_point:]
+                    indented_handler = "\n".join(
+                        " " * indentation + line
+                        for line in dimension_handler.split("\n")
+                    )
+                    content = (
+                        content[:insert_point]
+                        + indented_handler
+                        + content[insert_point:]
+                    )
                     logger.info("Added dimension mismatch handler method")
-        
+
         # Fix query_embedding to use the dimension handler
         if "def query_embedding" in content:
             # Modify the method to use our new handler
@@ -189,37 +196,43 @@ def fix_data_types():
                     truncation_end = content.find("\n", truncation_end + 1)
                     # Replace with our handler
                     replacement = "            # Use dimension handler\n            embedding_list = self._handle_dimension_mismatch(embedding_list, collection_dim)"
-                    content = content[:dim_check_start] + replacement + content[truncation_end:]
+                    content = (
+                        content[:dim_check_start]
+                        + replacement
+                        + content[truncation_end:]
+                    )
                     logger.info("Fixed dimension handling in query_embedding method")
-        
+
         # Write the updated content back to the file
-        with open(chromadb_backend_path, 'w') as f:
+        with open(chromadb_backend_path, "w") as f:
             f.write(content)
-        
+
         logger.info(f"Successfully updated {chromadb_backend_path}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Failed to fix data type issues: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def fix_core_recognizer():
     """Fix the core recognizer to ensure proper data type handling."""
     print_header("Fixing Core Recognizer")
-    
+
     # Path to file containing the StandardFaceRecognizer
     recognizer_path = SRC_DIR / "core" / "recognizer.py"
-    
+
     if not backup_file(recognizer_path):
         return False
-    
+
     try:
         # Read file content
-        with open(recognizer_path, 'r') as f:
+        with open(recognizer_path, "r") as f:
             content = f.read()
-        
+
         # Find and fix the compute_embedding method to handle data types
         if "def compute_embedding" in content:
             # Find the method
@@ -231,53 +244,73 @@ def fix_core_recognizer():
                     # Find the start of the method body (after the signature)
                     method_body_start = content.find(":", method_start)
                     method_body_start = content.find("\n", method_body_start) + 1
-                    
+
                     # Determine indentation
                     next_line_end = content.find("\n", method_body_start)
                     first_line = content[method_body_start:next_line_end]
                     indentation = len(first_line) - len(first_line.lstrip())
-                    
+
                     # Add type checking code
-                    type_check_code = " " * indentation + "# Ensure input is float32 (required by ONNX)\n"
-                    type_check_code += " " * indentation + "if face_img is not None and face_img.dtype != np.float32:\n"
-                    type_check_code += " " * indentation + "    face_img = face_img.astype(np.float32)\n\n"
-                    
+                    type_check_code = (
+                        " " * indentation
+                        + "# Ensure input is float32 (required by ONNX)\n"
+                    )
+                    type_check_code += (
+                        " " * indentation
+                        + "if face_img is not None and face_img.dtype != np.float32:\n"
+                    )
+                    type_check_code += (
+                        " " * indentation
+                        + "    face_img = face_img.astype(np.float32)\n\n"
+                    )
+
                     # Insert the code at the start of the method body
-                    content = content[:method_body_start] + type_check_code + content[method_body_start:]
-                    logger.info("Added data type checking to compute_embedding in core recognizer")
-        
+                    content = (
+                        content[:method_body_start]
+                        + type_check_code
+                        + content[method_body_start:]
+                    )
+                    logger.info(
+                        "Added data type checking to compute_embedding in core recognizer"
+                    )
+
         # Write the updated content back to the file
-        with open(recognizer_path, 'w') as f:
+        with open(recognizer_path, "w") as f:
             f.write(content)
-        
+
         logger.info(f"Successfully updated {recognizer_path}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Failed to fix core recognizer: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def main():
     """Main function to apply all fixes."""
     print_header("ChromaDB Face Recognition Fix")
-    
+
     # Verify ChromaDB is installed
     try:
         import chromadb
+
         version = chromadb.__version__
         logger.info(f"ChromaDB version: {version}")
     except ImportError:
-        logger.error("ChromaDB is not installed. Please install it with: pip install chromadb>=0.4.18")
+        logger.error(
+            "ChromaDB is not installed. Please install it with: pip install chromadb>=0.4.18"
+        )
         return 1
-    
+
     # Apply fixes
     fixes = [
         ("Fix data types in ChromaDB backend", fix_data_types),
         ("Fix core recognizer", fix_core_recognizer),
     ]
-    
+
     success_count = 0
     for name, fix_fn in fixes:
         logger.info(f"Applying fix: {name}")
@@ -290,20 +323,22 @@ def main():
         except Exception as e:
             logger.error(f"❌ Error applying {name}: {e}")
             import traceback
+
             traceback.print_exc()
-    
+
     # Print summary
     print_header("Summary")
     print(f"Applied {success_count}/{len(fixes)} fixes successfully")
-    
+
     if success_count == len(fixes):
         print("\nAll fixes applied successfully!")
         print("\nTo test the fixes, run:")
         print("  python -m src.main --recognizer-backend chromadb --debug")
     else:
         print(f"\n{len(fixes) - success_count} fixes failed to apply.")
-    
+
     return 0 if success_count == len(fixes) else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

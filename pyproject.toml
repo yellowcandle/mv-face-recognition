@@ -12,38 +12,33 @@ dependencies = [
     "lxml-html-clean>=0.4.1",
     "selenium>=4.24.0",
     "webdriver-manager>=4.0.2",
-    
     # Core ML and data processing
     "tf-keras>=2.18.0",
     "numpy>=1.24.0",
     "torch>=2.0.0",
     "pandas>=2.1.1",
-    
     # Face detection and recognition
     "insightface>=0.7.3",
     "mediapipe>=0.10.20",
     "chromadb>=0.4.18",
-    
     # ONNX dependencies
     "onnx>=1.15.0",
     "onnxruntime>=1.19.2; sys_platform == 'darwin'",
     "onnxruntime-gpu>=1.19.2; sys_platform == 'win32'",
-    
     # Image and video processing
     "opencv-python>=4.8.0",
     "pillow>=10.4.0",
     "ffmpeg-python>=0.2.0",
     "freetype-py>=2.5.1",
-    
     # UI and visualization
     "streamlit>=1.38.0",
     "rich>=13.5.0",
     "typer>=0.9.0",
     "tqdm>=4.66.5",
     "matplotlib>=3.7.1",
-    
     # Development
     "ruff>=0.6.8",
+    "gradio>=5.29.0",
 ]
 
 [tool.setuptools]

@@ -234,8 +234,12 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                     matches = process_frame(frame, known_embeddings)
                     if matches:
                         timestamp_seconds = frame_count / fps
-                        timestamp_formatted = "{:02}:{:02}".format(int(timestamp_seconds // 60), int(timestamp_seconds % 60))
-                        frame_with_boxes = draw_boxes_and_labels(frame, matches, timestamp_formatted)
+                        timestamp_formatted = "{:02}:{:02}".format(
+                            int(timestamp_seconds // 60), int(timestamp_seconds % 60)
+                        )
+                        frame_with_boxes = draw_boxes_and_labels(
+                            frame, matches, timestamp_formatted
+                        )
                         output_frame_path = os.path.join(
                             output_dir, f"frame_{frame_count}.jpg"
                         )
@@ -266,6 +270,7 @@ def save_results(results, project_root):
         print(f"\nResults saved to {output_csv}")
     else:
         print("No faces recognized in videos.")
+
 
 def select_items(options, item_type):
     """Allow user to select items from a list."""

@@ -18,16 +18,13 @@ Example:
 
 import os
 import sys
-import time
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Union, Any
+from typing import List, Dict, Tuple, Optional, Any
 import pandas as pd
 import numpy as np
 import cv2
-import argparse
 import typer
 from enum import Enum
-import threading
 
 # Set up project root and importable path
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
@@ -39,8 +36,11 @@ from src.core.detector import FaceDetector
 from src.core.recognizer import StandardFaceRecognizer
 from src.core.video_processor import VideoProcessor
 from src.utils.visualization import (
-    display_banner, display_table, display_results, display_stats,
-    display_selection_menu, StatusDisplay
+    display_banner,
+    display_results,
+    display_stats,
+    display_selection_menu,
+    StatusDisplay,
 )
 
 # Import backends
@@ -49,6 +49,7 @@ from src.backends.standard_backend import StandardBackend
 # Check for ChromaDB availability
 try:
     from src.backends.chromadb_backend import ChromaDBFaceRecognizer
+
     HAS_CHROMADB = True
 except ImportError:
     HAS_CHROMADB = False
@@ -59,6 +60,7 @@ try:
     from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
     from rich.prompt import Confirm
     from rich import print as rich_print
+
     HAS_RICH = True
     console = Console()
 except ImportError:
@@ -95,7 +97,6 @@ def main(
         "-r",
         help="Face recognition backend (ChromaDB only)",
     ),
-    
     # Recognition parameters
     distance_threshold: float = typer.Option(
         0.4,
@@ -109,7 +110,6 @@ def main(
         "-s",
         help="Number of frames to skip between processing (default: 5)",
     ),
-    
     # Performance options
     use_tracking: bool = typer.Option(
         False,
@@ -127,7 +127,6 @@ def main(
         "-w",
         help="Maximum number of worker threads",
     ),
-    
     # Output options
     save_frames: bool = typer.Option(
         False,
@@ -139,14 +138,12 @@ def main(
         "--save-video",
         help="Save annotated video",
     ),
-    
     # ChromaDB options
     in_memory_db: bool = typer.Option(
         False,
         "--in-memory-db",
         help="Use in-memory ChromaDB (faster but not persistent)",
     ),
-    
     # High-level options
     optimize_cache: bool = typer.Option(
         False,
@@ -191,40 +188,39 @@ def main(
 ):
     """
     [bold cyan]Unified Face Recognition System[/bold cyan]
-    
+
     Process videos to recognize contestants' faces.
     """
     # Display banner
     if HAS_RICH:
         display_banner(
-            "Unified Face Recognition System",
-            "Process videos to recognize faces"
+            "Unified Face Recognition System", "Process videos to recognize faces"
         )
     else:
         print("\n=== Unified Face Recognition System ===")
         print("Process videos to recognize faces\n")
-    
+
     # Show configuration
     print(f"Detection Backend: {detector_backend}")
     print(f"Recognition Backend: {recognizer_backend}")
     print(f"Distance Threshold: {distance_threshold}")
     print(f"Frame Skip: {frame_skip}")
     print(f"Parallel Processing: {'Enabled' if parallel else 'Disabled'}")
-    
+
     # Check if ChromaDB is available
     if not HAS_CHROMADB:
         print("ERROR: ChromaDB is not installed but is required.")
         print("Install it with: pip install chromadb>=0.4.18")
         return
-    
+
     # Initialize paths
     paths = initialize_paths()
-    
+
     # Create cache directories
     os.makedirs(paths["cache_dir"], exist_ok=True)
     os.makedirs(paths["frames_dir"], exist_ok=True)
     os.makedirs(paths["outputs_dir"], exist_ok=True)
-    
+
     # Initialize components with InsightFace and ChromaDB only
     detector, recognizer, backend = initialize_components(
         similarity_threshold=distance_threshold,
@@ -234,62 +230,67 @@ def main(
         max_workers=max_workers,
         in_memory_db=in_memory_db,
         cache_dir=paths["cache_dir"],
-        optimize_performance=optimize_performance
-)
+        optimize_performance=optimize_performance,
+    )
     # If optimize-cache option is enabled, preload and optimize cache
     if optimize_cache:
         print("Preloading and optimizing cache...")
         preload_cache(detector, recognizer, paths["cache_dir"])
-    
+
     # Load contestant information
     try:
         contestant_info = pd.read_csv(paths["contestant_info_path"])
         # Ensure 編號 is string type for directory matching
-        contestant_info['編號'] = contestant_info['編號'].astype(str)
+        contestant_info["編號"] = contestant_info["編號"].astype(str)
     except Exception as e:
         print(f"Error reading contestant info CSV: {e}")
         return
-    
+
     # Select contestants
     all_contestants = contestant_info["暱稱"].tolist()
-    
+
     if specific_contestants:
-        selected_contestants = specific_contestants.split(',')
+        selected_contestants = specific_contestants.split(",")
     elif all_contestants:
         selected_contestants = all_contestants
     else:
         if interactive:
-            selected_contestants = display_selection_menu(all_contestants, "contestants")
+            selected_contestants = display_selection_menu(
+                all_contestants, "contestants"
+            )
         else:
             selected_contestants = all_contestants
-    
+
     if not selected_contestants:
         print("No contestants selected, exiting.")
         return
-    
+
     print(f"Selected {len(selected_contestants)} contestants.")
-    
+
     # Load contestant embeddings
     known_embeddings = load_embeddings(
         backend=backend,
         contestants_dir=paths["contestants_dir"],
         contestant_info=contestant_info,
-        selected_contestants=selected_contestants
+        selected_contestants=selected_contestants,
     )
-    
+
     # Select videos
-    all_videos = sorted([
-        f for f in os.listdir(paths["videos_dir"])
-        if os.path.isfile(os.path.join(paths["videos_dir"], f))
-        and f.lower().endswith(('.mp4', '.avi', '.mov'))
-    ])
-    
+    all_videos = sorted(
+        [
+            f
+            for f in os.listdir(paths["videos_dir"])
+            if os.path.isfile(os.path.join(paths["videos_dir"], f))
+            and f.lower().endswith((".mp4", ".avi", ".mov"))
+        ]
+    )
+
     if not all_videos:
         print(f"No video files found in {paths['videos_dir']}")
         return
-    
+
     if specific_videos:
-        selected_videos = specific_videos.split(',')
+        selected_videos = specific_videos.split(",")
     elif all_videos:
         selected_videos = all_videos
     else:
@@ -297,40 +298,48 @@ def main(
             selected_videos = display_selection_menu(all_videos, "videos")
         else:
             selected_videos = all_videos
-    
+
     if not selected_videos:
         print("No videos selected, exiting.")
         return
-    
+
     print(f"Selected {len(selected_videos)} videos.")
-    
+
     # Initialize status display
     status_display = StatusDisplay() if HAS_RICH else None
     if status_display:
         status_display.start(videos_total=len(selected_videos))
-    
+
     # Process videos
     all_results = []
     for video_idx, video_file in enumerate(selected_videos):
         video_path = os.path.join(paths["videos_dir"], video_file)
-        
+
         # Create output paths
         video_basename = os.path.splitext(video_file)[0]
-        frames_output_dir = paths["frames_dir"] / video_basename if save_frames else None
-        video_output_path = paths["outputs_dir"] / f"{video_basename}_labeled.mp4" if save_video else None
-        
+        frames_output_dir = (
+            paths["frames_dir"] / video_basename if save_frames else None
+        )
+        video_output_path = (
+            paths["outputs_dir"] / f"{video_basename}_labeled.mp4"
+            if save_video
+            else None
+        )
+
         # Process the video
         try:
             # Create processor with appropriate callbacks
             processor = VideoProcessor(
                 detector_fn=detector.detect_faces,
-                recognition_fn=lambda frame: backend.identify_faces(frame, known_embeddings),
+                recognition_fn=lambda frame: backend.identify_faces(
+                    frame, known_embeddings
+                ),
                 frame_skip=frame_skip,
                 buffer_size=10,
                 save_frames=save_frames,
-                max_workers=max_workers
+                max_workers=max_workers,
             )
-            
+
             # Define progress callback
             def update_progress(progress: float, info: Dict[str, Any]):
                 if status_display:
@@ -339,68 +348,78 @@ def main(
                         faces_detected=info["faces_detected"],
                         faces_recognized=info["faces_recognized"],
                         current_video=video_file,
-                        videos_completed=video_idx
+                        videos_completed=video_idx,
                     )
-            
+
             # Process the video
             results = processor.process_video(
                 video_path=video_path,
                 output_path=video_output_path,
                 frames_dir=frames_output_dir,
-                display_progress=update_progress
+                display_progress=update_progress,
             )
-            
+
             all_results.extend(results)
-            
+
         except Exception as e:
             print(f"Error processing video {video_file}: {str(e)}")
             if debug:
                 import traceback
+
                 traceback.print_exc()
             continue
-    
+
     # Stop status display
     if status_display:
         status_display.stop()
-    
+
     # Save results
     if all_results:
         results_df = pd.DataFrame(all_results)
         output_csv = paths["project_root"] / "video_recognition_results.csv"
         results_df.to_csv(output_csv, index=False)
         print(f"\nResults saved to {output_csv}")
-        
+
         # Display results
         if HAS_RICH:
             display_results(all_results, show_summary=True)
         else:
             # Simple summary
-            summary = results_df.groupby(['video', 'nickname' if 'nickname' in results_df.columns else 'person_id']).size().unstack(fill_value=0)
+            summary = (
+                results_df.groupby(
+                    [
+                        "video",
+                        "nickname" if "nickname" in results_df.columns else "person_id",
+                    ]
+                )
+                .size()
+                .unstack(fill_value=0)
+            )
             print("\nRecognition Summary:")
             print(summary)
     else:
         print("No faces recognized in videos.")
-    
+
     # Display stats
     if HAS_RICH:
         # Combine statistics from different components
         stats = {}
         stats.update(detector.get_stats())
         stats.update(recognizer.get_stats())
-        if hasattr(backend, 'get_stats'):
+        if hasattr(backend, "get_stats"):
             backend_stats = backend.get_stats()
             for key, value in backend_stats.items():
                 stats[f"backend_{key}"] = value
-        
+
         display_stats(stats)
-    
+
     print("\nProcessing complete!")
 
 
 def initialize_paths() -> Dict[str, Path]:
     """Initialize paths for the system."""
     project_root = PROJECT_ROOT
-    
+
     paths = {
         "project_root": project_root,
         "contestants_dir": project_root / "source" / "photo" / "contestants",
@@ -410,7 +429,7 @@ def initialize_paths() -> Dict[str, Path]:
         "frames_dir": project_root / "output_frames",
         "cache_dir": project_root / "cache",
     }
-    
+
     return paths
 
 
@@ -428,15 +447,21 @@ def initialize_components(
     # Initialize InsightFace detector with performance optimizations
     detector = FaceDetector(
         backend="insightface",
-        confidence_threshold=0.3 if not optimize_performance else 0.4,  # Higher threshold = fewer detections but faster
+        confidence_threshold=0.3
+        if not optimize_performance
+        else 0.4,  # Higher threshold = fewer detections but faster
         model_size=(320, 320),
-        tracking_method=FaceDetector.TRACKING_KCF if use_tracking else FaceDetector.TRACKING_NONE,
+        tracking_method=FaceDetector.TRACKING_KCF
+        if use_tracking
+        else FaceDetector.TRACKING_NONE,
         tracking_duration=30 if use_tracking else 0,
-        skip_frames=skip_frames if use_tracking else min(2, skip_frames),  # Always skip at least 2 frames for performance
+        skip_frames=skip_frames
+        if use_tracking
+        else min(2, skip_frames),  # Always skip at least 2 frames for performance
         cache_enabled=True,  # Always enable caching for performance
-        max_workers=max_workers
+        max_workers=max_workers,
     )
-    
+
     # Initialize standard recognizer with performance optimizations
     recognizer = StandardFaceRecognizer(
         face_detector=detector,
@@ -445,9 +470,11 @@ def initialize_components(
         use_quantized_model=True,  # Always use quantized model for performance
         cache_dir=str(cache_dir),
         max_workers=max_workers,
-        embedding_cache_size=1024 if optimize_performance else 512  # Larger cache if optimizing
+        embedding_cache_size=1024
+        if optimize_performance
+        else 512,  # Larger cache if optimizing
     )
-    
+
     # Initialize ChromaDB backend with performance optimizations
     backend = ChromaDBFaceRecognizer(
         face_detector=detector,
@@ -455,9 +482,9 @@ def initialize_components(
         similarity_threshold=similarity_threshold,
         persistent=not in_memory_db,
         collection_name="face_embeddings",
-        cache_dir=cache_dir / "chromadb"
+        cache_dir=cache_dir / "chromadb",
     )
-    
+
     return detector, recognizer, backend
 
 
@@ -465,7 +492,7 @@ def preload_cache(
     detector: FaceDetector,
     recognizer: StandardFaceRecognizer,
     cache_dir: Path,
-    optimize_performance: bool = True
+    optimize_performance: bool = True,
 ):
     """Preload and optimize cache."""
     # Look for test images
@@ -473,18 +500,18 @@ def preload_cache(
     if not test_images_dir.exists():
         print(f"Test images directory not found: {test_images_dir}")
         return
-    
+
     # Find all test images
     test_files = []
-    for ext in ['.jpg', '.jpeg', '.png']:
-        test_files.extend(list(test_images_dir.glob(f'*{ext}')))
-    
+    for ext in [".jpg", ".jpeg", ".png"]:
+        test_files.extend(list(test_images_dir.glob(f"*{ext}")))
+
     if not test_files:
         print("No test images found")
         return
-    
+
     print(f"Pre-processing {len(test_files)} test images...")
-    
+
     # Process each test image
     for img_path in test_files:
         try:
@@ -493,34 +520,34 @@ def preload_cache(
             if img is None:
                 print(f"Failed to load test image: {img_path}")
                 continue
-            
+
             # Generate a stable ID for this test image
             img_id = f"test_{img_path.stem}"
-            
+
             # Detect faces
             faces = detector.detect_faces(img, use_cache=True)
-            
+
             if not faces:
                 print(f"No faces found in: {img_path.name}")
                 continue
-            
+
             # Process each face
             for i, bbox in enumerate(faces):
                 # Extract face
                 face_img = detector.extract_face(img, bbox, padding=0.1)
                 if face_img is None:
                     continue
-                
+
                 # Compute embedding
                 face_id = f"{img_id}_face_{i}"
                 preprocessed = recognizer.preprocess_face(face_img)
                 embedding = recognizer.compute_embedding(preprocessed)
-                
+
                 # Save embedding
                 recognizer.save_embedding(face_id, embedding)
-            
+
             print(f"Processed: {img_path.name} - found {len(faces)} faces")
-            
+
         except Exception as e:
             print(f"Error processing test image {img_path}: {str(e)}")
 
@@ -529,23 +556,22 @@ def load_embeddings(
     backend: ChromaDBFaceRecognizer,
     contestants_dir: Path,
     contestant_info: pd.DataFrame,
-    selected_contestants: List[str]
+    selected_contestants: List[str],
 ) -> Dict[str, List[np.ndarray]]:
     """Load embeddings for selected contestants using ChromaDB."""
     print("Using ChromaDB for face recognition")
-    
+
     # First load embeddings in standard format
-    from src.backends.standard_backend import StandardBackend
     std_backend = StandardBackend(backend.standard_recognizer)
     embeddings_dict = std_backend.load_embeddings(
         contestant_dir=contestants_dir,
         contestant_info=contestant_info,
-        selected_contestants=selected_contestants
+        selected_contestants=selected_contestants,
     )
-    
+
     # Then load into ChromaDB
     backend.load_embeddings_from_dict(embeddings_dict)
-    
+
     # Return empty dict since ChromaDB doesn't need it
     return {}
 
@@ -561,5 +587,6 @@ if __name__ == "__main__":
         print(f"Error: {str(e)}")
         if "--debug" in sys.argv:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
