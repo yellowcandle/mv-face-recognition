@@ -60,6 +60,7 @@ def main():
         use_arcface=True
     )
     print("[INFO] FaceRecognizer initialized.")
+    print(f"[DEBUG] generate_embeddings: FaceRecognizer configured embedding_size: {face_recognizer.embedding_size}")
 
     # Define the central directory for saving all embeddings
     embeddings_save_dir = os.path.join(project_root, "source", "photo", "contestants", "embeddings")
@@ -97,32 +98,30 @@ def main():
 
                 first_face_data = detected_faces_bboxes[0]
                 current_embedding = None
+                bbox_to_extract = None
 
                 if isinstance(first_face_data, list):  # Bbox list
-                    bbox = first_face_data
-                    face_img = face_detector.extract_face(image, bbox, padding=0.1)
-                    if face_img is not None:
-                        current_embedding = face_recognizer._get_embedding(face_img)
-                    else:
-                        print(f"Could not extract face for {nickname} from {photo_path}")
+                    bbox_to_extract = first_face_data
                 elif hasattr(first_face_data, "bbox"):  # InsightFaceObject
-                    if (
-                        face_detector.backend == FaceDetector.BACKEND_INSIGHTFACE
-                        and hasattr(first_face_data, "normed_embedding")
-                        and first_face_data.normed_embedding is not None
-                    ):
-                        current_embedding = first_face_data.normed_embedding
-                    else:
-                        bbox = first_face_data.bbox.astype(int)
-                        face_img = face_detector.extract_face(
-                            image, bbox.tolist(), padding=0.1
-                        )
-                        if face_img is not None:
-                            current_embedding = face_recognizer._get_embedding(face_img)
-                        else:
-                            print(f"Could not extract face for {nickname} from {photo_path} (InsightFace obj)")
+                    bbox_to_extract = first_face_data.bbox.astype(int).tolist()
                 else:
                     print(f"Unknown face detection result type for {nickname} in {photo_path}")
+                    continue # Skip this photo if face data is not understandable
+
+                if bbox_to_extract is None:
+                    print(f"Could not determine bounding box for {nickname} from {photo_path}")
+                    continue
+
+                face_img = face_detector.extract_face(image, bbox_to_extract, padding=0.1)
+                
+                if face_img is not None:
+                    # Always use the face_recognizer's _get_embedding method to ensure consistency
+                    current_embedding = face_recognizer._get_embedding(face_img)
+                    if current_embedding is None or current_embedding.size == 0:
+                        print(f"Failed to compute embedding via face_recognizer._get_embedding for {nickname} from {photo_path}")
+                        current_embedding = None # Ensure it's None if failed
+                else:
+                    print(f"Could not extract face_img for {nickname} from {photo_path} using bbox {bbox_to_extract}")
 
                 if current_embedding is not None and current_embedding.size > 0:
                     embeddings.append(current_embedding)
@@ -149,6 +148,7 @@ def main():
 
         # Save the averaged embedding
         embedding_path = os.path.join(embeddings_save_dir, f"{nickname}_embedding.npy") # Use centralized save directory
+        print(f"[DEBUG] generate_embeddings: Saving avg_embedding for {nickname} with shape: {avg_embedding.shape} to {embedding_path}")
         np.save(embedding_path, avg_embedding)
         print(
             f"Generated and saved averaged embedding for {nickname} (ID: {contestant_id}) from {len(embeddings)} photos to {embedding_path}"
