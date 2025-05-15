@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import gradio as gr
 import matplotlib.pyplot as plt
+import umap.umap_ as umap
 import pandas as pd
 
 # from insightface.app import FaceAnalysis # Will be replaced by core_detector
@@ -33,15 +34,20 @@ CJKV_FONT_PATH = "fonts/SourceHanSansTC-VF.ttf"  # Update this path to a valid C
 FONT_SIZE = 60
 
 # --- Load Contestant Info ---
+print(f"[DEBUG] Current working directory: {os.getcwd()}") # Print CWD
 CONTESTANT_INFO_PATH = "contestant_info.csv"
 contestant_info_df = pd.read_csv(CONTESTANT_INFO_PATH)
 # Create a mapping from nickname (used in embedding filenames) to actual name
-nickname_to_name = pd.Series(contestant_info_df["姓名"].values, index=contestant_info_df["暱稱"]).to_dict()
+# nickname_to_name = pd.Series(contestant_info_df["姓名"].values, index=contestant_info_df["暱稱"]).to_dict()
 
 # --- Load Gallery Embeddings ---
-EMBEDDING_DIR = "source/photo/contestants"
-# Look for embeddings in the generated directories
-embedding_files = glob.glob(os.path.join(EMBEDDING_DIR, "*", "generated", "*_embedding.npy"), recursive=True)
+EMBEDDING_DIR = "source/photo/contestants/embeddings"
+print(f"[DEBUG] EMBEDDING_DIR: {os.path.abspath(EMBEDDING_DIR)}")
+glob_pattern = os.path.join(EMBEDDING_DIR, "*_embedding.npy")
+print(f"[DEBUG] Glob pattern: {glob_pattern}")
+# Look for embeddings in the new embeddings directory
+embedding_files = glob.glob(glob_pattern) # No recursive needed, files are directly in this dir
+print(f"[DEBUG] Files found by glob: {embedding_files}") # Print files found by glob
 gallery_nicknames = [] # Store nicknames corresponding to embeddings
 gallery_display_names = [] # Store actual names for display
 gallery_embeddings = []
@@ -53,7 +59,7 @@ for f in embedding_files:
         nickname = os.path.basename(f).replace("_embedding.npy", "")
         gallery_nicknames.append(nickname)
         # Use actual name if available, otherwise fallback to nickname
-        display_name = nickname_to_name.get(nickname, nickname)
+        display_name = nickname
         gallery_display_names.append(display_name)
         gallery_embeddings.append(arr)
     else:
@@ -87,7 +93,7 @@ core_detector = FaceDetector(
 # Note: The FaceAnalysis object 'app' is no longer needed globally.
 # The core_detector now manages its own instance of FaceAnalysis.
 
-RECOGNITION_THRESHOLD = 0.02  # Changed from 0.02, consistent with FaceRecognizer
+RECOGNITION_THRESHOLD = 0.4  # Changed from 0.02, consistent with FaceRecognizer
 
 # --- Helper Functions ---
 def cosine_similarity(a, b):
@@ -100,58 +106,209 @@ def get_top_matches(face_embedding, top_n=5):
     # Ensure face_embedding is normalized before dot product if not already
     norm_face_embedding = face_embedding / np.linalg.norm(face_embedding)
     sims = np.dot(gallery_embeddings, norm_face_embedding) # gallery_embeddings are assumed normalized or handled by dot product correctly
-    top_idx = np.argsort(sims)[::-1][:top_n]
-    # Use gallery_display_names for the names
-    filtered = [(gallery_display_names[i], sims[i]) for i in top_idx if sims[i] >= RECOGNITION_THRESHOLD]
-    return filtered, sims
+    top_idx_all = np.argsort(sims)[::-1][:top_n]
+    
+    # Filtered results: (name, score, original_gallery_index)
+    filtered_matches = []
+    for i in top_idx_all:
+        if sims[i] >= RECOGNITION_THRESHOLD:
+            filtered_matches.append((gallery_display_names[i], sims[i], i)) # Add original index 'i'
+            
+    return filtered_matches, sims # Return list of (name, score, index) tuples and all similarities
 
 
-def plot_bar(names, sims):
-    if not names or not sims:
+def plot_bar(all_top_matches_details):
+    """
+    Plots a horizontal bar chart for all top matches from all detected faces.
+    all_top_matches_details: A list of tuples, e.g., [("Face 1: Name A", 0.9), ("Face 2: Name B", 0.85)]
+                             Assumed to be sorted by score if desired.
+    """
+    if not all_top_matches_details:
         fig, ax = plt.subplots(figsize=(4, 3))
-        ax.text(0.5, 0.5, "No data to display", ha="center", va="center")
+        ax.text(0.5, 0.5, "No recognized matches to display", ha="center", va="center", fontsize=8)
         ax.set_xticks([])
         ax.set_yticks([])
+        plt.tight_layout()
         return fig
 
-    fig, ax = plt.subplots(figsize=(4, 3))
-    ax.barh(names[::-1], sims[::-1], color="skyblue")
+    labels = [item[0] for item in all_top_matches_details]
+    scores = [item[1] for item in all_top_matches_details]
+
+    # Determine figure height based on number of bars
+    num_bars = len(labels)
+    fig_height = max(3, num_bars * 0.4) # Adjust 0.4 factor as needed
+
+    fig, ax = plt.subplots(figsize=(5, fig_height)) # Increased width slightly for longer labels
+    ax.barh(labels[::-1], scores[::-1], color="skyblue") # Plot in reverse to have highest score at top
     ax.set_xlabel("Cosine Similarity")
-    ax.set_title("Top Matches")
-    plt.tight_layout()
+    ax.set_title("Top Matches Across All Detected Faces")
+    
+    # Adjust layout to prevent labels from being cut off
+    plt.subplots_adjust(left=0.4) # Increase left margin; adjust as needed
+    plt.tight_layout(rect=[0, 0, 1, 1]) # Apply tight_layout considering the whole figure
     return fig
 
 
-def plot_heatmap(all_sims):
-    if not all_sims or not gallery_display_names: # Use gallery_display_names
-        fig, ax = plt.subplots(figsize=(6, 2))
-        ax.text(0.5, 0.5, "No data to display", ha="center", va="center")
+def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_global, gallery_display_names_global, matches_per_detected_face):
+    """
+    Plots a 2D scatter plot of gallery and detected face embeddings using UMAP.
+    Highlights recognized faces and their nearest gallery matches.
+    """
+    num_detected = len(detected_face_embeddings_list)
+    num_gallery = gallery_embeddings_global.shape[0]
+
+    if num_detected == 0 and num_gallery == 0:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.text(0.5, 0.5, "No embeddings to display", ha="center", va="center")
         ax.set_xticks([])
         ax.set_yticks([])
+        plt.tight_layout()
         return fig
 
-    sims_matrix = np.stack(all_sims)
-    if sims_matrix.ndim < 2 or sims_matrix.shape[0] == 0 or sims_matrix.shape[1] == 0:
-        fig, ax = plt.subplots(figsize=(6, 2))
-        ax.text(0.5, 0.5, "Insufficient data for heatmap", ha="center", va="center")
+    all_embeddings_list = []
+    point_types = [] # 'gallery', 'detected_recognized', 'detected_unknown'
+    point_labels = []
+    # Store gallery indices of nearest matches for each detected face
+    nearest_gallery_indices_for_detected = [[] for _ in range(num_detected)]
+
+    # Add gallery embeddings
+    if num_gallery > 0:
+        all_embeddings_list.extend(list(gallery_embeddings_global))
+        point_types.extend(['gallery'] * num_gallery)
+        point_labels.extend(gallery_display_names_global)
+
+    # Add detected face embeddings and identify their nearest gallery matches
+    if num_detected > 0:
+        all_embeddings_list.extend(detected_face_embeddings_list)
+        for i, match_info_list_for_face in enumerate(matches_per_detected_face):
+            if match_info_list_for_face: # Recognized
+                top_match_name = match_info_list_for_face[0][0]
+                point_types.append('detected_recognized')
+                point_labels.append(f"Face {i+1}: {top_match_name}")
+                # Store indices of all gallery items this detected face matched with
+                nearest_gallery_indices_for_detected[i] = [match[2] for match in match_info_list_for_face]
+            else: # Unrecognized
+                point_types.append('detected_unknown')
+                point_labels.append(f"Face {i+1}: Unknown")
+                # No nearest gallery indices if unrecognized by threshold
+
+    if not all_embeddings_list:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.text(0.5, 0.5, "No embeddings available for UMAP", ha="center", va="center")
         ax.set_xticks([])
         ax.set_yticks([])
+        plt.tight_layout()
         return fig
 
-    fig, ax = plt.subplots(
-        figsize=(max(6, len(gallery_display_names) * 0.3), 1 + len(all_sims) * 0.5) # Use gallery_display_names
-    )
-    im = ax.imshow(sims_matrix, aspect="auto", cmap="viridis")
-    # Y-axis: Detected faces
-    y_labels = [f"Face {i + 1}" for i in range(len(all_sims))]
-    ax.set_yticks(range(len(all_sims)))
-    ax.set_yticklabels(y_labels)
-    # X-axis: Gallery names
-    ax.set_xticks(range(len(gallery_display_names))) # Use gallery_display_names
-    ax.set_xticklabels(gallery_display_names, rotation=90, fontsize=6) # Use gallery_display_names
-    plt.colorbar(im, ax=ax, orientation="vertical", label="Cosine Similarity")
-    ax.set_xlabel("Gallery Embeddings")
-    ax.set_title("Similarity of Detected Faces to Gallery Embeddings")
+    all_embeddings_np = np.array(all_embeddings_list)
+
+    if all_embeddings_np.shape[0] < 2:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.text(0.5, 0.5, "Not enough data points for UMAP (need at least 2)", ha="center", va="center")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        plt.tight_layout()
+        return fig
+        
+    n_neighbors_val = min(15, all_embeddings_np.shape[0] - 1)
+    if n_neighbors_val < 2 :
+        if all_embeddings_np.shape[0] <=2 :
+             fig, ax = plt.subplots(figsize=(6,4))
+             ax.text(0.5, 0.5, f"Too few points ({all_embeddings_np.shape[0]}) for robust UMAP.", ha="center", va="center")
+             ax.set_xticks([])
+             ax.set_yticks([])
+             plt.tight_layout()
+             return fig
+        n_neighbors_val = min(15, all_embeddings_np.shape[0] -1) 
+
+    try:
+        reducer = umap.UMAP(n_neighbors=n_neighbors_val, n_components=2, random_state=42, min_dist=0.1)
+        embedding_2d = reducer.fit_transform(all_embeddings_np)
+    except Exception as e:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.text(0.5, 0.5, f"UMAP processing error: {e}", ha="center", va="center", fontsize=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        plt.tight_layout()
+        return fig
+
+    fig, ax = plt.subplots(figsize=(12, 10)) # Slightly larger plot
+
+    # Define colors and sizes
+    color_map = {
+        'gallery': 'blue',
+        'detected_recognized': 'red',
+        'detected_unknown': 'orange',
+        'nearest_gallery': 'green' 
+    }
+    size_map = {
+        'gallery': 30,
+        'detected_recognized': 100,
+        'detected_unknown': 70,
+        'nearest_gallery': 50 
+    }
+    
+    plotted_nearest_gallery_indices = set()
+
+    # Plot gallery embeddings first (those not marked as nearest yet)
+    if num_gallery > 0:
+        gallery_2d = embedding_2d[:num_gallery]
+        for i in range(num_gallery):
+            is_nearest_to_any_detected = any(i in nearest_list for nearest_list in nearest_gallery_indices_for_detected)
+            if not is_nearest_to_any_detected:
+                 ax.scatter(gallery_2d[i, 0], gallery_2d[i, 1], 
+                           c=color_map['gallery'], s=size_map['gallery'], 
+                           alpha=0.5, label="Gallery (Other)" if 'Gallery (Other)' not in plt.gca().get_legend_handles_labels()[1] else "")
+
+
+    # Plot detected faces and their nearest gallery matches
+    if num_detected > 0:
+        detected_2d = embedding_2d[num_gallery:]
+        for i in range(num_detected):
+            detected_point = detected_2d[i]
+            ptype = point_types[num_gallery + i]
+            plabel = point_labels[num_gallery + i]
+            
+            ax.scatter(detected_point[0], detected_point[1], 
+                       c=color_map[ptype], s=size_map[ptype], 
+                       label=plabel.split(":")[0] if plabel.split(":")[0] not in plt.gca().get_legend_handles_labels()[1] else "", # Legend by type
+                       alpha=0.9, edgecolors='black' if ptype == 'detected_recognized' else None,
+                       marker='o' if ptype == 'detected_recognized' else 'X')
+            ax.text(detected_point[0], detected_point[1] + 0.05, plabel, fontsize=9, ha='center')
+
+            # Plot nearest gallery matches for this detected face and draw lines
+            for gallery_idx in nearest_gallery_indices_for_detected[i]:
+                if 0 <= gallery_idx < num_gallery:
+                    gallery_match_point = embedding_2d[gallery_idx]
+                    # Plot this specific gallery point as a "nearest match"
+                    ax.scatter(gallery_match_point[0], gallery_match_point[1],
+                               c=color_map['nearest_gallery'], s=size_map['nearest_gallery'],
+                               alpha=0.8, edgecolors='black', marker='s', # Square marker for nearest
+                               label="Nearest Gallery Match" if "Nearest Gallery Match" not in plt.gca().get_legend_handles_labels()[1] else "")
+                    plotted_nearest_gallery_indices.add(gallery_idx)
+                    
+                    # Draw line from detected face to this gallery match
+                    ax.plot([detected_point[0], gallery_match_point[0]],
+                            [detected_point[1], gallery_match_point[1]],
+                            c='gray', linestyle='--', linewidth=0.8, alpha=0.7)
+                    # Optionally, label the nearest gallery point if not already clear
+                    # ax.text(gallery_match_point[0], gallery_match_point[1] - 0.05, gallery_display_names_global[gallery_idx], 
+                    #         fontsize=8, ha='center', color='green')
+
+
+    # Re-plot any gallery points that were marked as nearest, to ensure they are on top or styled correctly if needed
+    # This step might be redundant if the above scatter for nearest_gallery is sufficient.
+    # For now, the above loop handles plotting nearest gallery points.
+
+    ax.set_title("Embedding Space (UMAP) with Nearest Matches")
+    ax.set_xlabel("UMAP Dimension 1")
+    ax.set_ylabel("UMAP Dimension 2")
+    
+    # Create a unique legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(), loc='best')
+    
     plt.tight_layout()
     return fig
 
@@ -238,68 +395,64 @@ def process_frame(frame, vis_type="bar"):
         plt.tight_layout()
         return frame, fig
 
-    matches = []
-    all_sims = []
+    matches = [] # This will store List[List[Tuple[str, float, int]]]
+    all_sims = [] # This seems unused now with the new scatter plot logic, but let's keep it for now.
     print(f"[DEBUG] Processing {len(detected_faces)} filtered faces for recognition.")
     for i, face in enumerate(detected_faces):  # Iterate through filtered InsightFaceObject instances
         print(f"[DEBUG] Face {i+1}/{len(detected_faces)}:")
         if hasattr(face, "normed_embedding") and face.normed_embedding is not None:
             print(f"[DEBUG]   normed_embedding shape: {face.normed_embedding.shape}, dtype: {face.normed_embedding.dtype}")
             print(f"[DEBUG]   normed_embedding norm: {np.linalg.norm(face.normed_embedding):.4f}")
-            # face.normed_embedding and face.bbox are available directly
-            top, sims = get_top_matches(face.normed_embedding)
-            print(f"[DEBUG]   get_top_matches returned {len(top)} matches (after RECOGNITION_THRESHOLD {RECOGNITION_THRESHOLD}).")
-            if top:
-                for name, score in top:
-                    print(f"[DEBUG]     Match: {name}, Score: {score:.4f}")
+            
+            top_matches_with_indices, sims_for_this_face = get_top_matches(face.normed_embedding)
+            print(f"[DEBUG]   get_top_matches returned {len(top_matches_with_indices)} matches (after RECOGNITION_THRESHOLD {RECOGNITION_THRESHOLD}).")
+            
+            if top_matches_with_indices:
+                for name, score, gallery_idx in top_matches_with_indices:
+                    print(f"[DEBUG]     Match: {name}, Score: {score:.4f}, Gallery Index: {gallery_idx}")
             else:
                 print(f"[DEBUG]     No matches found above threshold for this face.")
-            print(f"[DEBUG]   Raw similarities for this face (all gallery items): {sims[:10]}... (len: {len(sims)})") # Print first 10 raw sims
-            matches.append(top)
-            all_sims.append(sims)
+            
+            matches.append(top_matches_with_indices) 
+            all_sims.append(sims_for_this_face) # Store all similarities for this face
         else:
             print(f"[DEBUG]   Face {i+1} does not have 'normed_embedding' or it is None. Skipping recognition for this face.")
-            matches.append([]) # Add empty list for this face if no embedding
-            all_sims.append(np.array([])) # Add empty array for sims
+            matches.append([]) 
+            all_sims.append(np.array([]))
 
     print(f"[DEBUG] Final 'matches' list (top matches for each detected face): {matches}")
-    print(f"[DEBUG] Final 'all_sims' list length: {len(all_sims)}")
-
+    
+    # Prepare matches for overlay_faces (name, score only)
+    matches_for_overlay = []
+    for match_list_for_face in matches: 
+        matches_for_overlay.append([(name, score) for name, score, _ in match_list_for_face])
+        
     frame = overlay_faces(
-        frame, detected_faces, matches
-    )  # Pass filtered detected_faces
+        frame, detected_faces, matches_for_overlay
+    )
 
     # Visualization
-    # Check if any face had any matches. matches is a list of lists.
-    # any_match_found = any(match_list for match_list in matches)
-    # Simplified: if matches itself is not empty and its first element (matches for the first detected face) is not empty.
-
-    if not any(matches): # If all sublists in 'matches' are empty (no face had any match)
+    if not any(matches): 
         print("[DEBUG] No recognized matches for any detected faces after processing all.")
-        fig, ax = plt.subplots(figsize=(4, 3) if vis_type == "bar" else (6, 2))
-        ax.text(0.5, 0.5, "No recognized matches for detected faces", ha="center", va="center", fontsize=8)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        plt.tight_layout()
-        # Still return the frame with bounding boxes for detected (but unrecognized) faces
+        if vis_type == "bar":
+            fig = plot_bar([])
+        else: # scatter plot
+            detected_embeds = [face.normed_embedding for face in detected_faces if hasattr(face, 'normed_embedding') and face.normed_embedding is not None and face.normed_embedding.size > 0]
+            fig = plot_embedding_scatter(detected_embeds, gallery_embeddings, gallery_display_names, matches)
         return frame, fig
 
     if vis_type == "bar":
-        # Plot for the first detected face that has matches
-        first_face_with_matches = next((m for m in matches if m), None)
-        if first_face_with_matches:
-            fig = plot_bar([n for n, _ in first_face_with_matches], [s for _, s in first_face_with_matches])
-        else:
-            # This case should ideally be caught by "any(matches)" check above,
-            # but as a fallback:
-            fig, ax = plt.subplots(figsize=(4, 3))
-            ax.text(0.5, 0.5, "No top matches for display", ha="center", va="center", fontsize=8)
-            ax.set_xticks([])
-            ax.set_yticks([])
-            plt.tight_layout()
-    else: # heatmap
-        # plot_heatmap can handle empty or insufficient all_sims internally
-        fig = plot_heatmap(all_sims)
+        all_top_matches_for_plot = []
+        for i, match_list_for_face in enumerate(matches): 
+            if match_list_for_face: 
+                for name, score, _ in match_list_for_face: 
+                    all_top_matches_for_plot.append((f"Face {i+1}: {name}", score))
+        
+        all_top_matches_for_plot.sort(key=lambda x: x[1], reverse=True)
+        fig = plot_bar(all_top_matches_for_plot)
+    else: # scatter plot
+        detected_embeds = [face.normed_embedding for face in detected_faces if hasattr(face, 'normed_embedding') and face.normed_embedding is not None and face.normed_embedding.size > 0]
+        fig = plot_embedding_scatter(detected_embeds, gallery_embeddings, gallery_display_names, matches)
     return frame, fig
 
 
@@ -340,7 +493,7 @@ with gr.Blocks() as demo:
             value=video_files[0] if video_files else None,
             interactive=True,
         )
-    vis_type = gr.Radio(["bar", "heatmap"], value="bar", label="Visualization Type")
+    vis_type = gr.Radio(["bar", "scatter"], value="bar", label="Visualization Type") # Changed heatmap to scatter
     frame_slider = gr.Slider(
         minimum=0, maximum=1, value=0, step=1, label="Frame Timeline", interactive=True
     )

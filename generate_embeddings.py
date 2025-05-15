@@ -42,12 +42,29 @@ def main():
     contestant_info["編號"] = contestant_info["編號"].astype(str)
 
     # Initialize components
-    face_detector = FaceDetector(confidence_threshold=0.3)
-    face_recognizer = FaceRecognizer(  # Removed model_path argument
-        face_detector=face_detector,
-        similarity_threshold=0.6,
-        use_arcface=True,  # Explicitly use ArcFace, which is the default
+    print("[INFO] Initializing FaceDetector with InsightFace backend...")
+    face_detector = FaceDetector(
+        backend=FaceDetector.BACKEND_INSIGHTFACE,
+        model_size=(640, 640),  # Match Gradio app's detector
+        device="auto",         # Match Gradio app's detector
+        confidence_threshold=0.3 # Existing confidence threshold
     )
+    print("[INFO] FaceDetector initialized.")
+
+    # FaceRecognizer will use the backend from the passed face_detector
+    # The use_arcface=True is consistent with InsightFace's ArcFace models
+    print("[INFO] Initializing FaceRecognizer...")
+    face_recognizer = FaceRecognizer(
+        face_detector=face_detector,
+        similarity_threshold=0.6, # This threshold is for its own comparison logic, not directly for embedding generation
+        use_arcface=True
+    )
+    print("[INFO] FaceRecognizer initialized.")
+
+    # Define the central directory for saving all embeddings
+    embeddings_save_dir = os.path.join(project_root, "source", "photo", "contestants", "embeddings")
+    os.makedirs(embeddings_save_dir, exist_ok=True)
+    print(f"[INFO] Embeddings will be saved to: {embeddings_save_dir}")
 
     # Process each contestant
     for _, contestant in contestant_info.iterrows():
@@ -62,17 +79,7 @@ def main():
             continue
 
         embeddings = []
-        # Determine the directory for saving the averaged embedding.
-        # Use the directory of the first photo found for this contestant.
-        # This assumes all photos for a contestant are in the same parent numbered directory.
-        if photo_paths:
-            contestant_photo_parent_dir = os.path.dirname(photo_paths[0])
-            generated_dir = os.path.join(contestant_photo_parent_dir, "generated")
-            os.makedirs(generated_dir, exist_ok=True)
-        else: # Should not happen due to check above, but as a safeguard
-            print(f"No photo paths found for {nickname}, cannot determine save directory.")
-            continue
-
+        # Save directory is now centralized (embeddings_save_dir defined above)
 
         for photo_path in photo_paths:
             try:
@@ -141,7 +148,7 @@ def main():
             # For now, save it as is, but it might cause issues in similarity computation.
 
         # Save the averaged embedding
-        embedding_path = os.path.join(generated_dir, f"{nickname}_embedding.npy")
+        embedding_path = os.path.join(embeddings_save_dir, f"{nickname}_embedding.npy") # Use centralized save directory
         np.save(embedding_path, avg_embedding)
         print(
             f"Generated and saved averaged embedding for {nickname} (ID: {contestant_id}) from {len(embeddings)} photos to {embedding_path}"
