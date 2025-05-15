@@ -9,6 +9,10 @@ import argparse
 import sys
 import torch
 import mediapipe as mp  # Add MediaPipe import
+import logging
+from rich.logging import RichHandler
+
+logger = logging.getLogger(__name__)
 
 # Check if ChromaDB is available
 CHROMA_AVAILABLE = False
@@ -21,7 +25,7 @@ except ImportError as e:
 
 # Configure environment before importing FaceAnalysis
 os.environ['ONNXRT_ENABLE_COREML'] = '0'  # Disable CoreML for ONNX runtime
-os.environ['INSIGHTFACE_DISABLE_COREML'] = '1'  # Disable CoreML for InsightFace
+os.environ['INSIGHTFACE_DISABLE_COREML'] = '0'  # Disable CoreML for InsightFace
 
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
@@ -30,13 +34,27 @@ from rich.progress import track
 
 console = Console()
 
+def setup_logging(level):
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[RichHandler()]
+    )
+
 # Define constants with defaults that can be overridden
-DISTANCE_THRESHOLD = 0.4  # Default threshold
-FRAME_SKIP = 5            # Default frame skip
+DISTANCE_THRESHOLD = 0.3  # Default threshold
+FRAME_SKIP = 60            # Default frame skip
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
 project_root = os.path.dirname(current_script_path)
+
+# Global font cache
+FONT_PATH = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
+_font_cache = {}
+def get_font(font_size):
+    return _font_cache.setdefault(font_size, ImageFont.truetype(FONT_PATH, font_size))
 
 # Test mode configuration
 TEST_IMAGE_PATH = os.path.join(project_root, "source", "images", "test", "test_image.jpeg")
@@ -47,6 +65,10 @@ def parse_args():
                        help='Run in test mode with test_image.jpeg')
     parser.add_argument('--threshold', type=float, default=0.5,
                        help='Similarity threshold (0.0-1.0), default: 0.5')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Enable verbose logging')
+    parser.add_argument('--log-level', choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'],
+                        help='Set log level')
     args = parser.parse_args()
     
     # Validate threshold
@@ -97,16 +119,22 @@ def get_image_paths(contestant_path):
 def compute_embeddings(image_paths):
     """Compute embeddings for a list of image paths."""
     embeddings = []
-    for img_path in track(image_paths, description="Processing images..."):
-        console.print(f"[green]Processed:[/green] {os.path.basename(img_path)}")
+    images = []
+    for img_path in image_paths:
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"Failed to read {img_path}")
+            continue
+        images.append(img)
+        console.print(f"[green]Loaded:[/green] {os.path.basename(img_path)}")
+    if images:
         try:
-            img = cv2.imread(img_path)
-            faces = app.get(img)
-            for face in faces:
-                embedding = face.normed_embedding.flatten()  # Ensure 1D array
-                embeddings.append(embedding)
+            batch_results = app.get(images)
+            for faces in batch_results:
+                for face in faces:
+                    embeddings.append(face.normed_embedding.flatten())
         except Exception as e:
-            print(f"Error processing {img_path}: {e}")
+            print(f"Error processing batch embeddings: {e}")
     return embeddings
 
 
@@ -114,36 +142,25 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
     """Load and compute embeddings for selected contestants."""
     known_embeddings = {}
     for contestant_name in selected_contestants:
-        contestant_number = contestant_info.loc[
-            contestant_info["暱稱"] == contestant_name, "編號"
-        ].values[0]
-        contestant_path = os.path.join(contestants_dir, str(contestant_number))
-        if os.path.isdir(contestant_path):
-            image_paths = get_image_paths(contestant_path)
-            embeddings = compute_embeddings(image_paths)
-            if embeddings:
-                known_embeddings[contestant_name] = embeddings
-        else:
-            print(
-                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-            )
-    return known_embeddings
-    """Load and compute embeddings for selected contestants."""
-    known_embeddings = {}
-    for contestant_name in selected_contestants:
-        contestant_number = contestant_info.loc[
-            contestant_info["暱稱"] == contestant_name, "編號"
-        ].values[0]
-        contestant_path = os.path.join(contestants_dir, str(contestant_number))
-        if os.path.isdir(contestant_path):
-            image_paths = get_image_paths(contestant_path)
-            embeddings = compute_embeddings(image_paths)
-            if embeddings:
-                known_embeddings[contestant_name] = embeddings
-        else:
-            print(
-                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-            )
+        try:
+            contestant_number = contestant_info.loc[
+                contestant_info["暱稱"] == contestant_name, "編號"
+            ].values[0]
+            contestant_path = os.path.join(contestants_dir, str(contestant_number))
+            
+            if os.path.isdir(contestant_path):
+                image_paths = get_image_paths(contestant_path)
+                embeddings = compute_embeddings(image_paths)
+                
+                if embeddings:
+                    known_embeddings[contestant_name] = embeddings
+            else:
+                print(f"Directory not found for contestant {contestant_name}: {contestant_path}")
+        except Exception as e:
+            print(f"Error processing contestant {contestant_name}: {e}")
+            import traceback
+            print(traceback.format_exc())
+            
     return known_embeddings
 
 
@@ -179,134 +196,85 @@ def verify_borderline_match(face_embedding, candidate_embedding, threshold):
     return combined_score >= (threshold * 0.90)  # Allow 10% lower threshold for verification
 
 def match_face(face_embedding, known_embeddings, threshold=0.5):
-    """Compare a face embedding against known embeddings."""
+    """Compare a face embedding against known embeddings using vectorized cosine similarity."""
+    logger.debug(f"match_face called: threshold={threshold:.2f}, CHROMA_AVAILABLE={CHROMA_AVAILABLE}")
     try:
-        # First try using ChromaDB if available
+        face_emb = face_embedding.flatten().astype(np.float32)
+        face_emb /= (np.linalg.norm(face_emb) + 1e-10)
+        # ANN lookup with ChromaDB
         if CHROMA_AVAILABLE:
+            logger.debug("CHROMA_AVAILABLE: performing ANN lookup")
             try:
-                collection = get_contestant_collection()
-                results = collection.query(
-                    query_embeddings=[face_embedding.tolist()],
-                    n_results=3
-                )
-                
-                # Add comprehensive safety checks
+                coll = get_contestant_collection()
+                results = coll.query(query_embeddings=[face_emb.tolist()], n_results=1)
                 if results and results.get('distances') and results.get('metadatas'):
-                    if len(results['distances']) > 0 and len(results['distances'][0]) > 0:
+                    if len(results['distances'][0]) > 0 and len(results['metadatas'][0]) > 0:
                         best_distance = results['distances'][0][0]
                         best_name = results['metadatas'][0][0].get('name', 'Unknown')
-                        
-                        # Convert distance to similarity and compare with threshold
                         similarity = 1 - best_distance
-                        if similarity >= threshold:
-                            print(f"ChromaDB match: {best_name} with distance {best_distance}")
-                            return best_name, 1 - best_distance
+                        logger.debug(f"CHROMA branch result: {best_name}, similarity={similarity:.3f}")
+                        return best_name, similarity
             except Exception as e:
-                print(f"ChromaDB matching error: {e}")
-                print("Falling back to direct comparison")
-        
-        # Direct comparison with known_embeddings
+                logger.error(f"ChromaDB query error: {e}")
+                logger.debug("Falling back to vectorized matching")
+        # Fallback: vectorized cosine similarity
+        logger.debug("Using vectorized fallback matching")
         best_match = "Unknown"
         best_score = 0.0
-        
-        # Ensure face_embedding is a 1D array
-        face_emb_1d = face_embedding.flatten()
-        
-        for name, embeddings_list in known_embeddings.items():
-            for i, ref_embedding in enumerate(embeddings_list):
-                if ref_embedding is None:
-                    continue
-                    
-                # Ensure ref_embedding is a 1D array
-                try:
-                    ref_emb_1d = ref_embedding.flatten()
-                    
-                    # Convert and normalize embeddings
-                    face_emb_1d = face_emb_1d.astype(np.float32)
-                    ref_emb_1d = ref_emb_1d.astype(np.float32)
-                    face_emb_1d /= np.linalg.norm(face_emb_1d)
-                    ref_emb_1d /= np.linalg.norm(ref_emb_1d)
-                    
-                    # Calculate cosine similarity
-                    similarity = np.dot(face_emb_1d, ref_emb_1d)
-                    
-                    # Print similarity for debugging if it's high
-                    if similarity > 0.5:
-                        print(f"Similarity with {name}: {similarity:.4f}")
-                        
-                    if similarity >= threshold and similarity > best_score:
-                        # Additional verification for borderline matches
-                        if threshold <= similarity < (threshold + 0.20):  # Wider verification band
-                            if verify_borderline_match(face_emb_1d, ref_emb_1d, threshold * 0.90):  # More lenient verification
-                                # Only update if this is the best match so far
-                                if similarity > best_score:
-                                    best_match = name
-                                    best_score = similarity
-                                    print(f"Verified match: {name} with similarity {similarity:.4f}")
-                            else:
-                                print(f"Rejected borderline match: {name} {similarity:.4f}")
-                        else:
-                            best_match = name  
-                            best_score = similarity
-                            print(f"Strong match: {name} with similarity {similarity:.4f}")
-                except Exception as e:
-                    print(f"Error comparing with {name}: {e}")
-        
+        for name, emb_mat in known_embeddings.items():
+            sims = emb_mat @ face_emb  # vectorized cosine similarities
+            max_sim = float(np.max(sims))
+            if max_sim > best_score:
+                best_score = max_sim
+                best_match = name
+                logger.debug(f"Best fallback match so far: {best_match}, score={best_score:.3f}")
         return best_match, best_score
-        
     except Exception as e:
         print(f"Error in match_face: {e}")
-        import traceback
-        print(traceback.format_exc())
         return "Unknown", 0.0
 
-
-def copy_face_object(face):
-    """Create a copy of a face object to avoid modifying the original."""
-    import copy
-    try:
-        # Try using the built-in copy method if available
-        if hasattr(face, 'copy'):
-            return face.copy()
-        
-        # Otherwise create a new object with the same attributes
-        new_face = copy.copy(face)
-        # Make a deep copy of the bbox to avoid modifying the original
-        new_face.bbox = face.bbox.copy()
-        return new_face
-    except Exception as e:
-        print(f"Error copying face object: {e}")
-        # If copying fails, return the original (not ideal but better than failing)
-        return face
-
-def process_frame(frame, known_embeddings, threshold):
-    """Detect faces in a frame and recognize known faces using segmentation first."""
-    matches = []
+def detect_faces(frame):
+    """Detect faces in a frame using InsightFace."""
     try:
         # Check if frame is valid
         if frame is None or frame.size == 0:
             print("Warning: Empty or invalid frame received")
-            return matches
+            return []
             
-        # Print frame shape and type for debugging
-        print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
-        
-        # Step 1: Convert to RGB for consistent processing
+        # Convert to RGB for consistent processing
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Direct InsightFace processing without segmentation
+        # Get faces from InsightFace
         faces = app.get(rgb_frame)
         if faces:
             print(f"InsightFace found {len(faces)} faces in frame")
-            for face in faces:
-                face_embedding = face.normed_embedding
-                matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
-                if confidence >= threshold and matched_name != "Unknown":
-                    matches.append((face, matched_name))
+            return faces
+        return []
+    except Exception as e:
+        print(f"Error detecting faces: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return []
+
+def process_frame(frame, known_embeddings, threshold):
+    """Process a frame to identify known faces."""
+    matches = []
+    try:
+        # Detect faces
+        faces = detect_faces(frame)
+        logger.debug(f"Detected {len(faces)} faces in frame; threshold={threshold:.2f}")
+        
+        # Match each face against known embeddings
+        for face in faces:
+            face_embedding = face.normed_embedding
+            matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
+            logger.debug(f"Best match for face: {matched_name} (confidence: {confidence:.3f})")
+            if confidence >= threshold and matched_name != "Unknown":
+                matches.append((face, matched_name))
     except Exception as e:
         print(f"Error processing frame: {str(e)}")
         import traceback
-        print(traceback.format_exc())  # Print full traceback for debugging
+        print(traceback.format_exc())
     return matches
 
 
@@ -317,9 +285,8 @@ def draw_utf8_text(img, text, pos, font_size, color):
         pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(pil_img)
 
-        # Load the font
-        font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
-        font = ImageFont.truetype(font_path, font_size)
+        # Load font from cache
+        font = get_font(font_size)
 
         # Draw the text
         draw.text(pos, text, font=font, fill=color)
@@ -330,87 +297,104 @@ def draw_utf8_text(img, text, pos, font_size, color):
         print(f"Error drawing text: {e}")
 
 
+def create_pil_image(frame):
+    """Convert OpenCV frame to PIL Image."""
+    try:
+        return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    except Exception as e:
+        print(f"Error converting frame to PIL image: {e}")
+        return None
+
+def load_font(font_size):
+    """Load font for drawing text."""
+    font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
+    if not os.path.exists(font_path):
+        print(f"Warning: Font file not found at {font_path}")
+        return None
+    try:
+        return ImageFont.truetype(font_path, font_size)
+    except Exception as e:
+        print(f"Error loading font: {e}")
+        return None
+
+def draw_face_box(draw, face, font, color="green"):
+    """Draw bounding box around a face."""
+    try:
+        bbox = face.bbox.astype(int)
+        # Increase rectangle size
+        padding = 10
+        bbox_enlarged = [
+            max(0, bbox[0] - padding),
+            max(0, bbox[1] - padding),
+            bbox[2] + padding,
+            bbox[3] + padding,
+        ]
+        # Draw enlarged rectangle
+        draw.rectangle(bbox_enlarged, outline=color, width=3)
+        return bbox_enlarged
+    except Exception as e:
+        print(f"Error drawing face box: {e}")
+        return None
+
+def draw_name_label(draw, name, bbox, font, bg_color="green", text_color="white"):
+    """Draw name label above the face box."""
+    try:
+        if font:
+            text_bbox = draw.textbbox(
+                (bbox[0], bbox[1] - 65), name, font=font
+            )
+            draw.rectangle(text_bbox, fill=bg_color)
+            draw.text(
+                (bbox[0], bbox[1] - 65),
+                name,
+                font=font,
+                fill=text_color,
+            )
+    except Exception as e:
+        print(f"Error drawing name label: {e}")
+
+def draw_timestamp(draw, timestamp, img_size, font, text_color="yellow"):
+    """Draw timestamp on the image."""
+    try:
+        if font:
+            img_width, img_height = img_size
+            text_bbox = draw.textbbox((0, 0), timestamp, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            position = (img_width - text_width - 10, img_height - text_height - 10)
+            draw.text(position, timestamp, font=font, fill=text_color)
+    except Exception as e:
+        print(f"Error drawing timestamp: {e}")
+
 def draw_boxes_and_labels(frame, matches, timestamp):
-    """Draw boxes, labels, and timestamp on the frame using Pillow."""
+    """Draw boxes, labels, and timestamp on the frame."""
     try:
         # Check if frame is valid
         if frame is None or frame.size == 0:
             print("Warning: Empty or invalid frame in draw_boxes_and_labels")
             return frame
-            
-        # Convert OpenCV image (BGR) to PIL image (RGB)
-        try:
-            pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        except Exception as e:
-            print(f"Error converting frame to PIL image: {e}")
+        
+        # Convert to PIL image
+        pil_img = create_pil_image(frame)
+        if pil_img is None:
             return frame
             
         draw = ImageDraw.Draw(pil_img)
 
-        # Load the font
-        font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
-        if not os.path.exists(font_path):
-            print(f"Warning: Font file not found at {font_path}")
-            # Use a default font if the specified font is not available
-            larger_font = None
-            timestamp_font = None
-        else:
-            try:
-                larger_font = ImageFont.truetype(font_path, 60)
-                timestamp_font = ImageFont.truetype(font_path, 40)
-            except Exception as e:
-                print(f"Error loading font: {e}")
-                larger_font = None
-                timestamp_font = None
+        # Load fonts
+        larger_font = load_font(60)
+        timestamp_font = load_font(40)
 
         # Draw boxes and labels
         for face, name in matches:
-            try:
-                bbox = face.bbox.astype(int)
-                # Increase rectangle size
-                padding = 10
-                bbox_enlarged = [
-                    max(0, bbox[0] - padding),
-                    max(0, bbox[1] - padding),
-                    bbox[2] + padding,
-                    bbox[3] + padding,
-                ]
-                # Draw enlarged rectangle
-                draw.rectangle(bbox_enlarged, outline="green", width=3)
-                
-                # Draw text with increased size
-                if larger_font:
-                    text_bbox = draw.textbbox(
-                        (bbox_enlarged[0], bbox_enlarged[1] - 65), name, font=larger_font
-                    )
-                    draw.rectangle(text_bbox, fill="green")
-                    draw.text(
-                        (bbox_enlarged[0], bbox_enlarged[1] - 65),
-                        name,
-                        font=larger_font,
-                        fill="white",
-                    )
-            except Exception as e:
-                print(f"Error drawing box for face: {e}")
+            bbox = draw_face_box(draw, face, larger_font)
+            if bbox:
+                draw_name_label(draw, name, bbox, larger_font)
 
         # Draw timestamp
-        try:
-            # Get image dimensions
-            img_width, img_height = pil_img.size
+        draw_timestamp(draw, timestamp, pil_img.size, timestamp_font)
 
-            if timestamp_font:
-                # Calculate position for timestamp
-                text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_font)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_height = text_bbox[3] - text_bbox[1]
-                position = (img_width - text_width - 10, img_height - text_height - 10)
-
-                # Draw the timestamp
-                draw.text(position, timestamp, font=timestamp_font, fill="yellow")
-        except Exception as e:
-            print(f"Error drawing timestamp: {e}")
-
-        # Convert back to OpenCV image (BGR)
+        # Convert back to OpenCV image
         try:
             frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         except Exception as e:
@@ -445,9 +429,9 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
 def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, threshold=0.5, test_mode=False):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
-    console.print("[bold yellow]\nStarting video processing...[/bold yellow]")
+    logger.info("Starting video processing...")
     for video_file in track(selected_videos, description="Processing videos"):
-        console.print(f"\n[bold]Processing video:[/bold] [cyan]{video_file}[/cyan]")
+        logger.info(f"Processing video: {video_file}")
         video_path = os.path.join(videos_dir, video_file)
         if not os.path.isfile(video_path):
             print(f"Video file {video_file} not found.")
@@ -504,38 +488,55 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
         os.makedirs(output_dir, exist_ok=True)
 
         labeled_frames = []  # List to store paths of frames with labels
+        skip_frames = 0
+        # Parallel inference setup
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=4)
+        pending = []  # List of (future, frame, frame_no)
 
-        with tqdm(
-            total=total_frames, desc=f"Frames in {video_file}", leave=False
-        ) as pbar:
+        with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
             while True:
+                # Drop skipped frames without random seek
+                if skip_frames > 0:
+                    for _ in range(skip_frames):
+                        ret_drop, _ = cap.read()
+                        if not ret_drop:
+                            break
+                        frame_count += 1
+                        pbar.update(1)
+                    skip_frames = 0
+                # Read next frame
                 ret, frame = cap.read()
                 if not ret:
                     break
                 frame_count += 1
                 pbar.update(1)
-                if frame_count % FRAME_SKIP == 0:
-                    matches = process_frame(frame, known_embeddings, threshold)
-                    if matches:
-                        timestamp_seconds = frame_count / fps
-                        timestamp_formatted = "{:02}:{:02}".format(int(timestamp_seconds // 60), int(timestamp_seconds % 60))
-                        frame_with_boxes = draw_boxes_and_labels(frame, matches, timestamp_formatted)
-                        output_frame_path = os.path.join(
-                            output_dir, f"frame_{frame_count}.jpg"
-                        )
-                        cv2.imwrite(output_frame_path, frame_with_boxes)
-                        labeled_frames.append(output_frame_path)
-                        for _, matched_name in matches:
-                            print(
-                                f"Found {matched_name} in {video_file} at frame {frame_count}"
-                            )
-                            results.append(
-                                {
-                                    "Video": video_file,
-                                    "Frame": frame_count,
-                                    "Name": matched_name,
-                                }
-                            )
+                # Submit inference
+                future = executor.submit(process_frame, frame, known_embeddings, threshold)
+                pending.append((future, frame, frame_count))
+                # Handle completed tasks
+                new_pending = []
+                for fut, fr, cnt in pending:
+                    if fut.done():
+                        matches = fut.result()
+                        if matches:
+                            skip_frames = 2
+                            ts = cnt / fps
+                            ts_fmt = f"{int(ts//60):02}:{int(ts%60):02}"
+                            img_out = draw_boxes_and_labels(fr, matches, ts_fmt)
+                            out_path = os.path.join(output_dir, f"frame_{cnt}.jpg")
+                            cv2.imwrite(out_path, img_out)
+                            labeled_frames.append(out_path)
+                            for _, name in matches:
+                                results.append({"Video": video_file, "Frame": cnt, "Name": name})
+                        else:
+                            skip_frames = 10
+                        # Finished this task
+                    else:
+                        new_pending.append((fut, fr, cnt))
+                pending = new_pending
+        # Wait for any remaining inference tasks
+        executor.shutdown(wait=True)
         cap.release()
 
     save_results(results, project_root)
@@ -547,9 +548,10 @@ def save_results(results, project_root):
         df = pd.DataFrame(results)
         output_csv = os.path.join(project_root, "video_recognition_results.csv")
         df.to_csv(output_csv, index=False)
-        print(f"\nResults saved to {output_csv}")
+        logger.info(f"Results saved to {output_csv}")
     else:
-        print("No faces recognized in videos.")
+        logger.warning("No faces recognized in videos.")
+
 
 def select_items(options, item_type):
     """Allow user to select items from a list."""
@@ -667,9 +669,6 @@ def main():
     else:
         print("⚠️ Running on CPU only")
 
-    console.print("[bold green]\nMV Face Recognition System[/bold green]")
-    console.print("[bold magenta]=======================[/bold magenta]\n")
-    
     args = parse_args()
     TEST_MODE = args.test
     SIMILARITY_THRESHOLD = args.threshold  # Get threshold from arguments
@@ -681,6 +680,17 @@ def main():
             return
         print("\nRunning in test mode")
         
+    # Initialize logging
+    log_level = logging.INFO
+    if args.log_level:
+        log_level = getattr(logging, args.log_level)
+    elif args.verbose:
+        log_level = logging.DEBUG
+    setup_logging(log_level)
+
+    logger.info("MV Face Recognition System")
+    logger.info("=======================")
+    
     # Load contestant data
     contestant_info = pd.read_csv(contestant_info_path)
     all_contestants = contestant_info["暱稱"].tolist()
@@ -717,7 +727,7 @@ def main():
 
     # Load embeddings
     known_embeddings = {}
-    print("\nLoading contestant embeddings...")
+    logger.info("Loading contestant embeddings...")
     for contestant in selected_contestants:
         # Try to find contestant in contestant_info
         contestant_row = contestant_info[contestant_info["暱稱"] == contestant]
@@ -782,15 +792,38 @@ def main():
             else:
                 print(f"Directory not found for contestant {contestant}: {contestant_path}")
 
-    print(f"\nLoaded/computed embeddings for {len(known_embeddings)} contestants.")
-    print(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
+    logger.info(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
+    logger.info(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
 
     # Verify embeddings are valid
     valid_embeddings = 0
     for name, embeddings in known_embeddings.items():
         if embeddings and all(e is not None and isinstance(e, np.ndarray) for e in embeddings):
             valid_embeddings += 1
-    print(f"Valid embeddings: {valid_embeddings}/{len(known_embeddings)}")
+    logger.info(f"Valid embeddings: {valid_embeddings}/{len(known_embeddings)}")
+
+    # Batch optimization: convert known embedding lists to normalized numpy matrices
+    for name, embs in known_embeddings.items():
+        emb_mat = np.vstack(embs).astype(np.float32)
+        emb_mat /= np.linalg.norm(emb_mat, axis=1, keepdims=True) + 1e-10
+        known_embeddings[name] = emb_mat
+
+    # Ingest embeddings into ChromaDB for ANN indexing
+    if CHROMA_AVAILABLE:
+        coll = get_contestant_collection()
+        try:
+            existing = coll.get()
+            if not existing.get('ids'):
+                logger.info("Initializing ChromaDB index for embeddings...")
+                for name, emb_mat in known_embeddings.items():
+                    ids = [f"{name}_{i}" for i in range(emb_mat.shape[0])]
+                    metadatas = [{"name": name} for _ in range(emb_mat.shape[0])]
+                    coll.add(ids=ids, embeddings=emb_mat.tolist(), metadatas=metadatas)
+                logger.info("ChromaDB index initialization complete.")
+            else:
+                logger.info("ChromaDB index found, skipping initialization.")
+        except Exception as e:
+            logger.error(f"ChromaDB indexing error: {e}")
 
     # Process videos
     recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, 

@@ -23,4 +23,9 @@ dependencies = [
     "pillow>=10.4.0",
     "ffmpeg-python>=0.2.0",
     "ruff>=0.6.8",
+    "rich>=13.8.1",
+    "chromadb>=0.6.3",
+    "sentence-transformers>=4.0.1",
+    "mediapipe>=0.10.21",
+    "torch>=2.4.1",
 ]
