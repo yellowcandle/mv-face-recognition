@@ -1,26 +1,40 @@
-# Core dependencies for face recognition
-opencv-python>=4.8.0
-numpy>=1.24.0
-torch>=2.0.0
+# Web and data collection
+yt-dlp
+requests
+beautifulsoup4
+lxml-html-clean>=0.4.2
+selenium>=4.32.0
+webdriver-manager>=4.0.2
+
+# Core ML and data processing
+tf-keras~=2.16.0
+numpy<2.0.0
+torch>=2.7.0
+pandas>=2.2.3
+
+# Face detection and recognition
 insightface>=0.7.3
-mediapipe>=0.10.20  # Updated to match pyproject.toml
-chromadb>=0.4.18
+mediapipe>=0.10.21
+chromadb>=1.0.9
+opencv-contrib-python>=4.11.0.86
 
 # ONNX dependencies
-onnx>=1.15.0
-onnxruntime>=1.19.2; sys_platform == 'darwin'  # Updated to match pyproject.toml
-onnxruntime-gpu>=1.19.2; sys_platform == 'win32'  # Added from pyproject.toml
+onnx>=1.18.0
+onnxruntime>=1.19.2; sys_platform == 'darwin'
+onnxruntime-gpu>=1.19.2; sys_platform == 'win32'
+
+# Image and video processing
+pillow>=11.2.1
+ffmpeg-python>=0.2.0
+freetype-py>=2.5.1
 
 # UI and visualization
-rich>=13.5.0
-typer>=0.9.0
-pillow>=10.4.0  # Updated to match pyproject.toml
-pandas>=2.1.1  # Updated to match pyproject.toml
-tqdm>=4.66.5  # Updated to match pyproject.toml
-matplotlib>=3.7.1  # Added from pyproject.toml
-
-# Video processing
-ffmpeg-python>=0.2.0  # Added from pyproject.toml
+streamlit>=1.45.1
+rich>=14.0.0
+typer>=0.15.4
+tqdm>=4.67.1
+matplotlib>=3.10.3
+gradio>=5.29.1
 
 # Development
-ruff>=0.6.8  # Added from pyproject.toml
+ruff>=0.11.9

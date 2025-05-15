@@ -16,6 +16,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 try:
     from insightface.app import FaceAnalysis
+    from insightface.app.common import (
+        Face as InsightFaceObject,
+    )  # Import for type checking
 
     HAS_INSIGHTFACE = True
 except ImportError:
@@ -47,21 +50,20 @@ class FaceDetector:
     BACKEND_MEDIAPIPE = "mediapipe"
 
     # Tracking modes
-    TRACKING_NONE = "none"
-    TRACKING_KCF = "kcf"
-    TRACKING_CSRT = "csrt"
+    TRACKING_NONE = "none" # Kept for now, might be repurposed or removed later
 
     def __init__(
         self,
         backend: str = BACKEND_OPENCV,
         confidence_threshold: float = 0.5,
         model_size: Tuple[int, int] = (320, 320),
-        tracking_method: str = TRACKING_KCF,
-        tracking_duration: int = 30,
         skip_frames: int = 0,
         cache_enabled: bool = True,
         max_workers: int = 4,
         device: str = "auto",
+        recognition_model_name: Optional[
+            str
+        ] = None,  # Added for InsightFace model selection
     ):
         """
         Initialize the face detector.
@@ -76,15 +78,15 @@ class FaceDetector:
             cache_enabled: Whether to enable detection caching for static images
             max_workers: Number of worker threads for parallel processing
             device: Device to use (auto, cpu, cuda)
+            recognition_model_name: Name of the recognition model for InsightFace (e.g., 'antelopev2')
         """
         self.backend = backend
         self.confidence_threshold = confidence_threshold
         self.model_size = model_size
-        self.tracking_method = tracking_method
-        self.tracking_duration = tracking_duration
         self.skip_frames = skip_frames
         self.cache_enabled = cache_enabled
         self.max_workers = max_workers
+        self.recognition_model_name = recognition_model_name  # Store the model name
 
         # Check device availability
         self.device = self._resolve_device(device)
@@ -92,8 +94,13 @@ class FaceDetector:
         # Initialize tracking variables
         self.frame_count = 0
         self.last_detection_time = 0
-        self.trackers = []
-        self.tracker_lock = threading.Lock()
+        # Variables for optical flow tracking
+        self.prev_gray = None
+        self.prev_tracked_objects = [] # Will store (point, width, height) tuples
+        self.lk_params = dict(winSize=(15, 15),
+                              maxLevel=2,
+                              criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
 
         # Set up thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -192,7 +199,17 @@ class FaceDetector:
             providers.append("CUDAExecutionProvider")
         providers.append("CPUExecutionProvider")
 
-        self.detector = FaceAnalysis(providers=providers)
+        # Pass recognition_model_name to FaceAnalysis if provided
+        if self.recognition_model_name:
+            self.detector = FaceAnalysis(
+                name=self.recognition_model_name, providers=providers
+            )
+            print(
+                f"Initialized InsightFace with recognition model: {self.recognition_model_name}"
+            )
+        else:
+            self.detector = FaceAnalysis(providers=providers)
+            print("Initialized InsightFace with default recognition model.")
 
         # Determine ctx_id based on device
         ctx_id = 0 if self.device == "cuda" else -1
@@ -225,7 +242,7 @@ class FaceDetector:
 
     def detect_faces(
         self, image: np.ndarray, force_detection: bool = False, use_cache: bool = True
-    ) -> List[List[float]]:
+    ) -> List[Any]:
         """
         Detect faces in an image.
 
@@ -235,7 +252,9 @@ class FaceDetector:
             use_cache: Whether to use face cache for static images
 
         Returns:
-            list: List of bounding boxes in format [x1, y1, x2, y2]
+            list: Depending on the backend:
+                  - For InsightFace: List of insightface.app.common.Face objects.
+                  - For other backends: List of bounding boxes in format [x1, y1, x2, y2].
         """
         start_time = time.time()
         self.frame_count += 1
@@ -270,30 +289,64 @@ class FaceDetector:
             resized_image = image
 
         # Decide whether to run detection or tracking
-        use_tracking = (
-            not force_detection
-            and self.tracking_method != self.TRACKING_NONE
-            and self.frame_count % self.skip_frames != 0
-            and time.time() - self.last_detection_time < self.tracking_duration
-            and self.trackers
-        )
+        current_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        if use_tracking:
-            # Use existing trackers for faster processing
-            bboxes = self._track_faces(image)
-        else:
+        # Decide whether to run detection or tracking
+        run_full_detection = True # Default to full detection
+        if not force_detection and self.skip_frames > 0 and (self.frame_count % (self.skip_frames + 1) != 0):
+            if self.prev_gray is not None and self.prev_tracked_objects:
+                run_full_detection = False
+
+        detection_result: List[Any]
+        if not run_full_detection:
+            # Attempt to track faces using optical flow
+            detection_result = self._track_faces_with_optical_flow(current_gray, image)
+            # If tracking fails or yields no results, fall back to full detection
+            if not detection_result:
+                run_full_detection = True
+        
+        if run_full_detection:
             # Run full face detection
-            bboxes = self._detect_faces_with_backend(resized_image, scale_factor)
+            detection_result = self._detect_faces_with_backend(
+                resized_image, scale_factor # Use resized_image for detection
+            )
             self.last_detection_time = time.time()
 
-            # Update trackers if tracking is enabled
-            if self.tracking_method != self.TRACKING_NONE:
-                self._update_trackers(image, bboxes)
+            # Prepare for next tracking cycle
+            bboxes_for_tracking: List[List[float]]
+            if (
+                self.backend == self.BACKEND_INSIGHTFACE
+                and detection_result
+                and isinstance(detection_result[0], InsightFaceObject)
+            ):
+                # Bboxes from InsightFace are already scaled if original image was larger
+                bboxes_for_tracking = [
+                    f.bbox.astype(int).tolist() for f in detection_result
+                ]
+            elif detection_result and all(
+                isinstance(item, list) for item in detection_result
+            ):
+                # Bboxes from other backends are also scaled
+                bboxes_for_tracking = detection_result
+            else:
+                bboxes_for_tracking = []
+
+            if bboxes_for_tracking:
+                # Use the original image's gray version for initializing points for optical flow
+                # if resized_image was used for detection, points should correspond to original image scale
+                # So, convert the full 'image' to gray for _update_optical_flow_points
+                full_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                self._initialize_optical_flow_points(full_image_gray, bboxes_for_tracking)
+            else: # No faces detected, reset tracking
+                self.prev_tracked_objects = []
+            
+        self.prev_gray = current_gray.copy() # Update prev_gray for the next frame's tracking
+
 
         # Cache the results for static test images
-        if use_cache and self.cache_enabled and bboxes:
+        if use_cache and self.cache_enabled and detection_result:
             img_hash = self._compute_image_hash(image)
-            self.face_cache[img_hash] = bboxes
+            self.face_cache[img_hash] = detection_result  # Cache the actual result
 
             # Clean cache if it gets too large
             if len(self.face_cache) > self.cache_size_limit:
@@ -306,7 +359,7 @@ class FaceDetector:
         # Update statistics
         detection_time = time.time() - start_time
         self.stats["detection_time"] += detection_time
-        self.stats["detections"] += len(bboxes)
+        self.stats["detections"] += len(detection_result)
 
         if self.stats["frames_processed"] > 0:
             self.stats["avg_faces_per_frame"] = (
@@ -314,29 +367,27 @@ class FaceDetector:
             )
 
             # Cache the result
-        if hasattr(self, "detection_cache") and use_cache:
-            image_hash = hash(image.tobytes())
-            self.detection_cache[image_hash] = bboxes.copy()
-            # Limit cache size
-            if len(self.detection_cache) > 50:
-                # Remove oldest entry
-                self.detection_cache.pop(next(iter(self.detection_cache)))
-        return bboxes
+        return detection_result
 
     def _detect_faces_with_backend(
         self, image: np.ndarray, scale_factor: float = 1.0
-    ) -> List[List[float]]:
+    ) -> List[Any]:
         """
         Detect faces using the configured backend.
 
         Args:
-            image: Input image
-            scale_factor: Scale factor to restore original coordinates
+            image: Input image (potentially resized)
+            scale_factor: Scale factor to restore original coordinates from the input 'image'.
+                          If scale_factor is 1.0, 'image' is the original image.
 
         Returns:
-            list: List of bounding boxes in format [x1, y1, x2, y2]
+            list: Depending on the backend:
+                  - For InsightFace: List of insightface.app.common.Face objects with coordinates
+                                     scaled to the original image dimensions.
+                  - For other backends: List of bounding boxes in format [x1, y1, x2, y2]
+                                     scaled to the original image dimensions.
         """
-        bboxes = []
+        output_results: List[Any] = []
 
         if self.backend == self.BACKEND_OPENCV:
             # OpenCV YuNet detector
@@ -362,27 +413,38 @@ class FaceDetector:
                             h = int(h / scale_factor)
 
                         bbox = [x1, y1, x1 + w, y1 + h]
-                        bboxes.append(bbox)
+                        output_results.append(bbox)
 
         elif self.backend == self.BACKEND_INSIGHTFACE:
             # InsightFace detector
-            faces = self.detector.get(image)
+            # self.detector.get(image) returns Face objects with coordinates relative to 'image'
+            insight_faces = self.detector.get(image)
 
-            for face in faces:
-                bbox = face.bbox.astype(int)
-
-                # Rescale coordinates if needed
+            for face in insight_faces:
+                # If the input 'image' was a resized version of the original,
+                # scale the coordinates in the Face object back to the original image's dimensions.
                 if scale_factor != 1.0:
-                    bbox = [
-                        int(bbox[0] / scale_factor),
-                        int(bbox[1] / scale_factor),
-                        int(bbox[2] / scale_factor),
-                        int(bbox[3] / scale_factor),
-                    ]
+                    # Scale bounding box
+                    face.bbox = face.bbox / scale_factor
+                    # Scale keypoints if they exist
+                    if face.kps is not None:
+                        face.kps = face.kps / scale_factor
+                    # Scale other landmark attributes if they exist and are used
+                    if (
+                        hasattr(face, "landmark_2d_106")
+                        and face.landmark_2d_106 is not None
+                    ):
+                        face.landmark_2d_106 = face.landmark_2d_106 / scale_factor
+                    if (
+                        hasattr(face, "landmark_3d_68")
+                        and face.landmark_3d_68 is not None
+                    ):
+                        # For 3D landmarks, typically only x,y are scaled if z is depth/relative
+                        face.landmark_3d_68[:, :2] = (
+                            face.landmark_3d_68[:, :2] / scale_factor
+                        )
 
-                bboxes.append(
-                    bbox if isinstance(bbox, (np.ndarray, np.generic)) else bbox
-                )
+                output_results.append(face)
 
         elif self.backend == self.BACKEND_MEDIAPIPE:
             # MediaPipe detector
@@ -413,105 +475,111 @@ class FaceDetector:
                             h = int(h / scale_factor)
 
                         bbox = [x1, y1, x1 + w, y1 + h]
-                        bboxes.append(bbox)
+                        output_results.append(bbox)
 
-                # Cache the result
-        if hasattr(self, "detection_cache") and use_cache:
-            image_hash = hash(image.tobytes())
-            self.detection_cache[image_hash] = bboxes.copy()
-            # Limit cache size
-            if len(self.detection_cache) > 50:
-                # Remove oldest entry
-                self.detection_cache.pop(next(iter(self.detection_cache)))
-        return bboxes
+        return output_results
 
-    def _update_trackers(self, image: np.ndarray, bboxes: List[List[float]]):
+    def _initialize_optical_flow_points(self, gray_frame: np.ndarray, bboxes: List[List[float]]):
         """
-        Initialize trackers for the detected faces.
-
+        Initialize points and their corresponding bbox dimensions for optical flow tracking.
         Args:
-            image: Input image
-            bboxes: List of bounding boxes
+            gray_frame: Grayscale version of the full original image.
+            bboxes: List of bounding boxes from full detection, scaled to the original image.
         """
-        # Clear existing trackers
-        with self.tracker_lock:
-            self.trackers = []
+        self.prev_tracked_objects = []
+        points_to_track = []
+        for bbox in bboxes:
+            x1, y1, x2, y2 = map(int, bbox)
+            w = x2 - x1
+            h = y2 - y1
+            center_x = x1 + w / 2
+            center_y = y1 + h / 2
+            
+            # Store the center point and original dimensions
+            # Points are relative to the gray_frame (original image scale)
+            points_to_track.append([[center_x, center_y]])
+            self.prev_tracked_objects.append({'point': None, 'width': w, 'height': h, 'original_bbox': bbox})
 
-            # Create a new tracker for each face
-            for bbox in bboxes:
-                x1, y1, x2, y2 = map(int, bbox)
-                w = x2 - x1
-                h = y2 - y1
-
-                # Create appropriate tracker type
-                if self.tracking_method == self.TRACKING_KCF:
-                    tracker = cv2.TrackerKCF_create()
-                elif self.tracking_method == self.TRACKING_CSRT:
-                    tracker = cv2.TrackerCSRT_create()
-                else:
-                    continue
-
-                # Initialize tracker with bbox
-                tracker.init(image, (x1, y1, w, h))
-                self.trackers.append(tracker)
-
-    def _track_faces(self, image: np.ndarray) -> List[List[float]]:
-        """
-        Track faces using trackers.
-
-        Args:
-            image: Input image
-
-        Returns:
-            list: List of bounding boxes
-        """
-        bboxes = []
-        remaining_trackers = []
-
-        # Thread-safe tracker update
-        with self.tracker_lock:
-            trackers_copy = self.trackers.copy()
-
-        # Process trackers in parallel for large images
-        if len(trackers_copy) > 2 and image.shape[0] * image.shape[1] > 640 * 480:
-            futures = [
-                self.executor.submit(self._update_tracker, tracker, image)
-                for tracker in trackers_copy
-            ]
-            results = [future.result() for future in futures]
-
-            for success, bbox, tracker in results:
-                if success:
-                    x, y, w, h = map(int, bbox)
-                    bboxes.append([x, y, x + w, y + h])
-                    remaining_trackers.append(tracker)
+        if points_to_track:
+            initial_points = np.array(points_to_track, dtype=np.float32)
+            # Refine points to good features to track if desired, or use centers
+            # For simplicity, using centers. For robustness, consider cv2.goodFeaturesToTrack within each bbox.
+            # Make sure these points are on the gray_frame used for prev_gray
+            for i, pt_arr in enumerate(initial_points):
+                 self.prev_tracked_objects[i]['point'] = pt_arr
         else:
-            # Sequential update for small images or few trackers
-            for tracker in trackers_copy:
-                success, bbox = tracker.update(image)
-                if success:
-                    x, y, w, h = map(int, bbox)
-                    bboxes.append([x, y, x + w, y + h])
-                    remaining_trackers.append(tracker)
+            self.prev_tracked_objects = []
 
-        # Update trackers list thread-safely
-        with self.tracker_lock:
-            self.trackers = remaining_trackers
 
-            # Cache the result
-        if hasattr(self, "detection_cache") and use_cache:
-            image_hash = hash(image.tobytes())
-            self.detection_cache[image_hash] = bboxes.copy()
-            # Limit cache size
-            if len(self.detection_cache) > 50:
-                # Remove oldest entry
-                self.detection_cache.pop(next(iter(self.detection_cache)))
-        return bboxes
+    def _track_faces_with_optical_flow(self, current_gray_frame: np.ndarray, original_color_image: np.ndarray) -> List[List[float]]:
+        """
+        Track faces using Lucas-Kanade optical flow.
+        Args:
+            current_gray_frame: Grayscale version of the current full original image.
+            original_color_image: The original color image (used for getting dimensions).
+        Returns:
+            List of tracked bounding boxes.
+        """
+        if not self.prev_tracked_objects or self.prev_gray is None:
+            return []
 
-    def _update_tracker(self, tracker, image):
-        """Thread-safe tracker update helper"""
-        success, bbox = tracker.update(image)
-        return success, bbox, tracker
+        # Prepare points from prev_tracked_objects
+        old_points_list = [obj['point'] for obj in self.prev_tracked_objects if obj['point'] is not None]
+        if not old_points_list:
+            return []
+        
+        prev_points_np = np.array(old_points_list, dtype=np.float32)
+
+        # Calculate optical flow
+        new_points_np, status, err = cv2.calcOpticalFlowPyrLK(
+            self.prev_gray, current_gray_frame, prev_points_np, None, **self.lk_params
+        )
+
+        tracked_bboxes = []
+        updated_tracked_objects = []
+
+        if new_points_np is not None and status is not None:
+            h_img, w_img = original_color_image.shape[:2]
+            
+            original_objects_idx = 0 # To map status back to self.prev_tracked_objects
+            for i in range(len(prev_points_np)): # Iterate based on the points we attempted to track
+                # Find the corresponding original object. This assumes prev_points_np was built in order.
+                # This loop structure needs to correctly map tracked points back to their original objects
+                # This assumes that prev_points_np was constructed in the same order as prev_tracked_objects
+                original_obj_data = self.prev_tracked_objects[original_objects_idx]
+                original_objects_idx +=1
+
+                if status[i] == 1:  # Point was tracked successfully
+                    new_pt = new_points_np[i].ravel()
+                    
+                    # Retrieve original width and height for this tracked object
+                    face_width = original_obj_data['width']
+                    face_height = original_obj_data['height']
+
+                    # Reconstruct bbox around the new point using original dimensions
+                    x1 = int(new_pt[0] - face_width / 2)
+                    y1 = int(new_pt[1] - face_height / 2)
+                    x2 = int(new_pt[0] + face_width / 2)
+                    y2 = int(new_pt[1] + face_height / 2)
+                    
+                    # Ensure bbox is within image bounds
+                    x1 = max(0, x1)
+                    y1 = max(0, y1)
+                    x2 = min(w_img - 1, x2)
+                    y2 = min(h_img - 1, y2)
+
+                    if x2 > x1 and y2 > y1:  # Valid bbox
+                        tracked_bboxes.append([x1, y1, x2, y2])
+                        # Update the point and keep the object for the next tracking cycle
+                        updated_tracked_objects.append({
+                            'point': np.array([[new_pt[0], new_pt[1]]], dtype=np.float32),
+                            'width': face_width,
+                            'height': face_height,
+                            'original_bbox': [x1,y1,x2,y2] # Update original_bbox to current tracked one
+                        })
+        
+        self.prev_tracked_objects = updated_tracked_objects
+        return tracked_bboxes
 
     def extract_face(
         self, image: np.ndarray, bbox: List[float], padding: float = 0.0
@@ -528,34 +596,62 @@ class FaceDetector:
             numpy.ndarray: Extracted face region or None on error
         """
         try:
-            x1, y1, x2, y2 = map(int, bbox[:4])
+            orig_x1, orig_y1, orig_x2, orig_y2 = map(int, bbox[:4])
+            img_height, img_width = image.shape[:2]
 
-            # Add padding
-            if padding > 0:
-                height, width = image.shape[:2]
-                pad_x = int((x2 - x1) * padding)
-                pad_y = int((y2 - y1) * padding)
-
-                x1 = max(0, x1 - pad_x)
-                y1 = max(0, y1 - pad_y)
-                x2 = min(width, x2 + pad_x)
-                y2 = min(height, y2 + pad_y)
-
-            # Get face region
-            face = image[y1:y2, x1:x2]
-
-            # Ensure minimum size
-            if face.size == 0:  # Check if face region is empty
+            # If the initial bbox is invalid (e.g., x1 >= x2), return None early.
+            if orig_x1 >= orig_x2 or orig_y1 >= orig_y2:
+                # print(f"Warning: Initial bbox invalid: {[orig_x1, orig_y1, orig_x2, orig_y2]}")
                 return None
 
-            if face.shape[0] < 64 or face.shape[1] < 64:
-                scale = 64 / min(face.shape[0], face.shape[1])
-                face = cv2.resize(face, None, fx=scale, fy=scale)
+            # Calculate padding based on the valid part of the bbox dimensions
+            # Ensure width/height for padding calculation are non-negative
+            bbox_w = max(0, orig_x2 - orig_x1)
+            bbox_h = max(0, orig_y2 - orig_y1)
+            
+            pad_x = 0
+            pad_y = 0
+            if padding > 0:
+                pad_x = int(bbox_w * padding)
+                pad_y = int(bbox_h * padding)
 
+            # Apply padding
+            x1 = orig_x1 - pad_x
+            y1 = orig_y1 - pad_y
+            x2 = orig_x2 + pad_x
+            y2 = orig_y2 + pad_y
+
+            # Clip coordinates to image boundaries
+            # Important: Clip *after* padding, then check validity for slicing
+            x1_clipped = max(0, x1)
+            y1_clipped = max(0, y1)
+            x2_clipped = min(img_width, x2)
+            y2_clipped = min(img_height, y2)
+            
+            # If the clipped bbox is invalid or empty, return None
+            if x1_clipped >= x2_clipped or y1_clipped >= y2_clipped:
+                # print(f"Warning: Clipped bbox invalid or empty: {[x1_clipped, y1_clipped, x2_clipped, y2_clipped]}")
+                return None
+
+            # Get face region using clipped coordinates
+            face = image[y1_clipped:y2_clipped, x1_clipped:x2_clipped]
+
+            if face.size == 0:
+                return None
+
+            # Ensure minimum size (optional, consider if this is always desired)
+            # This might be better handled by the component requesting the face crop
+            # if face.shape[0] < 64 or face.shape[1] < 64:
+            #     scale = 64 / min(face.shape[0], face.shape[1])
+            #     face = cv2.resize(face, None, fx=scale, fy=scale)
+            #     if face.size == 0: # Resize might also result in empty if original was tiny and invalid
+            #         return None
+            
             return face
 
         except Exception as e:
-            print(f"Error extracting face: {e}")
+            # Catch any other unexpected errors during extraction
+            print(f"Error extracting face for bbox {bbox}: {e}")
             return None
 
     @staticmethod
@@ -604,7 +700,7 @@ class FaceDetector:
 
     def batch_detect(
         self, images: List[np.ndarray], use_parallel: bool = True
-    ) -> List[List[List[float]]]:
+    ) -> List[List[Any]]:
         """
         Detect faces in multiple images.
 
@@ -613,7 +709,7 @@ class FaceDetector:
             use_parallel: Whether to use parallel processing
 
         Returns:
-            list: List of detection results for each image
+            list: List of detection results for each image. Each result is as per detect_faces().
         """
         if not use_parallel or len(images) <= 1:
             return [self.detect_faces(img) for img in images]
@@ -634,9 +730,8 @@ class FaceDetector:
         self.frame_count = 0
         self.last_detection_time = 0
 
-        with self.tracker_lock:
-            self.trackers = []
-
+        self.prev_gray = None
+        self.prev_tracked_objects = []
         # Reset statistics
         for key in self.stats:
             self.stats[key] = 0
