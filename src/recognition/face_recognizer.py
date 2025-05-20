@@ -4,13 +4,14 @@ import numpy as np
 import onnxruntime
 from typing import List, Dict, Optional # Added Optional
 from src.core.detector import FaceDetector
+import sys # Added
 
 
 class FaceRecognizer:
     def __init__(
         self,
         face_detector: FaceDetector,
-        similarity_threshold: float = 0.35,
+        similarity_threshold: float = 0.6,  # Increased threshold for better precision
         use_arcface: bool = True,
     ):
         self.use_arcface = use_arcface
@@ -29,30 +30,63 @@ class FaceRecognizer:
             else:
                 print(f"Using SFace model: {model_path}") # This case implies SFace is used
 
+            # Construct providers list
+            providers_config = []
+            # Determine device preference (e.g. from face_detector if available, or a new param)
+            # For now, let's assume 'auto' behavior similar to FaceDetector
+            current_device_preference = "auto" # Could be made a parameter or inferred
+            resolved_device = "cpu" # Default
+            
+            if current_device_preference == "auto":
+                if sys.platform == "darwin" and 'MPSExecutionProvider' in onnxruntime.get_available_providers():
+                    resolved_device = "mps"
+                elif 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+                    resolved_device = "cuda"
+
+            if resolved_device == "mps" and sys.platform == "darwin":
+                providers_config.append('MPSExecutionProvider')
+            elif resolved_device == "cuda":
+                providers_config.append('CUDAExecutionProvider')
+            
+            providers_config.append('CPUExecutionProvider') # Always CPU fallback
+
+            final_providers = []
+            for p_item in providers_config:
+                if p_item not in final_providers:
+                    final_providers.append(p_item)
+
             # Attempt to load the selected model_path
             try:
-                self.session = onnxruntime.InferenceSession(model_path)
-                print(f"Successfully loaded model: {model_path}")
+                print(f"Attempting to load model: {model_path} with providers: {final_providers}")
+                self.session = onnxruntime.InferenceSession(model_path, providers=final_providers)
+                print(f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}")
             except Exception as e:
                 # If the chosen model (e.g. SFace) fails to load, try the other one if not already tried.
                 if "sface" in model_path.lower() and os.path.exists(os.path.join("models", "arcface_r50.onnx")):
-                    print(f"Failed to load {model_path} due to {e}. Attempting to load arcface_r50.onnx.")
+                    print(f"Failed to load {model_path} due to {e}. Attempting to load arcface_r50.onnx with providers {final_providers}.")
                     model_path = os.path.join("models", "arcface_r50.onnx")
                     try:
-                        self.session = onnxruntime.InferenceSession(model_path)
-                        print(f"Successfully loaded model: {model_path}")
+                        self.session = onnxruntime.InferenceSession(model_path, providers=final_providers)
+                        print(f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}")
                     except Exception as e2:
                         raise FileNotFoundError(f"Failed to load both SFace and ArcFace R50 models. Last error: {e2}")
                 elif "arcface_r50" in model_path.lower() and os.path.exists(os.path.join("models", "face_recognition_sface.onnx")):
-                     print(f"Failed to load {model_path} due to {e}. Attempting to load face_recognition_sface.onnx.")
+                     print(f"Failed to load {model_path} due to {e}. Attempting to load face_recognition_sface.onnx with providers {final_providers}.")
                      model_path = os.path.join("models", "face_recognition_sface.onnx")
                      try:
-                        self.session = onnxruntime.InferenceSession(model_path)
-                        print(f"Successfully loaded model: {model_path}")
+                        self.session = onnxruntime.InferenceSession(model_path, providers=final_providers)
+                        print(f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}")
                      except Exception as e2:
                         raise FileNotFoundError(f"Failed to load both ArcFace R50 and SFace models. Last error: {e2}")
                 else:
-                    raise e # Re-raise original error if no alternative or alternative also failed
+                    # If primary attempt failed, try with just CPUExecutionProvider as a last resort for the original model_path
+                    print(f"Failed to load {model_path} with {final_providers}. Retrying with CPUExecutionProvider only.")
+                    try:
+                        self.session = onnxruntime.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+                        print(f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}")
+                    except Exception as e_cpu:
+                        print(f"Failed to load {model_path} even with CPUExecutionProvider. Original error: {e}, CPU error: {e_cpu}")
+                        raise e # Re-raise original error if all fallbacks failed
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
             
@@ -67,8 +101,15 @@ class FaceRecognizer:
                     print("Adjusted embedding size to 128 based on SFace model name.")
 
             # Mean and std for normalization
-            self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-            self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            # Use different values based on model type
+            if "sface" in model_path.lower():
+                # SFace specific normalization values
+                self.mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+                self.std = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+            else:
+                # ArcFace values
+                self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         else:
             # Fallback to OpenCV DNN
             self.embedding_size = 128 # Default embedding size for OpenCV DNN

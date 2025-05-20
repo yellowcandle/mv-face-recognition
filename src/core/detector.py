@@ -13,6 +13,8 @@ import threading
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+import sys # Added
+import onnxruntime # Added
 
 try:
     from insightface.app import FaceAnalysis
@@ -127,16 +129,14 @@ class FaceDetector:
     def _resolve_device(self, device: str) -> str:
         """Resolve device based on availability."""
         if device == "auto":
+            if sys.platform == "darwin":
+                # Check if MPS is available in onnxruntime providers
+                if 'MPSExecutionProvider' in onnxruntime.get_available_providers():
+                    return "mps"
             # Check for CUDA
-            try:
-                count = cv2.cuda.getCudaEnabledDeviceCount()
-                if count > 0:
-                    return "cuda"
-            except:
-                pass
-
+            if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+                return "cuda"
             return "cpu"
-
         return device.lower()
 
     def _init_backend(self):
@@ -194,28 +194,66 @@ class FaceDetector:
             )
 
         # Initialize with appropriate providers
-        providers = []
-        if self.device == "cuda":
-            providers.append("CUDAExecutionProvider")
-        providers.append("CPUExecutionProvider")
+        providers_config = []
+        if self.device == "mps" and sys.platform == "darwin":
+            providers_config.append('MPSExecutionProvider')
+        elif self.device == "cuda":
+            providers_config.append("CUDAExecutionProvider")
+        
+        # CoreMLExecutionProvider can be an option for Mac if MPS isn't preferred or available for a model
+        # if sys.platform == "darwin" and 'CoreMLExecutionProvider' not in providers_config and 'MPSExecutionProvider' not in providers_config:
+        #     providers_config.append('CoreMLExecutionProvider')
+
+        providers_config.append("CPUExecutionProvider") # Always have CPU as fallback
+
+        # Remove duplicates just in case, maintaining order
+        final_providers = []
+        for p in providers_config:
+            if p not in final_providers:
+                final_providers.append(p)
+        
+        print(f"Attempting to initialize InsightFace with providers: {final_providers}")
 
         # Pass recognition_model_name to FaceAnalysis if provided
         if self.recognition_model_name:
             self.detector = FaceAnalysis(
-                name=self.recognition_model_name, providers=providers
+                name=self.recognition_model_name, providers=final_providers
             )
             print(
                 f"Initialized InsightFace with recognition model: {self.recognition_model_name}"
             )
         else:
-            self.detector = FaceAnalysis(providers=providers)
+            self.detector = FaceAnalysis(providers=final_providers)
             print("Initialized InsightFace with default recognition model.")
+        
+        # Access providers from the detection model (det_model)
+        # The FaceAnalysis object itself might not directly expose a 'providers' attribute
+        # in the way it's being accessed. The actual ONNX execution providers are
+        # associated with the loaded models (e.g., detection model, recognition model).
+        if hasattr(self.detector, 'det_model') and hasattr(self.detector.det_model, 'get_providers'):
+            actual_providers = self.detector.det_model.get_providers()
+            # The get_providers() method returns a list of strings, where each string
+            # might be like 'CUDAExecutionProvider_shared' or 'CPUExecutionProvider'.
+            # We can simplify this for display.
+            simple_providers = [p.split('_')[0] for p in actual_providers]
+            print(f"InsightFace detector (det_model) actually using providers: {simple_providers}")
+        else:
+            # Fallback or if the structure is different than expected
+            print("InsightFace detector: Could not determine specific providers for det_model. Using configured list.")
 
-        # Determine ctx_id based on device
-        ctx_id = 0 if self.device == "cuda" else -1
+
+        # Determine ctx_id based on device for InsightFace's prepare method
+        # ctx_id is primarily for CUDA. For MPS/CoreML, the provider list is key.
+        # If MPS is used, ctx_id should typically be -1 (CPU) as MPS handles its own device management.
+        ctx_id = -1 # Default to CPU context for prepare, letting providers handle device
+        # Check against the *configured* providers or a simplified list from actual_providers if available
+        # For simplicity, we'll check against `final_providers` which was used for initialization.
+        # A more robust check would involve inspecting `actual_providers` if the above block successfully got them.
+        if self.device == "cuda" and "CUDAExecutionProvider" in final_providers: # Check against configured providers
+            ctx_id = 0 # Use GPU context if CUDA is available and selected
+
         self.detector.prepare(ctx_id=ctx_id, det_size=self.model_size)
-
-        print(f"Initialized InsightFace detector with device: {self.device}")
+        print(f"Initialized InsightFace detector. Target device: {self.device}, Effective context_id for prepare: {ctx_id}")
 
     def _init_mediapipe_detector(self):
         """Initialize MediaPipe face detector."""
