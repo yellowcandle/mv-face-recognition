@@ -6,122 +6,155 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import umap.umap_ as umap
 import pandas as pd
-
-# from insightface.app import FaceAnalysis # Will be replaced by core_detector
-from src.core.detector import FaceDetector  # Import the centralized detector
-from insightface.app.common import Face as InsightFaceObject  # For type hinting
-from typing import List, Tuple  # Added Any for broader compatibility if needed
 import time
 import matplotlib
 from PIL import Image, ImageDraw, ImageFont
-import random
+import logging
+from typing import List, Tuple, Dict, Any, Optional, Union
+from src.core.detector import FaceDetector
+from insightface.app.common import Face as InsightFaceObject
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('face_recognition')
+
+# Configure matplotlib fonts for CJKV support
 matplotlib.rcParams["font.sans-serif"] = [
-    "Arial Unicode MS",
-    "SimHei",
-    "Noto Sans CJK TC",
-    "Noto Sans CJK SC",
-    "Noto Sans CJK JP",
-    "Noto Sans CJK KR",
-    "Microsoft JhengHei",
-    "Apple LiGothic Medium",
-    "WenQuanYi Zen Hei",
+    "Arial Unicode MS", "SimHei", "Noto Sans CJK TC", "Noto Sans CJK SC",
+    "Noto Sans CJK JP", "Noto Sans CJK KR", "Microsoft JhengHei",
+    "Apple LiGothic Medium", "WenQuanYi Zen Hei",
 ]
 matplotlib.rcParams["axes.unicode_minus"] = False
 
-# Path to a CJKV-supporting font (adjust as needed)
-CJKV_FONT_PATH = "fonts/SourceHanSansTC-VF.ttf"  # Update this path to a valid CJKV font on your system
+# Constants
+CJKV_FONT_PATH = "fonts/SourceHanSansTC-VF.ttf"
 FONT_SIZE = 60
-
-# --- Load Contestant Info ---
-print(f"[DEBUG] Current working directory: {os.getcwd()}") # Print CWD
 CONTESTANT_INFO_PATH = "contestant_info.csv"
-contestant_info_df = pd.read_csv(CONTESTANT_INFO_PATH)
-# Create a mapping from nickname (used in embedding filenames) to actual name
-# nickname_to_name = pd.Series(contestant_info_df["姓名"].values, index=contestant_info_df["暱稱"]).to_dict()
-
-# --- Load Gallery Embeddings ---
 EMBEDDING_DIR = "source/photo/contestants/embeddings"
-print(f"[DEBUG] EMBEDDING_DIR: {os.path.abspath(EMBEDDING_DIR)}")
-glob_pattern = os.path.join(EMBEDDING_DIR, "*_embedding.npy")
-print(f"[DEBUG] Glob pattern: {glob_pattern}")
-# Look for embeddings in the new embeddings directory
-embedding_files = glob.glob(glob_pattern) # No recursive needed, files are directly in this dir
-print(f"[DEBUG] Files found by glob: {embedding_files}") # Print files found by glob
-gallery_nicknames = [] # Store nicknames corresponding to embeddings
-gallery_display_names = [] # Store actual names for display
-gallery_embeddings = []
+VIDEO_DIR = "source/videos"
+RECOGNITION_THRESHOLD = 0.4
+DETECTION_SCORE_THRESHOLD = 0.2
 
-for f in embedding_files:
-    arr = np.load(f)
-    arr = arr.flatten()
-    if arr.shape == (512,):
-        nickname = os.path.basename(f).replace("_embedding.npy", "")
-        gallery_nicknames.append(nickname)
-        # Use actual name if available, otherwise fallback to nickname
-        display_name = nickname
-        gallery_display_names.append(display_name)
-        gallery_embeddings.append(arr)
-    else:
-        # Print full path for problematic files
-        full_path = os.path.abspath(f)
-        print(
-            f"[Warning] Skipping embedding file {full_path}: shape {arr.shape} != (512,)"
-        )
+# =============================================================================
+# Face Recognition Module
+# =============================================================================
 
-if not gallery_embeddings:
-    print("[ERROR] No embeddings found in gallery! Face recognition will not work.")
-    # Initialize gallery_embeddings as an empty array with correct dimensions to avoid later errors
-    gallery_embeddings = np.empty((0, 512), dtype=np.float32)
-    # gallery_display_names remains an empty list
-else:
-    print(f"Loaded {len(gallery_embeddings)} embeddings from gallery. Display names: {gallery_display_names[:5]}...") # Print first 5 for brevity
-    gallery_embeddings = np.stack(gallery_embeddings)
-    print(f"[DEBUG] Gallery embeddings shape: {gallery_embeddings.shape}")
-    if len(gallery_embeddings) > 0:
-        print(f"[DEBUG] Sample gallery embedding (first one) shape: {gallery_embeddings[0].shape}, dtype: {gallery_embeddings[0].dtype}")
-        print(f"[DEBUG] Sample gallery embedding (first one) norm: {np.linalg.norm(gallery_embeddings[0])}")
+def load_contestant_info():
+    """Load and process contestant information from CSV file."""
+    try:
+        contestant_info_df = pd.read_csv(CONTESTANT_INFO_PATH)
+        logger.info(f"Loaded contestant info from {CONTESTANT_INFO_PATH}: {len(contestant_info_df)} entries")
+        
+        # Create nickname to full name mapping
+        nickname_to_name = pd.Series(contestant_info_df["姓名"].values, index=contestant_info_df["暱稱"]).to_dict()
+        # Create nickname to display name mapping (format: "FullName (Nickname)")
+        nickname_to_display = {nick: f"{name} ({nick})" for nick, name in nickname_to_name.items()}
+        
+        return contestant_info_df, nickname_to_name, nickname_to_display
+    except Exception as e:
+        logger.error(f"Error loading contestant info: {str(e)}")
+        return pd.DataFrame(), {}, {}
 
+def load_gallery_embeddings():
+    """Load embeddings from the gallery directory."""
+    logger.info(f"Loading embeddings from: {os.path.abspath(EMBEDDING_DIR)}")
+    
+    # Load contestant info for proper name display
+    _, _, nickname_to_display = load_contestant_info()
+    
+    glob_pattern = os.path.join(EMBEDDING_DIR, "*_embedding.npy")
+    embedding_files = glob.glob(glob_pattern)
+    logger.info(f"Found {len(embedding_files)} embedding files")
+    
+    gallery_nicknames = []
+    gallery_display_names = []
+    gallery_embeddings = []
 
-# --- Initialize Centralized FaceDetector ---
-# Configure to use InsightFace backend, matching previous settings
-core_detector = FaceDetector(
-    backend=FaceDetector.BACKEND_INSIGHTFACE,
-    model_size=(640, 640),  # Standard size for InsightFace
-    device="auto",  # 'auto' will try CUDA first, then CPU
-)
-# Note: The FaceAnalysis object 'app' is no longer needed globally.
-# The core_detector now manages its own instance of FaceAnalysis.
+    for f in embedding_files:
+        try:
+            arr = np.load(f)
+            arr = arr.flatten()
+            if arr.shape == (512,):
+                nickname = os.path.basename(f).replace("_embedding.npy", "")
+                gallery_nicknames.append(nickname)
+                
+                # Use display name if available in mapping, otherwise use nickname
+                if nickname in nickname_to_display:
+                    display_name = nickname_to_display[nickname]
+                else:
+                    display_name = nickname
+                    
+                gallery_display_names.append(display_name)
+                gallery_embeddings.append(arr)
+            else:
+                logger.warning(f"Skipping embedding file {os.path.abspath(f)}: shape {arr.shape} != (512,)")
+        except Exception as e:
+            logger.error(f"Error loading embedding from {f}: {str(e)}")
 
-RECOGNITION_THRESHOLD = 0.4  # Changed from 0.02, consistent with FaceRecognizer
+    if not gallery_embeddings:
+        logger.error("No embeddings found in gallery! Face recognition will not work.")
+        return np.empty((0, 512), dtype=np.float32), [], []
+    
+    logger.info(f"Loaded {len(gallery_embeddings)} embeddings from gallery")
+    if gallery_embeddings:
+        logger.debug(f"Gallery embeddings shape: {np.stack(gallery_embeddings).shape}")
+        
+    return np.stack(gallery_embeddings), gallery_nicknames, gallery_display_names
 
-# --- Helper Functions ---
-def cosine_similarity(a, b):
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors."""
     a = a / np.linalg.norm(a)
     b = b / np.linalg.norm(b)
     return np.dot(a, b)
 
-
-def get_top_matches(face_embedding, top_n=5):
-    # Ensure face_embedding is normalized before dot product if not already
+def get_top_matches(face_embedding: np.ndarray, gallery_embeddings: np.ndarray, 
+                   gallery_display_names: List[str], top_n: int = 5) -> Tuple[List[Tuple[str, float, int]], np.ndarray]:
+    """
+    Find the top matches for a face embedding from the gallery.
+    
+    Args:
+        face_embedding: The embedding vector of the detected face
+        gallery_embeddings: Matrix of all gallery embeddings
+        gallery_display_names: List of names corresponding to gallery embeddings
+        top_n: Maximum number of top matches to return
+        
+    Returns:
+        filtered_matches: List of (name, score, index) tuples
+        sims: Array of similarity scores for all gallery embeddings
+    """
+    # Ensure face_embedding is normalized
     norm_face_embedding = face_embedding / np.linalg.norm(face_embedding)
-    sims = np.dot(gallery_embeddings, norm_face_embedding) # gallery_embeddings are assumed normalized or handled by dot product correctly
+    
+    # Calculate similarities with all gallery embeddings
+    sims = np.dot(gallery_embeddings, norm_face_embedding)
+    
+    # Get indices of top matches
     top_idx_all = np.argsort(sims)[::-1][:top_n]
     
-    # Filtered results: (name, score, original_gallery_index)
+    # Filter matches by threshold
     filtered_matches = []
     for i in top_idx_all:
         if sims[i] >= RECOGNITION_THRESHOLD:
-            filtered_matches.append((gallery_display_names[i], sims[i], i)) # Add original index 'i'
+            filtered_matches.append((gallery_display_names[i], sims[i], i))
             
-    return filtered_matches, sims # Return list of (name, score, index) tuples and all similarities
+    return filtered_matches, sims
 
+# =============================================================================
+# Visualization Module
+# =============================================================================
 
-def plot_bar(all_top_matches_details):
+def plot_bar(all_top_matches_details: List[Tuple[str, float]]):
     """
     Plots a horizontal bar chart for all top matches from all detected faces.
-    all_top_matches_details: A list of tuples, e.g., [("Face 1: Name A", 0.9), ("Face 2: Name B", 0.85)]
-                             Assumed to be sorted by score if desired.
+    
+    Args:
+        all_top_matches_details: A list of tuples (label, score)
+        
+    Returns:
+        fig: Matplotlib figure object
     """
     if not all_top_matches_details:
         fig, ax = plt.subplots(figsize=(4, 3))
@@ -136,27 +169,38 @@ def plot_bar(all_top_matches_details):
 
     # Determine figure height based on number of bars
     num_bars = len(labels)
-    fig_height = max(3, num_bars * 0.4) # Adjust 0.4 factor as needed
+    fig_height = max(3, num_bars * 0.4)
 
-    fig, ax = plt.subplots(figsize=(5, fig_height)) # Increased width slightly for longer labels
-    ax.barh(labels[::-1], scores[::-1], color="skyblue") # Plot in reverse to have highest score at top
+    fig, ax = plt.subplots(figsize=(5, fig_height))
+    ax.barh(labels[::-1], scores[::-1], color="skyblue")
     ax.set_xlabel("Cosine Similarity")
     ax.set_title("Top Matches Across All Detected Faces")
     
-    # Adjust layout to prevent labels from being cut off
-    plt.subplots_adjust(left=0.4) # Increase left margin; adjust as needed
-    plt.tight_layout(rect=[0, 0, 1, 1]) # Apply tight_layout considering the whole figure
+    # Adjust layout
+    plt.subplots_adjust(left=0.4)
+    plt.tight_layout(rect=[0, 0, 1, 1])
     return fig
 
-
-def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_global, gallery_display_names_global, matches_per_detected_face):
+def plot_embedding_scatter(detected_face_embeddings_list: List[np.ndarray], 
+                          gallery_embeddings_global: np.ndarray,
+                          gallery_display_names_global: List[str], 
+                          matches_per_detected_face: List[List[Tuple[str, float, int]]]):
     """
-    Plots a 2D scatter plot of gallery and detected face embeddings using UMAP.
-    Highlights recognized faces and their nearest gallery matches.
+    Plot a 2D UMAP scatter plot of embeddings showing detected faces and their gallery matches.
+    
+    Args:
+        detected_face_embeddings_list: List of embedding vectors for detected faces
+        gallery_embeddings_global: Matrix of gallery embedding vectors
+        gallery_display_names_global: List of names for gallery embeddings
+        matches_per_detected_face: List of match information for each detected face
+        
+    Returns:
+        fig: Matplotlib figure object
     """
     num_detected = len(detected_face_embeddings_list)
     num_gallery = gallery_embeddings_global.shape[0]
 
+    # Handle empty case
     if num_detected == 0 and num_gallery == 0:
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.text(0.5, 0.5, "No embeddings to display", ha="center", va="center")
@@ -165,10 +209,10 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
         plt.tight_layout()
         return fig
 
+    # Prepare data for UMAP
     all_embeddings_list = []
-    point_types = [] # 'gallery', 'detected_recognized', 'detected_unknown'
+    point_types = []  # 'gallery', 'detected_recognized', 'detected_unknown'
     point_labels = []
-    # Store gallery indices of nearest matches for each detected face
     nearest_gallery_indices_for_detected = [[] for _ in range(num_detected)]
 
     # Add gallery embeddings
@@ -177,20 +221,18 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
         point_types.extend(['gallery'] * num_gallery)
         point_labels.extend(gallery_display_names_global)
 
-    # Add detected face embeddings and identify their nearest gallery matches
+    # Add detected face embeddings
     if num_detected > 0:
         all_embeddings_list.extend(detected_face_embeddings_list)
         for i, match_info_list_for_face in enumerate(matches_per_detected_face):
-            if match_info_list_for_face: # Recognized
+            if match_info_list_for_face:  # Recognized
                 top_match_name = match_info_list_for_face[0][0]
                 point_types.append('detected_recognized')
                 point_labels.append(f"Face {i+1}: {top_match_name}")
-                # Store indices of all gallery items this detected face matched with
                 nearest_gallery_indices_for_detected[i] = [match[2] for match in match_info_list_for_face]
-            else: # Unrecognized
+            else:  # Unrecognized
                 point_types.append('detected_unknown')
                 point_labels.append(f"Face {i+1}: Unknown")
-                # No nearest gallery indices if unrecognized by threshold
 
     if not all_embeddings_list:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -202,6 +244,7 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
 
     all_embeddings_np = np.array(all_embeddings_list)
 
+    # Check if we have enough points for UMAP
     if all_embeddings_np.shape[0] < 2:
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.text(0.5, 0.5, "Not enough data points for UMAP (need at least 2)", ha="center", va="center")
@@ -210,17 +253,18 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
         plt.tight_layout()
         return fig
         
+    # Determine appropriate n_neighbors value
     n_neighbors_val = min(15, all_embeddings_np.shape[0] - 1)
-    if n_neighbors_val < 2 :
-        if all_embeddings_np.shape[0] <=2 :
-             fig, ax = plt.subplots(figsize=(6,4))
-             ax.text(0.5, 0.5, f"Too few points ({all_embeddings_np.shape[0]}) for robust UMAP.", ha="center", va="center")
-             ax.set_xticks([])
-             ax.set_yticks([])
-             plt.tight_layout()
-             return fig
-        n_neighbors_val = min(15, all_embeddings_np.shape[0] -1) 
+    if n_neighbors_val < 2:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.text(0.5, 0.5, f"Too few points ({all_embeddings_np.shape[0]}) for robust UMAP.", 
+                ha="center", va="center")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        plt.tight_layout()
+        return fig
 
+    # Run UMAP
     try:
         reducer = umap.UMAP(n_neighbors=n_neighbors_val, n_components=2, random_state=42, min_dist=0.1)
         embedding_2d = reducer.fit_transform(all_embeddings_np)
@@ -232,7 +276,8 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
         plt.tight_layout()
         return fig
 
-    fig, ax = plt.subplots(figsize=(12, 10)) # Slightly larger plot
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(12, 10))
 
     # Define colors and sizes
     color_map = {
@@ -250,7 +295,7 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
     
     plotted_nearest_gallery_indices = set()
 
-    # Plot gallery embeddings first (those not marked as nearest yet)
+    # Plot gallery embeddings first
     if num_gallery > 0:
         gallery_2d = embedding_2d[:num_gallery]
         for i in range(num_gallery):
@@ -259,7 +304,6 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
                  ax.scatter(gallery_2d[i, 0], gallery_2d[i, 1], 
                            c=color_map['gallery'], s=size_map['gallery'], 
                            alpha=0.5, label="Gallery (Other)" if 'Gallery (Other)' not in plt.gca().get_legend_handles_labels()[1] else "")
-
 
     # Plot detected faces and their nearest gallery matches
     if num_detected > 0:
@@ -271,34 +315,26 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
             
             ax.scatter(detected_point[0], detected_point[1], 
                        c=color_map[ptype], s=size_map[ptype], 
-                       label=plabel.split(":")[0] if plabel.split(":")[0] not in plt.gca().get_legend_handles_labels()[1] else "", # Legend by type
+                       label=plabel.split(":")[0] if plabel.split(":")[0] not in plt.gca().get_legend_handles_labels()[1] else "",
                        alpha=0.9, edgecolors='black' if ptype == 'detected_recognized' else None,
                        marker='o' if ptype == 'detected_recognized' else 'X')
             ax.text(detected_point[0], detected_point[1] + 0.05, plabel, fontsize=9, ha='center')
 
-            # Plot nearest gallery matches for this detected face and draw lines
+            # Plot nearest gallery matches and draw connecting lines
             for gallery_idx in nearest_gallery_indices_for_detected[i]:
                 if 0 <= gallery_idx < num_gallery:
                     gallery_match_point = embedding_2d[gallery_idx]
-                    # Plot this specific gallery point as a "nearest match"
+                    # Plot gallery point as "nearest match"
                     ax.scatter(gallery_match_point[0], gallery_match_point[1],
                                c=color_map['nearest_gallery'], s=size_map['nearest_gallery'],
-                               alpha=0.8, edgecolors='black', marker='s', # Square marker for nearest
+                               alpha=0.8, edgecolors='black', marker='s',
                                label="Nearest Gallery Match" if "Nearest Gallery Match" not in plt.gca().get_legend_handles_labels()[1] else "")
                     plotted_nearest_gallery_indices.add(gallery_idx)
                     
-                    # Draw line from detected face to this gallery match
+                    # Draw connection line
                     ax.plot([detected_point[0], gallery_match_point[0]],
                             [detected_point[1], gallery_match_point[1]],
                             c='gray', linestyle='--', linewidth=0.8, alpha=0.7)
-                    # Optionally, label the nearest gallery point if not already clear
-                    # ax.text(gallery_match_point[0], gallery_match_point[1] - 0.05, gallery_display_names_global[gallery_idx], 
-                    #         fontsize=8, ha='center', color='green')
-
-
-    # Re-plot any gallery points that were marked as nearest, to ensure they are on top or styled correctly if needed
-    # This step might be redundant if the above scatter for nearest_gallery is sufficient.
-    # For now, the above loop handles plotting nearest gallery points.
 
     ax.set_title("Embedding Space (UMAP) with Nearest Matches")
     ax.set_xlabel("UMAP Dimension 1")
@@ -312,55 +348,84 @@ def plot_embedding_scatter(detected_face_embeddings_list, gallery_embeddings_glo
     plt.tight_layout()
     return fig
 
-
-def overlay_faces(
-    frame, faces: List[InsightFaceObject], matches: List[List[Tuple[str, float]]]
-):
-    # Convert frame to PIL Image for CJKV text
+def overlay_faces(frame: np.ndarray, 
+                 faces: List[InsightFaceObject], 
+                 matches: List[List[Tuple[str, float]]]) -> np.ndarray:
+    """
+    Draw bounding boxes and labels on the frame for each detected face.
+    
+    Args:
+        frame: Input video frame
+        faces: List of detected faces
+        matches: List of match information for each face
+        
+    Returns:
+        Annotated frame with bounding boxes and labels
+    """
+    # Convert frame to PIL Image for CJKV text support
     frame_pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(frame_pil)
+    
+    # Load font
     try:
         font = ImageFont.truetype(CJKV_FONT_PATH, FONT_SIZE)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Could not load specified font: {e}")
         font = ImageFont.load_default()
-    for face, match_list in zip(
-        faces, matches
-    ):  # Renamed match to match_list for clarity
+        
+    for face, match_list in zip(faces, matches):
         box = face.bbox.astype(int)
 
-        if match_list:  # Check if match_list is not empty
+        # Prepare label text
+        if match_list:
             name, score = match_list[0]
             label = f"{name} ({score:.2f})"
-        else:  # Handle empty match_list (no match found)
-            name = "Unknown"
-            score = 0.0
-            label = f"{name} ({score:.2f})"
+        else:
+            label = f"Unknown (0.00)"
 
-        # Draw rectangle with cv2
-        # It's more efficient to convert to np.array once after all drawing if possible,
-        # but current structure modifies frame_pil in loop. Let's keep it for now.
+        # Draw rectangle
         current_frame_np = np.array(frame_pil)
-        cv2.rectangle(current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2) # pylint: disable=no-member
-        frame_pil = Image.fromarray(current_frame_np)  # Convert back to PIL Image
-        draw = ImageDraw.Draw(
-            frame_pil
-        )  # Re-initialize draw object on the (potentially) new frame_pil
+        cv2.rectangle(current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        frame_pil = Image.fromarray(current_frame_np)
+        draw = ImageDraw.Draw(frame_pil)
 
-        # Draw CJKV label with PIL
+        # Draw label
         draw.text((box[0], box[1] - FONT_SIZE - 2), label, font=font, fill=(0, 255, 0))
+        
     return np.array(frame_pil)
 
+# =============================================================================
+# Image/Video Processing Functions
+# =============================================================================
 
-def process_frame(frame, vis_type="bar"):
-    print(f"\n[DEBUG] --- process_frame called. Visualization type: {vis_type} ---")
-    # Use the centralized detector. It returns a list of InsightFaceObject instances.
-    print("[DEBUG] Calling core_detector.detect_faces()...")
+def process_frame(frame: np.ndarray, 
+                 core_detector: FaceDetector,
+                 gallery_embeddings: np.ndarray,
+                 gallery_display_names: List[str],
+                 vis_type: str = "bar") -> Tuple[np.ndarray, plt.Figure]:
+    """
+    Process a video frame for face recognition.
+    
+    Args:
+        frame: Input video frame
+        core_detector: FaceDetector instance
+        gallery_embeddings: Matrix of gallery embedding vectors
+        gallery_display_names: List of names for gallery embeddings
+        vis_type: Visualization type, either "bar" or "scatter"
+        
+    Returns:
+        processed_frame: Frame with annotations
+        fig: Matplotlib figure with visualization
+    """
+    logger.debug(f"Processing frame with visualization type: {vis_type}")
+    
+    # Detect faces
     raw_detected_faces = core_detector.detect_faces(frame)
-    print(f"[DEBUG] core_detector.detect_faces() returned {len(raw_detected_faces)} raw faces.")
+    logger.debug(f"Detected {len(raw_detected_faces)} raw faces")
 
+    # Handle no faces case
     if not raw_detected_faces:
-        print("[DEBUG] No raw faces detected by core_detector.")
-        # No faces detected at all
+        logger.debug("No faces detected")
         fig, ax = plt.subplots(figsize=(4, 3) if vis_type == "bar" else (6, 2))
         ax.text(0.5, 0.5, "No faces detected", ha="center", va="center")
         ax.set_xticks([])
@@ -369,141 +434,141 @@ def process_frame(frame, vis_type="bar"):
         return frame, fig
 
     # Filter faces by detection score
-    # InsightFaceObject has a 'det_score' attribute
-    DETECTION_SCORE_THRESHOLD = 0.2  # This threshold might need tuning
-    print(f"[DEBUG] Filtering raw faces with DETECTION_SCORE_THRESHOLD = {DETECTION_SCORE_THRESHOLD}")
     detected_faces = []
-    for i, face in enumerate(raw_detected_faces):
+    for face in raw_detected_faces:
         if hasattr(face, "det_score"):
-            print(f"[DEBUG] Raw Face {i+1} det_score: {face.det_score:.4f}")
             if face.det_score >= DETECTION_SCORE_THRESHOLD:
                 detected_faces.append(face)
-            else:
-                print(f"[DEBUG] Raw Face {i+1} REJECTED (score < threshold)")
         else:
-            print(f"[DEBUG] Raw Face {i+1} has no det_score attribute, keeping it for now (check detector logic if this is unexpected).")
-            detected_faces.append(face) # Keep if no score, might be from a different detector type or logic
+            detected_faces.append(face)
 
-    print(f"[DEBUG] Number of faces after detection score filtering: {len(detected_faces)}")
+    logger.debug(f"Number of faces after filtering: {len(detected_faces)}")
 
-    if not detected_faces:  # If no faces meet the threshold
-        print(f"[DEBUG] No faces met the detection score threshold of {DETECTION_SCORE_THRESHOLD}.")
+    # Handle no faces after filtering
+    if not detected_faces:
         fig, ax = plt.subplots(figsize=(4, 3) if vis_type == "bar" else (6, 2))
-        ax.text(0.5, 0.5, f"No faces above score threshold ({DETECTION_SCORE_THRESHOLD})", ha="center", va="center", fontsize=8)
+        ax.text(0.5, 0.5, f"No faces above score threshold ({DETECTION_SCORE_THRESHOLD})", 
+                ha="center", va="center", fontsize=8)
         ax.set_xticks([])
         ax.set_yticks([])
         plt.tight_layout()
         return frame, fig
 
-    matches = [] # This will store List[List[Tuple[str, float, int]]]
-    all_sims = [] # This seems unused now with the new scatter plot logic, but let's keep it for now.
-    print(f"[DEBUG] Processing {len(detected_faces)} filtered faces for recognition.")
-    for i, face in enumerate(detected_faces):  # Iterate through filtered InsightFaceObject instances
-        print(f"[DEBUG] Face {i+1}/{len(detected_faces)}:")
+    # Process each face for recognition
+    matches = []
+    all_sims = []
+    detected_embeds = []
+    
+    for face in detected_faces:
         if hasattr(face, "normed_embedding") and face.normed_embedding is not None:
-            print(f"[DEBUG]   normed_embedding shape: {face.normed_embedding.shape}, dtype: {face.normed_embedding.dtype}")
-            print(f"[DEBUG]   normed_embedding norm: {np.linalg.norm(face.normed_embedding):.4f}")
+            # Add to detected embeddings list for visualization
+            detected_embeds.append(face.normed_embedding)
             
-            top_matches_with_indices, sims_for_this_face = get_top_matches(face.normed_embedding)
-            print(f"[DEBUG]   get_top_matches returned {len(top_matches_with_indices)} matches (after RECOGNITION_THRESHOLD {RECOGNITION_THRESHOLD}).")
+            # Find matches
+            top_matches_with_indices, sims_for_this_face = get_top_matches(
+                face.normed_embedding, gallery_embeddings, gallery_display_names)
             
-            if top_matches_with_indices:
-                for name, score, gallery_idx in top_matches_with_indices:
-                    print(f"[DEBUG]     Match: {name}, Score: {score:.4f}, Gallery Index: {gallery_idx}")
-            else:
-                print(f"[DEBUG]     No matches found above threshold for this face.")
-            
-            matches.append(top_matches_with_indices) 
-            all_sims.append(sims_for_this_face) # Store all similarities for this face
+            matches.append(top_matches_with_indices)
+            all_sims.append(sims_for_this_face)
         else:
-            print(f"[DEBUG]   Face {i+1} does not have 'normed_embedding' or it is None. Skipping recognition for this face.")
-            matches.append([]) 
+            matches.append([])
             all_sims.append(np.array([]))
 
-    print(f"[DEBUG] Final 'matches' list (top matches for each detected face): {matches}")
-    
-    # Prepare matches for overlay_faces (name, score only)
+    # Prepare matches for overlay (name, score only)
     matches_for_overlay = []
-    for match_list_for_face in matches: 
+    for match_list_for_face in matches:
         matches_for_overlay.append([(name, score) for name, score, _ in match_list_for_face])
-        
-    frame = overlay_faces(
-        frame, detected_faces, matches_for_overlay
-    )
+    
+    # Overlay recognition results on frame
+    processed_frame = overlay_faces(frame, detected_faces, matches_for_overlay)
 
-    # Visualization
-    if not any(matches): 
-        print("[DEBUG] No recognized matches for any detected faces after processing all.")
+    # Create visualization
+    if not any(matches):
+        logger.debug("No recognized matches for any detected faces")
         if vis_type == "bar":
             fig = plot_bar([])
-        else: # scatter plot
-            detected_embeds = [face.normed_embedding for face in detected_faces if hasattr(face, 'normed_embedding') and face.normed_embedding is not None and face.normed_embedding.size > 0]
+        else:  # scatter plot
             fig = plot_embedding_scatter(detected_embeds, gallery_embeddings, gallery_display_names, matches)
-        return frame, fig
+        return processed_frame, fig
 
     if vis_type == "bar":
+        # Prepare data for bar plot
         all_top_matches_for_plot = []
-        for i, match_list_for_face in enumerate(matches): 
-            if match_list_for_face: 
-                for name, score, _ in match_list_for_face: 
+        for i, match_list_for_face in enumerate(matches):
+            if match_list_for_face:
+                for name, score, _ in match_list_for_face:
                     all_top_matches_for_plot.append((f"Face {i+1}: {name}", score))
         
         all_top_matches_for_plot.sort(key=lambda x: x[1], reverse=True)
         fig = plot_bar(all_top_matches_for_plot)
-    else: # scatter plot
-        detected_embeds = [face.normed_embedding for face in detected_faces if hasattr(face, 'normed_embedding') and face.normed_embedding is not None and face.normed_embedding.size > 0]
+    else:  # scatter plot
         fig = plot_embedding_scatter(detected_embeds, gallery_embeddings, gallery_display_names, matches)
-    return frame, fig
+        
+    return processed_frame, fig
 
-
-# --- Gradio Interface ---
-# List available mp4 files in source/videos
-VIDEO_DIR = "source/videos"
-video_files = [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith(".mp4")]
-video_paths = {f: os.path.join(VIDEO_DIR, f) for f in video_files}
-
-
-# Helper to get total frames for a video
-def get_total_frames(video_path):
-    cap = cv2.VideoCapture(video_path) # pylint: disable=no-member
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # pylint: disable=no-member
+def get_total_frames(video_path: str) -> int:
+    """Get the total number of frames in a video file."""
+    cap = cv2.VideoCapture(video_path)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
     return total
 
-
-# Helper to get a specific frame by index
-def get_frame_by_index(video_path, frame_idx, vis_type="bar"):  # Added vis_type
-    cap = cv2.VideoCapture(video_path) # pylint: disable=no-member
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx) # pylint: disable=no-member
+def get_frame_by_index(video_path: str, 
+                      frame_idx: int, 
+                      core_detector: FaceDetector,
+                      gallery_embeddings: np.ndarray,
+                      gallery_display_names: List[str],
+                      vis_type: str = "bar") -> Optional[Tuple[np.ndarray, plt.Figure]]:
+    """
+    Extract and process a specific frame from a video file.
+    
+    Args:
+        video_path: Path to the video file
+        frame_idx: Index of the frame to extract
+        core_detector: FaceDetector instance
+        gallery_embeddings: Matrix of gallery embedding vectors
+        gallery_display_names: List of names for gallery embeddings
+        vis_type: Visualization type, either "bar" or "scatter"
+        
+    Returns:
+        processed_frame: Frame with annotations
+        fig: Matplotlib figure with visualization
+    """
+    cap = cv2.VideoCapture(video_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
     ret, frame = cap.read()
     cap.release()
+    
     if not ret:
+        logger.warning(f"Failed to read frame {frame_idx} from {video_path}")
         return None
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # pylint: disable=no-member
-    out_frame, fig = process_frame(frame_rgb, vis_type=vis_type)  # Pass vis_type
-    return out_frame, fig
+        
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    return process_frame(frame_rgb, core_detector, gallery_embeddings, gallery_display_names, vis_type)
 
+# =============================================================================
+# Gradio UI Module
+# =============================================================================
 
-with gr.Blocks() as demo:
-    gr.Markdown("# Real-Time Face Recognition & Embedding Visualization")
-    with gr.Row():
-        video_dropdown = gr.Dropdown(
-            choices=video_files,
-            label="Select Video File",
-            value=video_files[0] if video_files else None,
-            interactive=True,
-        )
-    vis_type = gr.Radio(["bar", "scatter"], value="bar", label="Visualization Type") # Changed heatmap to scatter
-    frame_slider = gr.Slider(
-        minimum=0, maximum=1, value=0, step=1, label="Frame Timeline", interactive=True
+def build_gradio_interface():
+    """Build and configure the Gradio interface."""
+    # Initialize face detector
+    core_detector = FaceDetector(
+        backend=FaceDetector.BACKEND_INSIGHTFACE,
+        model_size=(640, 640),
+        device="auto",
     )
-    play_btn = gr.Button("Play")
-    pause_btn = gr.Button("Pause")
-    output_video = gr.Image(label="Output Frame")
-    output_plot = gr.Plot(label="Embedding Visualization")
-    state = gr.State({"playing": False, "frame": 0, "total": 1})
-
+    
+    # Load gallery embeddings
+    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings()
+    
+    # Get available video files
+    video_files = [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith(".mp4")]
+    video_paths = {f: os.path.join(VIDEO_DIR, f) for f in video_files}
+    
+    # Define UI update functions
     def update_slider_on_video(selected_video):
+        """Update slider range when video is selected."""
         video_path = video_paths[selected_video]
         total = get_total_frames(video_path)
         return gr.update(maximum=total - 1, value=0), {
@@ -513,19 +578,23 @@ with gr.Blocks() as demo:
         }
 
     def update_frame(selected_video, frame_idx, vis_type):
+        """Update displayed frame when slider changes."""
         video_path = video_paths[selected_video]
-        result = get_frame_by_index(video_path, frame_idx, vis_type)  # Pass vis_type
+        result = get_frame_by_index(
+            video_path, frame_idx, core_detector, gallery_embeddings, gallery_display_names, vis_type)
         if result is None:
             return None, None
         out_frame, fig = result
         return out_frame, fig
 
     def play_loop(selected_video, vis_type, state):
+        """Play video frames in sequence."""
         video_path = video_paths[selected_video]
         total = state["total"]
         frame = state["frame"]
         while state["playing"] and frame < total:
-            result = get_frame_by_index(video_path, frame, vis_type)  # Pass vis_type
+            result = get_frame_by_index(
+                video_path, frame, core_detector, gallery_embeddings, gallery_display_names, vis_type)
             if result is None:
                 break
             out_frame, fig = result
@@ -543,11 +612,96 @@ with gr.Blocks() as demo:
             frame,
             {"playing": False, "frame": frame, "total": total},
         )
+    
+    # Create the Gradio interface
+    with gr.Blocks(title="Face Recognition System", theme=gr.themes.Soft()) as demo:
+        gr.Markdown("# Real-Time Face Recognition & Embedding Visualization")
+        
+        with gr.Row():
+            with gr.Column(scale=3):
+                video_dropdown = gr.Dropdown(
+                    choices=video_files,
+                    label="Select Video File",
+                    value=video_files[0] if video_files else None,
+                    interactive=True,
+                )
+            with gr.Column(scale=2):
+                vis_type = gr.Radio(
+                    ["bar", "scatter"],
+                    value="bar",
+                    label="Visualization Type",
+                    interactive=True
+                )
+        
+        with gr.Row():
+            with gr.Column(scale=4):
+                frame_slider = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    value=0, 
+                    step=1, 
+                    label="Frame Timeline", 
+                    interactive=True
+                )
+            with gr.Column(scale=1):
+                with gr.Row():
+                    play_btn = gr.Button("▶️ Play", variant="primary")
+                    pause_btn = gr.Button("⏸️ Pause", variant="secondary")
+        
+        with gr.Row():
+            with gr.Column(scale=3):
+                output_video = gr.Image(label="Video Frame with Recognized Faces")
+            with gr.Column(scale=2):
+                output_plot = gr.Plot(label="Similarity Visualization")
+                
+        gr.Markdown("### Instructions")
+        with gr.Accordion("Help", open=False):
+            gr.Markdown("""
+            - **Select Video**: Choose a video file from the dropdown
+            - **Visualization Type**: 
+                - **Bar**: Shows similarity scores for recognized faces
+                - **Scatter**: Shows UMAP projection of face embeddings
+            - **Frame Timeline**: Drag to navigate through the video
+            - **Play/Pause**: Control video playback
+            """)
+                
+        state = gr.State({"playing": False, "frame": 0, "total": 1})
 
-    video_dropdown.change(fn=update_slider_on_video, inputs=[video_dropdown], outputs=[frame_slider, state]) # pylint: disable=no-member
-    frame_slider.change(fn=update_frame, inputs=[video_dropdown, frame_slider, vis_type], outputs=[output_video, output_plot]) # pylint: disable=no-member
-    vis_type.change(fn=update_frame, inputs=[video_dropdown, frame_slider, vis_type], outputs=[output_video, output_plot]) # pylint: disable=no-member
-    play_btn.click(fn=play_loop, inputs=[video_dropdown, vis_type, state], outputs=[output_video, output_plot, frame_slider, state], api_name=False) # pylint: disable=no-member
-    pause_btn.click(fn=lambda s: {"playing": False, "frame": s["frame"], "total": s["total"]}, inputs=[state], outputs=[state], api_name=False) # pylint: disable=no-member
+        # Connect events
+        video_dropdown.change(
+            fn=update_slider_on_video, 
+            inputs=[video_dropdown], 
+            outputs=[frame_slider, state]
+        )
+        frame_slider.change(
+            fn=update_frame, 
+            inputs=[video_dropdown, frame_slider, vis_type], 
+            outputs=[output_video, output_plot]
+        )
+        vis_type.change(
+            fn=update_frame, 
+            inputs=[video_dropdown, frame_slider, vis_type], 
+            outputs=[output_video, output_plot]
+        )
+        play_btn.click(
+            fn=play_loop, 
+            inputs=[video_dropdown, vis_type, state], 
+            outputs=[output_video, output_plot, frame_slider, state], 
+            api_name=False
+        )
+        pause_btn.click(
+            fn=lambda s: {"playing": False, "frame": s["frame"], "total": s["total"]}, 
+            inputs=[state], 
+            outputs=[state], 
+            api_name=False
+        )
+    
+    return demo
 
-demo.launch()
+# =============================================================================
+# Entry Point
+# =============================================================================
+
+if __name__ == "__main__":
+    demo = build_gradio_interface()
+    demo.launch()
