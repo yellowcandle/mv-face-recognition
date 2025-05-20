@@ -8,12 +8,16 @@ for efficient face matching using vector embeddings.
 import os
 import time
 import numpy as np
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 import threading
 
 from src.core.recognizer import FaceRecognizer
 from src.core.detector import FaceDetector
+
+# Set up logging
+logger = logging.getLogger("face_recognition")
 
 try:
     import chromadb
@@ -67,6 +71,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
         persistent: bool = True,
         collection_name: str = "face_embeddings",
         cache_dir: Optional[Union[str, Path]] = None,
+        target_dimensions: Optional[int] = None,
     ):
         """
         Initialize the ChromaDB face recognizer.
@@ -78,6 +83,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             persistent: Whether to use persistent storage
             collection_name: Name of the ChromaDB collection
             cache_dir: Directory for cache storage
+            target_dimensions: Target dimensionality for embeddings (if None, will be determined automatically)
         """
         if not HAS_CHROMADB:
             raise ImportError(
@@ -89,6 +95,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
         self.similarity_threshold = similarity_threshold
         self.persistent = persistent
         self.collection_name = collection_name
+        self.target_dimensions = target_dimensions
 
         # Set up cache directory
         if cache_dir is None:
@@ -109,6 +116,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             "initialization_time": 0,
             "batch_adds": 0,
             "single_adds": 0,
+            "dimension_conversions": 0,
         }
 
         # Initialize ChromaDB
@@ -128,7 +136,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
         if not hasattr(self, "_match_cache"):
             self._match_cache = {}
             self._match_cache_size = 100
-            print("Enabled in-memory match caching")
+            logger.info("Enabled in-memory match caching")
 
         # Pre-warm model to avoid cold-start issues
         if hasattr(self, "standard_recognizer") and hasattr(
@@ -139,7 +147,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
                 # Pre-compute embedding to load model
                 _ = self.standard_recognizer.compute_embedding(dummy_img)
-                print("Pre-warmed recognition model")
+                logger.info("Pre-warmed recognition model")
             except Exception:
                 pass
 
@@ -165,11 +173,11 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             # Try to get existing collection or create a new one
             try:
                 self.collection = self.client.get_collection(name=self.collection_name)
-                print(
+                logger.info(
                     f"Loaded existing ChromaDB collection '{self.collection_name}' with {self.collection.count()} embeddings"
                 )
                 # Store the collection dimensionality
-                self.embedding_dim = None  # Will be determined on first add
+                self.embedding_dim = self.target_dimensions  # Will be determined on first add if None
             except Exception:
                 # Create a new collection with optimized settings
                 self.collection = self.client.create_collection(
@@ -182,16 +190,16 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                     },
                     embedding_function=None,  # We'll provide precomputed embeddings
                 )
-                print(f"Created new ChromaDB collection '{self.collection_name}'")
-                self.embedding_dim = None  # Will be set on first embedding
+                logger.info(f"Created new ChromaDB collection '{self.collection_name}'")
+                self.embedding_dim = self.target_dimensions  # Will be set on first embedding
 
         except Exception as e:
-            print(f"Error setting up ChromaDB: {str(e)}")
+            logger.error(f"Error setting up ChromaDB: {str(e)}")
             # Fallback to in-memory dictionary if ChromaDB fails
             self.client = None
             self.collection = None
             self._fallback_embeddings = {}
-            print("WARNING: Using fallback in-memory dictionary for embeddings")
+            logger.warning("Using fallback in-memory dictionary for embeddings")
 
     def preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
         """
@@ -247,23 +255,30 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
         Returns:
             np.ndarray: Properly dimensioned embedding
         """
+        if embedding is None:
+            return None
+            
         if isinstance(embedding, list):
             embedding = np.array(embedding)
 
         if embedding.ndim > 1:
             embedding = embedding.flatten()
 
+        # If target_dimensions was explicitly set during initialization, use that
+        if self.target_dimensions is not None:
+            self.embedding_dim = self.target_dimensions
+        
         # Check if we need to initialize the collection dimensionality
-        if self.embedding_dim is None and self.collection.count() == 0:
+        if self.embedding_dim is None and self.collection and self.collection.count() == 0:
             # This is the first embedding, so we'll use its dimensionality for the collection
             self.embedding_dim = embedding.shape[0]
-            print(
+            logger.info(
                 f"Initialized ChromaDB collection with dimensionality: {self.embedding_dim}"
             )
             return embedding
 
         # Get dimensionality from an existing collection
-        if self.embedding_dim is None and self.collection.count() > 0:
+        if self.embedding_dim is None and self.collection and self.collection.count() > 0:
             try:
                 # Query a sample to determine dimensionality
                 existing = self.collection.peek(limit=1)
@@ -274,32 +289,32 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 ):
                     sample_embedding = existing["embeddings"][0]
                     self.embedding_dim = len(sample_embedding)
-                    print(
+                    logger.info(
                         f"Detected ChromaDB collection dimensionality: {self.embedding_dim}"
                     )
             except Exception as e:
-                print(f"Failed to determine collection dimensionality: {str(e)}")
+                logger.error(f"Failed to determine collection dimensionality: {str(e)}")
                 # Default to the current embedding's dimensionality
                 self.embedding_dim = embedding.shape[0]
+                logger.info(f"Using default dimensionality: {self.embedding_dim}")
 
         # If dimensions don't match, we need to resize
         if self.embedding_dim is not None and embedding.shape[0] != self.embedding_dim:
             original_dim = embedding.shape[0]
-            print(
-                f"Embedding dimension mismatch: embedding has {original_dim} dims, collection requires {self.embedding_dim}"
-            )
-
+            # Count dimension conversions for monitoring
+            self.stats["dimension_conversions"] += 1
+            
             if original_dim > self.embedding_dim:
                 # Truncate to match collection dimensionality
                 embedding = embedding[: self.embedding_dim]
-                print(
+                logger.info(
                     f"Truncated embedding from {original_dim} to {self.embedding_dim} dimensions"
                 )
             else:
                 # Pad with zeros to match collection dimensionality
                 padding = np.zeros(self.embedding_dim - original_dim)
                 embedding = np.concatenate([embedding, padding])
-                print(
+                logger.info(
                     f"Padded embedding from {original_dim} to {self.embedding_dim} dimensions"
                 )
 
@@ -332,7 +347,10 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             if isinstance(embedding, np.ndarray) or isinstance(embedding, list):
                 # Ensure embedding has the right dimensions
                 embedding = self._ensure_embedding_dimensions(embedding)
-
+                if embedding is None:
+                    logger.error(f"Failed to process embedding for {face_id}")
+                    return False
+                    
                 # Convert to list for ChromaDB
                 embedding_list = embedding.tolist()
             else:
@@ -367,7 +385,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                             metadatas=[metadata],
                         )
                 except Exception as e:
-                    print(f"Error checking existing embedding: {str(e)}")
+                    logger.warning(f"Error checking existing embedding: {str(e)}")
                     # Add new embedding if checking fails
                     self.collection.add(
                         ids=[face_id], embeddings=[embedding_list], metadatas=[metadata]
@@ -377,7 +395,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 return True
 
             except Exception as e:
-                print(f"Error adding embedding for {face_id}: {str(e)}")
+                logger.error(f"Error adding embedding for {face_id}: {str(e)}")
                 # Fallback to dictionary storage
                 if hasattr(self, "_fallback_embeddings"):
                     self._fallback_embeddings[face_id] = {
@@ -443,7 +461,11 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
 
                         # Convert embedding to list and ensure dimensions
                         if isinstance(emb, np.ndarray) or isinstance(emb, list):
-                            emb = self._ensure_embedding_dimensions(emb).tolist()
+                            processed_emb = self._ensure_embedding_dimensions(emb)
+                            if processed_emb is None:
+                                logger.warning(f"Skipping invalid embedding for {face_id}_{i}")
+                                continue
+                            emb = processed_emb.tolist()
 
                         embeddings.append(emb)
                         metadatas.append({"name": face_id})
@@ -452,12 +474,17 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
 
                     # Convert embedding to list and ensure dimensions
                     if isinstance(embs, np.ndarray) or isinstance(embs, list):
-                        embs = self._ensure_embedding_dimensions(embs).tolist()
+                        processed_emb = self._ensure_embedding_dimensions(embs)
+                        if processed_emb is None:
+                            logger.warning(f"Skipping invalid embedding for {face_id}")
+                            continue
+                        embs = processed_emb.tolist()
 
                     embeddings.append(embs)
                     metadatas.append({"name": face_id})
 
             if not ids:
+                logger.warning("No valid embeddings found in batch")
                 return True
 
             try:
@@ -472,7 +499,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                             metadatas=metadatas[i:end],
                         )
                     except Exception as batch_error:
-                        print(f"Error adding batch {i}-{end}: {str(batch_error)}")
+                        logger.error(f"Error adding batch {i}-{end}: {str(batch_error)}")
                         # If batch fails, try adding individually
                         for j in range(i, end):
                             try:
@@ -482,7 +509,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                                     metadatas=[metadatas[j]],
                                 )
                             except Exception as e:
-                                print(
+                                logger.error(
                                     f"Error adding individual item {ids[j]}: {str(e)}"
                                 )
 
@@ -490,7 +517,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 return True
 
             except Exception as e:
-                print(f"Error adding batch embeddings: {str(e)}")
+                logger.error(f"Error adding batch embeddings: {str(e)}")
                 # Fallback to individual adds
                 success = True
                 for i, face_id in enumerate(ids):
@@ -503,7 +530,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                         if not result:
                             success = False
                     except Exception as inner_e:
-                        print(
+                        logger.error(
                             f"Error adding individual embedding {face_id}: {str(inner_e)}"
                         )
                         success = False
@@ -542,8 +569,16 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
 
                 for face_id, data in self._fallback_embeddings.items():
                     known_embedding = data["embedding"]
+                    
+                    # Ensure embedding dimensions match
+                    face_embedding_norm = self._ensure_embedding_dimensions(face_embedding)
+                    known_embedding_norm = self._ensure_embedding_dimensions(known_embedding)
+                    
+                    if face_embedding_norm is None or known_embedding_norm is None:
+                        continue
+                        
                     similarity = self.compute_similarity(
-                        face_embedding, known_embedding
+                        face_embedding_norm, known_embedding_norm
                     )
 
                     if (
@@ -566,6 +601,11 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
 
             # Ensure the embedding has the right dimensions for the collection
             face_embedding = self._ensure_embedding_dimensions(face_embedding)
+            if face_embedding is None:
+                logger.error("Failed to process query embedding")
+                self.stats["query_time"] += time.time() - start_time
+                return None
+                
             face_embedding_list = face_embedding.tolist()
 
             try:
@@ -606,7 +646,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 return None
 
             except Exception as e:
-                print(f"Error querying ChromaDB: {str(e)}")
+                logger.error(f"Error querying ChromaDB: {str(e)}")
                 self.stats["query_time"] += time.time() - start_time
                 return None
 
@@ -629,7 +669,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
         try:
             face_bboxes = self.face_detector.detect_faces(image, use_cache=True)
         except Exception as e:
-            print(f"Error detecting faces: {str(e)}")
+            logger.error(f"Error detecting faces: {str(e)}")
             return results
 
         for i, bbox in enumerate(face_bboxes):
@@ -656,7 +696,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                         }
                     )
             except Exception as e:
-                print(f"Error identifying face: {str(e)}")
+                logger.error(f"Error identifying face: {str(e)}")
                 continue
 
         return results
@@ -701,5 +741,13 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             stats["match_rate"] = stats["match_count"] / stats["query_count"]
         else:
             stats["match_rate"] = 0
+            
+        # Add embedding dimension info
+        if self.embedding_dim is not None:
+            stats["embedding_dimension"] = self.embedding_dim
+            
+        # Add dimension conversion stats
+        if self.stats["dimension_conversions"] > 0:
+            stats["dimension_conversions"] = self.stats["dimension_conversions"]
 
         return stats

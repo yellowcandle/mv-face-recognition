@@ -8,11 +8,14 @@ on embedding similarity and dictionary-based matching.
 import os
 import time
 import numpy as np
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 
 from src.core.recognizer import StandardFaceRecognizer
 
+# Set up logging
+logger = logging.getLogger("face_recognition")
 
 class StandardBackend:
     """
@@ -37,6 +40,47 @@ class StandardBackend:
             "match_count": 0,
             "processing_time": 0.0,
         }
+        
+        # Target dimension for embeddings
+        self.target_dimension = None
+
+    def _normalize_embedding_dimension(self, embedding: np.ndarray) -> np.ndarray:
+        """
+        Normalize embedding dimensions to match the target dimension.
+        
+        Args:
+            embedding: The face embedding to normalize
+            
+        Returns:
+            numpy.ndarray: Normalized face embedding
+        """
+        if embedding is None:
+            return None
+            
+        # Convert to numpy array if it's a list
+        if isinstance(embedding, list):
+            embedding = np.array(embedding)
+            
+        # If no target dimension yet, use this embedding's dimension as target
+        if self.target_dimension is None:
+            self.target_dimension = embedding.shape[0]
+            return embedding
+            
+        # If dimensions already match, return as is
+        if embedding.shape[0] == self.target_dimension:
+            return embedding
+            
+        # Handle dimension mismatch
+        current_dim = embedding.shape[0]
+        logger.info(f"Normalizing embedding dimension from {current_dim} to {self.target_dimension}")
+        
+        if current_dim > self.target_dimension:
+            # Truncate to target dimension
+            return embedding[:self.target_dimension]
+        else:
+            # Pad with zeros to reach target dimension
+            padding = np.zeros(self.target_dimension - current_dim)
+            return np.concatenate([embedding, padding])
 
     def load_embeddings(
         self,
@@ -66,8 +110,11 @@ class StandardBackend:
             embedding = self.recognizer.get_embedding(contestant)
 
             if embedding is not None:
-                known_embeddings[contestant] = [embedding]
-                continue
+                # Normalize the embedding dimension
+                embedding = self._normalize_embedding_dimension(embedding)
+                if embedding is not None:
+                    known_embeddings[contestant] = [embedding]
+                    continue
 
             # If not available, compute from contestant images
             try:
@@ -77,7 +124,7 @@ class StandardBackend:
 
                 contestant_path = contestant_dir / str(contestant_number)
                 if not contestant_path.is_dir():
-                    print(
+                    logger.warning(
                         f"Directory not found for contestant {contestant}: {contestant_path}"
                     )
                     continue
@@ -90,7 +137,7 @@ class StandardBackend:
                 ]
 
                 if not image_paths:
-                    print(f"No images found for contestant {contestant}")
+                    logger.warning(f"No images found for contestant {contestant}")
                     continue
 
                 # Process first image only for now
@@ -98,7 +145,7 @@ class StandardBackend:
                 faces = self.recognizer.face_detector.detect_faces(img)
 
                 if not faces:
-                    print(f"No face detected for contestant {contestant}")
+                    logger.warning(f"No face detected for contestant {contestant}")
                     continue
 
                 # Extract and process face
@@ -106,22 +153,32 @@ class StandardBackend:
                     img, faces[0], padding=0.1
                 )
                 if face_img is None:
-                    print(f"Failed to extract face for contestant {contestant}")
+                    logger.warning(f"Failed to extract face for contestant {contestant}")
                     continue
 
                 # Compute embedding
                 preprocessed = self.recognizer.preprocess_face(face_img)
                 embedding = self.recognizer.compute_embedding(preprocessed)
+                
+                # Normalize the embedding dimension
+                embedding = self._normalize_embedding_dimension(embedding)
+                if embedding is None:
+                    continue
 
                 # Save for future use
                 known_embeddings[contestant] = [embedding]
                 self.recognizer.save_embedding(contestant, embedding)
 
             except Exception as e:
-                print(f"Error processing contestant {contestant}: {str(e)}")
+                logger.error(f"Error processing contestant {contestant}: {str(e)}")
 
         self.stats["processing_time"] += time.time() - start_time
-        print(f"Loaded embeddings for {len(known_embeddings)} contestants")
+        
+        if not known_embeddings:
+            logger.error("No embeddings found in gallery! Face recognition will not work.")
+        else:
+            logger.info(f"Loaded embeddings for {len(known_embeddings)} contestants with dimension {self.target_dimension}")
+            
         return known_embeddings
 
     def identify_face(
@@ -139,6 +196,11 @@ class StandardBackend:
         """
         start_time = time.time()
         self.stats["query_count"] += 1
+        
+        # Normalize the query embedding dimension
+        face_embedding = self._normalize_embedding_dimension(face_embedding)
+        if face_embedding is None:
+            return None
 
         best_match = None
         best_score = 0
@@ -147,6 +209,11 @@ class StandardBackend:
             for known_embedding in embeddings_list:
                 # Ensure both embeddings are in the correct format
                 if isinstance(known_embedding, np.ndarray) and known_embedding.size > 0:
+                    # Normalize the gallery embedding dimension if needed
+                    known_embedding = self._normalize_embedding_dimension(known_embedding)
+                    if known_embedding is None:
+                        continue
+                        
                     similarity = self.recognizer.compute_similarity(
                         face_embedding, known_embedding
                     )
@@ -203,5 +270,9 @@ class StandardBackend:
             ) * 1000
         else:
             stats["avg_query_time_ms"] = 0
+            
+        # Add embedding dimension info
+        if self.target_dimension is not None:
+            stats["embedding_dimension"] = self.target_dimension
 
         return stats

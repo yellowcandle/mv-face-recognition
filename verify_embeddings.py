@@ -42,6 +42,10 @@ class EmbeddingVerifier:
             "dimension_inconsistencies": 0,
             "format_issues": 0,
         }
+        # Store embedding dimensions to find inconsistencies
+        self.embedding_dimensions = {}
+        # Path of specific embedding files to check
+        self.problematic_files = []
 
     def print_header(self, message):
         """Print a formatted header"""
@@ -104,12 +108,28 @@ class EmbeddingVerifier:
         print(f"Dimension inconsistencies: {self.stats['dimension_inconsistencies']}")
         print(f"Format issues: {self.stats['format_issues']}")
 
+        # Print details about the dimensions found
+        if len(self.embedding_dimensions) > 0:
+            self.print_header("Embedding Dimensions Found")
+            for dims, files in self.embedding_dimensions.items():
+                print(f"Dimension {dims}: {len(files)} embeddings")
+                
+        # If specific problematic files were found, list them
+        if len(self.problematic_files) > 0:
+            self.print_header("Problematic Files")
+            for file_path in self.problematic_files:
+                self.print_warning(f"Problematic embedding file: {file_path}")
+
         if self.stats["dimension_inconsistencies"] > 0:
             self.print_error("Found embedding dimension inconsistencies!")
             print("\nPossible solutions:")
             print("1. Clear the ChromaDB database: rm -rf cache/chromadb/*")
             print("2. Regenerate embeddings with consistent model settings")
-            print("3. Use the embedding dimension handling in ChromaDBFaceRecognizer")
+            print("3. Use the dimension handling in StandardBackend and ChromaDBFaceRecognizer")
+            print("\nAutomatically fix dimensions:")
+            print("1. Edit src/backends/standard_backend.py to add dimension normalization")
+            print("2. Edit src/backends/chromadb_backend.py to normalize all embeddings to one size")
+            print("3. Choose target dimension (probably the most common one)")
         elif self.stats["format_issues"] > 0:
             self.print_warning("Found embedding format issues!")
             print("\nPossible solutions:")
@@ -117,6 +137,35 @@ class EmbeddingVerifier:
             print("2. Ensure proper serialization/deserialization of embeddings")
         else:
             self.print_success("No embedding issues found!")
+
+    def scan_specific_file(self, file_path):
+        """Scan a specific file that might be problematic"""
+        try:
+            if not Path(file_path).exists():
+                self.print_error(f"File not found: {file_path}")
+                return
+                
+            data = np.load(file_path, allow_pickle=True)
+            self.stats["embeddings_checked"] += 1
+            
+            if isinstance(data, np.ndarray):
+                shape = data.shape
+                dims = shape[-1] if len(shape) > 1 else shape[0]
+                self.print_info(f"File {file_path} has embedding dimension: {dims}")
+                
+                if dims not in self.embedding_dimensions:
+                    self.embedding_dimensions[dims] = []
+                self.embedding_dimensions[dims].append(file_path)
+                
+                # Add to problematic files
+                self.problematic_files.append(file_path)
+            else:
+                self.print_warning(f"File is not a numpy array: {file_path}")
+                self.stats["format_issues"] += 1
+                
+        except Exception as e:
+            self.print_error(f"Failed to load {file_path}: {str(e)}")
+            self.stats["format_issues"] += 1
 
     def verify_cached_embeddings(self):
         """Verify cached embeddings in the filesystem"""
@@ -146,6 +195,11 @@ class EmbeddingVerifier:
                     if dims not in dimensions:
                         dimensions[dims] = []
                     dimensions[dims].append(npy_file.name)
+                    
+                    # Store for later reference
+                    if dims not in self.embedding_dimensions:
+                        self.embedding_dimensions[dims] = []
+                    self.embedding_dimensions[dims].append(str(npy_file))
 
                 else:
                     self.print_warning(f"File is not a numpy array: {npy_file}")
@@ -175,6 +229,11 @@ class EmbeddingVerifier:
                                 if dims not in dimensions:
                                     dimensions[dims] = []
                                 dimensions[dims].append(f"{json_file.name}:{key}")
+                                
+                                # Store for later reference
+                                if dims not in self.embedding_dimensions:
+                                    self.embedding_dimensions[dims] = []
+                                self.embedding_dimensions[dims].append(f"{str(json_file)}:{key}")
 
             except Exception as e:
                 self.print_error(f"Failed to load {json_file}: {str(e)}")
@@ -198,6 +257,10 @@ class EmbeddingVerifier:
                     print(f"    - ... and {len(files) - 3} more")
 
             self.stats["dimension_inconsistencies"] += 1
+            
+            # Suggest a strategy
+            most_common_dim = max(dimensions.keys(), key=lambda k: len(dimensions[k]))
+            self.print_info(f"Recommended target dimension: {most_common_dim} (most common)")
         else:
             self.print_success("All cached embeddings have consistent dimensions")
 
@@ -235,6 +298,11 @@ class EmbeddingVerifier:
                             self.print_info(
                                 f"Collection {collection.name} has embedding dimension: {dims}"
                             )
+                            
+                            # Store for later reference
+                            if dims not in self.embedding_dimensions:
+                                self.embedding_dimensions[dims] = []
+                            self.embedding_dimensions[dims].append(f"chromadb:{collection.name}")
 
                             # Check more embeddings
                             count = collection.count()
@@ -288,4 +356,12 @@ class EmbeddingVerifier:
 
 if __name__ == "__main__":
     verifier = EmbeddingVerifier()
-    verifier.run_verification()
+    
+    # Check for specific problematic files
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--check-file' and len(sys.argv) > 2:
+            verifier.scan_specific_file(sys.argv[2])
+        else:
+            verifier.run_verification()
+    else:
+        verifier.run_verification()
