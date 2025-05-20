@@ -4,13 +4,14 @@ Benchmark script to compare standard face recognition performance with ChromaDB.
 This script runs both approaches on the same videos and reports performance metrics.
 """
 
+import argparse
 import os
 import sys
 import time
-import pandas as pd
-import numpy as np
-import argparse
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 # Add src to path so we can import our modules
@@ -31,25 +32,15 @@ except ImportError:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Benchmark ChromaDB vs Standard face recognition"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark ChromaDB vs Standard face recognition")
 
-    parser.add_argument(
-        "--video", type=str, help="Video file to process (in source/videos/)"
-    )
-    parser.add_argument(
-        "--iterations", type=int, default=3, help="Number of iterations to run"
-    )
-    parser.add_argument(
-        "--frame-limit", type=int, default=100, help="Max frames to process"
-    )
+    parser.add_argument("--video", type=str, help="Video file to process (in source/videos/)")
+    parser.add_argument("--iterations", type=int, default=3, help="Number of iterations to run")
+    parser.add_argument("--frame-limit", type=int, default=100, help="Max frames to process")
     parser.add_argument(
         "--contestants", type=int, default=5, help="Number of contestants to include"
     )
-    parser.add_argument(
-        "--plot", action="store_true", help="Generate performance plots"
-    )
+    parser.add_argument("--plot", action="store_true", help="Generate performance plots")
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
 
     return parser.parse_args()
@@ -79,9 +70,7 @@ def load_contestants_data(num_contestants=None):
 def setup_recognizers(similarity_threshold=0.4):
     """Set up both standard and ChromaDB recognizers."""
     # Initialize face detector
-    detector = OptimizedFaceDetector(
-        confidence_threshold=0.3, skip_frames=0, tracking_duration=0
-    )
+    detector = OptimizedFaceDetector(confidence_threshold=0.3, skip_frames=0, tracking_duration=0)
 
     # Initialize standard recognizer
     std_recognizer = OptimizedFaceRecognizer(
@@ -125,9 +114,7 @@ def load_embeddings(
 
             contestant_path = os.path.join(contestants_dir, str(contestant_number))
             if not os.path.isdir(contestant_path):
-                print(
-                    f"Directory not found for contestant {contestant}: {contestant_path}"
-                )
+                print(f"Directory not found for contestant {contestant}: {contestant_path}")
                 continue
 
             # Get image paths
@@ -227,9 +214,7 @@ def benchmark_matching(
         "chromadb": {"times": [], "matches": []} if can_use_chromadb else None,
     }
 
-    print(
-        f"Benchmarking with {iterations} iterations, max {frame_limit} frames per iteration"
-    )
+    print(f"Benchmarking with {iterations} iterations, max {frame_limit} frames per iteration")
 
     for iteration in range(iterations):
         print(f"\nIteration {iteration + 1}/{iterations}")
@@ -319,11 +304,7 @@ def analyze_results(benchmark_results):
     # Process ChromaDB results if available
     if benchmark_results["chromadb"]:
         chroma_times = np.array(
-            [
-                item
-                for sublist in benchmark_results["chromadb"]["times"]
-                for item in sublist
-            ]
+            [item for sublist in benchmark_results["chromadb"]["times"] for item in sublist]
         )
         chroma_avg = np.mean(chroma_times) * 1000  # Convert to ms
         chroma_median = np.median(chroma_times) * 1000
@@ -391,23 +372,11 @@ def plot_results(benchmark_results, output_dir=None):
 
     # Flatten times arrays
     std_times = (
-        np.array(
-            [
-                item
-                for sublist in benchmark_results["standard"]["times"]
-                for item in sublist
-            ]
-        )
+        np.array([item for sublist in benchmark_results["standard"]["times"] for item in sublist])
         * 1000
     )
     chroma_times = (
-        np.array(
-            [
-                item
-                for sublist in benchmark_results["chromadb"]["times"]
-                for item in sublist
-            ]
-        )
+        np.array([item for sublist in benchmark_results["chromadb"]["times"] for item in sublist])
         * 1000
     )
 
@@ -448,9 +417,7 @@ def main():
     args = parse_args()
 
     if not HAS_CHROMADB:
-        print(
-            "WARNING: ChromaDB is not installed. Only standard matching will be benchmarked."
-        )
+        print("WARNING: ChromaDB is not installed. Only standard matching will be benchmarked.")
         print("Install ChromaDB with: pip install chromadb>=0.4.18")
 
     # Setup paths
@@ -465,8 +432,7 @@ def main():
         video_files = [
             f
             for f in os.listdir(videos_dir)
-            if os.path.isfile(os.path.join(videos_dir, f))
-            and f.lower().endswith((".mp4", ".avi"))
+            if os.path.isfile(os.path.join(videos_dir, f)) and f.lower().endswith((".mp4", ".avi"))
         ]
         if not video_files:
             print(f"No video files found in {videos_dir}")

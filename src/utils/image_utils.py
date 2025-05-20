@@ -1,15 +1,15 @@
+import hashlib
 import os
+from pathlib import Path
+from typing import List, Optional, Union
+
 import cv2
 import numpy as np
-from pathlib import Path
-import hashlib
-from typing import List, Optional, Union
-from .performance import image_cache, compute_image_hash
+
+from .performance import compute_image_hash, image_cache
 
 
-def load_image(
-    image_path: Union[str, Path], use_cache: bool = True
-) -> Optional[np.ndarray]:
+def load_image(image_path: Union[str, Path], use_cache: bool = True) -> Optional[np.ndarray]:
     """
     Load an image with optimized caching for test images.
 
@@ -54,9 +54,7 @@ def load_image(
         return None
 
 
-def save_image(
-    image: np.ndarray, output_path: Union[str, Path], quality: int = 95
-) -> bool:
+def save_image(image: np.ndarray, output_path: Union[str, Path], quality: int = 95) -> bool:
     """
     Save an image with optimized parameters.
 
@@ -202,9 +200,7 @@ def enhance_test_image(image: np.ndarray) -> np.ndarray:
         return image
 
 
-def compare_test_images(
-    original_path: Union[str, Path], result_path: Union[str, Path]
-) -> float:
+def compare_test_images(original_path: Union[str, Path], result_path: Union[str, Path]) -> float:
     """
     Compare original and result test images to calculate similarity.
 
@@ -291,9 +287,7 @@ def create_composite_image(
         # Add labels
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(composite, "Original", (10, 30), font, 1, (0, 255, 0), 2)
-        cv2.putText(
-            composite, "Result", (original.shape[1] + 10, 30), font, 1, (0, 255, 0), 2
-        )
+        cv2.putText(composite, "Result", (original.shape[1] + 10, 30), font, 1, (0, 255, 0), 2)
 
         # Add similarity score
         similarity = compare_test_images(original_path, result_path)

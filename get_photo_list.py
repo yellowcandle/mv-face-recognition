@@ -22,14 +22,10 @@ for url in all_urls:
 print(f"\nTotal number of image URLs found: {len(all_urls)}")
 
 # Save all URLs to two text files
-with open(
-    "source/photo/raw/album1_image_urls.txt", "w", encoding="utf-8"
-) as output_file:
+with open("source/photo/raw/album1_image_urls.txt", "w", encoding="utf-8") as output_file:
     for url in album1_urls:
         output_file.write(url + "\n")
 
-with open(
-    "source/photo/raw/album2_image_urls.txt", "w", encoding="utf-8"
-) as output_file:
+with open("source/photo/raw/album2_image_urls.txt", "w", encoding="utf-8") as output_file:
     for url in album2_urls:
         output_file.write(url + "\n")

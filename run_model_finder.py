@@ -12,9 +12,9 @@ Options:
     --force: Force re-download of models even if they exist
 """
 
+import argparse
 import os
 import sys
-import argparse
 from pathlib import Path
 
 # Add project root to the path
@@ -26,9 +26,7 @@ if str(project_root) not in sys.path:
 try:
     from src.utils.model_finder import ModelFinder
 except ImportError:
-    print(
-        "Error: Could not import ModelFinder. Make sure src/utils/model_finder.py exists."
-    )
+    print("Error: Could not import ModelFinder. Make sure src/utils/model_finder.py exists.")
     sys.exit(1)
 
 
@@ -37,9 +35,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run Model Finder to discover face recognition models"
     )
-    parser.add_argument(
-        "--force", action="store_true", help="Force re-download of models"
-    )
+    parser.add_argument("--force", action="store_true", help="Force re-download of models")
     parser.add_argument(
         "--search-packages",
         action="store_true",
@@ -48,9 +44,7 @@ def main():
     parser.add_argument(
         "--recognition-only", action="store_true", help="Only find recognition models"
     )
-    parser.add_argument(
-        "--detection-only", action="store_true", help="Only find detection models"
-    )
+    parser.add_argument("--detection-only", action="store_true", help="Only find detection models")
     args = parser.parse_args()
 
     print("\n=== Face Recognition Model Finder ===\n")
@@ -137,14 +131,10 @@ def main():
     print("\nModel search complete!")
 
     if detection_count == 0 or recognition_count == 0:
-        print(
-            "\nWarning: Some model types are missing. Face recognition may not work properly."
-        )
+        print("\nWarning: Some model types are missing. Face recognition may not work properly.")
         print("Try running with --force to download all required models.")
     else:
-        print(
-            "\nAll required models are available. Face recognition should work properly."
-        )
+        print("\nAll required models are available. Face recognition should work properly.")
 
     return 0
 

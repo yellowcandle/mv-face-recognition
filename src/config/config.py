@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union, Any
+from typing import Any, Dict, Optional, Tuple, Union
 
 
 class DetectorBackend(str, Enum):
@@ -40,15 +40,9 @@ class PathConfig:
     """Configuration for system paths."""
 
     # Project directories
-    project_root: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent
-    )
-    models_dir: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent / "models"
-    )
-    cache_dir: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent / "cache"
-    )
+    project_root: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent)
+    models_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "models")
+    cache_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "cache")
     output_dir: Path = field(
         default_factory=lambda: Path(__file__).parent.parent.parent / "output_mp4s"
     )
@@ -64,13 +58,10 @@ class PathConfig:
         / "contestants"
     )
     videos_dir: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent
-        / "source"
-        / "videos"
+        default_factory=lambda: Path(__file__).parent.parent.parent / "source" / "videos"
     )
     contestant_info_path: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent
-        / "contestant_info.csv"
+        default_factory=lambda: Path(__file__).parent.parent.parent / "contestant_info.csv"
     )
 
     # Font files
@@ -179,9 +170,7 @@ class Config:
     detection: DetectionConfig = field(default_factory=DetectionConfig)
     segmentation: SegmentationConfig = field(default_factory=SegmentationConfig)
     recognition: RecognitionConfig = field(default_factory=RecognitionConfig)
-    video_processing: VideoProcessingConfig = field(
-        default_factory=VideoProcessingConfig
-    )
+    video_processing: VideoProcessingConfig = field(default_factory=VideoProcessingConfig)
     ui: UIConfig = field(default_factory=UIConfig)
 
     # Environment options
@@ -208,6 +197,7 @@ class Config:
     def from_file(cls, file_path: Union[str, Path]) -> "Config":
         """Create a config instance from a file."""
         import json
+
         import yaml
 
         file_path = Path(file_path)
@@ -249,8 +239,7 @@ class Config:
                 ),
             ):
                 result[section_name] = {
-                    k: str(v) if isinstance(v, Path) else v
-                    for k, v in section.__dict__.items()
+                    k: str(v) if isinstance(v, Path) else v for k, v in section.__dict__.items()
                 }
             else:
                 result[section_name] = section
@@ -260,6 +249,7 @@ class Config:
     def save_to_file(self, file_path: Union[str, Path]) -> None:
         """Save config to a file."""
         import json
+
         import yaml
 
         file_path = Path(file_path)

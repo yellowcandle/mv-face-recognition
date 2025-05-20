@@ -1,7 +1,8 @@
+import os
+
 import cv2
 import numpy as np
 import onnxruntime
-import os
 
 
 class SegmentationModel:
@@ -28,9 +29,7 @@ class SegmentationModel:
             import mediapipe as mp
 
             self.mp_selfie_segmentation = mp.solutions.selfie_segmentation
-            self.segmenter = self.mp_selfie_segmentation.SelfieSegmentation(
-                model_selection=1
-            )
+            self.segmenter = self.mp_selfie_segmentation.SelfieSegmentation(model_selection=1)
 
     def get_person_mask(self, image: np.ndarray) -> np.ndarray:
         if self.use_fcn:

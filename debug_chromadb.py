@@ -19,9 +19,10 @@ This script will test:
 import os
 import sys
 import time
-from pathlib import Path
-import numpy as np
 import traceback
+from pathlib import Path
+
+import numpy as np
 
 # Set up project root path
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -235,9 +236,7 @@ def test_performance():
         print(f"Generating {n_embeddings} random embeddings for performance testing...")
 
         # Generate random embeddings
-        embeddings = [
-            np.random.rand(TEST_EMBEDDING_DIM).tolist() for _ in range(n_embeddings)
-        ]
+        embeddings = [np.random.rand(TEST_EMBEDDING_DIM).tolist() for _ in range(n_embeddings)]
         ids = [f"test_face_{i}" for i in range(n_embeddings)]
         metadatas = [{"person_id": f"person_{i % 10}"} for i in range(n_embeddings)]
 
@@ -335,9 +334,7 @@ def test_fix_existing_collection():
             collection_names = [c.name for c in collections]
 
             if COLLECTION_NAME not in collection_names:
-                print(
-                    f"⚠️ Collection '{COLLECTION_NAME}' not found, skipping repair test."
-                )
+                print(f"⚠️ Collection '{COLLECTION_NAME}' not found, skipping repair test.")
                 return True
 
             # Attempt to get and use the collection
@@ -419,9 +416,7 @@ def main():
     if all_passed:
         print("\n✅ All tests passed! ChromaDB appears to be functioning correctly.")
     else:
-        print(
-            "\n⚠️ Some tests failed. Review the output above for details and suggested fixes."
-        )
+        print("\n⚠️ Some tests failed. Review the output above for details and suggested fixes.")
 
 
 if __name__ == "__main__":

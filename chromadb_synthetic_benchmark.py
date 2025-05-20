@@ -7,9 +7,10 @@ This benchmark creates synthetic embeddings and tests the performance
 of matching algorithms directly, which is where ChromaDB optimization applies.
 """
 
-import time
-import numpy as np
 import argparse
+import time
+
+import numpy as np
 
 # Check if ChromaDB is available
 try:
@@ -69,9 +70,7 @@ def create_synthetic_embeddings(count, dimensions):
     return normalized_embeddings
 
 
-def standard_matching(
-    query_embeddings, reference_embeddings, threshold=0.6, verbose=False
-):
+def standard_matching(query_embeddings, reference_embeddings, threshold=0.6, verbose=False):
     """Match using standard linear search approach."""
     start_time = time.time()
 
@@ -112,9 +111,7 @@ def chromadb_matching(
     start_setup = time.time()
     collection_name = f"synthetic_embeddings_{iteration}_{int(time.time())}"
     client = chromadb.Client()
-    collection = client.create_collection(
-        name=collection_name, metadata={"hnsw:space": "cosine"}
-    )
+    collection = client.create_collection(name=collection_name, metadata={"hnsw:space": "cosine"})
 
     # Add reference embeddings to collection
     collection.add(
@@ -176,9 +173,7 @@ def run_benchmark(args):
         print(f"\nIteration {iteration + 1}/{args.iterations}")
 
         # Create synthetic embeddings for this iteration
-        reference_embeddings = create_synthetic_embeddings(
-            args.embeddings, args.dimensions
-        )
+        reference_embeddings = create_synthetic_embeddings(args.embeddings, args.dimensions)
         query_embeddings = create_synthetic_embeddings(args.queries, args.dimensions)
 
         # Run standard matching
@@ -208,9 +203,7 @@ def run_benchmark(args):
         # Print iteration results
         print(f"Standard matching: {std_time:.4f}s, {len(std_matches)} matches")
         if HAS_CHROMADB:
-            print(
-                f"ChromaDB matching: {chroma_time:.4f}s, {len(chroma_matches)} matches"
-            )
+            print(f"ChromaDB matching: {chroma_time:.4f}s, {len(chroma_matches)} matches")
 
     # Compute and print overall results
     avg_std_time = np.mean(standard_times)
@@ -301,9 +294,7 @@ def main():
     args = parse_args()
 
     if not HAS_CHROMADB:
-        print(
-            "WARNING: ChromaDB is not installed. Only standard matching will be benchmarked."
-        )
+        print("WARNING: ChromaDB is not installed. Only standard matching will be benchmarked.")
         print("Install ChromaDB with: pip install chromadb>=0.4.18")
 
     run_benchmark(args)

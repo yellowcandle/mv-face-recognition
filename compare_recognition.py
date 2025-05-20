@@ -1,8 +1,8 @@
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
 
 # Load the sample data image (expected results)
 expected_results_path = "source/images/test/sample_data.png"
@@ -25,14 +25,14 @@ plt.figure(figsize=(20, 12))
 plt.subplot(1, len(test_result_images) + 1, 1)
 plt.imshow(expected_img)
 plt.title("Expected Results (sample_data.png)")
-plt.axis('off')
+plt.axis("off")
 
 # Display each of our test results
 for i, (threshold, img) in enumerate(test_result_images):
     plt.subplot(1, len(test_result_images) + 1, i + 2)
     plt.imshow(img)
     plt.title(f"Our Results (threshold = {threshold:.2f})")
-    plt.axis('off')
+    plt.axis("off")
 
 plt.tight_layout()
 plt.savefig("source/images/test/comparison.png", dpi=150)

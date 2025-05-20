@@ -15,18 +15,18 @@ Usage:
 This script works directly with the existing ChromaDB backend to optimize its performance.
 """
 
-import os
-import sys
-import time
-import gc
-from pathlib import Path
-import traceback
-from typing import Dict, List, Any
-import threading
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
+import gc
 import logging
 import multiprocessing
+import os
+import sys
+import threading
+import time
+import traceback
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List
 
 # Set up project root path
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -103,13 +103,9 @@ class ChromaDBOptimizer:
 
             if self.collection_name in collection_names:
                 self.collection = self.client.get_collection(name=self.collection_name)
-                logger.info(
-                    f"Connected to existing collection '{self.collection_name}'"
-                )
+                logger.info(f"Connected to existing collection '{self.collection_name}'")
             else:
-                self.collection = self.client.create_collection(
-                    name=self.collection_name
-                )
+                self.collection = self.client.create_collection(name=self.collection_name)
                 logger.info(f"Created new collection '{self.collection_name}'")
 
             return True
@@ -123,9 +119,7 @@ class ChromaDBOptimizer:
         import chromadb
 
         if not hasattr(self.thread_local, "client"):
-            self.thread_local.client = chromadb.PersistentClient(
-                path=str(self.cache_dir)
-            )
+            self.thread_local.client = chromadb.PersistentClient(path=str(self.cache_dir))
             self.thread_local.collection = self.thread_local.client.get_collection(
                 name=self.collection_name
             )
@@ -166,9 +160,7 @@ class ChromaDBOptimizer:
                 try:
                     optimize_fn()
                 except Exception as e:
-                    logger.error(
-                        f"Optimization function {optimize_fn.__name__} failed: {str(e)}"
-                    )
+                    logger.error(f"Optimization function {optimize_fn.__name__} failed: {str(e)}")
                     traceback.print_exc()
 
             logger.info("Collection optimization completed")
@@ -215,11 +207,7 @@ class ChromaDBOptimizer:
                 logger.error(f"Failed to get sample embedding: {str(e)}")
                 return
 
-            if (
-                not sample
-                or not sample.get("embeddings")
-                or not sample["embeddings"][0]
-            ):
+            if not sample or not sample.get("embeddings") or not sample["embeddings"][0]:
                 logger.warning("No embeddings found in collection")
                 return
 
@@ -289,9 +277,7 @@ class ChromaDBOptimizer:
         Args:
             embeddings_data: List of dicts with keys: id, embedding, metadata, document
         """
-        logger.info(
-            f"Adding {len(embeddings_data)} embeddings in batches of {self.batch_size}..."
-        )
+        logger.info(f"Adding {len(embeddings_data)} embeddings in batches of {self.batch_size}...")
 
         if not self.connect():
             return False
@@ -325,9 +311,7 @@ class ChromaDBOptimizer:
                 batch_time = time.time() - start_time
                 self.perf_stats["batch_add_times"].append(batch_time)
 
-                logger.info(
-                    f"Batch {i + 1}/{len(batches)} processed in {batch_time:.3f} seconds"
-                )
+                logger.info(f"Batch {i + 1}/{len(batches)} processed in {batch_time:.3f} seconds")
 
                 # Measure memory after each batch
                 memory_mb = self.measure_memory_usage()
@@ -370,9 +354,7 @@ class ChromaDBOptimizer:
             try:
                 # Get thread-local collection
                 collection = self.get_thread_local_client()
-                return collection.query(
-                    query_embeddings=[embedding], n_results=n_results
-                )
+                return collection.query(query_embeddings=[embedding], n_results=n_results)
             except Exception as e:
                 logger.error(f"Query execution failed: {str(e)}")
                 return None
@@ -393,17 +375,13 @@ class ChromaDBOptimizer:
                         if result:
                             results.append({"index": idx, "result": result})
                     except Exception as e:
-                        logger.error(
-                            f"Error processing result for query {idx}: {str(e)}"
-                        )
+                        logger.error(f"Error processing result for query {idx}: {str(e)}")
 
             total_time = time.time() - start_time
             logger.info(
                 f"Completed {len(query_embeddings)} parallel queries in {total_time:.3f} seconds"
             )
-            logger.info(
-                f"Average time per query: {total_time / len(query_embeddings):.6f} seconds"
-            )
+            logger.info(f"Average time per query: {total_time / len(query_embeddings):.6f} seconds")
 
             # Sort results by original index
             results.sort(key=lambda x: x["index"])
@@ -421,12 +399,8 @@ class ChromaDBOptimizer:
                 "count": len(self.perf_stats["query_times"]),
                 "average": sum(self.perf_stats["query_times"])
                 / max(1, len(self.perf_stats["query_times"])),
-                "min": min(self.perf_stats["query_times"])
-                if self.perf_stats["query_times"]
-                else 0,
-                "max": max(self.perf_stats["query_times"])
-                if self.perf_stats["query_times"]
-                else 0,
+                "min": min(self.perf_stats["query_times"]) if self.perf_stats["query_times"] else 0,
+                "max": max(self.perf_stats["query_times"]) if self.perf_stats["query_times"] else 0,
             },
             "batch_add_times": {
                 "count": len(self.perf_stats["batch_add_times"]),

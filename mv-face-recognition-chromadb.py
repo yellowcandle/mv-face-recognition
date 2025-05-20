@@ -1,13 +1,14 @@
+import argparse
 import os
+import sys
+import time
+
 import cv2
 import numpy as np
 import pandas as pd
-import argparse
-from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
-import time
-import sys
+from tqdm import tqdm
 
 # Try to import ChromaDB
 try:
@@ -47,9 +48,7 @@ def parse_args():
         help="Use in-memory ChromaDB (faster but not persistent)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
-    parser.add_argument(
-        "--augmentation", action="store_true", help="Use image augmentation"
-    )
+    parser.add_argument("--augmentation", action="store_true", help="Use image augmentation")
     parser.add_argument(
         "--quality-check",
         action="store_true",
@@ -175,9 +174,7 @@ def compute_embeddings_with_augmentation(image_paths, angles=[-10, -5, 0, 5, 10]
                 h, w = img.shape[:2]
                 center = (w // 2, h // 2)
                 M = cv2.getRotationMatrix2D(center, angle, 1.0)
-                rotated = cv2.warpAffine(
-                    img, M, (w, h), borderMode=cv2.BORDER_REPLICATE
-                )
+                rotated = cv2.warpAffine(img, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
 
                 # Process rotated image
                 rot_faces = app.get(rotated)
@@ -322,16 +319,12 @@ class ChromaDBFaceDB:
 
         try:
             # Query the collection
-            results = self.collection.query(
-                query_embeddings=[face_embedding], n_results=n_results
-            )
+            results = self.collection.query(query_embeddings=[face_embedding], n_results=n_results)
 
             # Return the best match if found
             if results["distances"][0] and results["metadatas"][0]:
                 # Check if distance meets threshold (converts cosine similarity to distance)
-                similarity = (
-                    1 - results["distances"][0][0]
-                )  # First result, first distance
+                similarity = 1 - results["distances"][0][0]  # First result, first distance
                 if similarity > self.distance_threshold:
                     self.match_count += 1
                     return results["metadatas"][0][0][
@@ -363,15 +356,11 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
         contestant_path = os.path.join(contestants_dir, str(contestant_number))
         if os.path.isdir(contestant_path):
             image_paths = get_image_paths(contestant_path)
-            embeddings = compute_embeddings(
-                image_paths, use_augmentation=parse_args().augmentation
-            )
+            embeddings = compute_embeddings(image_paths, use_augmentation=parse_args().augmentation)
             if embeddings:
                 known_embeddings[contestant_name] = embeddings
         else:
-            print(
-                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-            )
+            print(f"Directory for contestant '{contestant_name}' not found: {contestant_path}")
     return known_embeddings
 
 
@@ -397,13 +386,9 @@ def standard_match_face(face_embedding, known_embeddings, distance_threshold):
             # Handle if similarity is an array (shouldn't happen with properly flattened vectors)
             if isinstance(similarity, np.ndarray):
                 if similarity.size == 1:
-                    similarity = (
-                        similarity.item()
-                    )  # Convert single-element array to scalar
+                    similarity = similarity.item()  # Convert single-element array to scalar
                 else:
-                    similarity = (
-                        similarity.mean()
-                    )  # Handle multi-element arrays by taking the mean
+                    similarity = similarity.mean()  # Handle multi-element arrays by taking the mean
 
             # Update best match
             if similarity > best_similarity:
@@ -485,9 +470,7 @@ def process_frame(
                         similarity = np.dot(face_embedding_flat, known_embedding_flat)
                         if isinstance(similarity, np.ndarray):
                             similarity = (
-                                similarity.item()
-                                if similarity.size == 1
-                                else similarity.mean()
+                                similarity.item() if similarity.size == 1 else similarity.mean()
                             )
 
                         if similarity > highest_similarity:
@@ -501,9 +484,7 @@ def process_frame(
 
                     # If very close to threshold, add it with a flag
                     if highest_similarity > distance_threshold * 0.9:
-                        print(
-                            f"Close match added: {best_name} ({highest_similarity:.4f})"
-                        )
+                        print(f"Close match added: {best_name} ({highest_similarity:.4f})")
                         matches.append((face, f"{best_name}?"))
     except Exception as e:
         print(f"Error processing frame: {e}")
@@ -665,9 +646,7 @@ def recognize_faces_in_videos(
                     timestamp_str = f"{minutes:02d}:{seconds:02d}"
 
                     # Draw boxes and labels on the frame
-                    labeled_frame = draw_boxes_and_labels(
-                        frame.copy(), matches, timestamp_str
-                    )
+                    labeled_frame = draw_boxes_and_labels(frame.copy(), matches, timestamp_str)
 
                     # Add to recognized frames
                     recognized_frames.append(labeled_frame)
@@ -741,18 +720,14 @@ def select_items(options, item_type):
     if indices.strip() == str(len(options) + 1):
         return options
 
-    selected_indices = [
-        int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()
-    ]
+    selected_indices = [int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()]
     selected_items = [options[i] for i in selected_indices if 0 <= i < len(options)]
     return selected_items
 
 
 def get_contestant_image(contestants_dir, contestant, contestant_info):
     """Retrieve the image path for a contestant."""
-    contestant_number = contestant_info.loc[
-        contestant_info["暱稱"] == contestant, "編號"
-    ].values[0]
+    contestant_number = contestant_info.loc[contestant_info["暱稱"] == contestant, "編號"].values[0]
     contestant_path = os.path.join(contestants_dir, str(contestant_number))
     image_paths = get_image_paths(contestant_path)
     if image_paths:
@@ -782,9 +757,7 @@ def main():
 
     # Check if ChromaDB is requested but not available
     if args.use_chromadb and not HAS_CHROMADB:
-        print(
-            "ERROR: ChromaDB is not installed. Use --use-chromadb only if ChromaDB is installed."
-        )
+        print("ERROR: ChromaDB is not installed. Use --use-chromadb only if ChromaDB is installed.")
         sys.exit(1)
 
     # Initialize ChromaDB if requested
@@ -807,11 +780,7 @@ def main():
 
     # Select videos
     all_videos = sorted(
-        [
-            f
-            for f in os.listdir(videos_dir)
-            if os.path.isfile(os.path.join(videos_dir, f))
-        ]
+        [f for f in os.listdir(videos_dir) if os.path.isfile(os.path.join(videos_dir, f))]
     )
     if args.specific_videos:
         selected_videos = args.specific_videos.split(",")
@@ -824,23 +793,17 @@ def main():
         embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
         if os.path.exists(embedding_file):
             embedding = np.load(embedding_file, allow_pickle=True)
-            known_embeddings[contestant] = [
-                embedding
-            ]  # Ensure embeddings are stored as a list
+            known_embeddings[contestant] = [embedding]  # Ensure embeddings are stored as a list
         else:
             print(f"Computing embedding for {contestant}...")
-            contestant_image = get_contestant_image(
-                contestants_dir, contestant, contestant_info
-            )
+            contestant_image = get_contestant_image(contestants_dir, contestant, contestant_info)
             if contestant_image is not None:
                 embeddings = compute_embeddings(
                     [contestant_image], use_augmentation=args.augmentation
                 )
                 if embeddings:
                     known_embeddings[contestant] = embeddings
-                    np.save(
-                        embedding_file, embeddings
-                    )  # Save as a list to maintain consistency
+                    np.save(embedding_file, embeddings)  # Save as a list to maintain consistency
                 else:
                     print(f"Could not compute embedding for {contestant}")
     print(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")

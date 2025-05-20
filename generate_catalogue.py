@@ -1,7 +1,7 @@
-import os
 import csv
-from collections import defaultdict
 import glob
+import os
+from collections import defaultdict
 
 # Paths
 CSV_PATH = "video_recognition_results.csv"
@@ -79,9 +79,7 @@ def generate_markdown(contestants, output_md, contestant_info):
         md_file.write("    </tr>\n")
         md_file.write("  </thead>\n")
         md_file.write("  <tbody>\n")
-        for nickname, info in sorted(
-            contestant_info.items(), key=lambda x: int(x[1]["編號"])
-        ):
+        for nickname, info in sorted(contestant_info.items(), key=lambda x: int(x[1]["編號"])):
             number = info.get("編號", "N/A")
             anchor = nickname.lower().replace(" ", "-")
             md_file.write("    <tr>\n")
@@ -125,9 +123,7 @@ def generate_markdown(contestants, output_md, contestant_info):
             for image in images:
                 relative_path = os.path.relpath(image, OUTPUT_FRAMES_DIR)
                 image_url = f"{IMAGE_URL_PREFIX}/{relative_path}"
-                md_file.write(
-                    f'<img src="{image_url}" alt="{name}" loading="lazy">\n\n'
-                )
+                md_file.write(f'<img src="{image_url}" alt="{name}" loading="lazy">\n\n')
             md_file.write("---\n\n")
 
 

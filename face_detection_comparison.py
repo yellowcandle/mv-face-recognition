@@ -1,11 +1,12 @@
-import cv2
-import mediapipe as mp
-import insightface
-import numpy as np
-import time
-from pathlib import Path
 import os
 import sys
+import time
+from pathlib import Path
+
+import cv2
+import insightface
+import mediapipe as mp
+import numpy as np
 import pandas as pd
 
 
@@ -39,9 +40,7 @@ class FaceDetectionComparison:
             return database
 
         if not self.contestant_info_path.exists():
-            print(
-                f"Warning: contestant info CSV not found at {self.contestant_info_path}"
-            )
+            print(f"Warning: contestant info CSV not found at {self.contestant_info_path}")
             return database
 
         # Load contestant information
@@ -72,9 +71,7 @@ class FaceDetectionComparison:
             # Look for jpg files in the contestant folder
             photo_files = list(folder.glob("*.jpg"))
             if not photo_files:
-                print(
-                    f"Warning: No jpg files found for contestant {nickname} ({contestant_id})"
-                )
+                print(f"Warning: No jpg files found for contestant {nickname} ({contestant_id})")
                 continue
 
             # Use the first jpg file found
@@ -85,9 +82,7 @@ class FaceDetectionComparison:
 
             faces = self.insightface_detector.get(img)
             if not faces:
-                print(
-                    f"Warning: No face found in reference image for {nickname} ({contestant_id})"
-                )
+                print(f"Warning: No face found in reference image for {nickname} ({contestant_id})")
                 continue
 
             # Store both embedding and contestant info
@@ -132,9 +127,7 @@ class FaceDetectionComparison:
                 h, w, _ = image.shape
                 x, y = int(bbox.xmin * w), int(bbox.ymin * h)
                 width, height = int(bbox.width * w), int(bbox.height * h)
-                faces.append(
-                    {"bbox": (x, y, width, height), "confidence": detection.score[0]}
-                )
+                faces.append({"bbox": (x, y, width, height), "confidence": detection.score[0]})
 
         return faces, processing_time
 
@@ -166,9 +159,7 @@ class FaceDetectionComparison:
             cv2.rectangle(img_copy, (x, y), (x + w, y + h), color, 2)
             # Add both confidence and identity
             label = f"{face['confidence']:.2f} {face.get('identity', 'Unknown')}"
-            cv2.putText(
-                img_copy, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
-            )
+            cv2.putText(img_copy, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         return img_copy
 
     def compare_on_image(self, image):
@@ -266,9 +257,7 @@ def main():
         if not ret:
             break
 
-        print(
-            f"\nProcessing frame {current_frame}/{total_frames} ({current_frame / fps:.1f}s)"
-        )
+        print(f"\nProcessing frame {current_frame}/{total_frames} ({current_frame / fps:.1f}s)")
 
         results = comparison.compare_on_image(frame)
         if results is None:

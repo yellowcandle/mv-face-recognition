@@ -5,15 +5,16 @@ This module provides a multi-tiered caching system that combines memory,
 disk, and database (optional) storage for efficient data retrieval.
 """
 
-import os
-import time
-import threading
 import hashlib
-import numpy as np
-import cv2
-from pathlib import Path
-from typing import Dict, Any, Optional, Union
+import os
 import pickle
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
+import cv2
+import numpy as np
 
 
 class CacheEntry:
@@ -340,10 +341,7 @@ class CacheManager:
 
             # Calculate cache efficiency
             total_requests = (
-                stats["memory_hits"]
-                + stats["disk_hits"]
-                + stats["db_hits"]
-                + stats["misses"]
+                stats["memory_hits"] + stats["disk_hits"] + stats["db_hits"] + stats["misses"]
             )
             if total_requests > 0:
                 stats["hit_rate"] = (
@@ -380,9 +378,7 @@ class CacheManager:
         """Get the disk path for a cache key."""
         return self.cache_dir / f"{key}.cache"
 
-    def _save_to_disk(
-        self, key: str, data: Any, metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def _save_to_disk(self, key: str, data: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Save data to disk cache."""
         disk_path = self._get_disk_path(key)
 
@@ -411,9 +407,7 @@ class CacheManager:
         # This will be implemented by specific database backends
         return None
 
-    def _store_in_db(
-        self, key: str, data: Any, metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def _store_in_db(self, key: str, data: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Store data in database cache."""
         # This will be implemented by specific database backends
         pass
@@ -432,9 +426,7 @@ class CacheManager:
 class EmbeddingCache(CacheManager):
     """Specialized cache for face embeddings."""
 
-    def __init__(
-        self, cache_dir: Optional[Union[str, Path]] = None, memory_size: int = 1000
-    ):
+    def __init__(self, cache_dir: Optional[Union[str, Path]] = None, memory_size: int = 1000):
         """
         Initialize the embedding cache.
 
@@ -490,9 +482,7 @@ class EmbeddingCache(CacheManager):
 class ImageCache(CacheManager):
     """Specialized cache for images."""
 
-    def __init__(
-        self, cache_dir: Optional[Union[str, Path]] = None, memory_size: int = 500
-    ):
+    def __init__(self, cache_dir: Optional[Union[str, Path]] = None, memory_size: int = 500):
         """
         Initialize the image cache.
 

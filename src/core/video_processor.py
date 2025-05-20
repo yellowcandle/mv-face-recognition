@@ -6,14 +6,15 @@ for face detection and recognition.
 """
 
 import os
-import cv2
-import time
-import numpy as np
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Union, Any, Callable
-from concurrent.futures import ThreadPoolExecutor
-import threading
 import queue
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import cv2
+import numpy as np
 
 
 class VideoReader:
@@ -124,10 +125,7 @@ class VideoReader:
             self.actual_frame_count += 1
 
             # Skip frames if needed
-            if (
-                self.frame_skip > 0
-                and self.actual_frame_count % (self.frame_skip + 1) != 0
-            ):
+            if self.frame_skip > 0 and self.actual_frame_count % (self.frame_skip + 1) != 0:
                 self.stats["frames_skipped"] += 1
                 continue
 
@@ -479,9 +477,7 @@ class VideoProcessor:
             writer = VideoWriter(
                 output_path=output_path,
                 width=reader.width if not reader.resize_width else reader.resize_width,
-                height=reader.height
-                if not reader.resize_height
-                else reader.resize_height,
+                height=reader.height if not reader.resize_height else reader.resize_height,
                 fps=reader.fps,
                 buffer_size=self.buffer_size,
             )
@@ -682,9 +678,7 @@ class VideoProcessor:
 
         # Calculate average faces per frame
         if stats["frames_processed"] > 0:
-            stats["avg_faces_per_frame"] = (
-                stats["faces_detected"] / stats["frames_processed"]
-            )
+            stats["avg_faces_per_frame"] = stats["faces_detected"] / stats["frames_processed"]
             stats["avg_recognized_per_frame"] = (
                 stats["faces_recognized"] / stats["frames_processed"]
             )

@@ -1,5 +1,6 @@
-import yt_dlp
 import os
+
+import yt_dlp
 
 # List of videos to download
 url_list = {

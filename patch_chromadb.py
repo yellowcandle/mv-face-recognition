@@ -14,13 +14,13 @@ Usage:
 Run this script to patch the issues in the ChromaDB backend.
 """
 
+import logging
 import os
+import shutil
 import sys
 import time
-import shutil
-from pathlib import Path
 import traceback
-import logging
+from pathlib import Path
 
 # Set up project root path
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -122,9 +122,7 @@ def fix_embedding_dimensions():
         logger.info(f"Current embedding dimension: {dims}")
 
         if dims == 512:
-            logger.info(
-                "Embeddings are already 512-dimensional, no dimension fix needed"
-            )
+            logger.info("Embeddings are already 512-dimensional, no dimension fix needed")
             return True
 
         # Create a new collection with a temporary name
@@ -132,9 +130,7 @@ def fix_embedding_dimensions():
 
         # Delete existing temp collection if it exists
         if temp_collection_name in collection_names:
-            logger.info(
-                f"Deleting existing temporary collection {temp_collection_name}"
-            )
+            logger.info(f"Deleting existing temporary collection {temp_collection_name}")
             client.delete_collection(temp_collection_name)
 
         # Create new collection
@@ -144,9 +140,7 @@ def fix_embedding_dimensions():
             metadata={"dimensions": 512},  # Set correct dimension
         )
 
-        logger.info(
-            f"Created temporary collection '{temp_collection_name}' with 512 dimensions"
-        )
+        logger.info(f"Created temporary collection '{temp_collection_name}' with 512 dimensions")
 
         # Prepare data for the new collection
         padded_embeddings = []
@@ -315,9 +309,7 @@ def fix_data_type_issues():
                 "# Dimension mismatch already handled above",
             )
 
-            logger.info(
-                "Updated query_embedding method to use proper dimension handling"
-            )
+            logger.info("Updated query_embedding method to use proper dimension handling")
 
         # 5. Fix _get_collection_dim method to handle errors
         if "def _get_collection_dim" in content:
@@ -422,9 +414,7 @@ def fix_duplicate_embeddings():
 
         # Delete existing temp collection if it exists
         if temp_collection_name in collection_names:
-            logger.info(
-                f"Deleting existing temporary collection {temp_collection_name}"
-            )
+            logger.info(f"Deleting existing temporary collection {temp_collection_name}")
             client.delete_collection(temp_collection_name)
 
         # Create new collection
@@ -443,9 +433,7 @@ def fix_duplicate_embeddings():
             documents=unique_data["documents"],
         )
 
-        logger.info(
-            f"Added {len(unique_data['ids'])} unique embeddings to temporary collection"
-        )
+        logger.info(f"Added {len(unique_data['ids'])} unique embeddings to temporary collection")
 
         # Rename collections
         backup_name = f"{COLLECTION_NAME}_dup_backup"

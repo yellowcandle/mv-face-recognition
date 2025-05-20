@@ -14,22 +14,22 @@ Options:
     --force: Force re-download of models even if they exist
 """
 
+import argparse
+import hashlib
+import logging
 import os
 import sys
-import argparse
 import urllib.request
-import hashlib
 from pathlib import Path
-import logging
 
 try:
     from rich.console import Console
     from rich.progress import (
-        Progress,
         BarColumn,
         DownloadColumn,
-        TransferSpeedColumn,
+        Progress,
         TimeRemainingColumn,
+        TransferSpeedColumn,
     )
 
     HAS_RICH = True
@@ -37,9 +37,7 @@ except ImportError:
     HAS_RICH = False
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Console for rich output
@@ -127,9 +125,7 @@ class DownloadProgressBar:
                 TransferSpeedColumn(),
                 TimeRemainingColumn(),
             )
-            self.task_id = self.progress.add_task(
-                f"Downloading {filename}", total=total_size
-            )
+            self.task_id = self.progress.add_task(f"Downloading {filename}", total=total_size)
             self.progress.start()
         else:
             self.progress = None
@@ -157,9 +153,7 @@ class DownloadProgressBar:
             sys.stdout.write("\n")
 
 
-def download_file(
-    url, local_path, expected_md5=None, expected_size=None, backup_url=None
-):
+def download_file(url, local_path, expected_md5=None, expected_size=None, backup_url=None):
     """Download a file with progress bar."""
     urls_to_try = [url]
     if backup_url:
@@ -186,9 +180,7 @@ def download_file(
 
             with urllib.request.urlopen(request, timeout=30) as response:
                 # Get file size from header or use expected size
-                file_size = int(
-                    response.info().get("Content-Length", expected_size or 0)
-                )
+                file_size = int(response.info().get("Content-Length", expected_size or 0))
 
                 # Create progress bar
                 progress = DownloadProgressBar(os.path.basename(local_path), file_size)
@@ -217,17 +209,14 @@ def download_file(
                     # Check file size as secondary verification
                     actual_size = os.path.getsize(local_path)
                     if (
-                        expected_size
-                        and abs(actual_size - expected_size) > expected_size * 0.1
+                        expected_size and abs(actual_size - expected_size) > expected_size * 0.1
                     ):  # 10% tolerance
                         logger.error(
                             f"Size mismatch too large: expected {expected_size}, got {actual_size}"
                         )
                         continue  # Try next URL
                     else:
-                        logger.info(
-                            "File size check passed, accepting file despite MD5 mismatch"
-                        )
+                        logger.info("File size check passed, accepting file despite MD5 mismatch")
                         return True
 
                 logger.info(f"Successfully downloaded from {current_url}")
@@ -265,9 +254,7 @@ def download_models(force=False):
                     "[green]All required models already exist. Use --force to re-download.[/green]"
                 )
             else:
-                logger.info(
-                    "All required models already exist. Use --force to re-download."
-                )
+                logger.info("All required models already exist. Use --force to re-download.")
             return True
 
     success = True
@@ -275,11 +262,7 @@ def download_models(force=False):
         model_path = models_dir / model_name
 
         # Check if model exists - we'll accept it even if MD5 doesn't match
-        if (
-            not force
-            and os.path.exists(model_path)
-            and os.path.getsize(model_path) > 1000
-        ):
+        if not force and os.path.exists(model_path) and os.path.getsize(model_path) > 1000:
             actual_md5 = calculate_md5(model_path)
             if actual_md5 == model_info["md5"]:
                 if HAS_RICH:
@@ -373,9 +356,7 @@ def download_models(force=False):
                             f"[yellow]![/yellow] Download failed but using existing {model_info['description']}"
                         )
                     else:
-                        logger.warning(
-                            f"Download failed but using existing {model_name}"
-                        )
+                        logger.warning(f"Download failed but using existing {model_name}")
                 elif not found:
                     success = False
                     if HAS_RICH:
@@ -397,9 +378,7 @@ def download_models(force=False):
                 else:
                     success = False
                     if HAS_RICH:
-                        console.print(
-                            f"[red]✗[/red] Failed to find {model_info['description']}"
-                        )
+                        console.print(f"[red]✗[/red] Failed to find {model_info['description']}")
                     else:
                         logger.error(f"Failed to find {model_name}")
 
@@ -408,12 +387,8 @@ def download_models(force=False):
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(
-        description="Download models for face recognition system"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Force re-download of models"
-    )
+    parser = argparse.ArgumentParser(description="Download models for face recognition system")
+    parser.add_argument("--force", action="store_true", help="Force re-download of models")
     args = parser.parse_args()
 
     if HAS_RICH:

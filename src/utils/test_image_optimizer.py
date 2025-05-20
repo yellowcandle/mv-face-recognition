@@ -1,19 +1,20 @@
+import concurrent.futures
 import os
-import cv2
-import numpy as np
 import time
 from pathlib import Path
-from typing import List, Dict, Optional, Union
-import concurrent.futures
+from typing import Dict, List, Optional, Union
+
+import cv2
+import numpy as np
 
 from src.detection.optimized_detector import OptimizedFaceDetector
 from src.recognition.optimized_recognizer import OptimizedFaceRecognizer
 from src.utils.image_utils import (
+    create_composite_image,
+    enhance_test_image,
+    get_all_test_images,
     load_image,
     save_image,
-    enhance_test_image,
-    create_composite_image,
-    get_all_test_images,
 )
 
 
@@ -39,9 +40,7 @@ class TestImageOptimizer:
             cache_dir: Directory for caching (default is project_root/cache)
             max_workers: Maximum number of worker threads
         """
-        self.project_root = Path(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        )
+        self.project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         self.test_dir = self.project_root / "source" / "images" / "test"
 
         # Set up cache directory
@@ -100,12 +99,9 @@ class TestImageOptimizer:
         print(f"Preprocessing {len(test_files)} test images...")
 
         # Process images in parallel
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
-                executor.submit(self._preprocess_single_image, img_path)
-                for img_path in test_files
+                executor.submit(self._preprocess_single_image, img_path) for img_path in test_files
             ]
 
             # Wait for all to complete
@@ -139,9 +135,7 @@ class TestImageOptimizer:
             enhanced = enhance_test_image(img)
 
             # Detect faces
-            face_bboxes = self.detector.detect_faces(
-                enhanced, force_detection=True, use_cache=True
-            )
+            face_bboxes = self.detector.detect_faces(enhanced, force_detection=True, use_cache=True)
 
             # Cache the detection results
             img_id = f"test_{img_path.stem}"
@@ -165,26 +159,20 @@ class TestImageOptimizer:
 
                             # Save embedding
                             face_id = f"{img_id}_face_{i}"
-                            self.recognizer.save_embedding(
-                                face_id, embedding, save_to_disk=True
-                            )
+                            self.recognizer.save_embedding(face_id, embedding, save_to_disk=True)
 
                 # Save the updated cache
                 if hasattr(self.recognizer, "_save_metadata_cache"):
                     self.recognizer._save_metadata_cache()
 
-            print(
-                f"Preprocessed test image: {img_path.name} - found {len(face_bboxes)} faces"
-            )
+            print(f"Preprocessed test image: {img_path.name} - found {len(face_bboxes)} faces")
             return True
 
         except Exception as e:
             print(f"Error preprocessing {img_path}: {str(e)}")
             return False
 
-    def process_test_images(
-        self, output_dir: Optional[Union[str, Path]] = None
-    ) -> List[Dict]:
+    def process_test_images(self, output_dir: Optional[Union[str, Path]] = None) -> List[Dict]:
         """
         Process all test images with recognition.
 
@@ -216,9 +204,7 @@ class TestImageOptimizer:
         all_results = []
 
         # Process images in parallel
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
                 executor.submit(
                     self._process_single_test_image,
@@ -274,9 +260,7 @@ class TestImageOptimizer:
                     original_path = img_path.parent / "original.jpeg"
                     if original_path.exists():
                         comparison_path = output_dir / f"comparison{img_path.suffix}"
-                        create_composite_image(
-                            original_path, output_path, comparison_path
-                        )
+                        create_composite_image(original_path, output_path, comparison_path)
 
             return results
 
@@ -284,9 +268,7 @@ class TestImageOptimizer:
             print(f"Error processing {img_path}: {str(e)}")
             return []
 
-    def _create_annotated_image(
-        self, image: np.ndarray, results: List[Dict]
-    ) -> np.ndarray:
+    def _create_annotated_image(self, image: np.ndarray, results: List[Dict]) -> np.ndarray:
         """Create an annotated image with face detection and recognition results"""
         annotated = image.copy()
 
@@ -340,10 +322,7 @@ class TestImageOptimizer:
             if original_img_id in self.recognizer.metadata_cache:
                 # Check for precomputed embeddings
                 for key, value in self.recognizer.metadata_cache.items():
-                    if (
-                        key.startswith(f"{original_img_id}_face_")
-                        and "embedding" in value
-                    ):
+                    if key.startswith(f"{original_img_id}_face_") and "embedding" in value:
                         # Use as a known embedding with an arbitrary ID
                         person_id = f"Person_{key.split('_')[-1]}"
                         known_embeddings[person_id] = [value["embedding"]]
@@ -374,9 +353,7 @@ class TestImageOptimizer:
 
                             # Also save to cache
                             face_id = f"test_original_face_{i}"
-                            self.recognizer.save_embedding(
-                                face_id, embedding, save_to_disk=True
-                            )
+                            self.recognizer.save_embedding(face_id, embedding, save_to_disk=True)
 
         return known_embeddings
 

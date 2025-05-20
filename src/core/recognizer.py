@@ -5,15 +5,16 @@ This module provides a base recognizer interface and implementations
 for different face recognition methods.
 """
 
+import hashlib
 import os
-import cv2
-import numpy as np
 import time
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import cv2
+import numpy as np
 
 from src.core.detector import FaceDetector
 from src.utils.cache import EmbeddingCache
@@ -54,9 +55,7 @@ class FaceRecognizer(ABC):
         pass
 
     @abstractmethod
-    def compute_similarity(
-        self, embedding1: np.ndarray, embedding2: np.ndarray
-    ) -> float:
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Compute similarity between two face embeddings.
 
@@ -126,9 +125,7 @@ class StandardFaceRecognizer(FaceRecognizer):
         self._max_cache_size = embedding_cache_size
 
         # Path setup
-        self.project_root = Path(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        )
+        self.project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         self.models_dir = self.project_root / "models"
 
         # Cache directory setup
@@ -211,10 +208,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                 )
 
                 # Try to find the model from the specified path first
-                if (
-                    os.path.exists(self.model_path)
-                    and os.path.getsize(self.model_path) > 1000
-                ):
+                if os.path.exists(self.model_path) and os.path.getsize(self.model_path) > 1000:
                     print(f"Using specified model: {self.model_path}")
                     model_found = True
                 else:
@@ -230,9 +224,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                         model_found = True
                     else:
                         # Try alternative recognition models if the specific one wasn't found
-                        recognition_models = model_finder.find_models(
-                            ["face_recognition"]
-                        )
+                        recognition_models = model_finder.find_models(["face_recognition"])
                         if recognition_models:
                             # Use the first recognition model found
                             first_model_name = next(iter(recognition_models.keys()))
@@ -243,9 +235,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                             model_found = False
 
                 if not model_found:
-                    raise FileNotFoundError(
-                        "Could not find a suitable face recognition model"
-                    )
+                    raise FileNotFoundError("Could not find a suitable face recognition model")
             except ImportError:
                 # ModelFinder not available, fall back to the old behavior
                 if not os.path.exists(self.model_path):
@@ -254,15 +244,11 @@ class StandardFaceRecognizer(FaceRecognizer):
                 # Check model file size
                 file_size = os.path.getsize(self.model_path)
                 if file_size < 1000:  # Too small to be a valid model
-                    raise ValueError(
-                        f"Model file too small ({file_size} bytes), likely corrupted"
-                    )
+                    raise ValueError(f"Model file too small ({file_size} bytes), likely corrupted")
 
             # Set execution providers with optimized settings
             sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = (
-                ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            )
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             sess_options.intra_op_num_threads = min(4, os.cpu_count() or 1)
 
             # Get available providers
@@ -278,9 +264,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                 providers.append("CUDAExecutionProvider")
             providers.append("CPUExecutionProvider")
 
-            print(
-                f"Applied providers: {providers}, with options: {{'CPUExecutionProvider': {{}}}}"
-            )
+            print(f"Applied providers: {providers}, with options: {{'CPUExecutionProvider': {{}}}}")
 
             # Try to load the model
             try:
@@ -303,9 +287,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                         and os.path.isfile(fallback_path)
                         and fallback_path != self.model_path
                     ):
-                        print(
-                            f"Primary model failed, trying fallback model: {fallback_path}"
-                        )
+                        print(f"Primary model failed, trying fallback model: {fallback_path}")
                         try:
                             self.model_path = fallback_path
                             self.session = ort.InferenceSession(
@@ -316,9 +298,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                             model_loaded = True
                             break
                         except Exception as fallback_error:
-                            print(
-                                f"Fallback model {model_name} also failed: {str(fallback_error)}"
-                            )
+                            print(f"Fallback model {model_name} also failed: {str(fallback_error)}")
 
                 if not model_loaded:
                     # Try one more time to find and load a model using ModelFinder
@@ -329,9 +309,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                             project_root=str(self.project_root),
                             cache_dir=str(self.cache_dir),
                         )
-                        recognition_models = model_finder.find_models(
-                            ["face_recognition"]
-                        )
+                        recognition_models = model_finder.find_models(["face_recognition"])
 
                         if recognition_models:
                             for model_name, model_path in recognition_models.items():
@@ -346,9 +324,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                                     model_loaded = True
                                     break
                                 except Exception as alt_error:
-                                    print(
-                                        f"Failed to load {model_name}: {str(alt_error)}"
-                                    )
+                                    print(f"Failed to load {model_name}: {str(alt_error)}")
                     except ImportError:
                         pass
 
@@ -402,15 +378,11 @@ class StandardFaceRecognizer(FaceRecognizer):
                 )
                 # Extract model name from path or use a default recognition model
                 model_name = (
-                    os.path.basename(self.model_path)
-                    if self.model_path
-                    else "arcface_r50.onnx"
+                    os.path.basename(self.model_path) if self.model_path else "arcface_r50.onnx"
                 )
 
                 # Force re-download
-                found_path = model_finder.find_model(
-                    model_name, download_if_missing=True
-                )
+                found_path = model_finder.find_model(model_name, download_if_missing=True)
                 if found_path:
                     print(f"Downloaded model: {found_path}")
                     self.model_path = found_path
@@ -433,9 +405,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                     self.input_name = self.session.get_inputs()[0].name
                     self.output_name = self.session.get_outputs()[0].name
 
-                    print(
-                        f"Successfully initialized model after download: {self.model_path}"
-                    )
+                    print(f"Successfully initialized model after download: {self.model_path}")
                     return
             except ImportError:
                 # ModelFinder not available, use download_models.py
@@ -465,9 +435,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                 import onnxruntime as ort
 
                 sess_options = ort.SessionOptions()
-                sess_options.graph_optimization_level = (
-                    ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-                )
+                sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
                 self.session = ort.InferenceSession(
                     self.model_path,
@@ -478,9 +446,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                 self.input_name = self.session.get_inputs()[0].name
                 self.output_name = self.session.get_outputs()[0].name
 
-                print(
-                    f"Successfully initialized model after download: {self.model_path}"
-                )
+                print(f"Successfully initialized model after download: {self.model_path}")
 
             except Exception as download_error:
                 # If still failing, raise the original error
@@ -505,10 +471,7 @@ class StandardFaceRecognizer(FaceRecognizer):
 
         # Resize to model's input size
         # Use INTER_AREA for downsampling (better quality and speed)
-        if (
-            face_img.shape[0] > self.input_height
-            or face_img.shape[1] > self.input_width
-        ):
+        if face_img.shape[0] > self.input_height or face_img.shape[1] > self.input_width:
             face_img = cv2.resize(
                 face_img,
                 (self.input_width, self.input_height),
@@ -598,9 +561,7 @@ class StandardFaceRecognizer(FaceRecognizer):
             # Return a zero vector on error
             return np.zeros(512, dtype=np.float32)
 
-    def compute_similarity(
-        self, embedding1: np.ndarray, embedding2: np.ndarray
-    ) -> float:
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Compute similarity between two face embeddings.
 
@@ -652,9 +613,7 @@ class StandardFaceRecognizer(FaceRecognizer):
         # Process each detected face
         if self.use_batch_processing and len(face_bboxes) > 1:
             # Parallel processing for multiple faces
-            batch_results = self._process_faces_in_parallel(
-                image, face_bboxes, known_embeddings
-            )
+            batch_results = self._process_faces_in_parallel(image, face_bboxes, known_embeddings)
             results.extend(batch_results)
         else:
             # Sequential processing for single face
@@ -678,9 +637,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                     continue
 
                 # Process the face
-                result = self._process_single_face(
-                    face_img, face_id, bbox, known_embeddings
-                )
+                result = self._process_single_face(face_img, face_id, bbox, known_embeddings)
                 if result:
                     results.append(result)
 
@@ -776,17 +733,9 @@ class StandardFaceRecognizer(FaceRecognizer):
             for person_id, embeddings_list in known_embeddings.items():
                 for known_embedding in embeddings_list:
                     # Convert to proper format if needed
-                    if (
-                        isinstance(known_embedding, np.ndarray)
-                        and known_embedding.size > 0
-                    ):
-                        similarity = self.compute_similarity(
-                            face_embedding, known_embedding
-                        )
-                        if (
-                            similarity > self.similarity_threshold
-                            and similarity > best_score
-                        ):
+                    if isinstance(known_embedding, np.ndarray) and known_embedding.size > 0:
+                        similarity = self.compute_similarity(face_embedding, known_embedding)
+                        if similarity > self.similarity_threshold and similarity > best_score:
                             best_match = person_id
                             best_score = similarity
 
@@ -828,11 +777,7 @@ class StandardFaceRecognizer(FaceRecognizer):
 
         # 2. Check in contestant directory
         embedding_path = (
-            self.project_root
-            / "source"
-            / "photo"
-            / "contestants"
-            / f"{face_id}_embedding.npy"
+            self.project_root / "source" / "photo" / "contestants" / f"{face_id}_embedding.npy"
         )
         if embedding_path.exists():
             try:
@@ -870,11 +815,7 @@ class StandardFaceRecognizer(FaceRecognizer):
         # Save to contestant directory
         try:
             embedding_path = (
-                self.project_root
-                / "source"
-                / "photo"
-                / "contestants"
-                / f"{face_id}_embedding.npy"
+                self.project_root / "source" / "photo" / "contestants" / f"{face_id}_embedding.npy"
             )
             os.makedirs(os.path.dirname(embedding_path), exist_ok=True)
             np.save(str(embedding_path), embedding)
@@ -926,17 +867,13 @@ class StandardFaceRecognizer(FaceRecognizer):
 
         # Calculate average processing time
         if stats["faces_processed"] > 0:
-            stats["avg_processing_time"] = (
-                stats["processing_time"] / stats["faces_processed"]
-            )
+            stats["avg_processing_time"] = stats["processing_time"] / stats["faces_processed"]
         else:
             stats["avg_processing_time"] = 0.0
 
         # Calculate recognition rate
         if stats["faces_processed"] > 0:
-            stats["recognition_rate"] = (
-                stats["matches_found"] / stats["faces_processed"]
-            )
+            stats["recognition_rate"] = stats["matches_found"] / stats["faces_processed"]
         else:
             stats["recognition_rate"] = 0.0
 

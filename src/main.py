@@ -18,13 +18,14 @@ Example:
 
 import os
 import sys
-from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Any
-import pandas as pd
-import numpy as np
-import cv2
-import typer
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import cv2
+import numpy as np
+import pandas as pd
+import typer
 
 # Set up project root and importable path
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
@@ -32,19 +33,18 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import core components
+# Import backends
+from src.backends.standard_backend import StandardBackend
 from src.core.detector import FaceDetector
 from src.core.recognizer import StandardFaceRecognizer
 from src.core.video_processor import VideoProcessor
 from src.utils.visualization import (
+    StatusDisplay,
     display_banner,
     display_results,
-    display_stats,
     display_selection_menu,
-    StatusDisplay,
+    display_stats,
 )
-
-# Import backends
-from src.backends.standard_backend import StandardBackend
 
 # Check for ChromaDB availability
 try:
@@ -56,10 +56,10 @@ except ImportError:
 
 # Check for Rich availability
 try:
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-    from rich.prompt import Confirm
     from rich import print as rich_print
+    from rich.console import Console
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+    from rich.prompt import Confirm
 
     HAS_RICH = True
     console = Console()
@@ -193,9 +193,7 @@ def main(
     """
     # Display banner
     if HAS_RICH:
-        display_banner(
-            "Unified Face Recognition System", "Process videos to recognize faces"
-        )
+        display_banner("Unified Face Recognition System", "Process videos to recognize faces")
     else:
         print("\n=== Unified Face Recognition System ===")
         print("Process videos to recognize faces\n")
@@ -255,9 +253,7 @@ def main(
         selected_contestants = all_contestants
     else:
         if interactive:
-            selected_contestants = display_selection_menu(
-                all_contestants, "contestants"
-            )
+            selected_contestants = display_selection_menu(all_contestants, "contestants")
         else:
             selected_contestants = all_contestants
 
@@ -317,13 +313,9 @@ def main(
 
         # Create output paths
         video_basename = os.path.splitext(video_file)[0]
-        frames_output_dir = (
-            paths["frames_dir"] / video_basename if save_frames else None
-        )
+        frames_output_dir = paths["frames_dir"] / video_basename if save_frames else None
         video_output_path = (
-            paths["outputs_dir"] / f"{video_basename}_labeled.mp4"
-            if save_video
-            else None
+            paths["outputs_dir"] / f"{video_basename}_labeled.mp4" if save_video else None
         )
 
         # Process the video
@@ -331,9 +323,7 @@ def main(
             # Create processor with appropriate callbacks
             processor = VideoProcessor(
                 detector_fn=detector.detect_faces,
-                recognition_fn=lambda frame: backend.identify_faces(
-                    frame, known_embeddings
-                ),
+                recognition_fn=lambda frame: backend.identify_faces(frame, known_embeddings),
                 frame_skip=frame_skip,
                 buffer_size=10,
                 save_frames=save_frames,
@@ -451,9 +441,7 @@ def initialize_components(
         if not optimize_performance
         else 0.4,  # Higher threshold = fewer detections but faster
         model_size=(320, 320),
-        tracking_method=FaceDetector.TRACKING_KCF
-        if use_tracking
-        else FaceDetector.TRACKING_NONE,
+        tracking_method=FaceDetector.TRACKING_KCF if use_tracking else FaceDetector.TRACKING_NONE,
         tracking_duration=30 if use_tracking else 0,
         skip_frames=skip_frames
         if use_tracking
@@ -470,9 +458,7 @@ def initialize_components(
         use_quantized_model=True,  # Always use quantized model for performance
         cache_dir=str(cache_dir),
         max_workers=max_workers,
-        embedding_cache_size=1024
-        if optimize_performance
-        else 512,  # Larger cache if optimizing
+        embedding_cache_size=1024 if optimize_performance else 512,  # Larger cache if optimizing
     )
 
     # Initialize ChromaDB backend with performance optimizations

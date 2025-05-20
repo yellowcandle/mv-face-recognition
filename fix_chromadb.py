@@ -11,15 +11,13 @@ Usage:
     python fix_chromadb.py
 """
 
-import sys
-import shutil
 import logging
+import shutil
+import sys
 from pathlib import Path
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 logger = logging.getLogger("chromadb_fix")
 
@@ -173,14 +171,9 @@ def fix_data_types():
                     indentation = len(first_line) - len(first_line.lstrip())
                     # Add indentation to the dimension handler
                     indented_handler = "\n".join(
-                        " " * indentation + line
-                        for line in dimension_handler.split("\n")
+                        " " * indentation + line for line in dimension_handler.split("\n")
                     )
-                    content = (
-                        content[:insert_point]
-                        + indented_handler
-                        + content[insert_point:]
-                    )
+                    content = content[:insert_point] + indented_handler + content[insert_point:]
                     logger.info("Added dimension mismatch handler method")
 
         # Fix query_embedding to use the dimension handler
@@ -196,11 +189,7 @@ def fix_data_types():
                     truncation_end = content.find("\n", truncation_end + 1)
                     # Replace with our handler
                     replacement = "            # Use dimension handler\n            embedding_list = self._handle_dimension_mismatch(embedding_list, collection_dim)"
-                    content = (
-                        content[:dim_check_start]
-                        + replacement
-                        + content[truncation_end:]
-                    )
+                    content = content[:dim_check_start] + replacement + content[truncation_end:]
                     logger.info("Fixed dimension handling in query_embedding method")
 
         # Write the updated content back to the file
@@ -252,27 +241,21 @@ def fix_core_recognizer():
 
                     # Add type checking code
                     type_check_code = (
-                        " " * indentation
-                        + "# Ensure input is float32 (required by ONNX)\n"
+                        " " * indentation + "# Ensure input is float32 (required by ONNX)\n"
                     )
                     type_check_code += (
                         " " * indentation
                         + "if face_img is not None and face_img.dtype != np.float32:\n"
                     )
                     type_check_code += (
-                        " " * indentation
-                        + "    face_img = face_img.astype(np.float32)\n\n"
+                        " " * indentation + "    face_img = face_img.astype(np.float32)\n\n"
                     )
 
                     # Insert the code at the start of the method body
                     content = (
-                        content[:method_body_start]
-                        + type_check_code
-                        + content[method_body_start:]
+                        content[:method_body_start] + type_check_code + content[method_body_start:]
                     )
-                    logger.info(
-                        "Added data type checking to compute_embedding in core recognizer"
-                    )
+                    logger.info("Added data type checking to compute_embedding in core recognizer")
 
         # Write the updated content back to the file
         with open(recognizer_path, "w") as f:

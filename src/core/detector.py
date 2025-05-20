@@ -6,15 +6,15 @@ detection methods and optimization strategies.
 """
 
 import os
+import sys  # Added
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import cv2
 import numpy as np
-import time
-import threading
-from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor
-import sys # Added
-import onnxruntime # Added
+import onnxruntime  # Added
 
 try:
     from insightface.app import FaceAnalysis
@@ -52,7 +52,7 @@ class FaceDetector:
     BACKEND_MEDIAPIPE = "mediapipe"
 
     # Tracking modes
-    TRACKING_NONE = "none" # Kept for now, might be repurposed or removed later
+    TRACKING_NONE = "none"  # Kept for now, might be repurposed or removed later
 
     def __init__(
         self,
@@ -63,9 +63,7 @@ class FaceDetector:
         cache_enabled: bool = True,
         max_workers: int = 4,
         device: str = "auto",
-        recognition_model_name: Optional[
-            str
-        ] = None,  # Added for InsightFace model selection
+        recognition_model_name: Optional[str] = None,  # Added for InsightFace model selection
     ):
         """
         Initialize the face detector.
@@ -98,11 +96,12 @@ class FaceDetector:
         self.last_detection_time = 0
         # Variables for optical flow tracking
         self.prev_gray = None
-        self.prev_tracked_objects = [] # Will store (point, width, height) tuples
-        self.lk_params = dict(winSize=(15, 15),
-                              maxLevel=2,
-                              criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
-
+        self.prev_tracked_objects = []  # Will store (point, width, height) tuples
+        self.lk_params = dict(
+            winSize=(15, 15),
+            maxLevel=2,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+        )
 
         # Set up thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -131,10 +130,10 @@ class FaceDetector:
         if device == "auto":
             if sys.platform == "darwin":
                 # Check if MPS is available in onnxruntime providers
-                if 'MPSExecutionProvider' in onnxruntime.get_available_providers():
+                if "MPSExecutionProvider" in onnxruntime.get_available_providers():
                     return "mps"
             # Check for CUDA
-            if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+            if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
                 return "cuda"
             return "cpu"
         return device.lower()
@@ -196,22 +195,22 @@ class FaceDetector:
         # Initialize with appropriate providers
         providers_config = []
         if self.device == "mps" and sys.platform == "darwin":
-            providers_config.append('MPSExecutionProvider')
+            providers_config.append("MPSExecutionProvider")
         elif self.device == "cuda":
             providers_config.append("CUDAExecutionProvider")
-        
+
         # CoreMLExecutionProvider can be an option for Mac if MPS isn't preferred or available for a model
         # if sys.platform == "darwin" and 'CoreMLExecutionProvider' not in providers_config and 'MPSExecutionProvider' not in providers_config:
         #     providers_config.append('CoreMLExecutionProvider')
 
-        providers_config.append("CPUExecutionProvider") # Always have CPU as fallback
+        providers_config.append("CPUExecutionProvider")  # Always have CPU as fallback
 
         # Remove duplicates just in case, maintaining order
         final_providers = []
         for p in providers_config:
             if p not in final_providers:
                 final_providers.append(p)
-        
+
         print(f"Attempting to initialize InsightFace with providers: {final_providers}")
 
         # Pass recognition_model_name to FaceAnalysis if provided
@@ -219,41 +218,46 @@ class FaceDetector:
             self.detector = FaceAnalysis(
                 name=self.recognition_model_name, providers=final_providers
             )
-            print(
-                f"Initialized InsightFace with recognition model: {self.recognition_model_name}"
-            )
+            print(f"Initialized InsightFace with recognition model: {self.recognition_model_name}")
         else:
             self.detector = FaceAnalysis(providers=final_providers)
             print("Initialized InsightFace with default recognition model.")
-        
+
         # Access providers from the detection model (det_model)
         # The FaceAnalysis object itself might not directly expose a 'providers' attribute
         # in the way it's being accessed. The actual ONNX execution providers are
         # associated with the loaded models (e.g., detection model, recognition model).
-        if hasattr(self.detector, 'det_model') and hasattr(self.detector.det_model, 'get_providers'):
+        if hasattr(self.detector, "det_model") and hasattr(
+            self.detector.det_model, "get_providers"
+        ):
             actual_providers = self.detector.det_model.get_providers()
             # The get_providers() method returns a list of strings, where each string
             # might be like 'CUDAExecutionProvider_shared' or 'CPUExecutionProvider'.
             # We can simplify this for display.
-            simple_providers = [p.split('_')[0] for p in actual_providers]
+            simple_providers = [p.split("_")[0] for p in actual_providers]
             print(f"InsightFace detector (det_model) actually using providers: {simple_providers}")
         else:
             # Fallback or if the structure is different than expected
-            print("InsightFace detector: Could not determine specific providers for det_model. Using configured list.")
-
+            print(
+                "InsightFace detector: Could not determine specific providers for det_model. Using configured list."
+            )
 
         # Determine ctx_id based on device for InsightFace's prepare method
         # ctx_id is primarily for CUDA. For MPS/CoreML, the provider list is key.
         # If MPS is used, ctx_id should typically be -1 (CPU) as MPS handles its own device management.
-        ctx_id = -1 # Default to CPU context for prepare, letting providers handle device
+        ctx_id = -1  # Default to CPU context for prepare, letting providers handle device
         # Check against the *configured* providers or a simplified list from actual_providers if available
         # For simplicity, we'll check against `final_providers` which was used for initialization.
         # A more robust check would involve inspecting `actual_providers` if the above block successfully got them.
-        if self.device == "cuda" and "CUDAExecutionProvider" in final_providers: # Check against configured providers
-            ctx_id = 0 # Use GPU context if CUDA is available and selected
+        if (
+            self.device == "cuda" and "CUDAExecutionProvider" in final_providers
+        ):  # Check against configured providers
+            ctx_id = 0  # Use GPU context if CUDA is available and selected
 
         self.detector.prepare(ctx_id=ctx_id, det_size=self.model_size)
-        print(f"Initialized InsightFace detector. Target device: {self.device}, Effective context_id for prepare: {ctx_id}")
+        print(
+            f"Initialized InsightFace detector. Target device: {self.device}, Effective context_id for prepare: {ctx_id}"
+        )
 
     def _init_mediapipe_detector(self):
         """Initialize MediaPipe face detector."""
@@ -274,9 +278,7 @@ class FaceDetector:
             min_detection_confidence=self.confidence_threshold,
         )
 
-        print(
-            f"Initialized MediaPipe face detector with model selection: {model_selection}"
-        )
+        print(f"Initialized MediaPipe face detector with model selection: {model_selection}")
 
     def detect_faces(
         self, image: np.ndarray, force_detection: bool = False, use_cache: bool = True
@@ -330,8 +332,12 @@ class FaceDetector:
         current_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Decide whether to run detection or tracking
-        run_full_detection = True # Default to full detection
-        if not force_detection and self.skip_frames > 0 and (self.frame_count % (self.skip_frames + 1) != 0):
+        run_full_detection = True  # Default to full detection
+        if (
+            not force_detection
+            and self.skip_frames > 0
+            and (self.frame_count % (self.skip_frames + 1) != 0)
+        ):
             if self.prev_gray is not None and self.prev_tracked_objects:
                 run_full_detection = False
 
@@ -342,11 +348,12 @@ class FaceDetector:
             # If tracking fails or yields no results, fall back to full detection
             if not detection_result:
                 run_full_detection = True
-        
+
         if run_full_detection:
             # Run full face detection
             detection_result = self._detect_faces_with_backend(
-                resized_image, scale_factor # Use resized_image for detection
+                resized_image,
+                scale_factor,  # Use resized_image for detection
             )
             self.last_detection_time = time.time()
 
@@ -358,12 +365,8 @@ class FaceDetector:
                 and isinstance(detection_result[0], InsightFaceObject)
             ):
                 # Bboxes from InsightFace are already scaled if original image was larger
-                bboxes_for_tracking = [
-                    f.bbox.astype(int).tolist() for f in detection_result
-                ]
-            elif detection_result and all(
-                isinstance(item, list) for item in detection_result
-            ):
+                bboxes_for_tracking = [f.bbox.astype(int).tolist() for f in detection_result]
+            elif detection_result and all(isinstance(item, list) for item in detection_result):
                 # Bboxes from other backends are also scaled
                 bboxes_for_tracking = detection_result
             else:
@@ -375,11 +378,10 @@ class FaceDetector:
                 # So, convert the full 'image' to gray for _update_optical_flow_points
                 full_image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                 self._initialize_optical_flow_points(full_image_gray, bboxes_for_tracking)
-            else: # No faces detected, reset tracking
+            else:  # No faces detected, reset tracking
                 self.prev_tracked_objects = []
-            
-        self.prev_gray = current_gray.copy() # Update prev_gray for the next frame's tracking
 
+        self.prev_gray = current_gray.copy()  # Update prev_gray for the next frame's tracking
 
         # Cache the results for static test images
         if use_cache and self.cache_enabled and detection_result:
@@ -407,9 +409,7 @@ class FaceDetector:
             # Cache the result
         return detection_result
 
-    def _detect_faces_with_backend(
-        self, image: np.ndarray, scale_factor: float = 1.0
-    ) -> List[Any]:
+    def _detect_faces_with_backend(self, image: np.ndarray, scale_factor: float = 1.0) -> List[Any]:
         """
         Detect faces using the configured backend.
 
@@ -468,19 +468,11 @@ class FaceDetector:
                     if face.kps is not None:
                         face.kps = face.kps / scale_factor
                     # Scale other landmark attributes if they exist and are used
-                    if (
-                        hasattr(face, "landmark_2d_106")
-                        and face.landmark_2d_106 is not None
-                    ):
+                    if hasattr(face, "landmark_2d_106") and face.landmark_2d_106 is not None:
                         face.landmark_2d_106 = face.landmark_2d_106 / scale_factor
-                    if (
-                        hasattr(face, "landmark_3d_68")
-                        and face.landmark_3d_68 is not None
-                    ):
+                    if hasattr(face, "landmark_3d_68") and face.landmark_3d_68 is not None:
                         # For 3D landmarks, typically only x,y are scaled if z is depth/relative
-                        face.landmark_3d_68[:, :2] = (
-                            face.landmark_3d_68[:, :2] / scale_factor
-                        )
+                        face.landmark_3d_68[:, :2] = face.landmark_3d_68[:, :2] / scale_factor
 
                 output_results.append(face)
 
@@ -532,11 +524,13 @@ class FaceDetector:
             h = y2 - y1
             center_x = x1 + w / 2
             center_y = y1 + h / 2
-            
+
             # Store the center point and original dimensions
             # Points are relative to the gray_frame (original image scale)
             points_to_track.append([[center_x, center_y]])
-            self.prev_tracked_objects.append({'point': None, 'width': w, 'height': h, 'original_bbox': bbox})
+            self.prev_tracked_objects.append(
+                {"point": None, "width": w, "height": h, "original_bbox": bbox}
+            )
 
         if points_to_track:
             initial_points = np.array(points_to_track, dtype=np.float32)
@@ -544,12 +538,13 @@ class FaceDetector:
             # For simplicity, using centers. For robustness, consider cv2.goodFeaturesToTrack within each bbox.
             # Make sure these points are on the gray_frame used for prev_gray
             for i, pt_arr in enumerate(initial_points):
-                 self.prev_tracked_objects[i]['point'] = pt_arr
+                self.prev_tracked_objects[i]["point"] = pt_arr
         else:
             self.prev_tracked_objects = []
 
-
-    def _track_faces_with_optical_flow(self, current_gray_frame: np.ndarray, original_color_image: np.ndarray) -> List[List[float]]:
+    def _track_faces_with_optical_flow(
+        self, current_gray_frame: np.ndarray, original_color_image: np.ndarray
+    ) -> List[List[float]]:
         """
         Track faces using Lucas-Kanade optical flow.
         Args:
@@ -562,10 +557,12 @@ class FaceDetector:
             return []
 
         # Prepare points from prev_tracked_objects
-        old_points_list = [obj['point'] for obj in self.prev_tracked_objects if obj['point'] is not None]
+        old_points_list = [
+            obj["point"] for obj in self.prev_tracked_objects if obj["point"] is not None
+        ]
         if not old_points_list:
             return []
-        
+
         prev_points_np = np.array(old_points_list, dtype=np.float32)
 
         # Calculate optical flow
@@ -578,28 +575,30 @@ class FaceDetector:
 
         if new_points_np is not None and status is not None:
             h_img, w_img = original_color_image.shape[:2]
-            
-            original_objects_idx = 0 # To map status back to self.prev_tracked_objects
-            for i in range(len(prev_points_np)): # Iterate based on the points we attempted to track
+
+            original_objects_idx = 0  # To map status back to self.prev_tracked_objects
+            for i in range(
+                len(prev_points_np)
+            ):  # Iterate based on the points we attempted to track
                 # Find the corresponding original object. This assumes prev_points_np was built in order.
                 # This loop structure needs to correctly map tracked points back to their original objects
                 # This assumes that prev_points_np was constructed in the same order as prev_tracked_objects
                 original_obj_data = self.prev_tracked_objects[original_objects_idx]
-                original_objects_idx +=1
+                original_objects_idx += 1
 
                 if status[i] == 1:  # Point was tracked successfully
                     new_pt = new_points_np[i].ravel()
-                    
+
                     # Retrieve original width and height for this tracked object
-                    face_width = original_obj_data['width']
-                    face_height = original_obj_data['height']
+                    face_width = original_obj_data["width"]
+                    face_height = original_obj_data["height"]
 
                     # Reconstruct bbox around the new point using original dimensions
                     x1 = int(new_pt[0] - face_width / 2)
                     y1 = int(new_pt[1] - face_height / 2)
                     x2 = int(new_pt[0] + face_width / 2)
                     y2 = int(new_pt[1] + face_height / 2)
-                    
+
                     # Ensure bbox is within image bounds
                     x1 = max(0, x1)
                     y1 = max(0, y1)
@@ -609,13 +608,20 @@ class FaceDetector:
                     if x2 > x1 and y2 > y1:  # Valid bbox
                         tracked_bboxes.append([x1, y1, x2, y2])
                         # Update the point and keep the object for the next tracking cycle
-                        updated_tracked_objects.append({
-                            'point': np.array([[new_pt[0], new_pt[1]]], dtype=np.float32),
-                            'width': face_width,
-                            'height': face_height,
-                            'original_bbox': [x1,y1,x2,y2] # Update original_bbox to current tracked one
-                        })
-        
+                        updated_tracked_objects.append(
+                            {
+                                "point": np.array([[new_pt[0], new_pt[1]]], dtype=np.float32),
+                                "width": face_width,
+                                "height": face_height,
+                                "original_bbox": [
+                                    x1,
+                                    y1,
+                                    x2,
+                                    y2,
+                                ],  # Update original_bbox to current tracked one
+                            }
+                        )
+
         self.prev_tracked_objects = updated_tracked_objects
         return tracked_bboxes
 
@@ -646,7 +652,7 @@ class FaceDetector:
             # Ensure width/height for padding calculation are non-negative
             bbox_w = max(0, orig_x2 - orig_x1)
             bbox_h = max(0, orig_y2 - orig_y1)
-            
+
             pad_x = 0
             pad_y = 0
             if padding > 0:
@@ -665,7 +671,7 @@ class FaceDetector:
             y1_clipped = max(0, y1)
             x2_clipped = min(img_width, x2)
             y2_clipped = min(img_height, y2)
-            
+
             # If the clipped bbox is invalid or empty, return None
             if x1_clipped >= x2_clipped or y1_clipped >= y2_clipped:
                 # print(f"Warning: Clipped bbox invalid or empty: {[x1_clipped, y1_clipped, x2_clipped, y2_clipped]}")
@@ -684,7 +690,7 @@ class FaceDetector:
             #     face = cv2.resize(face, None, fx=scale, fy=scale)
             #     if face.size == 0: # Resize might also result in empty if original was tiny and invalid
             #         return None
-            
+
             return face
 
         except Exception as e:
@@ -721,9 +727,7 @@ class FaceDetector:
 
         # Calculate average detection time
         if stats["frames_processed"] > 0:
-            stats["avg_detection_time"] = (
-                stats["detection_time"] / stats["frames_processed"]
-            )
+            stats["avg_detection_time"] = stats["detection_time"] / stats["frames_processed"]
         else:
             stats["avg_detection_time"] = 0.0
 
@@ -736,9 +740,7 @@ class FaceDetector:
 
         return stats
 
-    def batch_detect(
-        self, images: List[np.ndarray], use_parallel: bool = True
-    ) -> List[List[Any]]:
+    def batch_detect(self, images: List[np.ndarray], use_parallel: bool = True) -> List[List[Any]]:
         """
         Detect faces in multiple images.
 

@@ -1,14 +1,16 @@
+import hashlib
 import os
+import pickle
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Optional
+
 import cv2
 import numpy as np
 import onnxruntime
-from typing import List, Dict, Optional
-from functools import lru_cache
-import threading
-import hashlib
-import pickle
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+
 from src.detection.optimized_detector import OptimizedFaceDetector
 from src.utils.performance import profile_execution
 
@@ -49,9 +51,7 @@ class OptimizedFaceRecognizer:
         self._max_cache_size = embedding_cache_size
 
         # Path setup
-        self.project_root = Path(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        )
+        self.project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         self.models_dir = self.project_root / "models"
 
         # Cache directory setup
@@ -115,9 +115,7 @@ class OptimizedFaceRecognizer:
 
         # Set execution providers with optimized settings
         sess_options = onnxruntime.SessionOptions()
-        sess_options.graph_optimization_level = (
-            onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-        )
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         sess_options.intra_op_num_threads = min(4, os.cpu_count() or 1)
 
         self.session = onnxruntime.InferenceSession(
@@ -239,9 +237,7 @@ class OptimizedFaceRecognizer:
         return hashlib.md5(img.tobytes()).hexdigest()
 
     @lru_cache(maxsize=1024)
-    def compute_similarity(
-        self, embedding1: np.ndarray, embedding2: np.ndarray
-    ) -> float:
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Compute similarity between two face embeddings.
 
@@ -292,11 +288,7 @@ class OptimizedFaceRecognizer:
 
             # Try to load from disk cache
             embedding_path = (
-                self.project_root
-                / "source"
-                / "photo"
-                / "contestants"
-                / f"{face_id}_embedding.npy"
+                self.project_root / "source" / "photo" / "contestants" / f"{face_id}_embedding.npy"
             )
             disk_cache_path = self.cache_dir / f"{face_id}_embedding.npy"
 
@@ -338,9 +330,7 @@ class OptimizedFaceRecognizer:
             print(f"Error loading embedding for {face_id}: {str(e)}")
             return None
 
-    def save_embedding(
-        self, face_id: str, embedding: np.ndarray, save_to_disk: bool = True
-    ):
+    def save_embedding(self, face_id: str, embedding: np.ndarray, save_to_disk: bool = True):
         """
         Save embedding for future use.
 
@@ -370,11 +360,7 @@ class OptimizedFaceRecognizer:
 
             # Save to disk cache
             embedding_path = (
-                self.project_root
-                / "source"
-                / "photo"
-                / "contestants"
-                / f"{face_id}_embedding.npy"
+                self.project_root / "source" / "photo" / "contestants" / f"{face_id}_embedding.npy"
             )
             disk_cache_path = self.cache_dir / f"{face_id}_embedding.npy"
 
@@ -430,9 +416,7 @@ class OptimizedFaceRecognizer:
         # Process each detected face
         if self.use_batch_processing and len(face_bboxes) > 1:
             # Parallel processing for multiple faces
-            batch_results = self._process_faces_in_parallel(
-                image, face_bboxes, known_embeddings
-            )
+            batch_results = self._process_faces_in_parallel(image, face_bboxes, known_embeddings)
             results.extend(batch_results)
         else:
             # Sequential processing for single face
@@ -456,9 +440,7 @@ class OptimizedFaceRecognizer:
                     continue
 
                 # Process the face
-                result = self._process_single_face(
-                    face_img, face_id, bbox, known_embeddings
-                )
+                result = self._process_single_face(face_img, face_id, bbox, known_embeddings)
                 if result:
                     results.append(result)
 
@@ -527,17 +509,9 @@ class OptimizedFaceRecognizer:
             for person_id, embeddings_list in known_embeddings.items():
                 for known_embedding in embeddings_list:
                     # Convert to proper format if needed
-                    if (
-                        isinstance(known_embedding, np.ndarray)
-                        and known_embedding.size > 0
-                    ):
-                        similarity = self.compute_similarity(
-                            face_embedding, known_embedding
-                        )
-                        if (
-                            similarity > self.similarity_threshold
-                            and similarity > best_score
-                        ):
+                    if isinstance(known_embedding, np.ndarray) and known_embedding.size > 0:
+                        similarity = self.compute_similarity(face_embedding, known_embedding)
+                        if similarity > self.similarity_threshold and similarity > best_score:
                             best_match = person_id
                             best_score = similarity
 
@@ -672,9 +646,7 @@ class OptimizedFaceRecognizer:
                     self.metadata_cache[img_id]["faces"] = faces
                     self.metadata_cache[img_id]["path"] = str(img_path)
 
-                print(
-                    f"Processed test image: {img_path.name} - found {len(faces)} faces"
-                )
+                print(f"Processed test image: {img_path.name} - found {len(faces)} faces")
 
             except Exception as e:
                 print(f"Error processing test image {img_path}: {str(e)}")

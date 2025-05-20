@@ -4,11 +4,11 @@ Optimize and process test images.
 This script provides a convenient way to optimize and process test images in the source/images/test directory.
 """
 
+import argparse
 import os
 import sys
-from pathlib import Path
-import argparse
 import time
+from pathlib import Path
 
 from src.detection.optimized_detector import OptimizedFaceDetector
 from src.recognition.optimized_recognizer import OptimizedFaceRecognizer
@@ -24,17 +24,13 @@ def parse_args():
         type=str,
         help="Directory to save output images (default: output/test_images)",
     )
-    parser.add_argument(
-        "--skip-preprocessing", action="store_true", help="Skip preprocessing step"
-    )
+    parser.add_argument("--skip-preprocessing", action="store_true", help="Skip preprocessing step")
     parser.add_argument(
         "--force-detection",
         action="store_true",
         help="Force face detection even if cached results exist",
     )
-    parser.add_argument(
-        "--parallel", action="store_true", help="Use parallel processing"
-    )
+    parser.add_argument("--parallel", action="store_true", help="Use parallel processing")
     parser.add_argument("--debug", action="store_true", help="Print debug information")
 
     return parser.parse_args()

@@ -1,6 +1,7 @@
-import numpy as np
-import os
 import glob
+import os
+
+import numpy as np
 
 # Path to the embeddings directory
 EMBEDDING_DIR = "source/photo/contestants/embeddings"
@@ -10,7 +11,7 @@ print(f"[INFO] Checking directory: {os.path.abspath(EMBEDDING_DIR)}")
 try:
     all_files_in_dir = os.listdir(EMBEDDING_DIR)
     print(f"[INFO] Files found by os.listdir: {all_files_in_dir}")
-    npy_files_os_listdir = [f for f in all_files_in_dir if f.endswith('_embedding.npy')]
+    npy_files_os_listdir = [f for f in all_files_in_dir if f.endswith("_embedding.npy")]
     print(f"[INFO] .npy files found by os.listdir: {npy_files_os_listdir}")
 except Exception as e:
     print(f"[ERROR] Could not list directory {EMBEDDING_DIR}: {e}")
@@ -25,7 +26,9 @@ print(f"[INFO] .npy files found by glob.glob: {npy_files_glob}")
 if not npy_files_glob:
     print("[ERROR] No embedding files found by glob.glob. Please check the path and pattern.")
     if npy_files_os_listdir:
-        print("[INFO] os.listdir found .npy files, so the issue might be with glob pattern or special characters.")
+        print(
+            "[INFO] os.listdir found .npy files, so the issue might be with glob pattern or special characters."
+        )
     exit()
 
 # Pick the first file found by glob for inspection
@@ -37,7 +40,7 @@ print(f"[INFO] File size: {os.path.getsize(file_path)} bytes")
 # Try to load the file
 try:
     # allow_pickle=False is safer, True might be needed if they are pickled objects
-    data = np.load(file_path, allow_pickle=False) 
+    data = np.load(file_path, allow_pickle=False)
     print(f"[SUCCESS] Data loaded successfully from {file_path}")
     print(f"  Shape: {data.shape}")
     print(f"  Data type: {data.dtype}")
@@ -46,13 +49,15 @@ try:
     print(f"  Flattened shape: {flat_data.shape}")
     print(f"  First 5 values of flattened data: {flat_data[:5]}")
     if flat_data.shape == (512,):
-        print(f"  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script.")
+        print("  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script.")
     else:
-        print(f"  [WARNING] Flattened data shape is {flat_data.shape}, NOT (512,). This will be skipped by the main script.")
+        print(
+            f"  [WARNING] Flattened data shape is {flat_data.shape}, NOT (512,). This will be skipped by the main script."
+        )
 
 except Exception as e:
     print(f"[ERROR] Error loading file {file_path} with np.load: {e}")
-    print(f"  Attempting with allow_pickle=True...")
+    print("  Attempting with allow_pickle=True...")
     try:
         data = np.load(file_path, allow_pickle=True)
         print(f"[SUCCESS] Data loaded successfully from {file_path} with allow_pickle=True")
@@ -65,13 +70,16 @@ except Exception as e:
             print(f"  Flattened shape: {flat_data.shape}")
             print(f"  First 5 values of flattened data: {flat_data[:5]}")
             if flat_data.shape == (512,):
-                print(f"  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script.")
+                print(
+                    "  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script."
+                )
             else:
-                print(f"  [WARNING] Flattened data shape is {flat_data.shape}, NOT (512,). This will be skipped by the main script.")
+                print(
+                    f"  [WARNING] Flattened data shape is {flat_data.shape}, NOT (512,). This will be skipped by the main script."
+                )
         else:
             print(f"  Loaded data is not a NumPy array. It's a {type(data)}.")
             print(f"  Content: {data}")
-
 
     except Exception as e2:
         print(f"[ERROR] Error loading file {file_path} with np.load (allow_pickle=True): {e2}")

@@ -1,10 +1,11 @@
 import os
+
 import cv2
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
+from tqdm import tqdm
 
 # Define constants
 # User input for distance threshold and frame skip
@@ -61,9 +62,7 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
             if embeddings:
                 known_embeddings[contestant_name] = embeddings
         else:
-            print(
-                f"Directory for contestant '{contestant_name}' not found: {contestant_path}"
-            )
+            print(f"Directory for contestant '{contestant_name}' not found: {contestant_path}")
     return known_embeddings
 
 
@@ -71,18 +70,14 @@ def match_face(face_embedding, known_embeddings):
     """Compare a face embedding against known embeddings."""
     for name, embeddings_list in known_embeddings.items():
         for known_embedding in embeddings_list:
-            known_embedding = (
-                known_embedding.flatten()
-            )  # {{ Ensure known_embedding is 1D }}
+            known_embedding = known_embedding.flatten()  # {{ Ensure known_embedding is 1D }}
             distance = np.dot(face_embedding, known_embedding)
             if isinstance(distance, np.ndarray):
                 if distance.size == 1:
                     distance = distance.item()  # Convert single-element array to scalar
                 else:
                     print(f"Unexpected distance array size for {name}: {distance.size}")
-                    distance = (
-                        distance.mean()
-                    )  # Handle multi-element arrays appropriately
+                    distance = distance.mean()  # Handle multi-element arrays appropriately
             if distance > DISTANCE_THRESHOLD:
                 return name
     return None
@@ -221,9 +216,7 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
 
         labeled_frames = []  # List to store paths of frames with labels
 
-        with tqdm(
-            total=total_frames, desc=f"Frames in {video_file}", leave=False
-        ) as pbar:
+        with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -240,15 +233,11 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings):
                         frame_with_boxes = draw_boxes_and_labels(
                             frame, matches, timestamp_formatted
                         )
-                        output_frame_path = os.path.join(
-                            output_dir, f"frame_{frame_count}.jpg"
-                        )
+                        output_frame_path = os.path.join(output_dir, f"frame_{frame_count}.jpg")
                         cv2.imwrite(output_frame_path, frame_with_boxes)
                         labeled_frames.append(output_frame_path)
                         for _, matched_name in matches:
-                            print(
-                                f"Found {matched_name} in {video_file} at frame {frame_count}"
-                            )
+                            print(f"Found {matched_name} in {video_file} at frame {frame_count}")
                             results.append(
                                 {
                                     "Video": video_file,
@@ -286,18 +275,14 @@ def select_items(options, item_type):
     if indices.strip() == str(len(options) + 1):
         return options
 
-    selected_indices = [
-        int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()
-    ]
+    selected_indices = [int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()]
     selected_items = [options[i] for i in selected_indices if 0 <= i < len(options)]
     return selected_items
 
 
 def get_contestant_image(contestants_dir, contestant, contestant_info):
     """Retrieve the image path for a contestant."""
-    contestant_number = contestant_info.loc[
-        contestant_info["暱稱"] == contestant, "編號"
-    ].values[0]
+    contestant_number = contestant_info.loc[contestant_info["暱稱"] == contestant, "編號"].values[0]
     contestant_path = os.path.join(contestants_dir, str(contestant_number))
     image_paths = get_image_paths(contestant_path)
     if image_paths:
@@ -326,11 +311,7 @@ def main():
 
     # Select videos
     all_videos = sorted(
-        [
-            f
-            for f in os.listdir(videos_dir)
-            if os.path.isfile(os.path.join(videos_dir, f))
-        ]
+        [f for f in os.listdir(videos_dir) if os.path.isfile(os.path.join(videos_dir, f))]
     )
     selected_videos = select_items(all_videos, "videos")
 
@@ -340,23 +321,15 @@ def main():
         embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
         if os.path.exists(embedding_file):
             embedding = np.load(embedding_file, allow_pickle=True)
-            known_embeddings[contestant] = [
-                embedding
-            ]  # Ensure embeddings are stored as a list
+            known_embeddings[contestant] = [embedding]  # Ensure embeddings are stored as a list
         else:
             print(f"Computing embedding for {contestant}...")
-            contestant_image = get_contestant_image(
-                contestants_dir, contestant, contestant_info
-            )
+            contestant_image = get_contestant_image(contestants_dir, contestant, contestant_info)
             if contestant_image is not None:
                 embedding = compute_face_embedding(contestant_image)
                 if embedding is not None:
-                    known_embeddings[contestant] = [
-                        embedding
-                    ]  # Store embedding in a list
-                    np.save(
-                        embedding_file, [embedding]
-                    )  # Save as a list to maintain consistency
+                    known_embeddings[contestant] = [embedding]  # Store embedding in a list
+                    np.save(embedding_file, [embedding])  # Save as a list to maintain consistency
                 else:
                     print(f"Could not compute embedding for {contestant}")
             else:

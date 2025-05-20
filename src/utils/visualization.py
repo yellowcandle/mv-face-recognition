@@ -8,29 +8,30 @@ and statistics with rich formatting.
 import os
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+
 import cv2
 import numpy as np
 import pandas as pd
 
 try:
+    from rich import box
     from rich.console import Console
+    from rich.layout import Layout
+    from rich.live import Live
+    from rich.panel import Panel
     from rich.progress import (
+        BarColumn,
         Progress,
         SpinnerColumn,
-        TextColumn,
-        BarColumn,
         TaskProgressColumn,
+        TextColumn,
         TimeElapsedColumn,
         TimeRemainingColumn,
     )
     from rich.table import Table
-    from rich.panel import Panel
-    from rich.layout import Layout
-    from rich.live import Live
     from rich.text import Text
     from rich.tree import Tree
-    from rich import box
 
     HAS_RICH = True
 except ImportError:
@@ -155,9 +156,7 @@ def display_results(
         show_summary: Whether to show summary statistics
     """
     if not results:
-        console.print(
-            "[italic yellow]No recognition results to display[/italic yellow]"
-        )
+        console.print("[italic yellow]No recognition results to display[/italic yellow]")
         return
 
     # Convert to DataFrame
@@ -168,9 +167,7 @@ def display_results(
         df = df[df["video"] == video_name]
 
     if df.empty:
-        console.print(
-            f"[italic yellow]No results for video: {video_name}[/italic yellow]"
-        )
+        console.print(f"[italic yellow]No results for video: {video_name}[/italic yellow]")
         return
 
     if HAS_RICH:
@@ -216,9 +213,7 @@ def display_results(
                 if col == "confidence" and col in row:
                     # Format confidence as percentage
                     values.append(
-                        f"{row[col]:.2%}"
-                        if isinstance(row[col], float)
-                        else str(row[col])
+                        f"{row[col]:.2%}" if isinstance(row[col], float) else str(row[col])
                     )
                 elif col in row:
                     values.append(str(row[col]))
@@ -391,9 +386,7 @@ def display_selection_menu(options: List[str], prompt: str):
     if indices.strip() == str(len(options) + 1):
         return options
 
-    selected_indices = [
-        int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()
-    ]
+    selected_indices = [int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()]
     selected_items = [options[i] for i in selected_indices if 0 <= i < len(options)]
 
     return selected_items
@@ -514,16 +507,12 @@ class StatusDisplay:
         # Calculate estimated remaining time
         if self.stats["videos_completed"] > 0 and self.stats["videos_total"] > 0:
             time_per_video = self.stats["elapsed_time"] / self.stats["videos_completed"]
-            remaining_videos = (
-                self.stats["videos_total"] - self.stats["videos_completed"]
-            )
+            remaining_videos = self.stats["videos_total"] - self.stats["videos_completed"]
             self.stats["estimated_remaining"] = time_per_video * remaining_videos
 
         # Calculate current FPS
         if now - self.last_update >= self.update_interval:
-            frames_delta = self.stats["frames_processed"] - getattr(
-                self, "_last_frames", 0
-            )
+            frames_delta = self.stats["frames_processed"] - getattr(self, "_last_frames", 0)
             time_delta = now - self.last_update
 
             if time_delta > 0:
@@ -534,9 +523,7 @@ class StatusDisplay:
 
         # Update display
         if HAS_RICH and self.live_display:
-            if (
-                now - getattr(self, "_last_display_update", 0) >= 0.25
-            ):  # Limit update rate
+            if now - getattr(self, "_last_display_update", 0) >= 0.25:  # Limit update rate
                 try:
                     # Create a new layout for each update to avoid issues with the 'Live' object
                     layout = Layout()
@@ -597,15 +584,11 @@ class StatusDisplay:
 
         if self.stats["videos_total"] > 0:
             stats_content.append(
-                Text(
-                    f"Videos: {self.stats['videos_completed']}/{self.stats['videos_total']}"
-                )
+                Text(f"Videos: {self.stats['videos_completed']}/{self.stats['videos_total']}")
             )
             if self.stats["estimated_remaining"] > 0:
                 stats_content.append(
-                    Text(
-                        f"Est. Remaining: {self._format_time(self.stats['estimated_remaining'])}"
-                    )
+                    Text(f"Est. Remaining: {self._format_time(self.stats['estimated_remaining'])}")
                 )
 
         stats_panel = Panel(
@@ -629,7 +612,9 @@ class StatusDisplay:
             width = 40
             completed = min(self.stats["videos_completed"], self.stats["videos_total"])
             filled = int(width * (completed / self.stats["videos_total"]))
-            bar = f"[{'=' * filled}{' ' * (width - filled)}] {completed}/{self.stats['videos_total']}"
+            bar = (
+                f"[{'=' * filled}{' ' * (width - filled)}] {completed}/{self.stats['videos_total']}"
+            )
             progress_content.append(Text(bar))
 
         # Add face recognition events
@@ -717,18 +702,14 @@ def save_annotated_frame(
                     label_parts.append(str(face["name"]))
 
                 # Add confidence if available
-                if "confidence" in face and isinstance(
-                    face["confidence"], (int, float)
-                ):
+                if "confidence" in face and isinstance(face["confidence"], (int, float)):
                     label_parts.append(f"{face['confidence']:.2f}")
 
                 if label_parts:
                     label = " ".join(label_parts)
 
                     # Draw label background
-                    label_size, _ = cv2.getTextSize(
-                        label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
-                    )
+                    label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
 
                     cv2.rectangle(
                         annotated,

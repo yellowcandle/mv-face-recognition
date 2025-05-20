@@ -1,13 +1,14 @@
+import hashlib
+import os
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
+from pathlib import Path
+from typing import List, Optional, Tuple
+
 import cv2
 import numpy as np
-import os
-import hashlib
-import threading
-from functools import lru_cache
-from typing import List, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 # Global thread pool for shared usage
 _global_thread_pool = None
@@ -38,9 +39,7 @@ def get_thread_pool(max_workers=None):
 
     with _thread_pool_lock:
         if _global_thread_pool is None:
-            _global_thread_pool = ThreadPoolExecutor(
-                max_workers=max_workers or _thread_pool_size
-            )
+            _global_thread_pool = ThreadPoolExecutor(max_workers=max_workers or _thread_pool_size)
     return _global_thread_pool
 
 
@@ -270,9 +269,7 @@ class ImageCache:
             self.cache_dir = Path(cache_dir)
         else:
             project_root = Path(
-                os.path.abspath(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                )
+                os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             )
             self.cache_dir = project_root / "cache" / "images"
 

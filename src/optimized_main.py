@@ -1,11 +1,12 @@
+import argparse
 import os
+import time
+from typing import Dict, List, Tuple
+
 import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-import time
-import argparse
-from typing import Dict, List, Tuple
 
 from src.detection.optimized_detector import OptimizedFaceDetector
 from src.recognition.optimized_recognizer import OptimizedFaceRecognizer
@@ -15,9 +16,7 @@ from src.utils.test_image_optimizer import TestImageOptimizer
 
 def parse_arguments():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(
-        description="Optimized Face Recognition for Videos"
-    )
+    parser = argparse.ArgumentParser(description="Optimized Face Recognition for Videos")
 
     parser.add_argument(
         "--distance-threshold",
@@ -43,12 +42,8 @@ def parse_arguments():
     parser.add_argument(
         "--parallel", action="store_true", help="Use parallel processing where possible"
     )
-    parser.add_argument(
-        "--save-frames", action="store_true", help="Save annotated frames"
-    )
-    parser.add_argument(
-        "--save-video", action="store_true", help="Save annotated video"
-    )
+    parser.add_argument("--save-frames", action="store_true", help="Save annotated frames")
+    parser.add_argument("--save-video", action="store_true", help="Save annotated video")
     parser.add_argument("--debug", action="store_true", help="Print debug information")
 
     parser.add_argument(
@@ -78,9 +73,7 @@ def select_items(options, item_type):
     if indices.strip() == str(len(options) + 1):
         return options
 
-    selected_indices = [
-        int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()
-    ]
+    selected_indices = [int(i.strip()) - 1 for i in indices.split(",") if i.strip().isdigit()]
     selected_items = [options[i] for i in selected_indices if 0 <= i < len(options)]
     return selected_items
 
@@ -124,9 +117,7 @@ def load_known_embeddings(
 
             contestant_path = os.path.join(contestants_dir, str(contestant_number))
             if not os.path.isdir(contestant_path):
-                print(
-                    f"Directory not found for contestant {contestant}: {contestant_path}"
-                )
+                print(f"Directory not found for contestant {contestant}: {contestant_path}")
                 continue
 
             # Get image paths
@@ -231,12 +222,8 @@ def process_video(
 
     # Setup output paths
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    frames_dir = os.path.join(
-        project_root, "output_frames", os.path.splitext(video_name)[0]
-    )
-    output_video_path = os.path.join(
-        project_root, "output_mp4s", f"{video_name}_labeled.mp4"
-    )
+    frames_dir = os.path.join(project_root, "output_frames", os.path.splitext(video_name)[0])
+    output_video_path = os.path.join(project_root, "output_mp4s", f"{video_name}_labeled.mp4")
 
     if args.save_frames:
         os.makedirs(frames_dir, exist_ok=True)
@@ -245,9 +232,7 @@ def process_video(
     out = None
     if args.save_video:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(
-            output_video_path, fourcc, fps, (frame_width, frame_height)
-        )
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
 
     # Process video frames
     frame_count = 0
@@ -298,9 +283,7 @@ def process_video(
                     label = f"{person_id} ({confidence:.2f})"
 
                     # Draw background rectangle for text
-                    label_size, _ = cv2.getTextSize(
-                        label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-                    )
+                    label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
 
                     cv2.rectangle(
                         annotated_frame,
@@ -351,9 +334,7 @@ def process_video(
 
             # Save frame if requested
             if args.save_frames:
-                output_frame_path = os.path.join(
-                    frames_dir, f"frame_{frame_count:04d}.jpg"
-                )
+                output_frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.jpg")
                 cv2.imwrite(output_frame_path, annotated_frame)
 
             # Write to output video if requested
@@ -464,8 +445,7 @@ def main():
         [
             f
             for f in os.listdir(videos_dir)
-            if os.path.isfile(os.path.join(videos_dir, f))
-            and f.lower().endswith((".mp4", ".avi"))
+            if os.path.isfile(os.path.join(videos_dir, f)) and f.lower().endswith((".mp4", ".avi"))
         ]
     )
     if not all_videos:
@@ -482,9 +462,7 @@ def main():
     for video_file in selected_videos:
         video_path = os.path.join(videos_dir, video_file)
         try:
-            _, results = process_video(
-                video_path, known_embeddings, recognizer, detector, args
-            )
+            _, results = process_video(video_path, known_embeddings, recognizer, detector, args)
             all_results.extend(results)
         except Exception as e:
             print(f"Error processing video {video_file}: {str(e)}")

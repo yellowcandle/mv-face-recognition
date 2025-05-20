@@ -9,10 +9,10 @@ Usage:
     python fix_syntax.py
 """
 
-import sys
-import shutil
-from pathlib import Path
 import logging
+import shutil
+import sys
+from pathlib import Path
 
 # Set up project root path
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -20,9 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 logger = logging.getLogger("chromadb_fix")
 
@@ -134,12 +132,8 @@ def fix_data_type_issues():
             # Continue with original embedding
 """
                     # Insert the code after the method signature
-                    content = (
-                        content[:insert_point] + insert_code + content[insert_point:]
-                    )
-                    logger.info(
-                        "Added dimension mismatch handling in query_embedding method"
-                    )
+                    content = content[:insert_point] + insert_code + content[insert_point:]
+                    logger.info("Added dimension mismatch handling in query_embedding method")
 
         # Write updated content back to file
         with open(chromadb_backend_path, "w") as f:

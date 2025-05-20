@@ -15,18 +15,16 @@ Usage:
     model_path = finder.find_model("arcface_r50")
 """
 
+import logging
 import os
 import sys
-import logging
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Any, Dict, List, Optional, Union
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -77,9 +75,7 @@ class ModelFinder:
         },
     }
 
-    def __init__(
-        self, project_root: Optional[str] = None, cache_dir: Optional[str] = None
-    ):
+    def __init__(self, project_root: Optional[str] = None, cache_dir: Optional[str] = None):
         """
         Initialize the model finder.
 
@@ -118,9 +114,7 @@ class ModelFinder:
         # Track discovered models
         self.discovered_models = {}
 
-    def find_model(
-        self, model_name: str, download_if_missing: bool = True
-    ) -> Optional[str]:
+    def find_model(self, model_name: str, download_if_missing: bool = True) -> Optional[str]:
         """
         Find a model by name or alias.
 
@@ -135,9 +129,7 @@ class ModelFinder:
         if not model_name.endswith(".onnx"):
             if any(model_name + ".onnx" == name for name in self.MODEL_INFO.keys()):
                 model_name = model_name + ".onnx"
-            elif any(
-                model_name in info["aliases"] for _, info in self.MODEL_INFO.items()
-            ):
+            elif any(model_name in info["aliases"] for _, info in self.MODEL_INFO.items()):
                 # Find model by alias
                 for name, info in self.MODEL_INFO.items():
                     if model_name in info["aliases"]:
@@ -154,9 +146,7 @@ class ModelFinder:
 
         # Check if we've already discovered this model
         if model_name in self.discovered_models:
-            logger.info(
-                f"Using previously discovered model: {self.discovered_models[model_name]}"
-            )
+            logger.info(f"Using previously discovered model: {self.discovered_models[model_name]}")
             return self.discovered_models[model_name]
 
         # Search order:
@@ -240,9 +230,7 @@ class ModelFinder:
             return str(model_path)
         return None
 
-    def _check_packages(
-        self, model_name: str, model_info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _check_packages(self, model_name: str, model_info: Dict[str, Any]) -> Optional[str]:
         """Check if model exists in installed packages."""
         # Check specific package paths from model info
         for rel_path in model_info.get("package_paths", []):
@@ -271,9 +259,7 @@ class ModelFinder:
 
         return None
 
-    def _download_model(
-        self, model_name: str, model_info: Dict[str, Any]
-    ) -> Optional[str]:
+    def _download_model(self, model_name: str, model_info: Dict[str, Any]) -> Optional[str]:
         """Download model from URLs in model info."""
         logger.info(f"Attempting to download {model_name}...")
 
@@ -293,12 +279,8 @@ class ModelFinder:
                         file_size = int(response.info().get("Content-Length", 0))
 
                         # Check if size seems reasonable
-                        min_size, max_size = model_info.get(
-                            "size_range", (0, float("inf"))
-                        )
-                        if file_size > 0 and (
-                            file_size < min_size or file_size > max_size
-                        ):
+                        min_size, max_size = model_info.get("size_range", (0, float("inf")))
+                        if file_size > 0 and (file_size < min_size or file_size > max_size):
                             logger.warning(
                                 f"Suspicious file size: {file_size} bytes (expected {min_size}-{max_size})"
                             )
@@ -354,21 +336,15 @@ class ModelFinder:
         """Check if file size is within valid range for the model type."""
         try:
             file_size = os.path.getsize(path)
-            min_size, max_size = self.MODEL_INFO[model_name].get(
-                "size_range", (0, float("inf"))
-            )
+            min_size, max_size = self.MODEL_INFO[model_name].get("size_range", (0, float("inf")))
 
             # Check if file is too small or too large
             if file_size < min_size:
-                logger.warning(
-                    f"File is too small: {file_size} bytes (min: {min_size})"
-                )
+                logger.warning(f"File is too small: {file_size} bytes (min: {min_size})")
                 return False
 
             if file_size > max_size:
-                logger.warning(
-                    f"File is too large: {file_size} bytes (max: {max_size})"
-                )
+                logger.warning(f"File is too large: {file_size} bytes (max: {max_size})")
                 return False
 
             return True

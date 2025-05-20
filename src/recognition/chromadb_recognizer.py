@@ -1,9 +1,11 @@
 import os
-import numpy as np
-from pathlib import Path
-import chromadb
-from typing import Dict, List, Optional, Union, Any
 import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import chromadb
+import numpy as np
+
 from src.utils.performance import profile_execution
 
 
@@ -76,9 +78,7 @@ class ChromaDBFaceRecognizer:
             except Exception:
                 self.collection = self.client.create_collection(
                     name=self.collection_name,
-                    metadata={
-                        "hnsw:space": "cosine"
-                    },  # Use cosine similarity for face embeddings
+                    metadata={"hnsw:space": "cosine"},  # Use cosine similarity for face embeddings
                 )
                 print(f"Created new ChromaDB collection '{self.collection_name}'")
 
@@ -156,9 +156,7 @@ class ChromaDBFaceRecognizer:
                 }
 
     @profile_execution
-    def add_embeddings_batch(
-        self, embeddings_dict: Dict[str, Union[List[np.ndarray], np.ndarray]]
-    ):
+    def add_embeddings_batch(self, embeddings_dict: Dict[str, Union[List[np.ndarray], np.ndarray]]):
         """
         Add multiple embeddings in batch.
 
@@ -195,15 +193,11 @@ class ChromaDBFaceRecognizer:
             if isinstance(embs, list):
                 for i, emb in enumerate(embs):
                     ids.append(f"{face_id}_{i}")
-                    embeddings.append(
-                        emb.tolist() if isinstance(emb, np.ndarray) else emb
-                    )
+                    embeddings.append(emb.tolist() if isinstance(emb, np.ndarray) else emb)
                     metadatas.append({"name": face_id})
             else:
                 ids.append(face_id)
-                embeddings.append(
-                    embs.tolist() if isinstance(embs, np.ndarray) else embs
-                )
+                embeddings.append(embs.tolist() if isinstance(embs, np.ndarray) else embs)
                 metadatas.append({"name": face_id})
 
         if not ids:
@@ -231,9 +225,7 @@ class ChromaDBFaceRecognizer:
                         metadata=metadatas[i],
                     )
                 except Exception as inner_e:
-                    print(
-                        f"Error adding individual embedding {face_id}: {str(inner_e)}"
-                    )
+                    print(f"Error adding individual embedding {face_id}: {str(inner_e)}")
 
     @profile_execution
     def match_face(
@@ -254,10 +246,7 @@ class ChromaDBFaceRecognizer:
 
         if self.collection is None or self.collection.count() == 0:
             # Fallback to dictionary-based matching
-            if (
-                not hasattr(self, "_fallback_embeddings")
-                or not self._fallback_embeddings
-            ):
+            if not hasattr(self, "_fallback_embeddings") or not self._fallback_embeddings:
                 return None
 
             best_match = None
@@ -376,9 +365,7 @@ class ChromaDBFaceRecognizer:
 
         return results
 
-    def load_embeddings_from_files(
-        self, contestants_dir: Union[str, Path], contestant_info
-    ):
+    def load_embeddings_from_files(self, contestants_dir: Union[str, Path], contestant_info):
         """
         Load embeddings from .npy files and add to ChromaDB.
 
