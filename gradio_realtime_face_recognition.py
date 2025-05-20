@@ -72,12 +72,34 @@ def load_gallery_embeddings():
     gallery_nicknames = []
     gallery_display_names = []
     gallery_embeddings = []
+    embedding_dimensions = None
 
     for f in embedding_files:
         try:
             arr = np.load(f)
             arr = arr.flatten()
-            if arr.shape == (512,):
+            
+            # Accept any 1D embedding array
+            if len(arr.shape) == 1:
+                if embedding_dimensions is None:
+                    # Set the first encountered dimension as our standard
+                    embedding_dimensions = arr.shape[0]
+                    logger.info(f"Using embedding dimension: {embedding_dimensions}")
+                
+                # If dimensions don't match, resize the embedding
+                if arr.shape[0] != embedding_dimensions:
+                    logger.warning(f"Embedding in {os.path.basename(f)} has dimension {arr.shape[0]}, "
+                                  f"resizing to {embedding_dimensions}")
+                    
+                    # Resize strategy: either truncate or pad with zeros
+                    if arr.shape[0] > embedding_dimensions:
+                        # Truncate to the standard dimension
+                        arr = arr[:embedding_dimensions]
+                    else:
+                        # Pad with zeros
+                        padding = np.zeros(embedding_dimensions - arr.shape[0])
+                        arr = np.concatenate([arr, padding])
+                
                 nickname = os.path.basename(f).replace("_embedding.npy", "")
                 gallery_nicknames.append(nickname)
                 
@@ -90,7 +112,7 @@ def load_gallery_embeddings():
                 gallery_display_names.append(display_name)
                 gallery_embeddings.append(arr)
             else:
-                logger.warning(f"Skipping embedding file {os.path.abspath(f)}: shape {arr.shape} != (512,)")
+                logger.warning(f"Skipping embedding file {os.path.abspath(f)}: not a 1D array, shape={arr.shape}")
         except Exception as e:
             logger.error(f"Error loading embedding from {f}: {str(e)}")
 
@@ -127,6 +149,16 @@ def get_top_matches(face_embedding: np.ndarray, gallery_embeddings: np.ndarray,
     """
     # Ensure face_embedding is normalized
     norm_face_embedding = face_embedding / np.linalg.norm(face_embedding)
+    
+    # Make sure face_embedding has the right dimension
+    if norm_face_embedding.shape[0] != gallery_embeddings.shape[1]:
+        logger.warning(f"Face embedding dimension {norm_face_embedding.shape[0]} doesn't match gallery "
+                       f"dimension {gallery_embeddings.shape[1]}. Adjusting...")
+        if norm_face_embedding.shape[0] > gallery_embeddings.shape[1]:
+            norm_face_embedding = norm_face_embedding[:gallery_embeddings.shape[1]]
+        else:
+            padding = np.zeros(gallery_embeddings.shape[1] - norm_face_embedding.shape[0])
+            norm_face_embedding = np.concatenate([norm_face_embedding, padding])
     
     # Calculate similarities with all gallery embeddings
     sims = np.dot(gallery_embeddings, norm_face_embedding)
@@ -223,7 +255,20 @@ def plot_embedding_scatter(detected_face_embeddings_list: List[np.ndarray],
 
     # Add detected face embeddings
     if num_detected > 0:
-        all_embeddings_list.extend(detected_face_embeddings_list)
+        # Make sure detected embeddings match gallery embedding dimensions
+        processed_detected_embeddings = []
+        for embed in detected_face_embeddings_list:
+            if embed.shape[0] != gallery_embeddings_global.shape[1]:
+                if embed.shape[0] > gallery_embeddings_global.shape[1]:
+                    # Truncate
+                    embed = embed[:gallery_embeddings_global.shape[1]]
+                else:
+                    # Pad
+                    padding = np.zeros(gallery_embeddings_global.shape[1] - embed.shape[0])
+                    embed = np.concatenate([embed, padding])
+            processed_detected_embeddings.append(embed)
+            
+        all_embeddings_list.extend(processed_detected_embeddings)
         for i, match_info_list_for_face in enumerate(matches_per_detected_face):
             if match_info_list_for_face:  # Recognized
                 top_match_name = match_info_list_for_face[0][0]
