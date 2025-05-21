@@ -59,6 +59,66 @@ PROCESSING_STATS = {
 STATUS_LOCK = threading.Lock()
 
 
+# UI Component Creation Functions
+
+def create_recognition_settings_group():
+    """
+    Creates a Gradio group for recognition settings.
+
+    Returns:
+        Tuple: (gr.Group, gr.Slider, gr.Checkbox, gr.Slider, gr.Radio)
+               The group itself, similarity_threshold, use_tracking,
+               max_matches, and visualization_type components.
+    """
+    with gr.Group():
+        gr.Markdown("### Recognition Settings")
+        similarity_threshold = gr.Slider(
+            minimum=0.3,
+            maximum=0.9,
+            value=0.6,
+            step=0.05,
+            label="Similarity Threshold",
+            info="Lower values match more faces but may have false positives",
+        )
+        use_tracking = gr.Checkbox(
+            value=True,
+            label="Use Face Tracking",
+            info="Improves performance by tracking faces between frames",
+        )
+        max_matches = gr.Slider(
+            minimum=1,
+            maximum=10,
+            value=3,
+            step=1,
+            label="Max Matches Per Face",
+            info="Maximum number of matches to show for each face",
+        )
+        visualization_type = gr.Radio(
+            choices=["bar", "scatter"],
+            value="bar",
+            label="Visualization Type",
+            info="Bar chart or embedding scatter plot",
+        )
+    return similarity_threshold, use_tracking, max_matches, visualization_type
+
+
+def create_status_group():
+    """
+    Creates a Gradio group for status display and controls.
+
+    Returns:
+        Tuple: (gr.Group, gr.HTML, gr.Button, gr.Button, gr.Markdown)
+               The group itself, stats_html, reset_stats_btn,
+               reload_gallery_btn, and gallery_status components.
+    """
+    with gr.Group():
+        stats_html = gr.HTML(value=format_stats_for_display(), label="Performance Stats")
+        reset_stats_btn = gr.Button("Reset Statistics")
+        reload_gallery_btn = gr.Button("Reload Gallery")
+        gallery_status = gr.Markdown("Gallery not loaded yet")
+    return stats_html, reset_stats_btn, reload_gallery_btn, gallery_status
+
+
 def initialize_models(
     detector_backend: str = "insightface",
     device: str = "auto",
@@ -116,7 +176,7 @@ def initialize_models(
     except Exception as e:
         logger.error(f"Error initializing models: {str(e)}")
         logger.error(traceback.format_exc())
-        raise RuntimeError(f"Failed to initialize models: {str(e)}")
+        raise RuntimeError(f"Error during model setup: {str(e)}. Please check model files and configurations.")
 
 
 def load_gallery_embeddings(
@@ -228,9 +288,12 @@ def load_gallery_embeddings(
         return embeddings_dict, names_dict
         
     except Exception as e:
-        logger.error(f"Error loading gallery embeddings: {str(e)}")
+        user_friendly_error = f"Could not load gallery embeddings: {str(e)}. Check image files and directory structure in 'source/photo/contestants/'."
+        logger.error(user_friendly_error)
         logger.error(traceback.format_exc())
-        return {}, {}
+        # This function is called by reload_gallery, which handles UI messages.
+        # We should raise an exception here to be caught by the caller, allowing it to set a UI error.
+        raise RuntimeError(user_friendly_error)
 
 
 def process_frame(
@@ -379,7 +442,7 @@ def process_frame(
         )
         
         # Create error figure
-        fig = plot_bar([("Error", 0.0)])
+        fig = plot_bar([("Processing Error", 0.0)]) # Changed title
         
         return error_frame, fig
 
@@ -465,6 +528,7 @@ def format_stats_for_display() -> str:
     Returns:
         Formatted statistics as HTML
     """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     stats = get_performance_stats()
     
     html = """
@@ -508,6 +572,7 @@ def format_stats_for_display() -> str:
     
     html += """
         </table>
+        <p style="font-size: 0.9em; text-align: right; color: #555;">Last updated: {now}</p>
     </div>
     """
     
@@ -555,6 +620,7 @@ def process_webcam_frame(
     try:
         # Create models if they don't exist
         if DETECTOR is None or RECOGNIZER is None:
+            gr.Info("Initializing models, please wait...")
             DETECTOR, RECOGNIZER = initialize_models(
                 similarity_threshold=similarity_threshold,
                 use_tracking=use_tracking,
@@ -653,6 +719,7 @@ def process_video_frame(
     try:
         # Create models if they don't exist
         if DETECTOR is None or RECOGNIZER is None:
+            gr.Info("Initializing models, please wait...")
             DETECTOR, RECOGNIZER = initialize_models(
                 similarity_threshold=similarity_threshold,
                 use_tracking=use_tracking,
@@ -661,17 +728,20 @@ def process_video_frame(
         
         # Check if video path exists
         if not os.path.exists(video_path):
+            # Raise gr.Error for Gradio UI
+            gr.Error(f"Video file not found: {os.path.basename(video_path)}. Please check the 'source/videos' directory.")
+            # Return an error frame and figure as per existing logic
             error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(
                 error_frame,
-                f"Video file not found: {os.path.basename(video_path)}",
+                f"Video Not Found: {os.path.basename(video_path)}", # Updated message
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (255, 0, 0),
+                (0, 0, 255), # Red color for error text
                 2
             )
-            fig = plot_bar([("Error", 0.0)])
+            fig = plot_bar([("Video Not Found", 0.0)])
             return error_frame, fig, format_stats_for_display()
             
         # Update detector settings if tracking setting has changed
@@ -700,17 +770,18 @@ def process_video_frame(
         cap.release()
         
         if not ret:
+            gr.Warning(f"Could not read frame {frame_idx} from {os.path.basename(video_path)}. The video file might be corrupted or incomplete.")
             error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(
                 error_frame,
-                f"Could not read frame {frame_idx} from {os.path.basename(video_path)}",
+                f"Frame Read Error: {os.path.basename(video_path)} Frame {frame_idx}", # Updated message
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (255, 0, 0),
+                (0, 0, 255), # Red color for error text
                 2
             )
-            fig = plot_bar([("Error", 0.0)])
+            fig = plot_bar([("Frame Read Error", 0.0)])
             return error_frame, fig, format_stats_for_display()
         
         # Convert to RGB
@@ -732,23 +803,29 @@ def process_video_frame(
         return frame_with_faces, fig, format_stats_for_display()
         
     except Exception as e:
-        logger.error(f"Error processing video frame: {str(e)}")
+            user_friendly_message = f"Error processing video frame: {str(e)}. Please check the video file and system logs."
+            logger.error(user_friendly_message)
         logger.error(traceback.format_exc())
+            gr.Error(user_friendly_message) # Display error in Gradio UI
         
         # Create error frame
-        error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        error_frame = np.zeros((480, 640, 3), dtype=np.uint8) # Default error frame
+        # Try to use the original frame if available, otherwise use the blank one
+        if 'frame' in locals() and frame is not None:
+            error_frame = frame.copy()
+
         cv2.putText(
             error_frame,
-            f"Error: {str(e)}",
+            f"Processing Error: {str(e)}", # More specific message
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
-            (255, 0, 0),
+            (0, 0, 255), # Red color
             2
         )
         
         # Create error figure
-        fig = plot_bar([("Error", 0.0)])
+        fig = plot_bar([("Video Processing Error", 0.0)]) # More specific title
         
         return error_frame, fig, format_stats_for_display()
 
@@ -785,8 +862,9 @@ def video_play_loop(
         # Get video path
         video_path = video_paths.get(video_name)
         if not video_path or not os.path.exists(video_path):
-            error_msg = f"Video file not found: {video_name}"
+            error_msg = f"Video file not found: {video_name}. Please check 'source/videos/' directory."
             logger.error(error_msg)
+            gr.Error(error_msg) # Show Gradio error notification
             
             # Yield error message
             yield (
@@ -794,7 +872,7 @@ def video_play_loop(
                 None,  # plot
                 start_frame,  # slider
                 format_stats_for_display(),  # stats
-                error_msg,  # status
+                error_msg,  # status (Markdown)
                 False,  # playing
                 start_frame,  # current frame
                 0,  # total frames
@@ -870,7 +948,7 @@ def video_play_loop(
                 )
                 
                 # Create error figure
-                fig = plot_bar([("Error", 0.0)])
+                fig = plot_bar([("Frame Processing Error", 0.0)]) # More specific title
                 
                 # Yield error
                 yield (
@@ -878,7 +956,7 @@ def video_play_loop(
                     fig,  # plot
                     frame_idx,  # slider
                     format_stats_for_display(),  # stats
-                    f"Error processing frame {frame_idx}: {str(e)}",  # status
+                    f"Error processing frame {frame_idx} in {video_name}: {str(e)}",  # More specific status
                     playing,  # playing
                     frame_idx,  # current frame
                     total_frames,  # total frames
@@ -915,24 +993,26 @@ def video_play_loop(
             None,  # plot
             start_frame,  # slider
             format_stats_for_display(),  # stats
-            f"Error: {str(e)}",  # status
+            f"Video Playback Error: {str(e)}. Check logs.",  # status
             False,  # playing
             start_frame,  # current frame
             0,  # total frames
         )
 
 
-def reload_gallery() -> Tuple[str, Dict[str, Any]]:
+def reload_gallery() -> str:
     """
     Reload gallery embeddings.
     
     Returns:
-        Tuple of status message and updated state
+        Status message
     """
     global DETECTOR, RECOGNIZER, GALLERY_EMBEDDINGS, GALLERY_NAMES
     
     try:
         if RECOGNIZER:
+            logger.info("Recognizer found, proceeding with gallery reload.")
+            # This call might raise RuntimeError if load_gallery_embeddings fails
             GALLERY_EMBEDDINGS, GALLERY_NAMES = load_gallery_embeddings(RECOGNIZER)
             
             # Count embeddings
@@ -940,15 +1020,49 @@ def reload_gallery() -> Tuple[str, Dict[str, Any]]:
             total_people = len(GALLERY_EMBEDDINGS)
             
             if total_embeddings > 0:
-                return f"Successfully loaded {total_embeddings} embeddings for {total_people} people", {}
+                msg = f"Successfully loaded {total_embeddings} embeddings for {total_people} people."
+                logger.info(msg)
+                return msg
             else:
-                return "No gallery embeddings found. Please add faces to source/photo/contestants/", {}
+                msg = "No gallery embeddings found or loaded. Please check 'source/photo/contestants/' and logs."
+                logger.warning(msg)
+                return msg
         else:
-            return "Models not initialized yet. Add a frame to initialize.", {}
+            msg = "Models not initialized. Cannot reload gallery. Process a frame or webcam feed first."
+            logger.warning(msg)
+            return msg
             
+    except RuntimeError as e: # Catch specific error from load_gallery_embeddings
+        error_msg = f"Failed to reload gallery: {str(e)}"
+        logger.error(error_msg)
+        return error_msg # Return the user-friendly message from the caught exception
     except Exception as e:
-        logger.error(f"Error reloading gallery: {str(e)}")
-        return f"Error reloading gallery: {str(e)}", {}
+        error_msg = f"Unexpected error reloading gallery: {str(e)}. Check logs for details."
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return error_msg
+
+# Action functions for reload_gallery buttons
+def reload_gallery_action():
+    """
+    Action for the reload gallery button.
+    Updates UI to show loading state, reloads gallery, then updates UI with result.
+    This function is a generator.
+    """
+    yield "Reloading gallery, please wait...", gr.update(interactive=False)
+    try:
+        # reload_gallery now returns a message, or raises an exception that is caught here
+        result_message = reload_gallery() 
+        if "Error" in result_message or "Failed" in result_message or "Could not" in result_message:
+            gr.Warning(result_message) # Show warning for non-critical load issues
+        else:
+            gr.Info(result_message) # Show info for success
+        yield result_message, gr.update(interactive=True)
+    except Exception as e: # Catch any other unexpected errors
+        logger.error(f"Critical exception in reload_gallery_action: {str(e)}")
+        logger.error(traceback.format_exc())
+        gr.Error(f"A critical error occurred during gallery reload: {str(e)}")
+        yield f"Critical error: {str(e)}", gr.update(interactive=True)
 
 
 # Create the Gradio interface
@@ -1012,41 +1126,16 @@ def create_interface():
                             plot_output = gr.Plot(label="Recognition Results")
                             
                         with gr.Tab("Settings"):
-                            with gr.Group():
-                                gr.Markdown("### Recognition Settings")
-                                similarity_threshold = gr.Slider(
-                                    minimum=0.3,
-                                    maximum=0.9,
-                                    value=0.6,
-                                    step=0.05,
-                                    label="Similarity Threshold",
-                                    info="Lower values match more faces but may have false positives",
-                                )
-                                use_tracking = gr.Checkbox(
-                                    value=True,
-                                    label="Use Face Tracking",
-                                    info="Improves performance by tracking faces between frames",
-                                )
-                                max_matches = gr.Slider(
-                                    minimum=1,
-                                    maximum=10,
-                                    value=3,
-                                    step=1,
-                                    label="Max Matches Per Face",
-                                    info="Maximum number of matches to show for each face",
-                                )
-                                visualization_type = gr.Radio(
-                                    choices=["bar", "scatter"],
-                                    value="bar",
-                                    label="Visualization Type",
-                                    info="Bar chart or embedding scatter plot",
-                                )
+                            (similarity_threshold_video, 
+                             use_tracking_video, 
+                             max_matches_video, 
+                             visualization_type_video) = create_recognition_settings_group()
                         
                         with gr.Tab("Status"):
-                            stats_html = gr.HTML(value=format_stats_for_display(), label="Performance Stats")
-                            reset_stats_btn = gr.Button("Reset Statistics")
-                            reload_gallery_btn = gr.Button("Reload Gallery")
-                            gallery_status = gr.Markdown("Gallery not loaded yet")
+                            (stats_html_video, 
+                             reset_stats_btn_video, 
+                             reload_gallery_btn_video, 
+                             gallery_status_video) = create_status_group()
             
             # Webcam input tab
             with gr.TabItem("Webcam Mode") as webcam_tab:
@@ -1062,103 +1151,521 @@ def create_interface():
                             webcam_plot = gr.Plot(label="Recognition Results")
                             
                         with gr.Tab("Settings"):
-                            with gr.Group():
-                                gr.Markdown("### Recognition Settings")
-                                webcam_threshold = gr.Slider(
-                                    minimum=0.3,
-                                    maximum=0.9,
-                                    value=0.6,
-                                    step=0.05,
-                                    label="Similarity Threshold",
-                                    info="Lower values match more faces but may have false positives",
-                                )
-                                webcam_tracking = gr.Checkbox(
-                                    value=True,
-                                    label="Use Face Tracking",
-                                    info="Improves performance by tracking faces between frames",
-                                )
-                                webcam_max_matches = gr.Slider(
-                                    minimum=1,
-                                    maximum=10,
-                                    value=3,
-                                    step=1,
-                                    label="Max Matches Per Face",
-                                    info="Maximum number of matches to show for each face",
-                                )
-                                webcam_visualization = gr.Radio(
-                                    choices=["bar", "scatter"],
-                                    value="bar",
-                                    label="Visualization Type",
-                                    info="Bar chart or embedding scatter plot",
-                                )
+                            (similarity_threshold_webcam, 
+                             use_tracking_webcam, 
+                             max_matches_webcam, 
+                             visualization_type_webcam) = create_recognition_settings_group()
                         
                         with gr.Tab("Status"):
-                            webcam_stats = gr.HTML(value=format_stats_for_display(), label="Performance Stats")
-                            webcam_reset_btn = gr.Button("Reset Statistics")
-                            webcam_reload_btn = gr.Button("Reload Gallery")
-                            webcam_status = gr.Markdown("Ready to process webcam feed")
+                            (stats_html_webcam, 
+                             reset_stats_btn_webcam, 
+                             reload_gallery_btn_webcam, 
+                             gallery_status_webcam) = create_status_group()
         
         # Help tab
         with gr.Row():
             gr.Markdown("""
             ### Instructions
-            1. **Video Analysis:** Upload MP4 files to `source/videos/` directory
-            2. **Add People:** Add face images to `source/photo/contestants/` directory
-            3. **Recognition Settings:** Adjust threshold and tracking for optimal performance
-            4. **Save Results:** Screenshots will be automatically saved in the `output` directory
-            
-            For technical support or issues, check the log file or repository documentation.
+
+            1.  **Video Analysis:**
+                *   Upload your MP4, AVI, MOV, MKV, or WEBM video files into the `source/videos/` directory in the project.
+                *   Select the video from the dropdown in the "Video Analysis" tab.
+                *   Use the player controls and frame slider to navigate or analyze specific frames.
+
+            2.  **Gallery Management (Known Faces):**
+                The system identifies faces by comparing them against a gallery of known individuals. Here's how to manage it:
+                *   **Main Gallery Folder:** All known faces should be organized within the `source/photo/contestants/` directory in your project.
+                *   **Adding a New Person:**
+                    1.  Inside `source/photo/contestants/`, create a new sub-folder for the person.
+                    2.  **Folder Naming:** For best results, name this folder using the format `ID_DisplayName` (e.g., `001_AliceSmith`, `002_BobJohnson`).
+                        *   The `DisplayName` (e.g., AliceSmith) will be used in the recognition results.
+                        *   If the `_DisplayName` part is omitted (e.g., folder named just `001`), the `ID` (e.g., 001) will be used as the name.
+                    3.  Place one or more clear photos of this person into their newly created sub-folder. More photos, especially with varied angles and expressions, can improve recognition accuracy.
+                    4.  Supported image types are `.jpg`, `.jpeg`, and `.png`.
+                *   **Removing a Person:**
+                    1.  Delete the person's entire sub-folder (e.g., `001_AliceSmith`) from the `source/photo/contestants/` directory.
+                *   **Applying Changes:**
+                    *   After making any changes to the gallery (adding new people, adding/removing photos, deleting person folders), you **must** click the **"Reload Gallery"** button.
+                    *   This button is located in the "Status" tab within both the "Video Analysis" and "Webcam Mode" sections. This action rescans the gallery and updates the face recognition database.
+
+            3.  **Recognition Settings:**
+                *   Adjust the "Similarity Threshold", "Face Tracking", and other settings in the "Settings" tab for optimal performance based on your input.
+                *   Experiment with these settings to find the best balance between detection accuracy and speed.
+
+            4.  **Webcam Mode:**
+                *   Ensure your webcam is connected and permissions are granted if prompted by your browser.
+                *   The processed feed will appear in the "Webcam Output" panel.
+
+            5.  **Viewing Results:**
+                *   Detected faces will be highlighted in the output images/video.
+                *   Recognition results (name, confidence) and visualizations (bar chart or scatter plot) are shown in the "Visualization" tab.
+                *   Performance statistics (FPS, processing times) are available in the "Status" tab.
+
+            6.  **Saving Results (Screenshots):**
+                *   Screenshots of processed frames with detected faces are automatically saved in the `output/screenshots/` directory. These are timestamped for easy reference.
+
+            For technical support, to report issues, or for more advanced configurations, please check the application's log file (`gradio_app.log`) or consult the project's repository documentation.
             """)
         
         # Event handlers for video tab
-        def update_video_slider(video_name):
-            """Update slider when video changes."""
-            if not video_name or video_name not in video_files:
-                return gr.update(maximum=100, value=0), "No video selected", {
-                    "playing": False,
-                    "current_frame": 0,
-                    "total_frames": 0,
-                    "input_mode": "video",
-                }
+            
+            # Connect reset statistics button for video tab
+            reset_stats_btn_video.click(
+                reset_stats,
+                outputs=[stats_html_video],
+                queue=False
+            )
+            
+            # Connect reload gallery button for video tab
+            reload_gallery_btn_video.click(
+                reload_gallery_action,
+                outputs=[gallery_status_video, reload_gallery_btn_video],
+                queue=True # Use queue for generator
+            )
+
+        def update_video_slider(video_name, current_state):
+            """Update slider when video changes. Also clears outputs if video is invalid."""
+            logger.info(f"update_video_slider called with video_name: {video_name}")
+            
+            # Default state to reset to on failure
+            reset_s = {
+                "playing": False,
+                "current_frame": 0,
+                "total_frames": 0,
+                "input_mode": "video",
+            }
+
+            if not video_name or video_name not in video_files or not os.path.exists(video_files.get(video_name, "")):
+                status_message = "No video selected or video file not found."
+                if video_name and (video_name not in video_files or not os.path.exists(video_files.get(video_name, ""))):
+                    status_message = f"Video file '{video_name}' not found. Please check file path or select a valid video."
+                    gr.Warning(status_message)
+                
+                logger.info(f"Invalid video selection: {video_name}. Resetting UI.")
+                # Outputs: frame_slider, video_status, state, video_player_image, plot_output
+                return (
+                    gr.update(maximum=0, value=0, interactive=False), 
+                    status_message, 
+                    reset_s,
+                    None, # Clear video_player_image
+                    None  # Clear plot_output
+                )
             
             video_path = video_files[video_name]
             try:
                 cap = cv2.VideoCapture(video_path)
+                if not cap.isOpened():
+                    cap.release()
+                    error_msg = f"Failed to open video: {video_name}. It might be corrupted or an unsupported format."
+                    gr.Error(error_msg)
+                    logger.error(error_msg)
+                    return (
+                        gr.update(maximum=0, value=0, interactive=False), 
+                        error_msg, 
+                        reset_s,
+                        None, 
+                        None
+                    )
+
                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 cap.release()
                 
-                return gr.update(maximum=total_frames-1, value=0), f"Loaded {video_name} ({total_frames} frames)", {
+                if total_frames == 0:
+                    error_msg = f"Video '{video_name}' has 0 frames or could not be read properly."
+                    gr.Warning(error_msg)
+                    logger.warning(error_msg)
+                    return (
+                        gr.update(maximum=0, value=0, interactive=False),
+                        error_msg,
+                        reset_s,
+                        None,
+                        None
+                    )
+
+                logger.info(f"Successfully loaded video '{video_name}' with {total_frames} frames.")
+                success_s = {
                     "playing": False,
-                    "current_frame": 0,
+                    "current_frame": 0, # Will be processed by initial_video_load
                     "total_frames": total_frames,
                     "input_mode": "video",
                 }
+                return (
+                    gr.update(maximum=total_frames - 1, value=0, interactive=True), 
+                    f"Video '{video_name}' loaded ({total_frames} frames). Processing initial frame...",
+                    success_s,
+                    None, # video_player_image will be updated by initial_video_load
+                    None  # plot_output will be updated by initial_video_load
+                )
+
             except Exception as e:
-                logger.error(f"Error loading video: {str(e)}")
-                return gr.update(maximum=100, value=0), f"Error loading video: {str(e)}", initial_state
-        
-        def update_video_frame(video_name, frame_idx, threshold, vis_type, tracking, max_match):
-            """Update frame when slider changes."""
-            if not video_name or video_name not in video_files:
-                return None, None, "No video selected", {}
+                error_msg = f"Critical error loading video '{video_name}': {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                gr.Error(error_msg)
+                return (
+                    gr.update(maximum=0, value=0, interactive=False), 
+                    error_msg, 
+                    reset_s,
+                    None, 
+                    None
+                )
+
+        def initial_video_load(video_name, current_state, threshold, vis_type, tracking, max_match):
+            """Loads the initial frame (frame 0) of the selected video AFTER update_video_slider."""
+            logger.info(f"initial_video_load called for video: {video_name}, current_state total_frames: {current_state.get('total_frames')}")
+
+            if not video_name or video_name not in video_files or current_state.get("total_frames", 0) == 0:
+                logger.warning(f"initial_video_load: Skipping frame processing for '{video_name}' due to invalid state or zero total frames.")
+                # Outputs: video_player_image, plot_output, video_status, stats_html_video, frame_slider (no change needed), state (no change needed)
+                return None, None, "No valid video loaded to process initial frame.", format_stats_for_display(), gr.update(), current_state
+
+            video_path = video_files[video_name]
+            logger.info(f"initial_video_load: Processing frame 0 for {video_path}")
+            
+            try:
+                processed_frame, plot, stats_text = process_video_frame(
+                    video_path, 0, threshold, vis_type, tracking, max_match
+                )
+                # Update state's current_frame, though it should be 0 from update_video_slider's success path
+                updated_s = {**current_state, "current_frame": 0} 
+                logger.info(f"initial_video_load: Successfully processed frame 0 for {video_name}")
+                return processed_frame, plot, f"Displaying frame 0 of {video_name}.", stats_text, gr.update(value=0), updated_s
+            except Exception as e:
+                error_message = f"Error processing initial frame of '{video_name}': {str(e)}"
+                logger.error(error_message, exc_info=True)
+                gr.Error(error_message)
+                return None, plot_bar([("Load Error", 0.0)]), error_message, format_stats_for_display(), gr.update(value=0, interactive=False), current_state
+
+        def update_video_frame_on_slider_release(video_name, frame_idx, threshold, vis_type, tracking, max_match, current_state):
+            """Update frame when slider is released."""
+            logger.info(f"update_video_frame_on_slider_release for video: {video_name}, frame: {frame_idx}")
+            if not video_name or video_name not in video_files or current_state.get("total_frames", 0) == 0:
+                logger.warning("Slider released but no valid video loaded or video is empty.")
+                # Outputs: video_player_image, plot_output, video_status, stats_html_video, state
+                return None, None, "Cannot process frame: No valid video selected or video is empty.", format_stats_for_display(), current_state
             
             video_path = video_files[video_name]
             try:
-                # Process the video frame
-                frame, plot, stats = process_video_frame(
-                    video_path,
-                    frame_idx,
+                processed_frame, plot, stats_text = process_video_frame(
+                    video_path, frame_idx, threshold, vis_type, tracking, max_match
+                )
+                updated_s = {**current_state, "current_frame": frame_idx}
+                return processed_frame, plot, f"Displaying frame {frame_idx} of {video_name}.", stats_text, updated_s
+            except Exception as e:
+                error_message = f"Failed to update video frame (slider release): {str(e)}"
+                logger.error(error_message, exc_info=True)
+                gr.Error(error_message)
+                # Outputs: video_player_image, plot_output, video_status, stats_html_video, state
+                return None, plot_bar([("Frame Error", 0.0)]), error_message, format_stats_for_display(), current_state
+        
+        def _update_video_frame_on_setting_change(video_name, frame_idx, threshold, vis_type, tracking, max_match, current_state):
+            """Dedicated handler for settings changes, re-processes current frame."""
+            logger.info(f"Settings changed. Re-processing frame {frame_idx} for video {video_name}.")
+            if not video_name or video_name not in video_files or current_state.get("total_frames", 0) == 0:
+                logger.warning("Setting changed but no valid video loaded. Cannot re-process.")
+                # Outputs: video_player_image, plot_output, video_status, stats_html_video
+                return None, None, "Cannot re-process: No valid video loaded.", format_stats_for_display()
+
+            video_path = video_files[video_name]
+            try:
+                # Re-use the core processing logic
+                processed_frame, plot, stats_text = process_video_frame(
+                    video_path, frame_idx, threshold, vis_type, tracking, max_match
+                )
+                # Note: We don't update state's current_frame here as it's already the correct one.
+                return processed_frame, plot, f"Re-processed frame {frame_idx} of {video_name} with new settings.", stats_text
+            except Exception as e:
+                error_message = f"Failed to re-process frame on setting change: {str(e)}"
+                logger.error(error_message, exc_info=True)
+                gr.Error(error_message)
+                # Outputs: video_player_image, plot_output, video_status, stats_html_video
+                return None, plot_bar([("Settings Error", 0.0)]), error_message, format_stats_for_display()
+
+        # Event handlers for frame slider and video settings
+        frame_slider.release(  # Changed from .change to .release
+            update_video_frame_on_slider_release,
+            inputs=[
+                video_dropdown,
+                frame_slider,
+                similarity_threshold_video,
+                visualization_type_video,
+                use_tracking_video,
+                max_matches_video,
+                state # Pass current state
+            ],
+            outputs=[video_player_image, plot_output, video_status, stats_html_video, state], # state is an output
+            queue=True
+        )
+        
+        settings_inputs_video = [
+            video_dropdown,
+            frame_slider, # Current frame index
+            similarity_threshold_video,
+            visualization_type_video,
+            use_tracking_video,
+            max_matches_video,
+            state # Pass current state
+        ]
+        
+        for setting_component in [similarity_threshold_video, use_tracking_video, max_matches_video, visualization_type_video]:
+            setting_component.change(
+                _update_video_frame_on_setting_change,
+                inputs=settings_inputs_video,
+                outputs=[video_player_image, plot_output, video_status, stats_html_video], # No state output here
+                queue=True 
+            )
+
+        # Function to handle webcam input
+        def process_webcam_input_stream(frame, threshold, vis_type, tracking, max_match):
+            """Process webcam stream."""
+            global DETECTOR, RECOGNIZER # Added to check model status
+            if frame is None:
+                return None, None, format_stats_for_display()
+
+            # Feedback for model initialization
+            if DETECTOR is None or RECOGNIZER is None:
+                gr.Info("Initializing models for webcam, please wait...")
+            
+            try:
+                processed_frame, plot, stats_text = process_webcam_frame(
+                    frame,
                     threshold,
                     vis_type,
                     tracking,
                     max_match,
                 )
-                
-                return frame, plot, f"Showing frame {frame_idx}", stats
+                return processed_frame, plot, stats_text
             except Exception as e:
-                logger.error(f"Error updating frame: {str(e)}")
-                return None, None, f"Error: {str(e)}", format_stats_for_display()
+                error_message = f"Error processing webcam stream: {str(e)}"
+                logger.error(error_message)
+                logger.error(traceback.format_exc())
+                gr.Error(error_message) # Show error in Gradio UI
+
+                # Create error frame
+                current_frame_for_error = frame.copy() if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(
+                    current_frame_for_error,
+                    f"Stream Error: {str(e)}", # More specific message
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255), # Red color
+                    2
+                )
+                # Create error plot
+                fig = plot_bar([("Webcam Stream Error", 0.0)]) # More specific title
+                return current_frame_for_error, fig, format_stats_for_display()
+
+        # Event handlers for webcam tab
+        webcam_input.stream(
+            process_webcam_input_stream,
+            inputs=[
+                webcam_input,
+                similarity_threshold_webcam,
+                visualization_type_webcam,
+                use_tracking_webcam,
+                max_matches_webcam,
+            ],
+            outputs=[webcam_output, webcam_plot, stats_html_webcam],
+            show_progress="hidden",
+        )
+
+        # Connect reset statistics button for webcam tab
+        reset_stats_btn_webcam.click(
+            reset_stats,
+            outputs=[stats_html_webcam],
+            queue=False
+        )
+            
+        # Connect reload gallery button for webcam tab
+        reload_gallery_btn_webcam.click(
+                reload_gallery_action, # Use the same action function
+                outputs=[gallery_status_webcam, reload_gallery_btn_webcam],
+                queue=True # Use queue for generator
+        )
         
-        # Function to handle webcam input
-        def process_webcam_
+        # Video playback logic (play, pause, next, prev)
+        # ... (This part needs to be carefully reviewed and updated if necessary)
+        
+        # Update video dropdown:
+        # 1. Calls update_video_slider to set up slider, state, and clear outputs if invalid.
+        # 2. Then calls initial_video_load to process and display the first frame if valid.
+        video_dropdown.change(
+            update_video_slider,
+            inputs=[video_dropdown, state], # Pass state
+            outputs=[frame_slider, video_status, state, video_player_image, plot_output], # Ensure all outputs are covered
+            queue=True
+        ).then(
+            initial_video_load, # This is called after update_video_slider completes
+            inputs=[
+                video_dropdown, 
+                state, # Pass the updated state from update_video_slider
+                similarity_threshold_video, 
+                visualization_type_video, 
+                use_tracking_video, 
+                max_matches_video
+            ],
+            outputs=[ # Outputs for initial_video_load
+                video_player_image, 
+                plot_output, 
+                video_status, 
+                stats_html_video,
+                frame_slider, # initial_video_load can update slider (e.g. value, interactive)
+                state         # initial_video_load can update state
+            ],
+            queue=True
+        )
+        
+        # REMOVE app.load as per instructions, initial load handled by video_dropdown.change().then()
+        # app.load(
+        # initial_video_load,
+        # inputs=[
+        # video_dropdown, # Uses the default selected video
+        # similarity_threshold_video,
+        # visualization_type_video,
+        # use_tracking_video,
+        # max_matches_video,
+        # ],
+        # outputs=[
+        # video_player_image, 
+        # plot_output, 
+        # video_status, 
+        # stats_html_video,
+        # frame_slider, # Update slider value
+        # frame_slider, # Update slider maximum (this is a bit of a hack, ideally one output for max)
+        # ]
+        # )
+
+        # Video Playback Control Logic
+        # Play button
+        play_btn.click(
+            lambda current_state: {"playing": True, "input_mode": "video", **current_state},
+            inputs=[state],
+            outputs=[state],
+            queue=False
+        ).then(
+            video_play_loop,
+            inputs=[
+                video_dropdown,
+                gr.State(video_files), # Pass video_files as a state
+                frame_slider,
+                similarity_threshold_video,
+                visualization_type_video,
+                use_tracking_video,
+                max_matches_video,
+                state
+            ],
+            outputs=[
+                video_player_image,
+                plot_output,
+                frame_slider,
+                stats_html_video,
+                video_status,
+                state, # Update playing status
+                gr.Number(label="Current Frame", interactive=False), # For display
+                gr.Number(label="Total Frames", interactive=False)  # For display
+            ],
+            show_progress="hidden"
+        )
+
+        # Pause button
+        pause_btn.click(
+            lambda current_state: {"playing": False, **current_state},
+            inputs=[state],
+            outputs=[state],
+            queue=False
+        )
+
+        # Previous Frame button
+        def go_to_prev_frame(current_frame_idx, video_name, threshold, vis_type, tracking, max_match):
+            new_frame_idx = max(0, current_frame_idx - 1)
+            frame, plot, status, stats = update_video_frame(video_name, new_frame_idx, threshold, vis_type, tracking, max_match)
+            return frame, plot, new_frame_idx, status, stats
+
+        prev_frame_btn.click(
+            go_to_prev_frame,
+            inputs=[
+                frame_slider,
+                video_dropdown,
+                similarity_threshold_video,
+                visualization_type_video,
+                use_tracking_video,
+                max_matches_video,
+            ],
+            outputs=[video_player_image, plot_output, frame_slider, video_status, stats_html_video],
+            queue=True
+        )
+
+        # Next Frame button
+        def go_to_next_frame(current_frame_idx, total_frames, video_name, threshold, vis_type, tracking, max_match):
+            # total_frames comes from state.total_frames, need to ensure it's up-to-date
+            new_frame_idx = min(total_frames - 1 if total_frames > 0 else 0, current_frame_idx + 1)
+            frame, plot, status, stats = update_video_frame(video_name, new_frame_idx, threshold, vis_type, tracking, max_match)
+            return frame, plot, new_frame_idx, status, stats
+
+        next_frame_btn.click(
+            lambda current_frame_idx, current_state, video_name, threshold, vis_type, tracking, max_match: \
+                go_to_next_frame(current_frame_idx, current_state.get("total_frames", 0), video_name, threshold, vis_type, tracking, max_match),
+            inputs=[
+                frame_slider,
+                state, # Pass the whole state to get total_frames
+                video_dropdown,
+                similarity_threshold_video,
+                visualization_type_video,
+                use_tracking_video,
+                max_matches_video,
+            ],
+            outputs=[video_player_image, plot_output, frame_slider, video_status, stats_html_video],
+            queue=True
+        )
+
+        # Handle tab changes to set input mode in state
+        def on_tab_select(selected_tab: gr.SelectData, current_state: dict):
+            if selected_tab.index == 0: # Video tab
+                current_state["input_mode"] = "video"
+            elif selected_tab.index == 1: # Webcam tab
+                current_state["input_mode"] = "webcam"
+                # Reset stats when switching to webcam tab for a fresh view
+                reset_stats() 
+                return current_state, format_stats_for_display() # Also update webcam stats display
+            return current_state, gr.update() # No change to stats display for video tab
+
+        tabs.select(
+            on_tab_select,
+            inputs=[state],
+            outputs=[state, stats_html_webcam], # Update webcam stats on tab change
+            queue=False
+        )
+        
+        # Load initial frame for the default video when the app loads
+        # This uses the `load` event of the Blocks object
+        app.load(
+            initial_video_load,
+            inputs=[
+                video_dropdown, # Uses the default selected video
+                similarity_threshold_video,
+                visualization_type_video,
+                use_tracking_video,
+                max_matches_video,
+            ],
+            outputs=[
+                video_player_image, 
+                plot_output, 
+                video_status, 
+                stats_html_video,
+                frame_slider, # Update slider value
+                frame_slider, # Update slider maximum (this is a bit of a hack, ideally one output for max)
+            ]
+        )
+
+    return app
+
+
+if __name__ == "__main__":
+    # Initialize models globally (optional, can be done on first frame too)
+    # DETECTOR, RECOGNIZER = initialize_models()
+    # GALLERY_EMBEDDINGS, GALLERY_NAMES = load_gallery_embeddings(RECOGNIZER)
+    
+    app_instance = create_interface()
+    app_instance.queue(max_size=20).launch(share=True, debug=True)
+    logger.info("Gradio app launched.")
 
