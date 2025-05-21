@@ -493,8 +493,8 @@ class StandardFaceRecognizer(FaceRecognizer):
 
         # Vectorized normalization (faster than element-wise)
         # Reshape for broadcasting
-        mean = self.mean.reshape(1, 1, 3)
-        std = self.std.reshape(1, 1, 3)
+        mean = self.mean.reshape((1, 1, 3))
+        std = self.std.reshape((1, 1, 3))
         face_img = (face_img - mean) / std
 
         # HWC to NCHW format for the model
@@ -505,6 +505,7 @@ class StandardFaceRecognizer(FaceRecognizer):
             face_img = np.transpose(face_img, (2, 0, 1)).copy()
         face_img = np.expand_dims(face_img, axis=0)
 
+        print(f"DEBUG preprocess_face: returning shape {face_img.shape}, dtype {face_img.dtype}")
         return face_img
 
     def compute_embedding(self, face_img: np.ndarray) -> np.ndarray:
@@ -519,6 +520,10 @@ class StandardFaceRecognizer(FaceRecognizer):
         """
         start_time = time.time()
 
+        # Explicitly ensure float32 and contiguous memory for ONNX runtime
+        if face_img.dtype != np.float32 or not face_img.flags.c_contiguous:
+            face_img = np.ascontiguousarray(face_img, dtype=np.float32)
+
         # Check for cached embeddings
         img_hash = self._compute_image_hash(face_img)
         cache_key = f"embedding_{img_hash}"
@@ -528,11 +533,6 @@ class StandardFaceRecognizer(FaceRecognizer):
             return cached_embedding
 
         try:
-            # Use model to get embedding
-            # Ensure contiguous memory for optimal inference speed
-            if not face_img.flags.c_contiguous:
-                face_img = np.ascontiguousarray(face_img)
-
             outputs = self.session.run([self.output_name], {self.input_name: face_img})
             embedding = outputs[0][0]
 

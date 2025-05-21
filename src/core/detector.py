@@ -782,5 +782,5 @@ class FaceDetector:
             self.executor.shutdown()
 
         # Clean up backend
-        if self.backend == self.BACKEND_MEDIAPIPE and hasattr(self, "detector"):
+        if hasattr(self, "backend") and self.backend == self.BACKEND_MEDIAPIPE and hasattr(self, "detector"):
             self.detector.close()
