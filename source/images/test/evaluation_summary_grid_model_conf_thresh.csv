@@ -1,0 +1,2 @@
+recognition_model,detection_confidence,recognition_threshold,correct_recognitions,incorrect_recognitions (misidentified_known),missed_known_faces (FN),false_positives_on_unknown,correctly_unidentified_unknowns (TN_unknown),total_detected_faces,total_gt_known_faces_in_image,total_gt_unknown_faces_in_image
+sface,0.3,0.4,1,7,0,2,0,10,8,2

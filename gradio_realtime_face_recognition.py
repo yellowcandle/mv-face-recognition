@@ -15,7 +15,7 @@ from insightface.app.common import Face as InsightFaceObject
 from PIL import Image, ImageDraw, ImageFont
 
 from src.core.detector import FaceDetector
-from src.recognition.face_recognizer import FaceRecognizer  # MODIFIED: Added import
+from src.recognition.face_recognizer import FaceRecognizer
 
 # Configure logging
 logging.basicConfig(
@@ -43,8 +43,8 @@ FONT_SIZE = 60
 CONTESTANT_INFO_PATH = "contestant_info.csv"
 EMBEDDING_DIR = "source/photo/contestants/embeddings"
 VIDEO_DIR = "source/videos"
-RECOGNITION_THRESHOLD = 0.4
-DETECTION_SCORE_THRESHOLD = 0.2
+RECOGNITION_THRESHOLD = 0.4 # Reverting to a general threshold for SFace
+DETECTION_SCORE_THRESHOLD = 0.2 # Reverting to a general threshold
 
 # =============================================================================
 # Face Recognition Module
@@ -72,9 +72,10 @@ def load_contestant_info():
         return pd.DataFrame(), {}, {}
 
 
-def load_gallery_embeddings():
-    """Load embeddings from the gallery directory."""
+def load_gallery_embeddings(expected_embedding_size: int):
+    """Load embeddings from the gallery directory and normalize them."""
     logger.info(f"Loading embeddings from: {os.path.abspath(EMBEDDING_DIR)}")
+    logger.info(f"Expected embedding dimension: {expected_embedding_size}")
 
     # Load contestant info for proper name display
     _, _, nickname_to_display = load_contestant_info()
@@ -86,35 +87,36 @@ def load_gallery_embeddings():
     gallery_nicknames = []
     gallery_display_names = []
     gallery_embeddings = []
-    embedding_dimensions = None
 
     for f in embedding_files:
         try:
             arr = np.load(f)
             arr = arr.flatten()
 
-            # Accept any 1D embedding array
+            # Ensure embedding is 1D and resize if necessary to match expected size
             if len(arr.shape) == 1:
-                if embedding_dimensions is None:
-                    # Set the first encountered dimension as our standard
-                    embedding_dimensions = arr.shape[0]
-                    logger.info(f"Using embedding dimension: {embedding_dimensions}")
-
-                # If dimensions don't match, resize the embedding
-                if arr.shape[0] != embedding_dimensions:
+                if arr.shape[0] != expected_embedding_size:
                     logger.warning(
                         f"Embedding in {os.path.basename(f)} has dimension {arr.shape[0]}, "
-                        f"resizing to {embedding_dimensions}"
+                        f"resizing to expected {expected_embedding_size}"
                     )
 
                     # Resize strategy: either truncate or pad with zeros
-                    if arr.shape[0] > embedding_dimensions:
+                    if arr.shape[0] > expected_embedding_size:
                         # Truncate to the standard dimension
-                        arr = arr[:embedding_dimensions]
+                        arr = arr[:expected_embedding_size]
                     else:
                         # Pad with zeros
-                        padding = np.zeros(embedding_dimensions - arr.shape[0])
+                        padding = np.zeros(expected_embedding_size - arr.shape[0])
                         arr = np.concatenate([arr, padding])
+
+                # L2 Normalize the embedding
+                norm = np.linalg.norm(arr)
+                if norm > 1e-9: # Avoid division by zero
+                    arr = arr / norm
+                else:
+                    logger.warning(f"Embedding for {os.path.basename(f)} has zero norm. Skipping.")
+                    continue # Skip this embedding if norm is zero
 
                 nickname = os.path.basename(f).replace("_embedding.npy", "")
                 gallery_nicknames.append(nickname)
@@ -137,10 +139,10 @@ def load_gallery_embeddings():
     if not gallery_embeddings:
         logger.error("No embeddings found in gallery! Face recognition will not work.")
         return (
-            np.empty((0, 128), dtype=np.float32),
+            np.empty((0, expected_embedding_size), dtype=np.float32),
             [],
             [],
-        )  # MODIFIED: Default to 128 for consistency
+        )
 
     logger.info(f"Loaded {len(gallery_embeddings)} embeddings from gallery")
     if gallery_embeddings:
@@ -564,6 +566,33 @@ def get_frame_by_index(
 # Gradio UI Module
 # =============================================================================
 
+def process_static_image(image: np.ndarray, vis_type: str = "bar") -> Tuple[np.ndarray, plt.Figure]:
+    logger.debug(f"Processing static image with visualization type: {vis_type}")
+    
+    # Re-initialize detector and recognizer for this function call to ensure latest settings
+    # This is a simplified approach; in a real app, these might be global or passed
+    core_detector = FaceDetector(
+        backend=FaceDetector.BACKEND_INSIGHTFACE, model_size=(640, 640), device="auto"
+    )
+    sface_model_path = os.path.join("models", "face_recognition_sface.onnx")
+    face_recognizer_instance = FaceRecognizer(
+        face_detector=core_detector,
+        similarity_threshold=RECOGNITION_THRESHOLD,
+        model_path=sface_model_path
+    )
+    
+    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings(face_recognizer_instance.embedding_size)
+
+    # Use the existing process_frame logic
+    return process_frame(
+        image,
+        core_detector,
+        face_recognizer_instance,
+        gallery_embeddings,
+        gallery_display_names,
+        vis_type,
+    )
+
 
 def build_gradio_interface():
     # Create detector with proper access to providers attribute
@@ -572,17 +601,19 @@ def build_gradio_interface():
     )
     # No longer trying to access non-existent 'providers' attribute
 
-    # MODIFIED: Initialize FaceRecognizer instance
-    face_recognizer_instance = FaceRecognizer(face_detector=core_detector, use_arcface=True)
-    logger.info(
-        f"Initialized FaceRecognizer for Gradio with embedding size: {face_recognizer_instance.embedding_size}"
+    # MODIFIED: Initialize FaceRecognizer instance with optimized model path and threshold
+    sface_model_path = os.path.join("models", "face_recognition_sface.onnx")
+    face_recognizer_instance = FaceRecognizer(
+        face_detector=core_detector,
+        similarity_threshold=RECOGNITION_THRESHOLD, # Use the updated constant
+        model_path=sface_model_path # Explicitly use the sface model path
     )
-    if face_recognizer_instance.embedding_size != 128:
-        logger.warning(
-            f"Gradio's FaceRecognizer is NOT using 128-dim embeddings. Current: {face_recognizer_instance.embedding_size}. Check SFace model."
-        )
+    logger.info(
+        f"Initialized FaceRecognizer for Gradio with model: {face_recognizer_instance.model_path}, embedding size: {face_recognizer_instance.embedding_size}"
+    )
+    # SFace model is expected to be 128-dim.
 
-    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings()
+    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings(face_recognizer_instance.embedding_size)
     video_files = [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith(".mp4")]
     video_paths = {f: os.path.join(VIDEO_DIR, f) for f in video_files}
 
@@ -631,6 +662,7 @@ def build_gradio_interface():
                 )
                 if result:
                     out_frame, fig = result
+                    time.sleep(0.04)  # FPS control
                     # Yield current frame, update slider to current_frame_idx, set playing to True, and prepare for *next* frame
                     yield (
                         out_frame,
@@ -708,63 +740,90 @@ def build_gradio_interface():
 
     with gr.Blocks(title="Face Recognition System", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# Real-Time Face Recognition & Embedding Visualization")
-        with gr.Row():
-            with gr.Column(scale=3):
-                video_dropdown = gr.Dropdown(
-                    choices=video_files,
-                    label="Select Video File",
-                    value=video_files[0] if video_files else None,
-                    interactive=True,
-                )
-            with gr.Column(scale=2):
-                vis_type = gr.Radio(
-                    ["bar", "scatter"], value="bar", label="Visualization Type", interactive=True
-                )
-        with gr.Row():
-            with gr.Column(scale=4):
-                frame_slider = gr.Slider(
-                    minimum=0, maximum=1, value=0, step=1, label="Frame Timeline", interactive=True
-                )
-            with gr.Column(scale=1):
-                with gr.Row():
-                    play_btn = gr.Button("▶️ Play", variant="primary")
-                    pause_btn = gr.Button("⏸️ Pause", variant="secondary")
-        with gr.Row():
-            with gr.Column(scale=3):
-                output_video = gr.Image(label="Video Frame with Recognized Faces")
-            with gr.Column(scale=2):
-                output_plot = gr.Plot(label="Similarity Visualization")
+        
+        with gr.Tab("Video Processing"):
+            with gr.Row():
+                with gr.Column(scale=3):
+                    video_dropdown = gr.Dropdown(
+                        choices=video_files,
+                        label="Select Video File",
+                        value=video_files[0] if video_files else None,
+                        interactive=True,
+                    )
+                with gr.Column(scale=2):
+                    vis_type_video = gr.Radio(
+                        ["bar", "scatter"], value="bar", label="Visualization Type", interactive=True
+                    )
+            with gr.Row():
+                with gr.Column(scale=4):
+                    frame_slider = gr.Slider(
+                        minimum=0, maximum=1, value=0, step=1, label="Frame Timeline", interactive=True
+                    )
+                with gr.Column(scale=1):
+                    with gr.Row():
+                        play_btn = gr.Button("▶️ Play", variant="primary")
+                        pause_btn = gr.Button("⏸️ Pause", variant="secondary")
+            with gr.Row():
+                with gr.Column(scale=3):
+                    output_video = gr.Image(label="Video Frame with Recognized Faces")
+                with gr.Column(scale=2):
+                    output_plot_video = gr.Plot(label="Similarity Visualization")
+            
+            state = gr.State({"playing": False, "frame": 0, "total": 1})
+            video_dropdown.change(
+                fn=update_slider_on_video, inputs=[video_dropdown], outputs=[frame_slider, state]
+            )
+            frame_slider.change(
+                fn=update_frame,
+                inputs=[video_dropdown, frame_slider, vis_type_video],
+                outputs=[output_video, output_plot_video],
+            )
+            vis_type_video.change(
+                fn=update_frame,
+                inputs=[video_dropdown, frame_slider, vis_type_video],
+                outputs=[output_video, output_plot_video],
+            )
+            play_btn.click(
+                fn=play_loop,
+                inputs=[video_dropdown, vis_type_video, state],
+                outputs=[output_video, output_plot_video, frame_slider, state],
+                api_name=False,
+            )
+            pause_btn.click(
+                fn=lambda s: {"playing": False, "frame": s["frame"], "total": s["total"]},
+                inputs=[state],
+                outputs=[state],
+                api_name=False,
+            )
+
+        with gr.Tab("Static Image Processing"):
+            with gr.Row():
+                with gr.Column(scale=3):
+                    static_image_input = gr.Image(type="numpy", label="Upload Image for Recognition")
+                with gr.Column(scale=2):
+                    vis_type_static = gr.Radio(
+                        ["bar", "scatter"], value="bar", label="Visualization Type", interactive=True
+                    )
+            with gr.Row():
+                process_image_btn = gr.Button("Process Image", variant="primary")
+            with gr.Row():
+                with gr.Column(scale=3):
+                    output_static_image = gr.Image(label="Processed Image with Recognized Faces")
+                with gr.Column(scale=2):
+                    output_plot_static = gr.Plot(label="Similarity Visualization")
+            
+            process_image_btn.click(
+                fn=process_static_image,
+                inputs=[static_image_input, vis_type_static],
+                outputs=[output_static_image, output_plot_static],
+            )
+
         gr.Markdown("### Instructions")
         with gr.Accordion("Help", open=False):
             gr.Markdown(
-                "- **Select Video**: Choose a video file from the dropdown\n- **Visualization Type**: \n    - **Bar**: Shows similarity scores for recognized faces\n    - **Scatter**: Shows UMAP projection of face embeddings\n- **Frame Timeline**: Drag to navigate through the video\n- **Play/Pause**: Control video playback"
+                "- **Select Video**: Choose a video file from the dropdown\n- **Visualization Type**: \n    - **Bar**: Shows similarity scores for recognized faces\n    - **Scatter**: Shows UMAP projection of face embeddings\n- **Frame Timeline**: Drag to navigate through the video\n- **Play/Pause**: Control video playback\n\n"
+                "- **Upload Image**: Upload a static image for face recognition\n- **Process Image**: Click to process the uploaded image"
             )
-        state = gr.State({"playing": False, "frame": 0, "total": 1})
-        video_dropdown.change(
-            fn=update_slider_on_video, inputs=[video_dropdown], outputs=[frame_slider, state]
-        )
-        frame_slider.change(
-            fn=update_frame,
-            inputs=[video_dropdown, frame_slider, vis_type],
-            outputs=[output_video, output_plot],
-        )
-        vis_type.change(
-            fn=update_frame,
-            inputs=[video_dropdown, frame_slider, vis_type],
-            outputs=[output_video, output_plot],
-        )
-        play_btn.click(
-            fn=play_loop,
-            inputs=[video_dropdown, vis_type, state],
-            outputs=[output_video, output_plot, frame_slider, state],
-            api_name=False,
-        )
-        pause_btn.click(
-            fn=lambda s: {"playing": False, "frame": s["frame"], "total": s["total"]},
-            inputs=[state],
-            outputs=[state],
-            api_name=False,
-        )
     return demo
 
 

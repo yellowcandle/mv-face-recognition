@@ -1,2 +1,2 @@
 correct_recognitions,incorrect_recognitions (misidentified_known),false_positives_on_unknown,missed_known_faces (FN),correctly_unidentified_unknowns (TN_unknown),total_detected_faces,total_gt_known_faces_in_image,total_gt_unknown_faces_in_image,recognition_threshold,detection_confidence,recognition_model
-3,1,0,4,2,10,8,2,0.7589007161103782,0.8,sface
+1,4,1,3,1,10,8,2,0.8631316254094503,0.2004672595046086,arcface

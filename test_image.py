@@ -524,19 +524,23 @@ def run_single_evaluation_iteration(
         confidence_threshold=current_detection_confidence,
     )
 
-    # Determine use_arcface based on recognition_model_name
-    # This is a simplification. A more robust FaceRecognizer would take model_name directly.
-    use_arcface_flag = True  # Default for sface, arcface
-    if recognition_model_name == "opencv_dnn":
-        use_arcface_flag = False
-    # Note: If recognition_model_name is 'sface' or 'arcface', FaceRecognizer's internal logic
-    # will try sface.onnx first, then arcface_r50.onnx if use_arcface_flag is True.
-    # To strictly test 'arcface' even if 'sface' exists, FaceRecognizer would need modification.
+    # Determine the model path based on recognition_model_name
+    model_file_path = None
+    if recognition_model_name == "sface":
+        model_file_path = os.path.join(PROJECT_ROOT, "models", "face_recognition_sface.onnx")
+    elif recognition_model_name == "arcface":
+        model_file_path = os.path.join(PROJECT_ROOT, "models", "arcface_r50.onnx")
+    # Note: "opencv_dnn" is excluded from optimization dimensions, but if used elsewhere,
+    # its path would need to be handled here as well.
+
+    if model_file_path and not os.path.exists(model_file_path):
+         console.print(f"[red]Error:[/red] Recognition model file not found at {model_file_path}. Skipping iteration.")
+         return None, {} # Return empty results if model file is missing
 
     face_recognizer = FaceRecognizer(
         face_detector=face_detector,
         similarity_threshold=current_recognition_threshold,
-        use_arcface=use_arcface_flag,  # Controls which type of recognizer model path is taken
+        model_path=model_file_path, # Pass the determined model path
     )
 
     target_contestants_for_debug = [
@@ -1072,9 +1076,8 @@ if __name__ == "__main__":
                         model_name,  # Pass model name
                         ARGS,
                         PROJECT_ROOT,
-                        None,
-                        FONT_PATH,
-                        GROUND_TRUTH_MAP,
+                        FONT_PATH, # Correctly pass FONT_PATH here
+                        GROUND_TRUTH_MAP, # Correctly pass GROUND_TRUTH_MAP here
                     )
 
                     if eval_summary:

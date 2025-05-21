@@ -13,33 +13,38 @@ class FaceRecognizer:
     def __init__(
         self,
         face_detector: FaceDetector,
-        similarity_threshold: float = 0.6,  # Increased threshold for better precision
-        use_arcface: bool = True,
+        similarity_threshold: float = 0.6,
+        model_path: Optional[str] = None, # Added model_path parameter
     ):
-        self.use_arcface = use_arcface
-        if self.use_arcface:
-            # Initialize SFace ONNX model as primary option
-            model_path = os.path.join("models", "face_recognition_sface.onnx")
-            if not os.path.exists(model_path):
-                # Fallback to arcface_r50
-                model_path = os.path.join("models", "arcface_r50.onnx")
-                if not os.path.exists(model_path):
-                    raise FileNotFoundError(
+        self.face_detector = face_detector
+        self.similarity_threshold = similarity_threshold
+        self.face_database = {}
+
+        # Determine model path
+        if model_path:
+            self.model_path = model_path
+            self.use_arcface = "onnx" in model_path.lower() # Assume ONNX models are ArcFace/SFace variants
+        else:
+            # Original logic to select model if no path is provided
+            self.use_arcface = True # Default to ONNX models if no path specified
+            self.model_path = os.path.join("models", "face_recognition_sface.onnx")
+            if not os.path.exists(self.model_path):
+                self.model_path = os.path.join("models", "arcface_r50.onnx")
+                if not os.path.exists(self.model_path):
+                     raise FileNotFoundError(
                         "Neither SFace nor ArcFace model found. Please download them first."
                     )
                 else:
-                    print(
-                        "Using arcface_r50.onnx as SFace was not found."
-                    )  # This case implies R50 is used
+                    print("Using arcface_r50.onnx as SFace was not found.")
             else:
-                print(f"Using SFace model: {model_path}")  # This case implies SFace is used
+                print(f"Using SFace model: {self.model_path}")
 
-            # Construct providers list
+
+        if self.use_arcface:
+            # Construct providers list (same logic as before)
             providers_config = []
-            # Determine device preference (e.g. from face_detector if available, or a new param)
-            # For now, let's assume 'auto' behavior similar to FaceDetector
-            current_device_preference = "auto"  # Could be made a parameter or inferred
-            resolved_device = "cpu"  # Default
+            current_device_preference = "auto"
+            resolved_device = "cpu"
 
             if current_device_preference == "auto":
                 if (
@@ -55,7 +60,7 @@ class FaceRecognizer:
             elif resolved_device == "cuda":
                 providers_config.append("CUDAExecutionProvider")
 
-            providers_config.append("CPUExecutionProvider")  # Always CPU fallback
+            providers_config.append("CPUExecutionProvider")
 
             final_providers = []
             for p_item in providers_config:
@@ -64,66 +69,29 @@ class FaceRecognizer:
 
             # Attempt to load the selected model_path
             try:
-                print(f"Attempting to load model: {model_path} with providers: {final_providers}")
-                self.session = onnxruntime.InferenceSession(model_path, providers=final_providers)
+                print(f"Attempting to load model: {self.model_path} with providers: {final_providers}")
+                self.session = onnxruntime.InferenceSession(self.model_path, providers=final_providers)
                 print(
-                    f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}"
+                    f"Successfully loaded model: {self.model_path} with providers: {self.session.get_providers()}"
                 )
             except Exception as e:
-                # If the chosen model (e.g. SFace) fails to load, try the other one if not already tried.
-                if "sface" in model_path.lower() and os.path.exists(
-                    os.path.join("models", "arcface_r50.onnx")
-                ):
-                    print(
-                        f"Failed to load {model_path} due to {e}. Attempting to load arcface_r50.onnx with providers {final_providers}."
+                 # If loading fails, try with just CPUExecutionProvider as a last resort
+                print(
+                    f"Failed to load {self.model_path} with {final_providers} due to {e}. Retrying with CPUExecutionProvider only."
+                )
+                try:
+                    self.session = onnxruntime.InferenceSession(
+                        self.model_path, providers=["CPUExecutionProvider"]
                     )
-                    model_path = os.path.join("models", "arcface_r50.onnx")
-                    try:
-                        self.session = onnxruntime.InferenceSession(
-                            model_path, providers=final_providers
-                        )
-                        print(
-                            f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}"
-                        )
-                    except Exception as e2:
-                        raise FileNotFoundError(
-                            f"Failed to load both SFace and ArcFace R50 models. Last error: {e2}"
-                        )
-                elif "arcface_r50" in model_path.lower() and os.path.exists(
-                    os.path.join("models", "face_recognition_sface.onnx")
-                ):
                     print(
-                        f"Failed to load {model_path} due to {e}. Attempting to load face_recognition_sface.onnx with providers {final_providers}."
+                        f"Successfully loaded model: {self.model_path} with providers: {self.session.get_providers()}"
                     )
-                    model_path = os.path.join("models", "face_recognition_sface.onnx")
-                    try:
-                        self.session = onnxruntime.InferenceSession(
-                            model_path, providers=final_providers
-                        )
-                        print(
-                            f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}"
-                        )
-                    except Exception as e2:
-                        raise FileNotFoundError(
-                            f"Failed to load both ArcFace R50 and SFace models. Last error: {e2}"
-                        )
-                else:
-                    # If primary attempt failed, try with just CPUExecutionProvider as a last resort for the original model_path
+                except Exception as e_cpu:
                     print(
-                        f"Failed to load {model_path} with {final_providers}. Retrying with CPUExecutionProvider only."
+                        f"Failed to load {self.model_path} even with CPUExecutionProvider. Original error: {e}, CPU error: {e_cpu}"
                     )
-                    try:
-                        self.session = onnxruntime.InferenceSession(
-                            model_path, providers=["CPUExecutionProvider"]
-                        )
-                        print(
-                            f"Successfully loaded model: {model_path} with providers: {self.session.get_providers()}"
-                        )
-                    except Exception as e_cpu:
-                        print(
-                            f"Failed to load {model_path} even with CPUExecutionProvider. Original error: {e}, CPU error: {e_cpu}"
-                        )
-                        raise e  # Re-raise original error if all fallbacks failed
+                    raise e  # Re-raise original error if all fallbacks failed
+
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
 
@@ -132,42 +100,45 @@ class FaceRecognizer:
             if len(model_output_shape) == 2 and isinstance(model_output_shape[1], int):
                 self.embedding_size = model_output_shape[1]
             else:
-                self.embedding_size = 512  # Default for ArcFace
-                if "sface" in model_path.lower():  # Check if 'sface' is in the model_path string
-                    self.embedding_size = 128
-                    print("Adjusted embedding size to 128 based on SFace model name.")
+                # Fallback based on model name if shape is dynamic
+                if "sface" in self.model_path.lower():
+                     self.embedding_size = 128
+                     print("Adjusted embedding size to 128 based on SFace model name.")
+                else: # Default for ArcFace R50 or others
+                    self.embedding_size = 512
+                    print("Adjusted embedding size to 512 based on non-SFace model name.")
+
 
             # Mean and std for normalization
-            # Use different values based on model type
-            if "sface" in model_path.lower():
-                # SFace specific normalization values
+            # Use different values based on model type (derived from model_path)
+            if "sface" in self.model_path.lower():
                 self.mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
                 self.std = np.array([0.5, 0.5, 0.5], dtype=np.float32)
-            else:
-                # ArcFace values
+            else: # Assume ArcFace values for other ONNX models
                 self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
                 self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
         else:
-            # Fallback to OpenCV DNN
-            self.embedding_size = 128  # Default embedding size for OpenCV DNN
-            recognition_model_path = os.path.join(
+            # Fallback to OpenCV DNN (original logic if not using ONNX)
+            self.embedding_size = 128
+            recognition_model_path_cv = os.path.join(
                 "models",
-                "face_recognition_resnet.caffemodel",  # Corrected model name
+                "face_recognition_resnet.caffemodel",
             )
-            prototxt_path = recognition_model_path.replace(".caffemodel", ".prototxt")
-            if not os.path.exists(recognition_model_path) or not os.path.exists(prototxt_path):
-                # Try another common model name as a fallback
-                recognition_model_path = os.path.join("models", "face_recognition.caffemodel")
-                prototxt_path = recognition_model_path.replace(".caffemodel", ".prototxt")
-                if not os.path.exists(recognition_model_path) or not os.path.exists(prototxt_path):
+            prototxt_path_cv = recognition_model_path_cv.replace(".caffemodel", ".prototxt")
+            if not os.path.exists(recognition_model_path_cv) or not os.path.exists(prototxt_path_cv):
+                recognition_model_path_cv = os.path.join("models", "face_recognition.caffemodel")
+                prototxt_path_cv = recognition_model_path_cv.replace(".caffemodel", ".prototxt")
+                if not os.path.exists(recognition_model_path_cv) or not os.path.exists(prototxt_path_cv):
                     raise FileNotFoundError(
                         "OpenCV face recognition model files not found. Searched for resnet and generic versions."
                     )
-            self.model = cv2.dnn.readNetFromCaffe(prototxt_path, recognition_model_path)
+            self.model = cv2.dnn.readNetFromCaffe(prototxt_path_cv, recognition_model_path_cv)
+            self.model_path = recognition_model_path_cv # Store path for info
 
-        self.face_detector = face_detector
-        self.similarity_threshold = similarity_threshold
-        self.face_database = {}  # Initialize an empty dictionary for storing known faces
+        # self.face_detector is already set by the parameter
+        # self.similarity_threshold is already set by the parameter
+        # self.face_database is already initialized
 
     # Add a method to directly add pre-computed embeddings to the database
     def add_known_embedding(self, person_id: str, embedding: np.ndarray):
