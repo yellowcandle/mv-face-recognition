@@ -314,7 +314,7 @@ def download_models(force=False):
 
                 import site
 
-                site_packages = site.getsitepackages()[0]
+                site.getsitepackages()[0]
 
                 found = False
                 for location in package_locations:

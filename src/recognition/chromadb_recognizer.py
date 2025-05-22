@@ -332,7 +332,7 @@ class ChromaDBFaceRecognizer:
             # Detect faces
             face_bboxes = face_detector.detect(image)
 
-            for i, bbox in enumerate(face_bboxes):
+            for _i, bbox in enumerate(face_bboxes):
                 # Extract face
                 face_img = face_detector.extract_face(image, bbox)
                 if face_img is None:

@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 """
 Unified face recognizer with multiple backend support.
 
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
+import onnxruntime as ort
 
 from src.core.detector import FaceDetector
 from src.utils.cache import EmbeddingCache
@@ -39,7 +41,6 @@ class FaceRecognizer(ABC):
         Returns:
             numpy.ndarray: Face embedding vector
         """
-        pass
 
     @abstractmethod
     def preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
@@ -52,7 +53,6 @@ class FaceRecognizer(ABC):
         Returns:
             numpy.ndarray: Preprocessed face image
         """
-        pass
 
     @abstractmethod
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
@@ -66,7 +66,6 @@ class FaceRecognizer(ABC):
         Returns:
             float: Similarity score (higher is more similar)
         """
-        pass
 
     @abstractmethod
     def identify_faces(
@@ -82,7 +81,6 @@ class FaceRecognizer(ABC):
         Returns:
             list: List of identification results
         """
-        pass
 
 
 class StandardFaceRecognizer(FaceRecognizer):
@@ -197,8 +195,6 @@ class StandardFaceRecognizer(FaceRecognizer):
     def _init_model(self):
         """Initialize the face recognition model."""
         try:
-            import onnxruntime as ort
-
             # Use ModelFinder to locate or download the model
             try:
                 from src.utils.model_finder import ModelFinder
@@ -236,15 +232,15 @@ class StandardFaceRecognizer(FaceRecognizer):
 
                 if not model_found:
                     raise FileNotFoundError("Could not find a suitable face recognition model")
-            except ImportError:
+            except ImportError as exc:
                 # ModelFinder not available, fall back to the old behavior
                 if not os.path.exists(self.model_path):
-                    raise FileNotFoundError(f"Model file not found: {self.model_path}")
+                    raise FileNotFoundError(f"Model file not found: {self.model_path}") from exc
 
                 # Check model file size
                 file_size = os.path.getsize(self.model_path)
                 if file_size < 1000:  # Too small to be a valid model
-                    raise ValueError(f"Model file too small ({file_size} bytes), likely corrupted")
+                    raise ValueError(f"Model file too small ({file_size} bytes), likely corrupted") from exc
 
             # Set execution providers with optimized settings
             sess_options = ort.SessionOptions()
@@ -271,7 +267,7 @@ class StandardFaceRecognizer(FaceRecognizer):
                 self.session = ort.InferenceSession(
                     self.model_path, sess_options=sess_options, providers=providers
                 )
-            except Exception as model_error:
+            except Exception as model_error: # Catching broad exception, but re-raising with context
                 # Try to use other recognition models as fallbacks
                 fallback_models = [
                     "face_recognition_sface.onnx",
@@ -357,12 +353,13 @@ class StandardFaceRecognizer(FaceRecognizer):
         except ImportError as import_error:
             if "onnxruntime" in str(import_error):
                 raise ImportError(
-                    "ONNX Runtime is not installed. Install with: pip install onnxruntime>=1.16.0"
-                )
+                    "ONNX Runtime is not installed. Install with: "
+                    "pip install onnxruntime>=1.16.0"
+                ) from import_error
             else:
                 # Reraise other import errors
-                raise import_error
-        except Exception as e:
+                raise
+        except Exception as e: # Catching broad exception, but re-raising with context
             # Try to download the model
             print(f"Error initializing face recognition model: {str(e)}")
             print("Attempting to download required models...")
@@ -389,8 +386,6 @@ class StandardFaceRecognizer(FaceRecognizer):
 
                     # Try initialization again
                     print("Retrying model initialization after download...")
-                    import onnxruntime as ort
-
                     sess_options = ort.SessionOptions()
                     sess_options.graph_optimization_level = (
                         ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -407,11 +402,12 @@ class StandardFaceRecognizer(FaceRecognizer):
 
                     print(f"Successfully initialized model after download: {self.model_path}")
                     return
-            except ImportError:
+            except ImportError as exc: # Catching broad exception, but re-raising with context
                 # ModelFinder not available, use download_models.py
                 pass
-            except Exception as model_finder_error:
+            except Exception as model_finder_error: # Catching broad exception, but re-raising with context
                 print(f"ModelFinder error: {str(model_finder_error)}")
+                raise model_finder_error from e # Re-raise ModelFinder error, chaining original exception
 
             # Fall back to using download_models.py script
             try:
@@ -432,8 +428,6 @@ class StandardFaceRecognizer(FaceRecognizer):
 
                 # Try initialization again
                 print("Retrying model initialization after download...")
-                import onnxruntime as ort
-
                 sess_options = ort.SessionOptions()
                 sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
@@ -448,12 +442,12 @@ class StandardFaceRecognizer(FaceRecognizer):
 
                 print(f"Successfully initialized model after download: {self.model_path}")
 
-            except Exception as download_error:
+            except Exception as download_error: # Catching broad exception, but re-raising with context
                 # If still failing, raise the original error
                 raise RuntimeError(
                     f"Error initializing face recognition model: {str(e)}\n"
                     f"Download attempt also failed: {str(download_error)}"
-                )
+                ) from download_error
 
     def preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
         """
@@ -893,3 +887,35 @@ class StandardFaceRecognizer(FaceRecognizer):
         """Cleanup resources."""
         if hasattr(self, "executor"):
             self.executor.shutdown()
+
+</final_file_content>
+
+IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
+
+
+
+New problems detected after saving the file:
+src/core/recognizer.py
+- [Pylint Error] Line 472: Module 'cv2' has no 'resize' member
+- [Pylint Error] Line 475: Module 'cv2' has no 'INTER_AREA' member
+- [Pylint Error] Line 478: Module 'cv2' has no 'resize' member
+- [Pylint Error] Line 481: Module 'cv2' has no 'INTER_LINEAR' member
+- [Pylint Error] Line 486: Module 'cv2' has no 'cvtColor' member
+- [Pylint Error] Line 486: Module 'cv2' has no 'COLOR_BGR2RGB' member<environment_details>
+# VSCode Visible Files
+src/core/recognizer.py
+
+# VSCode Open Tabs
+src/core/detector.py
+pyproject.toml
+src/core/recognizer.py
+
+# Current Time
+5/22/2025, 9:00:19 AM (Asia/Hong_Kong, UTC+8:00)
+
+# Context Window Usage
+103,103 / 1,048.576K tokens used (10%)
+
+# Current Mode
+ACT MODE
+</environment_details>

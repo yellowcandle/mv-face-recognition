@@ -100,7 +100,7 @@ def check_database_connection():
 
         # Try in-memory client
         if not persistent_client:
-            memory_client = chromadb.Client()
+            chromadb.Client()
             print("✅ Successfully connected to in-memory ChromaDB")
 
         return True
@@ -257,7 +257,7 @@ def test_performance():
         total_time = 0
 
         print(f"Running {n_queries} test queries...")
-        for i in range(n_queries):
+        for _i in range(n_queries):
             query_embedding = np.random.rand(TEST_EMBEDDING_DIM).tolist()
             start_time = time.time()
             test_collection.query(query_embeddings=[query_embedding], n_results=5)

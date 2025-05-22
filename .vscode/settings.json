@@ -1,3 +1,5 @@
 {
-    "dependi.python.lockFileEnabled": true
+    "dependi.python.lockFileEnabled": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true
 }

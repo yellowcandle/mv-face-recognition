@@ -143,8 +143,10 @@ def is_quality_face(face, frame, min_size=30, blur_threshold=25):
         return True  # Be more permissive on error
 
 
-def compute_embeddings_with_augmentation(image_paths, angles=[-10, -5, 0, 5, 10]):
+def compute_embeddings_with_augmentation(image_paths, angles=None):
     """Compute face embeddings with augmentation for better matching."""
+    if angles is None:
+        angles = [-10, -5, 0, 5, 10]
     embeddings = []
     for img_path in image_paths:
         try:

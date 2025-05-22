@@ -401,7 +401,7 @@ def main():
         )
 
     # Run benchmark (100 frames)
-    results = benchmark_video_processing(
+    benchmark_video_processing(
         video_path,
         std_embeddings,
         chroma_recognizer,

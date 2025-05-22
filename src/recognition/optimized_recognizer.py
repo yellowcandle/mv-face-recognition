@@ -256,7 +256,7 @@ class OptimizedFaceRecognizer:
 
         # Compute cosine similarity
         # Use faster implementations
-        dot_product = np.dot(embedding1, embedding2)
+        np.dot(embedding1, embedding2)
         norm1 = np.sqrt(np.sum(embedding1 * embedding1))
         norm2 = np.sqrt(np.sum(embedding2 * embedding2))
 

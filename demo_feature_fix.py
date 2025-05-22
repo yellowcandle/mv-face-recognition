@@ -124,7 +124,7 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
 
     # Load gallery embeddings
     gallery_embeddings, gallery_nicknames = load_embeddings()
-    gallery_embeddings_np = np.stack(gallery_embeddings)
+    np.stack(gallery_embeddings)
 
     # Initialize detectors and recognizers
     detector = FaceDetector(
@@ -240,7 +240,7 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
     )
 
     # Create a figure with two subplots for comparison
-    fig = plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(20, 10))
     gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1])
 
     ax0 = plt.subplot(gs[0])

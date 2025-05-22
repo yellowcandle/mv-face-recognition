@@ -12,7 +12,7 @@ def load_gallery_embeddings(embedding_dir="source/photo/contestants/embeddings")
     """Load embeddings from the gallery directory."""
     print(f"Loading embeddings from: {os.path.abspath(embedding_dir)}")
 
-    glob_pattern = os.path.join(embedding_dir, "*_embedding.npy")
+    os.path.join(embedding_dir, "*_embedding.npy")
     embedding_files = [f for f in os.listdir(embedding_dir) if f.endswith("_embedding.npy")]
     print(f"Found {len(embedding_files)} embedding files")
 

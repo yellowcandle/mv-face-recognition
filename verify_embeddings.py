@@ -319,7 +319,7 @@ class EmbeddingVerifier:
                                 ):
                                     # Check dimensions of results
                                     result_embeddings = query_results["embeddings"][0]
-                                    for i, emb in enumerate(result_embeddings):
+                                    for _i, emb in enumerate(result_embeddings):
                                         if len(emb) != dims:
                                             self.print_error(
                                                 f"Dimension mismatch in collection {collection.name}!"

@@ -149,8 +149,8 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
                 preprocessed_dummy = self.standard_recognizer.preprocess_face(dummy_img)
                 _ = self.standard_recognizer.compute_embedding(preprocessed_dummy)
                 logger.info("Pre-warmed recognition model")
-            except Exception as e: # Added 'e' to capture the exception for logging
-                logger.error(f"Error during pre-warming: {str(e)}") # Log the actual error
+            except Exception as e:  # Added 'e' to capture the exception for logging
+                logger.error(f"Error during pre-warming: {str(e)}")  # Log the actual error
 
     def _setup_chromadb(self):
         """Set up the ChromaDB client and collection with performance optimizations."""
@@ -655,7 +655,7 @@ class ChromaDBFaceRecognizer(FaceRecognizer):
             logger.error(f"Error detecting faces: {str(e)}")
             return results
 
-        for i, bbox in enumerate(face_bboxes):
+        for _i, bbox in enumerate(face_bboxes):
             # Extract face region
             try:
                 face_img = self.face_detector.extract_face(image, bbox, padding=0.1)

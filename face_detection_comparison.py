@@ -103,7 +103,7 @@ class FaceDetectionComparison:
         min_dist = float("inf")
         best_match = {"name": "Unknown"}
 
-        for contestant_id, data in self.contestant_db.items():
+        for _contestant_id, data in self.contestant_db.items():
             dist = np.linalg.norm(face_embedding - data["embedding"])
             if dist < min_dist and dist < 0.6:  # Threshold for matching
                 min_dist = dist

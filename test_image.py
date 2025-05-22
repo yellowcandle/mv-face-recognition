@@ -83,7 +83,6 @@ def main():
     # Debug settings
     DEBUG = args.debug
     SHOW_ALL_SIMILARITIES = args.show_similarities
-    SHOW_TIMING = True  # Keep timing enabled for now, can be made an arg later
 
     # Recognition settings
     RECOGNITION_THRESHOLD = args.threshold
@@ -1126,7 +1125,7 @@ if __name__ == "__main__":
             grid_results_table = Table(title="Grid Search Evaluation Summary")
             for col in summary_df.columns:
                 grid_results_table.add_column(col)
-            for index, row in summary_df.iterrows():
+            for _index, row in summary_df.iterrows():
                 grid_results_table.add_row(*[str(x) for x in row.values])
             console.print(grid_results_table)
 
