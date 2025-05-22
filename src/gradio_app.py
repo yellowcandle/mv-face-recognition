@@ -418,10 +418,9 @@ def draw_boxes_and_labels_mv(frame, matches, timestamp):
         text_height = text_bbox[3] - text_bbox[1]
         position = (img_width - text_width - 10, img_height - text_height - 10)
         draw.text(position, timestamp_text, font=timestamp_font, fill=timestamp_color)
-        # Return BGR image for Gradio (to test if Gradio expects BGR)
+        # Return RGB image for Gradio (skip BGR conversion)
         frame = np.array(pil_img)
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        return frame_bgr
+        return frame
     except Exception as e:
         logger.error("Error drawing boxes and labels: %s", e)
         logger.error(traceback.format_exc())
