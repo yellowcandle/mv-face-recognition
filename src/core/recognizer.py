@@ -888,34 +888,3 @@ class StandardFaceRecognizer(FaceRecognizer):
         if hasattr(self, "executor"):
             self.executor.shutdown()
 
-</final_file_content>
-
-IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
-
-
-
-New problems detected after saving the file:
-src/core/recognizer.py
-- [Pylint Error] Line 472: Module 'cv2' has no 'resize' member
-- [Pylint Error] Line 475: Module 'cv2' has no 'INTER_AREA' member
-- [Pylint Error] Line 478: Module 'cv2' has no 'resize' member
-- [Pylint Error] Line 481: Module 'cv2' has no 'INTER_LINEAR' member
-- [Pylint Error] Line 486: Module 'cv2' has no 'cvtColor' member
-- [Pylint Error] Line 486: Module 'cv2' has no 'COLOR_BGR2RGB' member<environment_details>
-# VSCode Visible Files
-src/core/recognizer.py
-
-# VSCode Open Tabs
-src/core/detector.py
-pyproject.toml
-src/core/recognizer.py
-
-# Current Time
-5/22/2025, 9:00:19 AM (Asia/Hong_Kong, UTC+8:00)
-
-# Context Window Usage
-103,103 / 1,048.576K tokens used (10%)
-
-# Current Mode
-ACT MODE
-</environment_details>
