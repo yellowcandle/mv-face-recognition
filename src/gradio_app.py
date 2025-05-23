@@ -24,6 +24,98 @@ import umap.umap_ as umap
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.colors import hsv_to_rgb
+
+# --- Fix CJKV font for matplotlib ---
+import matplotlib
+import matplotlib.font_manager as fm
+import os
+import platform
+
+def setup_matplotlib_fonts():
+    """Setup matplotlib fonts with proper CJKV support and fallbacks."""
+    # Common CJKV fonts available on different systems
+    cjkv_fonts = []
+    
+    # macOS fonts
+    if platform.system() == 'Darwin':
+        cjkv_fonts.extend([
+            'PingFang TC',
+            'Hiragino Sans GB',
+            'STHeiti',
+            'Apple LiGothic',
+            'SimHei'
+        ])
+    
+    # Windows fonts
+    elif platform.system() == 'Windows':
+        cjkv_fonts.extend([
+            'Microsoft YaHei',
+            'SimHei',
+            'KaiTi',
+            'FangSong'
+        ])
+    
+    # Linux fonts
+    else:
+        cjkv_fonts.extend([
+            'Noto Sans CJK TC',
+            'Noto Sans CJK SC',
+            'WenQuanYi Micro Hei',
+            'AR PL UMing CN'
+        ])
+    
+    # Try to register custom font if available
+    CJKV_FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "SourceHanSansTC-VF.ttf")
+    custom_font_name = None
+    
+    if os.path.exists(CJKV_FONT_PATH):
+        try:
+            # Try to register the custom font
+            fm.fontManager.addfont(CJKV_FONT_PATH)
+            font_prop = fm.FontProperties(fname=CJKV_FONT_PATH)
+            custom_font_name = font_prop.get_name()
+            cjkv_fonts.insert(0, custom_font_name)  # Prioritize custom font
+            print(f"Successfully registered custom font: {custom_font_name}")
+        except Exception as e:
+            print(f"Warning: Could not register custom font {CJKV_FONT_PATH}: {e}")
+    
+    # Find available fonts from our list
+    available_fonts = []
+    for font_name in cjkv_fonts:
+        try:
+            # Check if font is available
+            font_files = fm.findSystemFonts(fontpaths=None, fontext='ttf')
+            for font_file in font_files:
+                try:
+                    font_prop = fm.FontProperties(fname=font_file)
+                    if font_prop.get_name() == font_name:
+                        available_fonts.append(font_name)
+                        break
+                except:
+                    continue
+        except:
+            continue
+    
+    # Set up matplotlib with available fonts
+    font_list = available_fonts + ['DejaVu Sans', 'Arial', 'Helvetica', 'sans-serif']
+    
+    matplotlib.rcParams['font.sans-serif'] = font_list
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    matplotlib.rcParams['axes.unicode_minus'] = False
+    matplotlib.rcParams['font.size'] = 16
+    matplotlib.rcParams['text.color'] = 'black'
+    matplotlib.rcParams['axes.labelcolor'] = 'black'
+    matplotlib.rcParams['xtick.color'] = 'black'
+    matplotlib.rcParams['ytick.color'] = 'black'
+    matplotlib.rcParams['figure.facecolor'] = 'white'
+    matplotlib.rcParams['savefig.facecolor'] = 'white'
+    matplotlib.rcParams['savefig.dpi'] = 150
+    
+    print(f"Configured matplotlib fonts: {font_list[:3]}...")  # Show first 3 fonts
+    return available_fonts
+
+# Setup fonts
+available_cjkv_fonts = setup_matplotlib_fonts()
 from insightface.app import (
     FaceAnalysis,
 )  # Using InsightFace for detection and embedding computation
@@ -407,7 +499,9 @@ def draw_boxes_and_labels_mv(frame, matches, timestamp):
         # Overlay a visible warning if the font is missing (CJKV will not render)
         if font_missing:
             warning_text = "⚠️ CJKV font missing! CJKV chars will not render."
-            w, h = draw.textsize(warning_text, font=ImageFont.load_default())
+            warning_bbox = draw.textbbox((10, 10), warning_text, font=ImageFont.load_default())
+            w = warning_bbox[2] - warning_bbox[0]
+            h = warning_bbox[3] - warning_bbox[1]
             draw.rectangle([(0, 0), (w + 20, h + 20)], fill="red")
             draw.text((10, 10), warning_text, fill="white", font=ImageFont.load_default())
         timestamp_color = "yellow"
@@ -550,82 +644,224 @@ def process_frame(frame: np.ndarray, **kwargs) -> Tuple[np.ndarray, List[np.ndar
     
     embeddings = []
     names = []
+    matches = []  # Collect all face matches for single drawing call
     
-    # Make a copy of the frame to draw on, to avoid modifying the input frame directly
-    # if it's passed around elsewhere, though Gradio usually handles copies.
-    # The frame returned by draw_boxes_and_labels_mv is already RGB.
-    output_frame = frame.copy()
-
+    # Process all faces first to collect matches
     for face in faces:
         embedding = face.normed_embedding
         name, confidence = match_face_mv(embedding, GALLERY_EMBEDDINGS, rec_threshold)
         embeddings.append(embedding)
         names.append(f"{name} ({confidence:.2f})" if name else "Unknown")
-        
-        # Draw bounding boxes and labels on the output_frame
-        output_frame = draw_boxes_and_labels_mv(output_frame, [(face, name or "Unknown", confidence)],
-                                                datetime.now().strftime("%H:%M:%S"))
+        matches.append((face, name or "Unknown", confidence))
+    
+    # Draw all faces at once to avoid multiple BGR/RGB conversions
+    if matches:
+        output_frame = draw_boxes_and_labels_mv(frame, matches, datetime.now().strftime("%H:%M:%S"))
+    else:
+        # If no faces detected, convert frame to RGB for consistency
+        output_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     return output_frame, embeddings, names
 
-def generate_umap_plot(embeddings: List[np.ndarray], labels: List[str], gallery_embeddings: Dict[str, List[np.ndarray]], gallery_names: Dict[str, str]) -> Figure:
-    """Generate UMAP plot of face embeddings, including all gallery embeddings."""
-    # Combine gallery embeddings and current embeddings
+def generate_umap_plot(embeddings: List[np.ndarray], labels: List[str], gallery_embeddings: Dict[str, List[np.ndarray]], gallery_names: Dict[str, str], show_current_only: bool = False) -> Figure:
+    """Generate enhanced UMAP plot showing relationships between detected faces and gallery embeddings."""
+    # Separate current detected embeddings from gallery
+    if show_current_only:
+        # Only use the last detected embeddings (from current frame)
+        if embeddings:
+            # Find how many embeddings were added in the last frame
+            # We'll assume labels with same frame number are from the same frame
+            current_embeddings = []
+            current_labels = []
+            if embeddings:
+                # Get the last set of embeddings that seem to be from the same frame
+                # Look for pattern "Face X" in labels to identify current frame detections
+                for i in range(len(embeddings) - 1, -1, -1):
+                    if labels[i].startswith("Face ") or labels[i] == "Unknown":
+                        current_embeddings.insert(0, embeddings[i])
+                        current_labels.insert(0, labels[i])
+                    else:
+                        break
+        else:
+            current_embeddings = []
+            current_labels = []
+    else:
+        current_embeddings = embeddings
+        current_labels = labels
+    
+    # Prepare data structures
     all_embeddings = []
     all_labels = []
-
-    # Add gallery embeddings
+    all_types = []  # 'current', 'gallery_matched', 'gallery_other'
+    gallery_indices = {}  # Map gallery names to their indices in all_embeddings
+    
+    # Add gallery embeddings first
+    gallery_start_idx = 0
     for name, emb_list in gallery_embeddings.items():
+        display_name = gallery_names.get(name, name)
+        gallery_indices[name] = []
         for emb in emb_list:
             all_embeddings.append(emb)
-            all_labels.append(gallery_names.get(name, name))
-
+            all_labels.append(display_name)
+            all_types.append('gallery_other')  # Will update later if matched
+            gallery_indices[name].append(len(all_embeddings) - 1)
+    
     # Add current detected embeddings
-    all_embeddings.extend(embeddings)
-    all_labels.extend(labels)
-
+    current_start_idx = len(all_embeddings)
+    all_embeddings.extend(current_embeddings)
+    all_labels.extend(current_labels)
+    all_types.extend(['current'] * len(current_embeddings))
+    
     if not all_embeddings:
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "No embeddings to visualize", ha='center', va='center')
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.text(0.5, 0.5, "No embeddings to visualize", ha='center', va='center', fontsize=14)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         return fig
-
+    
     # Check if we have enough embeddings for UMAP
     if len(all_embeddings) < 4:
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, f"Not enough embeddings for UMAP visualization (found {len(all_embeddings)}, need at least 4)", 
-                ha='center', va='center', wrap=True)
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.text(0.5, 0.5, f"Not enough embeddings for UMAP visualization\n(found {len(all_embeddings)}, need at least 4)", 
+                ha='center', va='center', wrap=True, fontsize=12)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         return fig
-
-    # n_neighbors must be less than the number of samples
+    
+    # Calculate similarities between current detections and gallery
+    matches_info = []
+    if current_embeddings:
+        for i, curr_emb in enumerate(current_embeddings):
+            curr_emb_flat = curr_emb.flatten().astype(np.float32)
+            best_matches = []
+            
+            for name, indices in gallery_indices.items():
+                for idx in indices:
+                    gallery_emb = all_embeddings[idx].flatten().astype(np.float32)
+                    
+                    # Calculate cosine similarity
+                    norm_curr = np.linalg.norm(curr_emb_flat)
+                    norm_gallery = np.linalg.norm(gallery_emb)
+                    if norm_curr > 1e-10 and norm_gallery > 1e-10:
+                        similarity = np.dot(curr_emb_flat, gallery_emb) / (norm_curr * norm_gallery)
+                    else:
+                        similarity = 0.0
+                    
+                    best_matches.append((idx, name, similarity))
+            
+            # Sort by similarity and keep top 5
+            best_matches.sort(key=lambda x: x[2], reverse=True)
+            top_matches = best_matches[:5]
+            matches_info.append((current_start_idx + i, top_matches))
+            
+            # Mark matched gallery embeddings
+            for idx, name, sim in top_matches:
+                if sim > 0.5:  # Threshold for considering it a match
+                    all_types[idx] = 'gallery_matched'
+    
+    # Perform UMAP
     n_neighbors = min(15, len(all_embeddings) - 1)
-    if len(all_embeddings) > 1 and n_neighbors < 2:
-        n_neighbors = max(1, len(all_embeddings) - 1)
-        if n_neighbors < 2 and len(all_embeddings) >= 2:
-            n_neighbors = 1
-
     reducer = umap.UMAP(random_state=42, n_neighbors=n_neighbors, min_dist=0.1)
-    raw_embeddings_2d = reducer.fit_transform(np.array(all_embeddings))
+    embeddings_2d = reducer.fit_transform(np.array(all_embeddings))
+    
+    # Create enhanced scatter plot
+    fig, ax = plt.subplots(figsize=(14, 10))
+    
+    # Plot gallery embeddings (non-matched)
+    gallery_other_mask = np.array([t == 'gallery_other' for t in all_types])
+    if np.any(gallery_other_mask):
+        ax.scatter(embeddings_2d[gallery_other_mask, 0], 
+                  embeddings_2d[gallery_other_mask, 1],
+                  c='lightgray', s=50, alpha=0.3, marker='o',
+                  label='Gallery (unmatched)', edgecolors='none')
+    
+    # Plot gallery embeddings (matched)
+    gallery_matched_mask = np.array([t == 'gallery_matched' for t in all_types])
+    if np.any(gallery_matched_mask):
+        # Group by person for coloring
+        matched_labels = [all_labels[i] for i, matched in enumerate(gallery_matched_mask) if matched]
+        unique_matched = list(set(matched_labels))
+        # Use a colormap for matched gallery embeddings
+        colors = plt.get_cmap('tab20')(np.linspace(0, 1, len(unique_matched)))
+        
+        for i, person in enumerate(unique_matched):
+            person_mask = np.array([t == 'gallery_matched' and all_labels[j] == person 
+                                   for j, t in enumerate(all_types)])
+            ax.scatter(embeddings_2d[person_mask, 0], 
+                      embeddings_2d[person_mask, 1],
+                      c=[colors[i]], s=150, alpha=0.8, marker='s',
+                      label=f'{person} (matched)', edgecolors='black', linewidth=1)
+            
+            # Add label for matched gallery points
+            if np.any(person_mask):
+                # Find the centroid of the cluster for labeling
+                centroid_x = np.mean(embeddings_2d[person_mask, 0])
+                centroid_y = np.mean(embeddings_2d[person_mask, 1])
+                ax.annotate(person, (centroid_x, centroid_y), 
+                           xytext=(0, 10), textcoords='offset points',
+                           fontsize=9, ha='center', va='bottom',
+                           bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7))
 
-    # Ensure embeddings_2d is a dense numpy array for consistent indexing
-    if hasattr(raw_embeddings_2d, "toarray"):
-        embeddings_2d = raw_embeddings_2d.toarray()
-    else:
-        embeddings_2d = raw_embeddings_2d
-
-    # Generate unique colors for each label
-    unique_labels = list(set(all_labels))
-    label_colors = {label: hsv_to_rgb([i/len(unique_labels), 0.9, 0.8]) 
-                   for i, label in enumerate(unique_labels)}
-
-    # Create scatter plot
-    fig, ax = plt.subplots(figsize=(8, 6))
-    for label in unique_labels:
-        mask = np.array([l == label for l in all_labels])
-        ax.scatter(embeddings_2d[mask, 0], embeddings_2d[mask, 1], 
-                  color=label_colors[label], label=label, alpha=0.7)
-
-    ax.set_title("Face Embedding Similarity (UMAP)")
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    # Plot current detected faces
+    current_mask = np.array([t == 'current' for t in all_types])
+    if np.any(current_mask):
+        current_points = embeddings_2d[current_mask]
+        ax.scatter(current_points[:, 0], current_points[:, 1],
+                  c='red', s=300, alpha=1.0, marker='*',
+                  label='Current Detection', edgecolors='darkred', linewidth=2, zorder=3)
+        
+        # Add labels for current detections with recognized names
+        for i, (x, y) in enumerate(current_points):
+            label_text = all_labels[current_start_idx + i] # Get the actual label (e.g., "Unknown" or "Name (score)")
+            ax.annotate(label_text, (x, y), 
+                       xytext=(5, 5), textcoords='offset points',
+                       fontsize=10, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                       zorder=4)
+    
+    # Draw connection lines between current detections and their matches
+    for curr_idx, top_matches in matches_info:
+        curr_x, curr_y = embeddings_2d[curr_idx]
+        
+        for match_idx, match_name, similarity in top_matches:
+            if similarity > 0.5:  # Only show significant matches
+                match_x, match_y = embeddings_2d[match_idx]
+                
+                # Line properties based on similarity
+                alpha = min(similarity, 0.8)
+                linewidth = 1 + (similarity * 2)
+                
+                # Draw arrow
+                ax.annotate('', xy=(match_x, match_y), xytext=(curr_x, curr_y),
+                            arrowprops=dict(facecolor='green', edgecolor='green', 
+                                            arrowstyle='->', linewidth=linewidth, 
+                                            alpha=alpha, shrinkA=5, shrinkB=5),
+                            zorder=2)
+                
+                # Add similarity score at midpoint
+                mid_x, mid_y = (curr_x + match_x) / 2, (curr_y + match_y) / 2
+                ax.annotate(f'{similarity:.2f}', (mid_x, mid_y),
+                           fontsize=8, ha='center', va='center',
+                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8),
+                           zorder=5)
+    
+    # Customize plot
+    ax.set_title("Face Embedding Relationships (UMAP)", fontsize=16, fontweight='bold')
+    ax.set_xlabel("UMAP Dimension 1", fontsize=12)
+    ax.set_ylabel("UMAP Dimension 2", fontsize=12)
+    
+    # Add legend with custom positioning
+    legend = ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
+                      fontsize=10, framealpha=0.9)
+    
+    # Add grid for better readability
+    ax.grid(True, alpha=0.3, linestyle='--')
+    
+    # Add similarity scale reference
+    ax.text(0.02, 0.98, 'Line thickness = similarity strength\nGreen arrows show matches > 0.5',
+            transform=ax.transAxes, fontsize=9, verticalalignment='top',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
+    
     plt.tight_layout()
     return fig
 
@@ -648,6 +884,7 @@ def create_gradio_interface():
             with gr.Column(scale=1):
                 det_thresh_slider = gr.Slider(0.1, 1.0, value=0.5, step=0.05, label="Detection Threshold")
                 rec_thresh_slider = gr.Slider(0.1, 1.0, value=0.5, step=0.05, label="Recognition Threshold")
+                show_current_only = gr.Checkbox(label="Show Current Frame Only", value=False)
 
         with gr.Row():
             frame_output = gr.Image(label="Processed Frame")
@@ -669,7 +906,7 @@ def create_gradio_interface():
                 all_labels: []
             }
         
-        def process_video_frame(video_name, frame_num, det_thresh, rec_thresh, embeddings, labels):
+        def process_video_frame(video_name, frame_num, det_thresh, rec_thresh, embeddings, labels, show_current_only):
             """Process a frame and update visualizations."""
             if not video_name or video_name not in video_files or not video_files[video_name]:
                 empty_fig, ax = plt.subplots()
@@ -721,7 +958,7 @@ def create_gradio_interface():
 
             # Generate UMAP plot (now includes all gallery embeddings)
             umap_plot = generate_umap_plot(
-                embeddings, labels, GALLERY_EMBEDDINGS, GALLERY_NAMES
+                embeddings, labels, GALLERY_EMBEDDINGS, GALLERY_NAMES, show_current_only
             )
 
             return {
@@ -739,7 +976,8 @@ def create_gradio_interface():
             det_thresh_slider, 
             rec_thresh_slider, 
             all_embeddings, 
-            all_labels
+            all_labels,
+            show_current_only
         ]
         # Define outputs for process_video_frame
         process_outputs = {
@@ -773,6 +1011,12 @@ def create_gradio_interface():
         )
 
         rec_thresh_slider.change(
+            process_video_frame,
+            inputs=process_inputs,
+            outputs=common_process_outputs
+        )
+        
+        show_current_only.change(
             process_video_frame,
             inputs=process_inputs,
             outputs=common_process_outputs
