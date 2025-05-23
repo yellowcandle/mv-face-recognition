@@ -64,21 +64,6 @@ def setup_matplotlib_fonts():
             'AR PL UMing CN'
         ])
     
-    # Try to register custom font if available
-    CJKV_FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "SourceHanSansTC-VF.ttf")
-    custom_font_name = None
-    
-    if os.path.exists(CJKV_FONT_PATH):
-        try:
-            # Try to register the custom font
-            fm.fontManager.addfont(CJKV_FONT_PATH)
-            font_prop = fm.FontProperties(fname=CJKV_FONT_PATH)
-            custom_font_name = font_prop.get_name()
-            cjkv_fonts.insert(0, custom_font_name)  # Prioritize custom font
-            print(f"Successfully registered custom font: {custom_font_name}")
-        except Exception as e:
-            print(f"Warning: Could not register custom font {CJKV_FONT_PATH}: {e}")
-    
     # Find available fonts from our list
     available_fonts = []
     for font_name in cjkv_fonts:
@@ -181,7 +166,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
 videos_dir = os.path.join(project_root, "source/videos")
 contestant_info_path = os.path.join(project_root, "contestant_info.csv")
-fonts_dir = os.path.join(project_root, "fonts")
+fonts_dir = os.path.join(project_root, "fonts") # Keep this line as other parts of the code use it
 
 try:
     contestant_info = pd.read_csv(contestant_info_path)
@@ -496,14 +481,6 @@ def draw_boxes_and_labels_mv(frame, matches, timestamp):
                 fill="white",
             )
 
-        # Overlay a visible warning if the font is missing (CJKV will not render)
-        if font_missing:
-            warning_text = "⚠️ CJKV font missing! CJKV chars will not render."
-            warning_bbox = draw.textbbox((10, 10), warning_text, font=ImageFont.load_default())
-            w = warning_bbox[2] - warning_bbox[0]
-            h = warning_bbox[3] - warning_bbox[1]
-            draw.rectangle([(0, 0), (w + 20, h + 20)], fill="red")
-            draw.text((10, 10), warning_text, fill="white", font=ImageFont.load_default())
         timestamp_color = "yellow"
         img_width, img_height = pil_img.size
         timestamp_text = f"Frame: {timestamp}"
@@ -761,8 +738,15 @@ def generate_umap_plot(embeddings: List[np.ndarray], labels: List[str], gallery_
     
     # Perform UMAP
     n_neighbors = min(15, len(all_embeddings) - 1)
-    reducer = umap.UMAP(random_state=42, n_neighbors=n_neighbors, min_dist=0.1)
-    embeddings_2d = reducer.fit_transform(np.array(all_embeddings))
+    reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1)
+    embeddings_2d_raw = reducer.fit_transform(np.array(all_embeddings))
+    if isinstance(embeddings_2d_raw, tuple):
+        embeddings_2d = embeddings_2d_raw[0]
+    else:
+        embeddings_2d = embeddings_2d_raw
+
+    if not isinstance(embeddings_2d, (np.ndarray, np.generic)):
+        embeddings_2d = embeddings_2d.toarray()
     
     # Create enhanced scatter plot
     fig, ax = plt.subplots(figsize=(14, 10))
@@ -885,6 +869,7 @@ def create_gradio_interface():
                 det_thresh_slider = gr.Slider(0.1, 1.0, value=0.5, step=0.05, label="Detection Threshold")
                 rec_thresh_slider = gr.Slider(0.1, 1.0, value=0.5, step=0.05, label="Recognition Threshold")
                 show_current_only = gr.Checkbox(label="Show Current Frame Only", value=False)
+                auto_advance_checkbox = gr.Checkbox(label="Auto-advance Frame", value=False)
 
         with gr.Row():
             frame_output = gr.Image(label="Processed Frame")
@@ -893,7 +878,9 @@ def create_gradio_interface():
         # Store embeddings and labels across interactions
         all_embeddings = gr.State([])
         all_labels = gr.State([])
-        
+        auto_advance_state = gr.State(False) # New state for auto-advance
+        total_frames_state = gr.State(1) # New state for total frames
+
         def load_video(video_name):
             """Initialize when video is selected."""
             video_path = video_files[video_name]
@@ -903,10 +890,11 @@ def create_gradio_interface():
             return {
                 frame_slider: gr.Slider(maximum=total_frames-1),
                 all_embeddings: [],
-                all_labels: []
+                all_labels: [],
+                total_frames_state: total_frames # Update total_frames_state
             }
         
-        def process_video_frame(video_name, frame_num, det_thresh, rec_thresh, embeddings, labels, show_current_only):
+        def process_video_frame(video_name, frame_num, det_thresh, rec_thresh, embeddings, labels, show_current_only, auto_advance_enabled):
             """Process a frame and update visualizations."""
             if not video_name or video_name not in video_files or not video_files[video_name]:
                 empty_fig, ax = plt.subplots()
@@ -969,7 +957,7 @@ def create_gradio_interface():
             }
         
         
-        # Define inputs for process_video_frame
+            # Define inputs for process_video_frame
         process_inputs = [
             video_dropdown, 
             frame_slider, 
@@ -977,7 +965,8 @@ def create_gradio_interface():
             rec_thresh_slider, 
             all_embeddings, 
             all_labels,
-            show_current_only
+            show_current_only,
+            auto_advance_state # Add auto_advance_state to inputs
         ]
         # Define outputs for process_video_frame
         process_outputs = {
@@ -992,7 +981,7 @@ def create_gradio_interface():
         video_dropdown.change(
             load_video,
             inputs=[video_dropdown], # Corrected inputs
-            outputs=[frame_slider, all_embeddings, all_labels]
+            outputs=[frame_slider, all_embeddings, all_labels, total_frames_state] # Update outputs
         )
         
         # Common outputs for all controls that trigger processing
@@ -1022,6 +1011,12 @@ def create_gradio_interface():
             outputs=common_process_outputs
         )
 
+        auto_advance_checkbox.change(
+            lambda x: x, # Simply update the state
+            inputs=[auto_advance_checkbox],
+            outputs=[auto_advance_state]
+        )
+
         prev_btn.click(
             lambda current_frame: max(0, current_frame - 1), # Ensure lambda takes correct arg
             inputs=[frame_slider], # Corrected inputs
@@ -1045,6 +1040,15 @@ def create_gradio_interface():
             process_video_frame,
             inputs=process_inputs,
             outputs=common_process_outputs
+        )
+
+        # Auto-advance logic: Triggered after processing a frame if auto_advance_state is True
+        frame_output.change(
+            lambda current_frame_num, total_frames, auto_advance_enabled: 
+                min(current_frame_num + 1, total_frames - 1) if auto_advance_enabled and current_frame_num < total_frames - 1 else current_frame_num,
+            inputs=[frame_slider, total_frames_state, auto_advance_state], # Pass current frame, total frames, and auto_advance_state
+            outputs=frame_slider,
+            queue=False # Do not queue this, it should happen immediately
         )
 
     return demo

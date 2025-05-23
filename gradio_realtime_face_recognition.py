@@ -13,6 +13,7 @@ import pandas as pd
 import umap.umap_ as umap
 from insightface.app.common import Face as InsightFaceObject
 from PIL import Image, ImageDraw, ImageFont
+from matplotlib.figure import Figure
 
 from src.core.detector import FaceDetector
 from src.recognition.face_recognizer import FaceRecognizer  # MODIFIED: Added import
@@ -308,9 +309,16 @@ def plot_embedding_scatter(
 
     try:
         reducer = umap.UMAP(
-            n_neighbors=n_neighbors_val, n_components=2, random_state=42, min_dist=0.1
+            n_neighbors=n_neighbors_val, n_components=2, min_dist=0.1
         )
-        embedding_2d = reducer.fit_transform(all_embeddings_np)
+        embedding_2d_raw = reducer.fit_transform(all_embeddings_np)
+        if isinstance(embedding_2d_raw, tuple):
+            embedding_2d = embedding_2d_raw[0]
+        else:
+            embedding_2d = embedding_2d_raw
+
+        if not isinstance(embedding_2d, (np.ndarray, np.generic)):
+            embedding_2d = embedding_2d.toarray()
     except Exception as e:
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.text(0.5, 0.5, f"UMAP error: {e}", ha="center", va="center", fontsize=8)
@@ -410,13 +418,16 @@ def overlay_faces(
         font = ImageFont.load_default()
 
     for face, match_list in zip(faces, matches, strict=False):
-        box = face.bbox.astype(int)
-        label = f"{match_list[0][0]} ({match_list[0][1]:.2f})" if match_list else "Unknown (0.00)"
-        current_frame_np = np.array(frame_pil)
-        cv2.rectangle(current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-        frame_pil = Image.fromarray(current_frame_np)
-        draw = ImageDraw.Draw(frame_pil)  # Re-initialize draw object
-        draw.text((box[0], box[1] - FONT_SIZE - 2), label, font=font, fill=(0, 255, 0))
+        if face.bbox is not None: # Added check for None
+            box = face.bbox.astype(int)
+            label = f"{match_list[0][0]} ({match_list[0][1]:.2f})" if match_list else "Unknown (0.00)"
+            current_frame_np = np.array(frame_pil)
+            cv2.rectangle(current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+            frame_pil = Image.fromarray(current_frame_np)
+            draw = ImageDraw.Draw(frame_pil)  # Re-initialize draw object
+            draw.text((box[0], box[1] - FONT_SIZE - 2), label, font=font, fill=(0, 255, 0))
+        else:
+            logger.warning("Face bounding box is None, skipping drawing for this face.")
     return np.array(frame_pil)
 
 
