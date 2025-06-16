@@ -1,18 +1,19 @@
 import yt_dlp
 import os
-import subprocess
 import logging
+import warnings
 from rich.logging import RichHandler
 from argparse import ArgumentParser
 
+# Suppress fsspec warnings
+warnings.filterwarnings("ignore", message=".*fsspec.*is yanked.*")
+
 # List of videos to download
 url_list = {
-    "v1": "https://www.youtube.com/watch?v=IpuMy0PcPAE",
-    "v2": "https://www.youtube.com/watch?v=2thpVqZsKHA",
-    "v3": "https://www.youtube.com/watch?v=O8MOUs0sz4U",
-    "v4": "https://www.youtube.com/watch?v=gizlTwFUL1M",
-    "v5": "https://www.youtube.com/watch?v=cTtBqzGI-HM",
-    "v6": "https://www.youtube.com/watch?v=3oreuR2L2GA",
+    "1.《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅": "https://youtu.be/IpuMy0PcPAE?si=54EeV1wjap1IkEeW",
+    "2.《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅": "https://youtu.be/2thpVqZsKHA?si=Vam2rSjE8sGh2cde",
+    "3.《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅": "https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb",
+    "4.《全民造星IV》極限拍MV": "https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp",
 }
 
 download_dir = "./source/videos"  # Directory to store downloaded videos
@@ -20,13 +21,15 @@ os.makedirs(download_dir, exist_ok=True)  # Ensure the directory exists
 
 logger = logging.getLogger(__name__)
 
+
 def setup_logging(level):
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
-        handlers=[RichHandler()]
+        handlers=[RichHandler()],
     )
+
 
 def download_video(url, output_path):
     ydl_opts = {
@@ -44,10 +47,15 @@ def download_video(url, output_path):
 
     output_file = output_path + ".mp4"
 
+
 def main():
     parser = ArgumentParser()
-    parser.add_argument('-v','--verbose', action='store_true', help='Verbose logs')
-    parser.add_argument('--log-level', choices=['DEBUG','INFO','WARNING','ERROR'], help='Set log level')
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logs")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Set log level",
+    )
     args = parser.parse_args()
     level = logging.INFO
     if args.log_level:
@@ -60,7 +68,8 @@ def main():
         output_path = os.path.join(download_dir, key)
         logger.info("Downloading %s from %s", key, url)
         download_video(url, output_path)
-        logger.success("Downloaded %s", key)
+        logger.info("✅ Downloaded %s", key)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
