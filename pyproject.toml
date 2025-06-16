@@ -28,4 +28,12 @@ dependencies = [
     "sentence-transformers>=4.0.1",
     "mediapipe>=0.10.21",
     "torch>=2.4.1",
-]
+    # New dependencies for improvements
+    "gradio>=5.0.0",
+    "plotly>=5.0.0",
+    "fastapi>=0.100.0",
+    "websockets>=11.0",
+    "pydantic>=2.0.0",
+    "python-multipart>=0.0.6",
+    "umap-learn>=0.5.3",
+    ]
