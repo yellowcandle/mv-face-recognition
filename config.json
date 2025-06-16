@@ -1,0 +1,43 @@
+{
+  "recognition": {
+    "similarity_threshold": 0.1,
+    "detection_threshold": 0.05,
+    "frame_skip": 15,
+    "max_faces_per_frame": 50,
+    "use_gpu": true,
+    "enable_chromadb": true,
+    "det_size": [
+      800,
+      800
+    ],
+    "providers": [
+      "CUDAExecutionProvider",
+      "CPUExecutionProvider"
+    ]
+  },
+  "ui": {
+    "theme": "light",
+    "language": "en",
+    "max_upload_size_mb": 100,
+    "enable_live_camera": true,
+    "enable_batch_processing": true,
+    "results_per_page": 20,
+    "auto_refresh_interval": 5
+  },
+  "storage": {
+    "chroma_db_path": ".chroma_db",
+    "cache_embeddings": true,
+    "cache_size_mb": 512,
+    "backup_enabled": true,
+    "backup_interval_hours": 24,
+    "max_video_size_mb": 500
+  },
+  "performance": {
+    "num_workers": 4,
+    "batch_size": 32,
+    "enable_gpu_acceleration": true,
+    "memory_limit_mb": 4096,
+    "prefetch_embeddings": true,
+    "parallel_video_processing": true
+  }
+}

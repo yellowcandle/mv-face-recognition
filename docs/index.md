@@ -14,7 +14,7 @@
 Note: 全民造星 IV 嘅 MV 總共 3 首，分別係：  
 1. [《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅](https://youtu.be/IpuMy0PcPAE?si=54EeV1wjap1IkEeW)  
 2. [《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅](https://youtu.be/2thpVqZsKHA?si=Vam2rSjE8sGh2cde)  
-3. [《全民造星IV》主題曲《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
+3. [《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅](https://youtu.be/O8MOUs0sz4U?si=nzdA3CcE10TKcykb)  
 
 撈埋電視汁系列：
 - [全民造星極限拍MV](https://youtu.be/gizlTwFUL1M?si=H_ozM3ixzzg77JUp)
