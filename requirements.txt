@@ -1,0 +1,51 @@
+# Core dependencies for MV Face Recognition System
+# Optimized for Hugging Face Spaces deployment with Gradio 5.x
+
+# Web Interface - Gradio 5.x
+gradio>=5.0.0
+
+# AI/ML Core
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# Face Recognition
+insightface>=0.7.3
+onnxruntime>=1.16.0
+
+# Data Processing
+pandas>=2.0.0
+scikit-image>=0.21.0
+scikit-learn>=1.3.0
+
+# Vector Database
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# Visualization
+plotly>=5.17.0
+matplotlib>=3.7.0
+umap-learn>=0.5.0
+
+# Media Processing
+ffmpeg-python>=0.2.0
+
+# Utilities
+tqdm>=4.65.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+rich>=13.0.0
+
+# Performance
+numba>=0.58.0
+
+# Optional dependencies for enhanced functionality
+# mediapipe>=0.10.0
+# tensorflow>=2.13.0
+
+# Development tools (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# isort>=5.12.0
