@@ -1,5 +1,6 @@
 import os
-os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'  # Suppress albumentations update warning
+
+os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # Suppress albumentations update warning
 import shutil
 import cv2
 import numpy as np
@@ -8,7 +9,6 @@ from tqdm import tqdm
 import argparse
 import sys
 import torch
-import mediapipe as mp  # Add MediaPipe import
 import logging
 from rich.logging import RichHandler
 
@@ -18,14 +18,15 @@ logger = logging.getLogger(__name__)
 CHROMA_AVAILABLE = False
 try:
     from chroma_db import get_contestant_collection
+
     CHROMA_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: ChromaDB import failed: {e}")
     print("Face matching will use direct comparison only.")
 
 # Configure environment before importing FaceAnalysis
-os.environ['ONNXRT_ENABLE_COREML'] = '0'  # Disable CoreML for ONNX runtime
-os.environ['INSIGHTFACE_DISABLE_COREML'] = '0'  # Disable CoreML for InsightFace
+os.environ["ONNXRT_ENABLE_COREML"] = "0"  # Disable CoreML for ONNX runtime
+os.environ["INSIGHTFACE_DISABLE_COREML"] = "0"  # Disable CoreML for InsightFace
 
 from insightface.app import FaceAnalysis
 from PIL import Image, ImageDraw, ImageFont
@@ -34,17 +35,19 @@ from rich.progress import track
 
 console = Console()
 
+
 def setup_logging(level):
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
-        handlers=[RichHandler()]
+        handlers=[RichHandler()],
     )
+
 
 # Define constants with defaults that can be overridden
 DISTANCE_THRESHOLD = 0.3  # Default threshold
-FRAME_SKIP = 60            # Default frame skip
+FRAME_SKIP = 60  # Default frame skip
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -53,33 +56,53 @@ project_root = os.path.dirname(current_script_path)
 # Global font cache
 FONT_PATH = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
 _font_cache = {}
+
+
 def get_font(font_size):
     return _font_cache.setdefault(font_size, ImageFont.truetype(FONT_PATH, font_size))
 
+
 # Test mode configuration
-TEST_IMAGE_PATH = os.path.join(project_root, "source", "images", "test", "test_image.jpeg")
+TEST_IMAGE_PATH = os.path.join(
+    project_root, "source", "images", "test", "test_image.jpeg"
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', action='store_true', 
-                       help='Run in test mode with test_image.jpeg')
-    parser.add_argument('--threshold', type=float, default=0.5,
-                       help='Similarity threshold (0.0-1.0), default: 0.5')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Enable verbose logging')
-    parser.add_argument('--log-level', choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'],
-                        help='Set log level')
+    parser.add_argument(
+        "--test", action="store_true", help="Run in test mode with test_image.jpeg"
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="Similarity threshold (0.0-1.0), default: 0.5",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging"
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set log level",
+    )
     args = parser.parse_args()
-    
+
     # Validate threshold
     if not 0.0 <= args.threshold <= 1.0:
-        print(f"Error: Threshold {args.threshold} is invalid. Must be between 0.0 and 1.0")
+        print(
+            f"Error: Threshold {args.threshold} is invalid. Must be between 0.0 and 1.0"
+        )
         sys.exit(1)
-        
+
     if args.threshold < 0.6:
-        print(f"Warning: Low threshold ({args.threshold}) may produce false positives. Recommended minimum is 0.6")
-        
+        print(
+            f"Warning: Low threshold ({args.threshold}) may produce false positives. Recommended minimum is 0.6"
+        )
+
     return args
+
 
 # Directory paths
 contestants_dir = os.path.join(project_root, "source/photo/contestants")
@@ -91,10 +114,10 @@ app = FaceAnalysis(
     providers=[
         "CUDAExecutionProvider" if torch.cuda.is_available() else "CPUExecutionProvider"
     ],
-    allowed_modules=['detection', 'recognition'],
+    allowed_modules=["detection", "recognition"],
     use_onnx=True,
     det_thresh=0.3,  # Lower detection threshold
-    det_size=(800, 800)  # Larger detection size
+    det_size=(800, 800),  # Larger detection size
 )
 app.prepare(ctx_id=0, det_size=(800, 800))
 
@@ -104,7 +127,7 @@ if torch.backends.mps.is_available():
     torch.mps.set_per_process_memory_fraction(0.75)
     torch.set_flush_denormal(True)
     # Use GPU-accelerated image processing
-    os.environ['OPENCV_OPENCL_DEVICE'] = 'Apple:GPU'
+    os.environ["OPENCV_OPENCL_DEVICE"] = "Apple:GPU"
 
 
 def get_image_paths(contestant_path):
@@ -147,72 +170,92 @@ def get_known_faces_embeddings(contestants_dir, selected_contestants, contestant
                 contestant_info["暱稱"] == contestant_name, "編號"
             ].values[0]
             contestant_path = os.path.join(contestants_dir, str(contestant_number))
-            
+
             if os.path.isdir(contestant_path):
                 image_paths = get_image_paths(contestant_path)
                 embeddings = compute_embeddings(image_paths)
-                
+
                 if embeddings:
                     known_embeddings[contestant_name] = embeddings
             else:
-                print(f"Directory not found for contestant {contestant_name}: {contestant_path}")
+                print(
+                    f"Directory not found for contestant {contestant_name}: {contestant_path}"
+                )
         except Exception as e:
             print(f"Error processing contestant {contestant_name}: {e}")
             import traceback
+
             print(traceback.format_exc())
-            
+
     return known_embeddings
 
 
 def debug_embedding(name, embedding):
     """Print debug info about an embedding"""
-    print(f"Embedding for {name}: shape={embedding.shape}, type={type(embedding)}, min={np.min(embedding)}, max={np.max(embedding)}")
+    print(
+        f"Embedding for {name}: shape={embedding.shape}, type={type(embedding)}, min={np.min(embedding)}, max={np.max(embedding)}"
+    )
     if isinstance(embedding, np.ndarray) and embedding.size > 0:
         print(f"First 5 values: {embedding.flatten()[:5]}")
     else:
         print("Empty or invalid embedding")
+
 
 def verify_borderline_match(face_embedding, candidate_embedding, threshold):
     """Additional verification for matches between threshold and threshold+0.1"""
     # Convert to float32 if needed
     face_emb = face_embedding.astype(np.float32)
     cand_emb = candidate_embedding.astype(np.float32)
-    
+
     # Normalize
     face_emb /= np.linalg.norm(face_emb)
     cand_emb /= np.linalg.norm(cand_emb)
-    
+
     # Calculate multiple similarity metrics
     cosine_sim = np.dot(face_emb, cand_emb)
     euclidean_dist = np.linalg.norm(face_emb - cand_emb)
-    pearson_corr = np.corrcoef(face_emb, cand_emb)[0,1]
-    
+    pearson_corr = np.corrcoef(face_emb, cand_emb)[0, 1]
+
     # More lenient weights favoring cosine similarity
-    combined_score = (0.7 * cosine_sim) + (0.2 * (1 - euclidean_dist)) + (0.1 * pearson_corr)
-    
-    print(f"Verification - Cosine: {cosine_sim:.3f}, Euclidean: {euclidean_dist:.3f}, Pearson: {pearson_corr:.3f}, Combined: {combined_score:.3f}")
-    
+    combined_score = (
+        (0.7 * cosine_sim) + (0.2 * (1 - euclidean_dist)) + (0.1 * pearson_corr)
+    )
+
+    print(
+        f"Verification - Cosine: {cosine_sim:.3f}, Euclidean: {euclidean_dist:.3f}, Pearson: {pearson_corr:.3f}, Combined: {combined_score:.3f}"
+    )
+
     # More permissive verification threshold
-    return combined_score >= (threshold * 0.90)  # Allow 10% lower threshold for verification
+    return combined_score >= (
+        threshold * 0.90
+    )  # Allow 10% lower threshold for verification
+
 
 def match_face(face_embedding, known_embeddings, threshold=0.5):
     """Compare a face embedding against known embeddings using vectorized cosine similarity."""
-    logger.debug(f"match_face called: threshold={threshold:.2f}, CHROMA_AVAILABLE={CHROMA_AVAILABLE}")
+    logger.debug(
+        f"match_face called: threshold={threshold:.2f}, CHROMA_AVAILABLE={CHROMA_AVAILABLE}"
+    )
     try:
         face_emb = face_embedding.flatten().astype(np.float32)
-        face_emb /= (np.linalg.norm(face_emb) + 1e-10)
+        face_emb /= np.linalg.norm(face_emb) + 1e-10
         # ANN lookup with ChromaDB
         if CHROMA_AVAILABLE:
             logger.debug("CHROMA_AVAILABLE: performing ANN lookup")
             try:
                 coll = get_contestant_collection()
                 results = coll.query(query_embeddings=[face_emb.tolist()], n_results=1)
-                if results and results.get('distances') and results.get('metadatas'):
-                    if len(results['distances'][0]) > 0 and len(results['metadatas'][0]) > 0:
-                        best_distance = results['distances'][0][0]
-                        best_name = results['metadatas'][0][0].get('name', 'Unknown')
+                if results and results.get("distances") and results.get("metadatas"):
+                    if (
+                        len(results["distances"][0]) > 0
+                        and len(results["metadatas"][0]) > 0
+                    ):
+                        best_distance = results["distances"][0][0]
+                        best_name = results["metadatas"][0][0].get("name", "Unknown")
                         similarity = 1 - best_distance
-                        logger.debug(f"CHROMA branch result: {best_name}, similarity={similarity:.3f}")
+                        logger.debug(
+                            f"CHROMA branch result: {best_name}, similarity={similarity:.3f}"
+                        )
                         return best_name, similarity
             except Exception as e:
                 logger.error(f"ChromaDB query error: {e}")
@@ -227,11 +270,14 @@ def match_face(face_embedding, known_embeddings, threshold=0.5):
             if max_sim > best_score:
                 best_score = max_sim
                 best_match = name
-                logger.debug(f"Best fallback match so far: {best_match}, score={best_score:.3f}")
+                logger.debug(
+                    f"Best fallback match so far: {best_match}, score={best_score:.3f}"
+                )
         return best_match, best_score
     except Exception as e:
         print(f"Error in match_face: {e}")
         return "Unknown", 0.0
+
 
 def detect_faces(frame):
     """Detect faces in a frame using InsightFace."""
@@ -240,10 +286,10 @@ def detect_faces(frame):
         if frame is None or frame.size == 0:
             print("Warning: Empty or invalid frame received")
             return []
-            
+
         # Convert to RGB for consistent processing
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
+
         # Get faces from InsightFace
         faces = app.get(rgb_frame)
         if faces:
@@ -253,8 +299,10 @@ def detect_faces(frame):
     except Exception as e:
         print(f"Error detecting faces: {str(e)}")
         import traceback
+
         print(traceback.format_exc())
         return []
+
 
 def process_frame(frame, known_embeddings, threshold):
     """Process a frame to identify known faces."""
@@ -263,17 +311,22 @@ def process_frame(frame, known_embeddings, threshold):
         # Detect faces
         faces = detect_faces(frame)
         logger.debug(f"Detected {len(faces)} faces in frame; threshold={threshold:.2f}")
-        
+
         # Match each face against known embeddings
         for face in faces:
             face_embedding = face.normed_embedding
-            matched_name, confidence = match_face(face_embedding, known_embeddings, threshold)
-            logger.debug(f"Best match for face: {matched_name} (confidence: {confidence:.3f})")
+            matched_name, confidence = match_face(
+                face_embedding, known_embeddings, threshold
+            )
+            logger.debug(
+                f"Best match for face: {matched_name} (confidence: {confidence:.3f})"
+            )
             if confidence >= threshold and matched_name != "Unknown":
                 matches.append((face, matched_name))
     except Exception as e:
         print(f"Error processing frame: {str(e)}")
         import traceback
+
         print(traceback.format_exc())
     return matches
 
@@ -305,6 +358,7 @@ def create_pil_image(frame):
         print(f"Error converting frame to PIL image: {e}")
         return None
 
+
 def load_font(font_size):
     """Load font for drawing text."""
     font_path = os.path.join(project_root, "fonts", "SourceHanSansTC-VF.ttf")
@@ -316,6 +370,7 @@ def load_font(font_size):
     except Exception as e:
         print(f"Error loading font: {e}")
         return None
+
 
 def draw_face_box(draw, face, font, color="green"):
     """Draw bounding box around a face."""
@@ -336,13 +391,12 @@ def draw_face_box(draw, face, font, color="green"):
         print(f"Error drawing face box: {e}")
         return None
 
+
 def draw_name_label(draw, name, bbox, font, bg_color="green", text_color="white"):
     """Draw name label above the face box."""
     try:
         if font:
-            text_bbox = draw.textbbox(
-                (bbox[0], bbox[1] - 65), name, font=font
-            )
+            text_bbox = draw.textbbox((bbox[0], bbox[1] - 65), name, font=font)
             draw.rectangle(text_bbox, fill=bg_color)
             draw.text(
                 (bbox[0], bbox[1] - 65),
@@ -352,6 +406,7 @@ def draw_name_label(draw, name, bbox, font, bg_color="green", text_color="white"
             )
     except Exception as e:
         print(f"Error drawing name label: {e}")
+
 
 def draw_timestamp(draw, timestamp, img_size, font, text_color="yellow"):
     """Draw timestamp on the image."""
@@ -366,6 +421,7 @@ def draw_timestamp(draw, timestamp, img_size, font, text_color="yellow"):
     except Exception as e:
         print(f"Error drawing timestamp: {e}")
 
+
 def draw_boxes_and_labels(frame, matches, timestamp):
     """Draw boxes, labels, and timestamp on the frame."""
     try:
@@ -373,12 +429,12 @@ def draw_boxes_and_labels(frame, matches, timestamp):
         if frame is None or frame.size == 0:
             print("Warning: Empty or invalid frame in draw_boxes_and_labels")
             return frame
-        
+
         # Convert to PIL image
         pil_img = create_pil_image(frame)
         if pil_img is None:
             return frame
-            
+
         draw = ImageDraw.Draw(pil_img)
 
         # Load fonts
@@ -399,11 +455,12 @@ def draw_boxes_and_labels(frame, matches, timestamp):
             frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         except Exception as e:
             print(f"Error converting PIL image back to OpenCV: {e}")
-            
+
         return frame
     except Exception as e:
         print(f"Error in draw_boxes_and_labels: {e}")
         import traceback
+
         print(traceback.format_exc())
         return frame  # Return original frame if any error occurs
 
@@ -426,7 +483,9 @@ def create_gif_from_frames(frame_paths, output_gif_path, duration=0.5):
     print(f"GIF saved to {output_gif_path}")
 
 
-def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, threshold=0.5, test_mode=False):
+def recognize_faces_in_videos(
+    videos_dir, selected_videos, known_embeddings, threshold=0.5, test_mode=False
+):
     """Recognize faces in selected videos and prepare frames for GIF creation."""
     results = []
     logger.info("Starting video processing...")
@@ -438,46 +497,46 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
             continue
 
         print(f"\nProcessing {'test image' if test_mode else 'video'}: {video_file}")
-        
+
         if test_mode:
             # For test image, validate and preprocess
             frame = cv2.imread(video_path)
             if frame is None:
                 print(f"Could not read test image {video_path}")
                 continue
-                
+
             # Check resolution
             if frame.shape[0] < 512 or frame.shape[1] < 512:
                 print("Test image resolution too low (min 512x512 required)")
                 continue
-                
+
             # Convert to 3 channels if needed
             if frame.shape[2] == 4:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-            
+
             # Apply sharpening
-            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
             frame = cv2.filter2D(frame, -1, kernel)
-                
+
             matches = process_frame(frame, known_embeddings, threshold)
             if matches:
                 frame_with_boxes = draw_boxes_and_labels(frame, matches, "00:00")
-                output_path = os.path.join(project_root, "output_frames", "test_result.jpg")
+                output_path = os.path.join(
+                    project_root, "output_frames", "test_result.jpg"
+                )
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 cv2.imwrite(output_path, frame_with_boxes)
                 print(f"\nTest result saved to {output_path}")
-                
+
                 for _, matched_name in matches:
                     print(f"Found {matched_name} in test image")
-                    results.append({
-                        "Video": "test_image.jpeg",
-                        "Frame": 0,
-                        "Name": matched_name
-                    })
+                    results.append(
+                        {"Video": "test_image.jpeg", "Frame": 0, "Name": matched_name}
+                    )
             else:
                 print("No matches found in test image")
             continue
-                
+
         # Normal video processing
         cap = cv2.VideoCapture(video_path)
         frame_count = 0
@@ -491,10 +550,13 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
         skip_frames = 0
         # Parallel inference setup
         from concurrent.futures import ThreadPoolExecutor
+
         executor = ThreadPoolExecutor(max_workers=4)
         pending = []  # List of (future, frame, frame_no)
 
-        with tqdm(total=total_frames, desc=f"Frames in {video_file}", leave=False) as pbar:
+        with tqdm(
+            total=total_frames, desc=f"Frames in {video_file}", leave=False
+        ) as pbar:
             while True:
                 # Drop skipped frames without random seek
                 if skip_frames > 0:
@@ -512,7 +574,9 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
                 frame_count += 1
                 pbar.update(1)
                 # Submit inference
-                future = executor.submit(process_frame, frame, known_embeddings, threshold)
+                future = executor.submit(
+                    process_frame, frame, known_embeddings, threshold
+                )
                 pending.append((future, frame, frame_count))
                 # Handle completed tasks
                 new_pending = []
@@ -522,13 +586,15 @@ def recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, thr
                         if matches:
                             skip_frames = 2
                             ts = cnt / fps
-                            ts_fmt = f"{int(ts//60):02}:{int(ts%60):02}"
+                            ts_fmt = f"{int(ts // 60):02}:{int(ts % 60):02}"
                             img_out = draw_boxes_and_labels(fr, matches, ts_fmt)
                             out_path = os.path.join(output_dir, f"frame_{cnt}.jpg")
                             cv2.imwrite(out_path, img_out)
                             labeled_frames.append(out_path)
                             for _, name in matches:
-                                results.append({"Video": video_file, "Frame": cnt, "Name": name})
+                                results.append(
+                                    {"Video": video_file, "Frame": cnt, "Name": name}
+                                )
                         else:
                             skip_frames = 10
                         # Finished this task
@@ -588,65 +654,70 @@ def get_contestant_image(contestants_dir, contestant, contestant_info):
 
 # ChromaDB import is now handled at the top of the file
 
+
 def compute_face_embedding(image_path):
     """Compute the face embedding for a given image."""
     try:
         print(f"Reading image from {image_path}")
         img = cv2.imread(image_path)
-        
+
         if img is None:
             print(f"Failed to read image: {image_path}")
             return None
-            
+
         print(f"Image shape: {img.shape}, detecting faces...")
-        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB for better face detection
+        rgb_img = cv2.cvtColor(
+            img, cv2.COLOR_BGR2RGB
+        )  # Convert to RGB for better face detection
         # Try detection with different sizes with debug info
-        print(f"Attempting face detection with InsightFace...")
+        print("Attempting face detection with InsightFace...")
         for det_size in [(800, 800), (640, 640), (1024, 1024)]:
             print(f"Trying detection size {det_size}")
             app.det_size = det_size
             faces = app.get(rgb_img)
             if faces:
                 break
-        
+
         print(f"Found {len(faces)} faces in {image_path}")
-        
+
         if len(faces) > 0:
             face = faces[0]
             embedding = face.normed_embedding
-            
+
             # Get contestant name from path
-            path_parts = image_path.split('/')
+            path_parts = image_path.split("/")
             contestant_id = path_parts[-2]  # Folder name (number)
-            
+
             # Look up contestant name from contestant_info
             try:
                 contestant_info = pd.read_csv(contestant_info_path)
-                contestant_row = contestant_info[contestant_info['編號'].astype(str) == contestant_id]
+                contestant_row = contestant_info[
+                    contestant_info["編號"].astype(str) == contestant_id
+                ]
                 if not contestant_row.empty:
-                    contestant_name = contestant_row['暱稱'].iloc[0]
+                    contestant_name = contestant_row["暱稱"].iloc[0]
                 else:
                     # Use filename as fallback
-                    contestant_name = os.path.basename(image_path).split('-')[0]
+                    contestant_name = os.path.basename(image_path).split("-")[0]
             except Exception as e:
                 print(f"Error looking up contestant name: {e}")
-                contestant_name = os.path.basename(image_path).split('-')[0]
-            
+                contestant_name = os.path.basename(image_path).split("-")[0]
+
             # Store in ChromaDB if available
             if CHROMA_AVAILABLE:
                 try:
                     collection = get_contestant_collection()
-                    
+
                     collection.add(
                         embeddings=[embedding.tolist()],
                         metadatas=[{"name": contestant_name}],
-                        ids=[f"{contestant_id}-{os.path.basename(image_path)}"]
+                        ids=[f"{contestant_id}-{os.path.basename(image_path)}"],
                     )
                     print(f"Stored embedding for {contestant_name} in ChromaDB")
                 except Exception as e:
                     print(f"Error storing in ChromaDB: {e}")
                     print("Continuing without ChromaDB storage")
-            
+
             return embedding
         else:
             print(f"No faces detected in {image_path}")
@@ -654,6 +725,7 @@ def compute_face_embedding(image_path):
     except Exception as e:
         print(f"Error computing embedding for {image_path}: {e}")
         import traceback
+
         print(traceback.format_exc())
         return None
 
@@ -662,24 +734,26 @@ def main():
     # Add hardware acceleration
     cv2.setUseOptimized(True)
     cv2.ocl.setUseOpenCL(True)
-    
+
     if torch.backends.mps.is_available():
         print("🚀 Using Apple Silicon GPU acceleration")
-        os.environ['INSIGHTFACE_ENABLE_MPS'] = '1'
+        os.environ["INSIGHTFACE_ENABLE_MPS"] = "1"
     else:
         print("⚠️ Running on CPU only")
 
     args = parse_args()
     TEST_MODE = args.test
     SIMILARITY_THRESHOLD = args.threshold  # Get threshold from arguments
-    
+
     if TEST_MODE:
         if not os.path.exists(TEST_IMAGE_PATH):
             print(f"\nError: Test image not found at {TEST_IMAGE_PATH}")
-            print("Please place your test image at that location or run without --test flag")
+            print(
+                "Please place your test image at that location or run without --test flag"
+            )
             return
         print("\nRunning in test mode")
-        
+
     # Initialize logging
     log_level = logging.INFO
     if args.log_level:
@@ -690,7 +764,7 @@ def main():
 
     logger.info("MV Face Recognition System")
     logger.info("=======================")
-    
+
     # Load contestant data
     contestant_info = pd.read_csv(contestant_info_path)
     all_contestants = contestant_info["暱稱"].tolist()
@@ -700,20 +774,20 @@ def main():
         selected_contestants = all_contestants
         test_video = "test_image.jpeg"
         selected_videos = [test_video]
-        
+
         # Check if test image exists
         if not os.path.exists(TEST_IMAGE_PATH):
             print(f"Test image not found at {TEST_IMAGE_PATH}")
             return
-            
+
         # Print test image info
         test_img = cv2.imread(TEST_IMAGE_PATH)
         if test_img is None:
             print(f"Failed to read test image: {TEST_IMAGE_PATH}")
             return
-            
+
         print(f"Test image dimensions: {test_img.shape}")
-        
+
         # Copy test image to videos dir temporarily
         shutil.copy(TEST_IMAGE_PATH, os.path.join(videos_dir, test_video))
         print(f"Copied test image to {os.path.join(videos_dir, test_video)}")
@@ -721,7 +795,11 @@ def main():
         # Normal mode - user selects contestants and videos
         selected_contestants = select_items(all_contestants, "contestants")
         all_videos = sorted(
-            [f for f in os.listdir(videos_dir) if os.path.isfile(os.path.join(videos_dir, f))]
+            [
+                f
+                for f in os.listdir(videos_dir)
+                if os.path.isfile(os.path.join(videos_dir, f))
+            ]
         )
         selected_videos = select_items(all_videos, "videos")
 
@@ -734,17 +812,19 @@ def main():
         if contestant_row.empty:
             print(f"Could not find contestant info for {contestant}")
             continue
-            
+
         contestant_number = contestant_row["編號"].values[0]
         contestant_path = os.path.join(contestants_dir, str(contestant_number))
-        
+
         # Check if we have embedding file
         embedding_file = os.path.join(contestants_dir, f"{contestant}_embedding.npy")
         if os.path.exists(embedding_file):
             try:
-                embedding = np.load(embedding_file, allow_pickle=True).flatten()  # Ensure 1D array
+                embedding = np.load(
+                    embedding_file, allow_pickle=True
+                ).flatten()  # Ensure 1D array
                 print(f"Loaded embedding for {contestant} from file: {embedding_file}")
-                
+
                 # Debug the loaded embedding
                 if isinstance(embedding, np.ndarray):
                     print(f"  Shape: {embedding.shape}, Type: {type(embedding)}")
@@ -755,7 +835,7 @@ def main():
                     print(f"  List of {len(embedding)} embeddings")
                 else:
                     print(f"  Unexpected type: {type(embedding)}")
-                
+
                 # Ensure embeddings are in a list and have consistent shape
                 if isinstance(embedding, list):
                     # Make sure each embedding is a 1D array
@@ -770,8 +850,9 @@ def main():
             except Exception as e:
                 print(f"Error loading embedding for {contestant}: {e}")
                 import traceback
+
                 print(traceback.format_exc())
-                
+
         # If no embedding file or loading failed, try to compute from images
         if contestant not in known_embeddings or not known_embeddings[contestant]:
             print(f"Computing embedding for {contestant}...")
@@ -790,7 +871,9 @@ def main():
                 else:
                     print(f"No images found for {contestant} in {contestant_path}")
             else:
-                print(f"Directory not found for contestant {contestant}: {contestant_path}")
+                print(
+                    f"Directory not found for contestant {contestant}: {contestant_path}"
+                )
 
     logger.info(f"Loaded/computed embeddings for {len(known_embeddings)} contestants.")
     logger.info(f"Contestant names with embeddings: {list(known_embeddings.keys())}")
@@ -798,7 +881,9 @@ def main():
     # Verify embeddings are valid
     valid_embeddings = 0
     for name, embeddings in known_embeddings.items():
-        if embeddings and all(e is not None and isinstance(e, np.ndarray) for e in embeddings):
+        if embeddings and all(
+            e is not None and isinstance(e, np.ndarray) for e in embeddings
+        ):
             valid_embeddings += 1
     logger.info(f"Valid embeddings: {valid_embeddings}/{len(known_embeddings)}")
 
@@ -813,7 +898,7 @@ def main():
         coll = get_contestant_collection()
         try:
             existing = coll.get()
-            if not existing.get('ids'):
+            if not existing.get("ids"):
                 logger.info("Initializing ChromaDB index for embeddings...")
                 for name, emb_mat in known_embeddings.items():
                     ids = [f"{name}_{i}" for i in range(emb_mat.shape[0])]
@@ -826,8 +911,13 @@ def main():
             logger.error(f"ChromaDB indexing error: {e}")
 
     # Process videos
-    recognize_faces_in_videos(videos_dir, selected_videos, known_embeddings, 
-                             threshold=SIMILARITY_THRESHOLD, test_mode=TEST_MODE)
+    recognize_faces_in_videos(
+        videos_dir,
+        selected_videos,
+        known_embeddings,
+        threshold=SIMILARITY_THRESHOLD,
+        test_mode=TEST_MODE,
+    )
 
 
 if __name__ == "__main__":

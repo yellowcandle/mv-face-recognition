@@ -7,7 +7,9 @@ import warnings
 from insightface.app import FaceAnalysis
 
 # Suppress the specific FutureWarning from numpy.linalg.lstsq
-warnings.filterwarnings('ignore', category=FutureWarning, module='insightface.utils.transform')
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, module="insightface.utils.transform"
+)
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -32,6 +34,7 @@ def face_exists(img_path):
             return False
         else:
             raise e
+
 
 # Function to verify faces in a folder
 def verify_faces_in_folder(folder_path):
