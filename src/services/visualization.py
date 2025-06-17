@@ -141,27 +141,88 @@ class VisualizationService:
         Returns:
             matplotlib.figure.Figure: The generated UMAP plot.
         """
+        # Define consistent color palette for contestants (matching timeline colors)
+        color_palette = [
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", 
+            "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
+            "#F8C471", "#82E0AA", "#F1948A", "#85929E", "#D2B4DE",
+            "#F39C12", "#E74C3C", "#9B59B6", "#3498DB", "#1ABC9C",
+            "#2ECC71", "#F1C40F", "#E67E22", "#E91E63", "#9C27B0"
+        ]
+        
+        # Get all unique contestants and create color mapping
+        all_contestant_names = set()
+        for label in detected_labels:
+            # Extract contestant name (remove confidence scores if present)
+            clean_name = label.split('(')[0].strip() if '(' in label else label.strip()
+            if clean_name != "Unknown":
+                all_contestant_names.add(clean_name)
+        
+        for name in gallery_names.values():
+            all_contestant_names.add(name)
+        
+        # Also add any names from the internal gallery keys
+        for name in gallery_embeddings.keys():
+            all_contestant_names.add(name)
+            
+        contestants_list = sorted(list(all_contestant_names))
+        
+        # Ensure we have enough colors, repeat the palette if needed
+        extended_palette = color_palette * ((len(contestants_list) // len(color_palette)) + 1)
+        contestant_color_map = dict(zip(contestants_list, extended_palette[:len(contestants_list)]))
+        
+        # Debug logging
+        logger.info(f"UMAP Color Mapping: Found {len(contestants_list)} contestants: {contestants_list}")
+        logger.info(f"Color map keys: {list(contestant_color_map.keys())}")
+        
         # Prepare data structures
         all_embeddings = []
         all_labels = []
         all_types = []  # 'current', 'gallery_matched', 'gallery_other'
+        all_colors = []  # Store color for each point
         gallery_indices = {}  # Map gallery names to their indices in all_embeddings
 
         # Add gallery embeddings first
         for name, emb_list in gallery_embeddings.items():
             display_name = gallery_names.get(name, name)
             gallery_indices[name] = []
+            
+            # Ensure we have a color for this contestant
+            if display_name not in contestant_color_map:
+                # Add missing contestant to color map
+                next_color_index = len(contestant_color_map) % len(extended_palette)
+                contestant_color_map[display_name] = extended_palette[next_color_index]
+                logger.warning(f"Added missing gallery contestant '{display_name}' to color map with color {extended_palette[next_color_index]}")
+            
+            contestant_color = contestant_color_map.get(display_name, "#888888")
+            
             for emb in emb_list:
                 all_embeddings.append(emb)
                 all_labels.append(display_name)
                 all_types.append("gallery_other")  # Will update later if matched
+                all_colors.append(contestant_color)
                 gallery_indices[name].append(len(all_embeddings) - 1)
 
         # Add current detected embeddings
         current_start_idx = len(all_embeddings)
         all_embeddings.extend(detected_embeddings)
-        all_labels.extend(detected_labels)
-        all_types.extend(["current"] * len(detected_embeddings))
+        
+        # Process detected labels and assign colors
+        for label in detected_labels:
+            clean_name = label.split('(')[0].strip() if '(' in label else label.strip()
+            
+            # Ensure we have a color for this contestant
+            if clean_name not in contestant_color_map and clean_name != "Unknown":
+                # Add missing contestant to color map
+                next_color_index = len(contestant_color_map) % len(extended_palette)
+                contestant_color_map[clean_name] = extended_palette[next_color_index]
+                logger.warning(f"Added missing contestant '{clean_name}' to color map with color {extended_palette[next_color_index]}")
+            
+            contestant_color = contestant_color_map.get(clean_name, "#FF0000")  # Red for Unknown/unmatched
+            
+            all_labels.append(label)
+            all_types.append("current")
+            all_colors.append(contestant_color)
 
         if not all_embeddings:
             fig, ax = plt.subplots(figsize=(12, 8))
@@ -228,7 +289,7 @@ class VisualizationService:
 
         # Perform UMAP
         n_neighbors = min(15, len(all_embeddings) - 1)
-        reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1)
+        reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, random_state=42)
         embeddings_2d_raw = reducer.fit_transform(np.array(all_embeddings))
         if isinstance(embeddings_2d_raw, tuple):
             embeddings_2d = embeddings_2d_raw[0]
@@ -239,106 +300,124 @@ class VisualizationService:
             embeddings_2d = embeddings_2d.toarray()
 
         # Create enhanced scatter plot
-        fig, ax = plt.subplots(figsize=(14, 10))
+        fig, ax = plt.subplots(figsize=(16, 12))
 
-        # Plot gallery embeddings (non-matched)
+        # Plot gallery embeddings (non-matched) - use lighter versions of contestant colors
         gallery_other_mask = np.array([t == "gallery_other" for t in all_types])
         if np.any(gallery_other_mask):
+            gallery_other_colors = [all_colors[i] for i, mask in enumerate(gallery_other_mask) if mask]
             ax.scatter(
                 embeddings_2d[gallery_other_mask, 0],
                 embeddings_2d[gallery_other_mask, 1],
-                c="lightgray",
-                s=50,
-                alpha=0.3,
+                c=gallery_other_colors,
+                s=60,
+                alpha=0.4,
                 marker="o",
                 label="Gallery (unmatched)",
-                edgecolors="none",
+                edgecolors="white",
+                linewidth=1,
             )
 
-        # Plot gallery embeddings (matched)
+        # Plot gallery embeddings (matched) - use full contestant colors
         gallery_matched_mask = np.array([t == "gallery_matched" for t in all_types])
         if np.any(gallery_matched_mask):
-            # Group by person for coloring
-            matched_labels = [
-                all_labels[i]
-                for i, matched in enumerate(gallery_matched_mask)
-                if matched
-            ]
+            # Group by person for consistent coloring
+            matched_indices = [i for i, mask in enumerate(gallery_matched_mask) if mask]
+            matched_labels = [all_labels[i] for i in matched_indices]
+            matched_colors = [all_colors[i] for i in matched_indices]
+            matched_positions = embeddings_2d[gallery_matched_mask]
+            
             unique_matched = list(set(matched_labels))
-            # Use a colormap for matched gallery embeddings
-            colors = plt.get_cmap("tab20")(np.linspace(0, 1, len(unique_matched)))
-
-            for i, person in enumerate(unique_matched):
-                person_mask = np.array(
-                    [
-                        t == "gallery_matched" and all_labels[j] == person
-                        for j, t in enumerate(all_types)
-                    ]
-                )
+            
+            for person in unique_matched:
+                person_indices = [i for i, label in enumerate(matched_labels) if label == person]
+                person_positions = matched_positions[person_indices]
+                person_color = contestant_color_map.get(person, "#888888")
+                
                 ax.scatter(
-                    embeddings_2d[person_mask, 0],
-                    embeddings_2d[person_mask, 1],
-                    c=[colors[i]],
-                    s=150,
+                    person_positions[:, 0],
+                    person_positions[:, 1],
+                    c=person_color,
+                    s=120,
                     alpha=0.8,
                     marker="s",
-                    label=f"{person} (matched)",
+                    label=f"{person} (gallery)",
                     edgecolors="black",
-                    linewidth=1,
+                    linewidth=1.5,
                 )
 
                 # Add label for matched gallery points
-                if np.any(person_mask):
+                if len(person_positions) > 0:
                     # Find the centroid of the cluster for labeling
-                    centroid_x = np.mean(embeddings_2d[person_mask, 0])
-                    centroid_y = np.mean(embeddings_2d[person_mask, 1])
+                    centroid_x = np.mean(person_positions[:, 0])
+                    centroid_y = np.mean(person_positions[:, 1])
                     ax.annotate(
                         person,
                         (centroid_x, centroid_y),
-                        xytext=(0, 10),
+                        xytext=(0, 15),
                         textcoords="offset points",
-                        fontsize=9,
+                        fontsize=10,
                         ha="center",
                         va="bottom",
-                        bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.7),
+                        bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8, edgecolor=person_color),
+                        fontweight="bold",
                     )
 
-        # Plot current detected faces
+        # Plot current detected faces - use contestant colors or red for unknown
         current_mask = np.array([t == "current" for t in all_types])
         if np.any(current_mask):
-            current_points = embeddings_2d[current_mask]
-            ax.scatter(
-                current_points[:, 0],
-                current_points[:, 1],
-                c="red",
-                s=300,
-                alpha=1.0,
-                marker="*",
-                label="Current Detection",
-                edgecolors="darkred",
-                linewidth=2,
-                zorder=3,
-            )
-
-            # Add labels for current detections with recognized names
-            for i, (x, y) in enumerate(current_points):
-                label_text = all_labels[
-                    current_start_idx + i
-                ]  # Get the actual label (e.g., "Unknown" or "Name (score)")
-                ax.annotate(
-                    label_text,
-                    (x, y),
-                    xytext=(5, 5),
-                    textcoords="offset points",
-                    fontsize=10,
-                    fontweight="bold",
-                    bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7),
-                    zorder=4,
+            current_indices = [i for i, mask in enumerate(current_mask) if mask]
+            current_labels = [all_labels[i] for i in current_indices]
+            current_colors = [all_colors[i] for i in current_indices]
+            current_positions = embeddings_2d[current_mask]
+            
+            # Group current detections by contestant
+            unique_current = {}
+            for i, label in enumerate(current_labels):
+                clean_name = label.split('(')[0].strip() if '(' in label else label.strip()
+                if clean_name not in unique_current:
+                    unique_current[clean_name] = []
+                unique_current[clean_name].append((current_positions[i], current_colors[i], label))
+            
+            for contestant_name, detections in unique_current.items():
+                positions = np.array([det[0] for det in detections])
+                colors = [det[1] for det in detections]
+                labels = [det[2] for det in detections]
+                
+                # Use the same color for all detections of this contestant
+                contestant_color = contestant_color_map.get(contestant_name, "#FF0000")
+                
+                ax.scatter(
+                    positions[:, 0],
+                    positions[:, 1],
+                    c=contestant_color,
+                    s=200,
+                    alpha=1.0,
+                    marker="*",
+                    label=f"{contestant_name} (detected)",
+                    edgecolors="white",
+                    linewidth=2,
+                    zorder=3,
                 )
+
+                # Add labels for current detections
+                for pos, label in zip(positions, labels):
+                    ax.annotate(
+                        label,
+                        pos,
+                        xytext=(8, 8),
+                        textcoords="offset points",
+                        fontsize=9,
+                        fontweight="bold",
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=contestant_color, alpha=0.8, edgecolor="white"),
+                        color="white",
+                        zorder=4,
+                    )
 
         # Draw connection lines between current detections and their matches
         for curr_idx, top_matches in matches_info:
             curr_x, curr_y = embeddings_2d[curr_idx]
+            curr_color = all_colors[curr_idx]
 
             for match_idx, match_name, similarity in top_matches:
                 if similarity > 0.5:  # Only show significant matches
@@ -348,19 +427,19 @@ class VisualizationService:
                     alpha = min(similarity, 0.8)
                     linewidth = 1 + (similarity * 2)
 
-                    # Draw arrow
+                    # Draw arrow using contestant color
                     ax.annotate(
                         "",
                         xy=(match_x, match_y),
                         xytext=(curr_x, curr_y),
                         arrowprops=dict(
-                            facecolor="green",
-                            edgecolor="green",
+                            facecolor=curr_color,
+                            edgecolor=curr_color,
                             arrowstyle="->",
                             linewidth=linewidth,
                             alpha=alpha,
-                            shrinkA=5,
-                            shrinkB=5,
+                            shrinkA=8,
+                            shrinkB=8,
                         ),
                         zorder=2,
                     )
@@ -374,36 +453,327 @@ class VisualizationService:
                         ha="center",
                         va="center",
                         bbox=dict(
-                            boxstyle="round,pad=0.2", facecolor="white", alpha=0.8
+                            boxstyle="round,pad=0.2", facecolor="white", alpha=0.9, edgecolor=curr_color
                         ),
                         zorder=5,
                     )
 
         # Customize plot
         ax.set_title(
-            "Face Embedding Relationships (UMAP)", fontsize=16, fontweight="bold"
+            "Face Embedding Relationships (UMAP) - Color-Coded by Contestant", 
+            fontsize=18, fontweight="bold", pad=20
         )
-        ax.set_xlabel("UMAP Dimension 1", fontsize=12)
-        ax.set_ylabel("UMAP Dimension 2", fontsize=12)
+        ax.set_xlabel("UMAP Dimension 1", fontsize=14)
+        ax.set_ylabel("UMAP Dimension 2", fontsize=14)
 
-        # Add legend with custom positioning
+        # Create custom legend with contestant colors
+        legend_elements = []
+        
+        # Get actual detected contestant names for safer processing
+        detected_contestant_names = set()
+        for label in detected_labels:
+            clean_name = label.split('(')[0].strip() if '(' in label else label.strip()
+            if clean_name != "Unknown":
+                detected_contestant_names.add(clean_name)
+        
+        # Add detected contestants
+        for contestant in detected_contestant_names:
+            if contestant in contestant_color_map:
+                legend_elements.append(
+                    plt.scatter([], [], c=contestant_color_map[contestant], s=100, marker="*", 
+                              label=f"🎯 {contestant} (detected)", edgecolors="white", linewidth=1)
+                )
+        
+        # Add gallery contestants (only those present in our data)
+        gallery_contestant_names = set()
+        for name in gallery_names.values():
+            gallery_contestant_names.add(name)
+        for name in gallery_embeddings.keys():
+            gallery_contestant_names.add(name)
+            
+        for contestant in gallery_contestant_names:
+            if contestant in contestant_color_map:
+                legend_elements.append(
+                    plt.scatter([], [], c=contestant_color_map[contestant], s=80, marker="s", 
+                              label=f"📚 {contestant} (gallery)", edgecolors="black", linewidth=1, alpha=0.8)
+                )
+
+        # Add unknown detections if any
+        if any("Unknown" in label for label in detected_labels):
+            legend_elements.append(
+                plt.scatter([], [], c="#FF0000", s=100, marker="*", 
+                          label="❓ Unknown", edgecolors="white", linewidth=1)
+            )
+
+        # Position legend
         legend = ax.legend(
-            bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=10, framealpha=0.9
+            handles=legend_elements,
+            bbox_to_anchor=(1.05, 1), 
+            loc="upper left", 
+            fontsize=10, 
+            framealpha=0.95,
+            title="Contestants",
+            title_fontsize=12
         )
 
         # Add grid for better readability
         ax.grid(True, alpha=0.3, linestyle="--")
 
-        # Add similarity scale reference
+        # Add enhanced similarity scale reference
         ax.text(
             0.02,
             0.98,
-            "Line thickness = similarity strength\nGreen arrows show matches > 0.5",
+            "🎨 Color-coded by contestant\n📏 Line thickness = similarity strength\n➡️ Arrows show matches > 0.5\n⭐ Stars = detected faces\n⬜ Squares = gallery faces",
             transform=ax.transAxes,
-            fontsize=9,
+            fontsize=10,
             verticalalignment="top",
-            bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8),
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.9, edgecolor="gray"),
         )
 
+        plt.tight_layout()
+        return fig
+
+    def create_similarity_plot(
+        self,
+        frame_similarities: List[Dict],
+        frame_number: int = None,
+        max_faces: int = 5
+    ) -> Figure:
+        """
+        Create a real-time similarity plot showing top 5 most similar faces for current frame.
+        
+        Args:
+            frame_similarities: List of similarity dictionaries from frame processing
+            frame_number: Current frame number for display
+            max_faces: Maximum number of top similar faces to show
+            
+        Returns:
+            matplotlib.figure.Figure: The generated similarity plot
+        """
+        if not frame_similarities:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.text(0.5, 0.5, "No face similarities to display", 
+                   ha='center', va='center', fontsize=14)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_title("Face Similarity Scores")
+            return fig
+            
+        # Group similarities by detected face and get top matches
+        face_groups = {}
+        for sim_data in frame_similarities:
+            face_id = sim_data.get('face_id', 'Face_1')
+            if face_id not in face_groups:
+                face_groups[face_id] = []
+            face_groups[face_id].append(sim_data)
+        
+        # Create subplot for each detected face (up to max_faces)
+        n_faces = min(len(face_groups), max_faces)
+        if n_faces == 0:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.text(0.5, 0.5, "No faces detected in current frame", 
+                   ha='center', va='center', fontsize=14)
+            ax.set_title("Face Similarity Scores")
+            return fig
+            
+        fig, axes = plt.subplots(n_faces, 1, figsize=(12, 3 * n_faces))
+        if n_faces == 1:
+            axes = [axes]
+            
+        frame_title = f" - Frame {frame_number}" if frame_number is not None else ""
+        fig.suptitle(f"Top 5 Most Similar Faces{frame_title}", fontsize=16, fontweight='bold')
+        
+        for i, (face_id, similarities) in enumerate(list(face_groups.items())[:n_faces]):
+            ax = axes[i]
+            
+            # Sort by similarity score and take top 5
+            similarities.sort(key=lambda x: x.get('similarity', 0), reverse=True)
+            top_similarities = similarities[:5]
+            
+            if not top_similarities:
+                ax.text(0.5, 0.5, f"No similarities for {face_id}", 
+                       ha='center', va='center')
+                ax.set_title(f"{face_id}")
+                continue
+                
+            # Prepare data for plotting
+            names = []
+            scores = []
+            colors = []
+            
+            for sim_data in top_similarities:
+                name = sim_data.get('name', 'Unknown')
+                similarity = sim_data.get('similarity', 0.0)
+                
+                # Truncate long names
+                if len(name) > 15:
+                    name = name[:12] + "..."
+                    
+                names.append(name)
+                scores.append(similarity)
+                
+                # Color coding based on similarity threshold
+                if similarity >= 0.7:
+                    colors.append('#2E8B57')  # Sea Green - High confidence
+                elif similarity >= 0.5:
+                    colors.append('#FF8C00')  # Dark Orange - Medium confidence  
+                elif similarity >= 0.3:
+                    colors.append('#FFD700')  # Gold - Low confidence
+                else:
+                    colors.append('#DC143C')  # Crimson - Very low confidence
+            
+            # Create horizontal bar chart
+            y_pos = np.arange(len(names))
+            bars = ax.barh(y_pos, scores, color=colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+            
+            # Customize the plot
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(names, fontsize=10)
+            ax.set_xlabel('Similarity Score', fontsize=11)
+            ax.set_title(f'{face_id} - Top Matches', fontsize=12, fontweight='bold')
+            ax.set_xlim(0, 1.0)
+            
+            # Add value labels on bars
+            for j, (bar, score) in enumerate(zip(bars, scores)):
+                width = bar.get_width()
+                label_x = width + 0.01 if width < 0.8 else width - 0.01
+                ha = 'left' if width < 0.8 else 'right'
+                color = 'black' if width < 0.8 else 'white'
+                ax.text(label_x, bar.get_y() + bar.get_height()/2,
+                       f'{score:.3f}', ha=ha, va='center', 
+                       fontweight='bold', fontsize=9, color=color)
+            
+            # Add threshold lines
+            ax.axvline(x=0.7, color='green', linestyle='--', alpha=0.7, linewidth=1)
+            ax.axvline(x=0.5, color='orange', linestyle='--', alpha=0.7, linewidth=1)
+            ax.axvline(x=0.3, color='gold', linestyle='--', alpha=0.7, linewidth=1)
+            
+            # Add grid
+            ax.grid(True, axis='x', alpha=0.3, linestyle='-', linewidth=0.5)
+            ax.set_axisbelow(True)
+            
+            # Invert y-axis to show highest similarity at top
+            ax.invert_yaxis()
+        
+        # Add legend
+        legend_elements = [
+            plt.Rectangle((0,0),1,1, fc='#2E8B57', alpha=0.8, label='High (≥0.7)'),
+            plt.Rectangle((0,0),1,1, fc='#FF8C00', alpha=0.8, label='Medium (0.5-0.7)'),
+            plt.Rectangle((0,0),1,1, fc='#FFD700', alpha=0.8, label='Low (0.3-0.5)'),
+            plt.Rectangle((0,0),1,1, fc='#DC143C', alpha=0.8, label='Very Low (<0.3)')
+        ]
+        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98), fontsize=10)
+        
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.93, right=0.85)
+        return fig
+
+    def create_frame_timeline_plot(
+        self, 
+        timeline_data: List[Dict], 
+        current_frame: int = None,
+        window_size: int = 100
+    ) -> Figure:
+        """
+        Create a timeline plot showing similarity scores across frames.
+        
+        Args:
+            timeline_data: List of frame data with similarities
+            current_frame: Current frame number to highlight
+            window_size: Number of frames to show around current frame
+            
+        Returns:
+            matplotlib.figure.Figure: The generated timeline plot
+        """
+        if not timeline_data:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.text(0.5, 0.5, "No timeline data available", 
+                   ha='center', va='center', fontsize=14)
+            ax.set_title("Similarity Timeline")
+            return fig
+            
+        # Extract frame numbers and similarity data
+        frames = []
+        max_similarities = []
+        avg_similarities = []
+        face_counts = []
+        
+        for frame_data in timeline_data:
+            frame_num = frame_data.get('frame', 0)
+            similarities = frame_data.get('similarities', [])
+            
+            frames.append(frame_num)
+            face_counts.append(len(similarities))
+            
+            if similarities:
+                scores = [s.get('similarity', 0) for s in similarities]
+                max_similarities.append(max(scores))
+                avg_similarities.append(np.mean(scores))
+            else:
+                max_similarities.append(0)
+                avg_similarities.append(0)
+        
+        if not frames:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.text(0.5, 0.5, "No frame data to display", 
+                   ha='center', va='center', fontsize=14)
+            ax.set_title("Similarity Timeline")
+            return fig
+            
+        # Filter data around current frame if specified
+        if current_frame is not None and window_size > 0:
+            start_frame = max(0, current_frame - window_size // 2)
+            end_frame = current_frame + window_size // 2
+            
+            # Find indices within the window
+            window_indices = [i for i, f in enumerate(frames) 
+                            if start_frame <= f <= end_frame]
+            
+            if window_indices:
+                frames = [frames[i] for i in window_indices]
+                max_similarities = [max_similarities[i] for i in window_indices]
+                avg_similarities = [avg_similarities[i] for i in window_indices]
+                face_counts = [face_counts[i] for i in window_indices]
+        
+        # Create the plot
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+        
+        # Plot 1: Similarity scores
+        ax1.plot(frames, max_similarities, 'r-', linewidth=2, label='Max Similarity', alpha=0.8)
+        ax1.plot(frames, avg_similarities, 'b-', linewidth=2, label='Avg Similarity', alpha=0.8)
+        ax1.fill_between(frames, max_similarities, alpha=0.3, color='red')
+        ax1.fill_between(frames, avg_similarities, alpha=0.3, color='blue')
+        
+        # Highlight current frame
+        if current_frame is not None and current_frame in frames:
+            curr_idx = frames.index(current_frame)
+            ax1.axvline(x=current_frame, color='green', linestyle='--', linewidth=3, 
+                       label=f'Current Frame ({current_frame})')
+            ax1.scatter([current_frame], [max_similarities[curr_idx]], 
+                       color='green', s=100, zorder=5, marker='o')
+        
+        ax1.set_ylabel('Similarity Score', fontsize=12)
+        ax1.set_title('Face Recognition Similarity Timeline', fontsize=14, fontweight='bold')
+        ax1.legend(loc='upper right')
+        ax1.grid(True, alpha=0.3)
+        ax1.set_ylim(0, 1.0)
+        
+        # Add threshold lines
+        ax1.axhline(y=0.7, color='green', linestyle=':', alpha=0.7, label='High Threshold')
+        ax1.axhline(y=0.5, color='orange', linestyle=':', alpha=0.7, label='Medium Threshold')
+        
+        # Plot 2: Face count
+        ax2.bar(frames, face_counts, alpha=0.7, color='purple', width=0.8)
+        ax2.set_xlabel('Frame Number', fontsize=12)
+        ax2.set_ylabel('Faces Detected', fontsize=12)
+        ax2.set_title('Number of Faces Detected per Frame', fontsize=12)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        # Highlight current frame
+        if current_frame is not None and current_frame in frames:
+            curr_idx = frames.index(current_frame)
+            ax2.bar([current_frame], [face_counts[curr_idx]], 
+                   color='green', alpha=0.8, width=0.8)
+        
         plt.tight_layout()
         return fig

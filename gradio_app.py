@@ -61,12 +61,12 @@ def get_face_detector():
     return _global_detector
 
 
-def process_frame(frame, known_embeddings, similarity_threshold=0.5):
+def process_frame(frame, known_embeddings, similarity_threshold=0.5, return_similarities=False):
     """Process a video frame and detect/recognize faces with adaptive scaling."""
     try:
         detector = get_face_detector()
         if detector is None:
-            return []
+            return [] if not return_similarities else ([], [])
 
         # Adaptive resolution scaling for better small face detection
         original_frame = frame.copy()
@@ -103,7 +103,9 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5):
                     face.bbox = face.bbox / scale_factor
 
         matches = []
-        for face in faces:
+        frame_similarities = []  # Store all similarity scores for plotting
+        
+        for face_idx, face in enumerate(faces):
             try:
                 face_embedding = None
 
@@ -143,9 +145,10 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5):
                     if np.linalg.norm(face_embedding) > 0:
                         face_embedding = face_embedding / np.linalg.norm(face_embedding)
 
-                    # Match against known embeddings
+                    # Match against known embeddings and collect all similarities
                     best_match = "Unknown"
                     best_score = 0
+                    face_similarities = []
 
                     for name, known_embedding in known_embeddings.items():
                         try:
@@ -165,6 +168,15 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5):
 
                             # Calculate cosine similarity
                             similarity = np.dot(face_embedding, known_embedding)
+                            
+                            # Store similarity data for plotting
+                            if return_similarities:
+                                face_similarities.append({
+                                    'face_id': f'Face_{face_idx + 1}',
+                                    'name': name,
+                                    'similarity': float(similarity),
+                                    'bbox': face.bbox.tolist() if hasattr(face, 'bbox') else None
+                                })
 
                             if (
                                 similarity > similarity_threshold
@@ -176,15 +188,21 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5):
                             logger.debug(f"Error comparing with {name}: {e}")
                             continue
 
+                    # Add all similarities for this face to the frame data
+                    if return_similarities:
+                        frame_similarities.extend(face_similarities)
+                    
                     matches.append((face, best_match))
             except Exception as e:
                 logger.warning(f"Error processing face: {e}")
                 matches.append((face, "Unknown"))
 
+        if return_similarities:
+            return matches, frame_similarities
         return matches
     except Exception as e:
         logger.error(f"Error processing frame: {e}")
-        return []
+        return [] if not return_similarities else ([], [])
 
 
 def calculate_face_similarity(bbox1, bbox2):
@@ -995,8 +1013,8 @@ class FaceRecognitionApp:
         """Get the file path from the selected title."""
         return self.title_to_path_mapping.get(title, title)
 
-    def _create_interactive_timeline(self, timeline_df, video_path):
-        """Create an interactive HTML timeline for jumping to specific frames."""
+    def _create_timeline_data(self, timeline_df):
+        """Create timeline data for Gradio components."""
         try:
             # Validate DataFrame structure
             required_columns = ["Time", "Frame", "Name"]
@@ -1006,136 +1024,94 @@ class FaceRecognitionApp:
                 )
 
             if len(timeline_df) == 0:
-                return "No recognition events found in video"
+                return [], [], "", []
 
-            # Create compact and user-friendly timeline
+            # Group data by contestant
+            grouped_data = timeline_df.groupby("Name")
+            
+            # Create statistics
             recognition_count = len(timeline_df)
             unique_people = timeline_df["Name"].nunique()
 
-            table_html = f"""
-            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin: 10px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
-                <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 15px;'>
-                    <h3 style='color: white; margin: 0 0 10px 0; font-weight: bold;'>🎯 Recognition Timeline</h3>
-                    <div style='color: rgba(255,255,255,0.9); font-size: 0.9em;'>
-                        📊 <strong>{recognition_count}</strong> recognition events • 
-                        👥 <strong>{unique_people}</strong> unique people detected •
-                        💡 Click timestamps to navigate
+            # Load contestant info for enhanced display
+            contestant_info_map = {}
+            try:
+                if hasattr(self, 'contestant_info') and self.contestant_info is not None:
+                    for _, row in self.contestant_info.iterrows():
+                        name = row.get('暱稱', '')
+                        full_name = row.get('姓名', '')
+                        number = row.get('編號', '')
+                        if name:
+                            contestant_info_map[name] = {
+                                'full_name': full_name,
+                                'nickname': name,
+                                'number': number
+                            }
+            except Exception as e:
+                logger.warning(f"Could not load contestant info: {e}")
+
+            # Prepare data for Gradio components
+            timeline_data = []
+            contestant_choices = ["All Contestants"]
+            search_data = {}
+
+            for contestant_name, contestant_data in grouped_data:
+                appearances = len(contestant_data)
+                contestant_data = contestant_data.sort_values("Frame")
+                
+                # Get contestant info
+                contestant_display = contestant_name
+                search_terms = [contestant_name.lower()]
+                
+                if contestant_name in contestant_info_map:
+                    info = contestant_info_map[contestant_name]
+                    if info['full_name'] and info['full_name'] != contestant_name:
+                        contestant_display += f" ({info['full_name']})"
+                        search_terms.append(info['full_name'].lower())
+                    if info['number']:
+                        contestant_display += f" #{info['number']}"
+                        search_terms.append(str(info['number']).lower())
+                
+                contestant_choices.append(contestant_display)
+                search_data[contestant_name] = search_terms
+                
+                # Add rows for this contestant
+                for i, (_, row) in enumerate(contestant_data.iterrows()):
+                    sequence_num = i + 1
+                    timeline_data.append([
+                        contestant_display,
+                        row["Time"],
+                        row["Frame"],
+                        sequence_num,
+                        appearances
+                    ])
+
+            # Create statistics HTML
+            stats_html = f"""
+            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 8px; color: white; margin: 10px 0;'>
+                <h4 style='margin: 0 0 10px 0;'>📊 Recognition Statistics</h4>
+                <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;'>
+                    <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;'>
+                        <div style='font-size: 1.2em; font-weight: bold;'>{recognition_count}</div>
+                        <div style='font-size: 0.9em; opacity: 0.9;'>Total Appearances</div>
                     </div>
-                </div>
-                <div style='max-height: 400px; overflow-y: auto; background: white; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);'>
-                    <table style='width: 100%; border-collapse: collapse;'>
-                        <thead style='position: sticky; top: 0; background: #2c3e50; z-index: 10;'>
-                            <tr>
-                                <th style='padding: 10px 15px; text-align: left; border: none; color: white; font-weight: bold;'>⏰ Time</th>
-                                <th style='padding: 10px 15px; text-align: left; border: none; color: white; font-weight: bold;'>🎬 Frame</th>
-                                <th style='padding: 10px 15px; text-align: left; border: none; color: white; font-weight: bold;'>👤 Name</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            """
-
-            # Add table rows with better styling and hover effects
-            for i, (_, row) in enumerate(timeline_df.iterrows()):
-                bg_color = "#f8f9fa" if i % 2 == 0 else "white"
-                hover_color = "#e3f2fd"
-                table_html += f"""
-                        <tr style='background: {bg_color}; transition: background-color 0.2s;' 
-                            onmouseover='this.style.backgroundColor="{hover_color}"' 
-                            onmouseout='this.style.backgroundColor="{bg_color}"'>
-                            <td style='padding: 8px 15px; border: none; font-weight: bold; color: #1976d2; cursor: pointer;'>{row["Time"]}</td>
-                            <td style='padding: 8px 15px; border: none; color: #666; font-family: monospace;'>{row["Frame"]}</td>
-                            <td style='padding: 8px 15px; border: none; color: #2c3e50; font-weight: 500;'>{row["Name"]}</td>
-                        </tr>
-                """
-
-            table_html += """
-                        </tbody>
-                    </table>
-                </div>
-                <div style='margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 6px;'>
-                    <div style='color: rgba(255,255,255,0.9); font-size: 0.85em; text-align: center;'>
-                        💡 <strong>Tip:</strong> Use your video player's seek/scrub controls to jump to these timestamps
+                    <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;'>
+                        <div style='font-size: 1.2em; font-weight: bold;'>{unique_people}</div>
+                        <div style='font-size: 0.9em; opacity: 0.9;'>Contestants Detected</div>
+                    </div>
+                    <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;'>
+                        <div style='font-size: 1.2em; font-weight: bold;'>{recognition_count/unique_people:.1f}</div>
+                        <div style='font-size: 0.9em; opacity: 0.9;'>Avg per Contestant</div>
                     </div>
                 </div>
             </div>
             """
 
-            # Try to create Plotly visualization as enhancement
-            try:
-                import plotly.graph_objects as go
-
-                # Group recognitions by name for color coding
-                names = timeline_df["Name"].unique()
-                colors = px.colors.qualitative.Set3[: len(names)]
-                color_map = dict(zip(names, colors))
-
-                # Create timeline visualization
-                fig = go.Figure()
-
-                for name in names:
-                    name_data = timeline_df[timeline_df["Name"] == name]
-                    # Convert time strings to seconds for plotting
-                    time_seconds = []
-                    for time_str in name_data["Time"]:
-                        try:
-                            minutes, seconds = map(int, time_str.split(":"))
-                            time_seconds.append(minutes * 60 + seconds)
-                        except ValueError:
-                            # Handle malformed time strings
-                            time_seconds.append(0)
-
-                    if time_seconds:  # Only add trace if we have valid time data
-                        fig.add_trace(
-                            go.Scatter(
-                                x=time_seconds,
-                                y=[name] * len(time_seconds),
-                                mode="markers",
-                                marker=dict(size=12, color=color_map[name]),
-                                name=name,
-                                text=[
-                                    f"Frame {frame}: {name} at {time}"
-                                    for frame, time in zip(
-                                        name_data["Frame"], name_data["Time"]
-                                    )
-                                ],
-                                hovertemplate="<b>%{text}</b><br>Recognition event<extra></extra>",
-                            )
-                        )
-
-                fig.update_layout(
-                    title="🎬 Recognition Timeline Visualization",
-                    xaxis_title="Time (seconds)",
-                    yaxis_title="Contestants",
-                    height=max(300, len(names) * 50),
-                    hovermode="closest",
-                    showlegend=True,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                )
-
-                # Add Plotly chart to the result
-                plotly_html = fig.to_html(
-                    include_plotlyjs="cdn", div_id="timeline_chart"
-                )
-                return table_html + plotly_html
-
-            except Exception as plotly_error:
-                logger.debug(
-                    f"Plotly visualization failed, using table only: {plotly_error}"
-                )
-                return table_html
+            return timeline_data, contestant_choices, stats_html, search_data
 
         except Exception as e:
-            logger.error(f"Timeline creation failed: {e}")
-            # Fallback to simple text list
-            try:
-                timeline_text = "📍 Recognition Timeline:\n"
-                for _, row in timeline_df.iterrows():
-                    timeline_text += (
-                        f"• {row['Time']} - {row['Name']} (Frame {row['Frame']})\n"
-                    )
-                return timeline_text
-            except Exception:
-                return "Error creating timeline - please check video processing results"
+            logger.error(f"Timeline data creation failed: {e}")
+            return [], [], f"Error creating timeline: {e}", {}
 
     def generate_umap_visualization(self, detected_faces_data):
         """Generate UMAP visualization for detected faces."""
@@ -1511,8 +1487,11 @@ class FaceRecognitionApp:
 
             self.processing_video = False
 
-            # Create timeline HTML if we have results
-            timeline_html = "Process a video to see interactive timeline"
+            # Create timeline data for native Gradio components
+            timeline_data = []
+            contestant_choices = ['All']
+            timeline_stats_html = "Process a video to see interactive timeline"
+            
             if results:
                 results_df = pd.DataFrame(results)
                 # Fix column names for timeline
@@ -1522,11 +1501,11 @@ class FaceRecognitionApp:
                     "Time",
                     "Name",
                 ]  # Rename to match expected format
-                timeline_html = self._create_interactive_timeline(
-                    timeline_df, output_path
-                )
+                
+                # Create timeline data using native Gradio components
+                timeline_data, contestant_choices, timeline_stats_html = self._create_timeline_data(timeline_df)
 
-            return output_path, summary, timeline_html
+            return output_path, summary, (timeline_data, contestant_choices, timeline_stats_html)
 
         except Exception as e:
             self.processing_video = False
@@ -1657,6 +1636,109 @@ class FaceRecognitionApp:
             logger.error(f"Add contestant error: {e}")
             return f"Error adding contestant: {e}"
 
+    def _create_timeline_data(self, results_df):
+        """Create timeline data for native Gradio Dataframe component."""
+        try:
+            if results_df is None or results_df.empty:
+                return [], [], "No timeline data available"
+            
+            # Group by contestant and calculate statistics
+            timeline_data = []
+            contestant_stats = {}
+            
+            for _, row in results_df.iterrows():
+                frame = int(row.get('Frame', 0))
+                time_str = str(row.get('Time', '00:00'))
+                name = str(row.get('Name', 'Unknown'))
+                
+                if name == 'Unknown':
+                    continue
+                    
+                # Track sequences for each contestant
+                if name not in contestant_stats:
+                    contestant_stats[name] = {
+                        'appearances': 0,
+                        'sequences': [],
+                        'current_sequence_start': frame,
+                        'last_frame': frame
+                    }
+                
+                stats = contestant_stats[name]
+                stats['appearances'] += 1
+                
+                # Detect sequence breaks (gap > 30 frames indicates new sequence)
+                if frame - stats['last_frame'] > 30:
+                    # End previous sequence
+                    if stats['current_sequence_start'] is not None:
+                        stats['sequences'].append((stats['current_sequence_start'], stats['last_frame']))
+                    # Start new sequence
+                    stats['current_sequence_start'] = frame
+                
+                stats['last_frame'] = frame
+                
+                # Add to timeline data
+                sequence_num = len(stats['sequences']) + 1
+                timeline_data.append([
+                    name,
+                    time_str,
+                    frame,
+                    sequence_num,
+                    stats['appearances']
+                ])
+            
+            # Close any open sequences
+            for name, stats in contestant_stats.items():
+                if stats['current_sequence_start'] is not None:
+                    stats['sequences'].append((stats['current_sequence_start'], stats['last_frame']))
+            
+            # Get unique contestants for filter dropdown
+            contestant_choices = ['All'] + sorted(list(contestant_stats.keys()))
+            
+            # Create summary statistics
+            total_contestants = len(contestant_stats)
+            total_appearances = sum(stats['appearances'] for stats in contestant_stats.values())
+            
+            stats_html = f"""
+            <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                <h4>📊 Recognition Statistics</h4>
+                <p><strong>👥 Contestants Detected:</strong> {total_contestants}</p>
+                <p><strong>📍 Total Appearances:</strong> {total_appearances}</p>
+                <p><strong>📋 Timeline Entries:</strong> {len(timeline_data)}</p>
+            </div>
+            """
+            
+            return timeline_data, contestant_choices, stats_html
+            
+        except Exception as e:
+            logger.error(f"Error creating timeline data: {e}")
+            return [], [], f"Error creating timeline: {str(e)}"
+
+    def _filter_timeline_data(self, timeline_data, search_query, filter_contestant):
+        """Filter timeline data based on search query and contestant filter."""
+        try:
+            if not timeline_data:
+                return []
+            
+            filtered_data = timeline_data.copy()
+            
+            # Apply contestant filter
+            if filter_contestant and filter_contestant != 'All':
+                filtered_data = [row for row in filtered_data if row[0] == filter_contestant]
+            
+            # Apply search query
+            if search_query:
+                search_lower = search_query.lower().strip()
+                filtered_data = [
+                    row for row in filtered_data 
+                    if search_lower in row[0].lower()  # Search in contestant name
+                ]
+            
+            return filtered_data
+            
+        except Exception as e:
+            logger.error(f"Error filtering timeline data: {e}")
+            return timeline_data if timeline_data else []
+
 
 # Global app instance
 app_instance = None
@@ -1746,12 +1828,38 @@ def create_gradio_interface():
                                 container=True,
                             )
 
-                            # Timeline component for interactive navigation
-                            recognition_timeline = gr.HTML(
-                                label="🎯 Recognition Timeline",
-                                value="Process a video to see interactive timeline",
-                                visible=True,
-                            )
+                            # Timeline components for interactive navigation
+                            with gr.Group():
+                                gr.Markdown("### 🎯 Recognition Timeline by Contestant")
+                                
+                                with gr.Row():
+                                    contestant_search = gr.Textbox(
+                                        label="🔍 Search Contestants",
+                                        placeholder="Search by name, nickname, or number...",
+                                        container=True,
+                                        scale=2
+                                    )
+                                    contestant_filter = gr.Dropdown(
+                                        label="📋 Filter by Contestant",
+                                        choices=[],
+                                        value=None,
+                                        container=True,
+                                        scale=1
+                                    )
+                                
+                                timeline_stats = gr.HTML(
+                                    value="Process a video to see recognition statistics",
+                                    visible=True,
+                                )
+                                
+                                recognition_timeline = gr.Dataframe(
+                                    headers=["👤 Contestant", "⏰ Time", "🎬 Frame", "📊 Sequence", "📍 Appearances"],
+                                    datatype=["str", "str", "number", "number", "number"],
+                                    interactive=False,
+                                    wrap=True,
+                                    height=400,
+                                    visible=True,
+                                )
 
                 def process_selected_video(dropdown_title):
                     """Process video from dropdown selection."""
@@ -1759,12 +1867,39 @@ def create_gradio_interface():
                         return (
                             None,
                             "Please select a video from the dropdown",
-                            "No video selected",
+                            [],  # Empty timeline data
+                            ['All'],  # Default contestant choices
+                            "No video selected",  # Timeline stats
                         )
 
                     # Convert title to actual file path
                     video_path = get_app().get_video_path_from_title(dropdown_title)
-                    return get_app().process_uploaded_video(video_path)
+                    video_output, summary, (timeline_data, contestant_choices, timeline_stats) = get_app().process_uploaded_video(video_path)
+                    
+                    return video_output, summary, timeline_data, contestant_choices, timeline_stats
+
+                def filter_timeline_by_search(timeline_data, search_query, filter_contestant):
+                    """Filter timeline data based on search and filter inputs."""
+                    filtered_data = get_app()._filter_timeline_data(timeline_data, search_query, filter_contestant)
+                    return filtered_data
+
+                def update_contestant_filter(timeline_data):
+                    """Update contestant filter choices based on timeline data."""
+                    try:
+                        if not timeline_data:
+                            return gr.Dropdown(choices=['All'])
+                        
+                        # Extract unique contestants from timeline data
+                        contestants = set()
+                        for row in timeline_data:
+                            if len(row) > 0:
+                                contestants.add(row[0])  # Contestant name is first column
+                        
+                        choices = ['All'] + sorted(list(contestants))
+                        return gr.Dropdown(choices=choices)
+                    except Exception as e:
+                        logger.error(f"Error updating contestant filter: {e}")
+                        return gr.Dropdown(choices=['All'])
 
                 def refresh_video_dropdown():
                     """Refresh the video dropdown with current videos."""
@@ -1772,10 +1907,34 @@ def create_gradio_interface():
                         choices=get_app().get_video_titles_for_dropdown()
                     )
 
+                # Store timeline data in State for filtering
+                full_timeline_data = gr.State(value=[])
+
                 video_button.click(
                     process_selected_video,
                     inputs=[video_dropdown],
-                    outputs=[video_output, video_results, recognition_timeline],
+                    outputs=[video_output, video_results, full_timeline_data, contestant_filter, timeline_stats],
+                ).then(
+                    lambda data: data,  # Pass through the full timeline data to display
+                    inputs=[full_timeline_data],
+                    outputs=[recognition_timeline]
+                ).then(
+                    update_contestant_filter,
+                    inputs=[full_timeline_data],
+                    outputs=[contestant_filter]
+                )
+
+                # Add event handlers for search and filter functionality
+                contestant_search.change(
+                    filter_timeline_by_search,
+                    inputs=[full_timeline_data, contestant_search, contestant_filter],
+                    outputs=[recognition_timeline]
+                )
+
+                contestant_filter.change(
+                    filter_timeline_by_search,
+                    inputs=[full_timeline_data, contestant_search, contestant_filter],
+                    outputs=[recognition_timeline]
                 )
 
                 refresh_videos_btn.click(
@@ -2061,6 +2220,270 @@ def create_gradio_interface():
                     generate_umap_for_video,
                     inputs=[umap_video_dropdown],
                     outputs=[umap_plot, umap_status],
+                )
+
+            # Similarity Analysis Tab
+            with gr.Tab("📊 Similarity Analysis"):
+                gr.Markdown("## 📊 Real-time Face Similarity Analysis")
+                gr.Markdown(
+                    "*Analyze similarity scores of the top 5 most similar faces as you navigate through video frames*"
+                )
+
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        with gr.Group():
+                            gr.Markdown("### 🎬 Video Selection")
+                            similarity_video_dropdown = gr.Dropdown(
+                                choices=get_app().get_video_titles_for_dropdown(),
+                                label="Select Video for Analysis",
+                                show_label=True,
+                                interactive=True,
+                            )
+                            
+                            with gr.Row():
+                                frame_number_input = gr.Number(
+                                    label="Frame Number",
+                                    value=1,
+                                    minimum=1,
+                                    maximum=10000,
+                                    step=1,
+                                    interactive=True,
+                                )
+                                
+                                analyze_frame_btn = gr.Button(
+                                    "🔍 Analyze Frame", variant="primary", size="lg"
+                                )
+                            
+                            similarity_status = gr.HTML(
+                                "Select a video and enter a frame number to analyze"
+                            )
+                            
+                            with gr.Row():
+                                prev_frame_btn = gr.Button("⬅️ Previous Frame", size="sm")
+                                next_frame_btn = gr.Button("Next Frame ➡️", size="sm")
+
+                        with gr.Group():
+                            gr.Markdown("### 🖼️ Frame Preview")
+                            frame_preview = gr.Image(
+                                label="Current Frame with Face Detection",
+                                show_label=True,
+                                container=True,
+                                height=300,
+                                interactive=False,
+                            )
+
+                    with gr.Column(scale=2):
+                        with gr.Group():
+                            similarity_plot = gr.Plot(
+                                label="Top 5 Similar Faces",
+                                show_label=True,
+                                container=True,
+                            )
+
+                with gr.Row():
+                    with gr.Column():
+                        with gr.Group():
+                            gr.Markdown("### 📈 Timeline Analysis")
+                            timeline_plot = gr.Plot(
+                                label="Similarity Timeline",
+                                show_label=True,
+                                container=True,
+                            )
+                            
+                            with gr.Row():
+                                timeline_window_size = gr.Slider(
+                                    minimum=50,
+                                    maximum=500,
+                                    value=100,
+                                    step=10,
+                                    label="Timeline Window Size (frames)",
+                                    info="Number of frames to show around current frame"
+                                )
+                                
+                                generate_timeline_btn = gr.Button(
+                                    "📈 Generate Timeline", variant="secondary", size="lg"
+                                )
+
+                # Store video analysis data
+                video_analysis_data = gr.State(value={})
+
+                def analyze_single_frame(video_title, frame_number):
+                    """Analyze a single frame and return similarity data with frame preview."""
+                    if not video_title:
+                        return None, None, "Please select a video"
+                    
+                    if not frame_number or frame_number < 1:
+                        return None, None, "Please enter a valid frame number"
+
+                    try:
+                        app = get_app()
+                        
+                        # Get video path
+                        video_path = app.get_video_path_from_title(video_title)
+                        
+                        import cv2
+                        cap = cv2.VideoCapture(video_path)
+                        
+                        if not cap.isOpened():
+                            return None, None, f"❌ Could not open video: {video_title}"
+                        
+                        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                        fps = cap.get(cv2.CAP_PROP_FPS)
+                        
+                        if frame_number > total_frames:
+                            cap.release()
+                            return None, None, f"❌ Frame {frame_number} exceeds video length ({total_frames} frames)"
+                        
+                        # Seek to the specific frame
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
+                        ret, frame = cap.read()
+                        cap.release()
+                        
+                        if not ret:
+                            return None, None, f"❌ Could not read frame {frame_number}"
+                        
+                        # Keep original frame for preview
+                        original_frame = frame.copy()
+                        
+                        # Process the frame with similarity data
+                        matches, frame_similarities = process_frame(
+                            frame, 
+                            app.known_embeddings, 
+                            app.config.recognition.similarity_threshold,
+                            return_similarities=True
+                        )
+                        
+                        # Create annotated frame preview even if no similarities
+                        timestamp = frame_number / fps if fps > 0 else 0
+                        time_str = f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
+                        
+                        # Draw face detection boxes and labels on the frame
+                        annotated_frame = draw_boxes_and_labels(
+                            original_frame, 
+                            matches, 
+                            f"Frame {frame_number} ({time_str})",
+                            {},  # No persistent labels needed for single frame analysis
+                            frame_number
+                        )
+                        
+                        # Convert BGR to RGB for Gradio display
+                        preview_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+                        
+                        if not frame_similarities:
+                            return None, preview_frame, f"Frame {frame_number}: No faces detected or no similarities above threshold"
+                        
+                        # Generate similarity plot
+                        similarity_fig = app.visualization_service.create_similarity_plot(
+                            frame_similarities, frame_number, max_faces=5
+                        )
+                        
+                        detected_faces = len(set([s['face_id'] for s in frame_similarities]))
+                        total_comparisons = len(frame_similarities)
+                        
+                        status_msg = f"✅ Frame {frame_number}: Found {detected_faces} faces, {total_comparisons} similarity comparisons"
+                        
+                        return similarity_fig, preview_frame, status_msg
+                        
+                    except Exception as e:
+                        logger.error(f"Error analyzing frame {frame_number}: {e}")
+                        return None, None, f"❌ Error analyzing frame {frame_number}: {str(e)}"
+
+                def navigate_frame(video_title, current_frame, direction):
+                    """Navigate to previous or next frame."""
+                    if not video_title or not current_frame:
+                        return current_frame
+                    
+                    new_frame = current_frame + direction
+                    return max(1, new_frame)  # Ensure frame number is at least 1
+
+                def generate_timeline_analysis(video_title, current_frame, window_size):
+                    """Generate timeline analysis for the video around the current frame."""
+                    if not video_title:
+                        return None, "Please select a video"
+                    
+                    try:
+                        app = get_app()
+                        video_path = app.get_video_path_from_title(video_title)
+                        
+                        import cv2
+                        cap = cv2.VideoCapture(video_path)
+                        
+                        if not cap.isOpened():
+                            return None, f"❌ Could not open video: {video_title}"
+                        
+                        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                        
+                        # Determine frame range around current frame
+                        start_frame = max(1, current_frame - window_size // 2)
+                        end_frame = min(total_frames, current_frame + window_size // 2)
+                        
+                        timeline_data = []
+                        
+                        # Process frames in the range
+                        for frame_num in range(start_frame, end_frame + 1, max(1, window_size // 50)):
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num - 1)
+                            ret, frame = cap.read()
+                            
+                            if ret:
+                                matches, frame_similarities = process_frame(
+                                    frame, 
+                                    app.known_embeddings, 
+                                    app.config.recognition.similarity_threshold,
+                                    return_similarities=True
+                                )
+                                
+                                timeline_data.append({
+                                    'frame': frame_num,
+                                    'similarities': frame_similarities
+                                })
+                        
+                        cap.release()
+                        
+                        if not timeline_data:
+                            return None, "No timeline data generated"
+                        
+                        # Generate timeline plot
+                        timeline_fig = app.visualization_service.create_frame_timeline_plot(
+                            timeline_data, current_frame, window_size
+                        )
+                        
+                        return timeline_fig, f"✅ Generated timeline for {len(timeline_data)} frames around frame {current_frame}"
+                        
+                    except Exception as e:
+                        logger.error(f"Error generating timeline: {e}")
+                        return None, f"❌ Error generating timeline: {str(e)}"
+
+                # Event handlers
+                analyze_frame_btn.click(
+                    analyze_single_frame,
+                    inputs=[similarity_video_dropdown, frame_number_input],
+                    outputs=[similarity_plot, frame_preview, similarity_status],
+                )
+
+                prev_frame_btn.click(
+                    lambda video, frame: navigate_frame(video, frame, -1),
+                    inputs=[similarity_video_dropdown, frame_number_input],
+                    outputs=[frame_number_input],
+                ).then(
+                    analyze_single_frame,
+                    inputs=[similarity_video_dropdown, frame_number_input],
+                    outputs=[similarity_plot, frame_preview, similarity_status],
+                )
+
+                next_frame_btn.click(
+                    lambda video, frame: navigate_frame(video, frame, 1),
+                    inputs=[similarity_video_dropdown, frame_number_input],
+                    outputs=[frame_number_input],
+                ).then(
+                    analyze_single_frame,
+                    inputs=[similarity_video_dropdown, frame_number_input],
+                    outputs=[similarity_plot, frame_preview, similarity_status],
+                )
+
+                generate_timeline_btn.click(
+                    generate_timeline_analysis,
+                    inputs=[similarity_video_dropdown, frame_number_input, timeline_window_size],
+                    outputs=[timeline_plot, similarity_status],
                 )
 
             # Analytics Tab
