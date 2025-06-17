@@ -1857,7 +1857,6 @@ def create_gradio_interface():
                                     datatype=["str", "str", "number", "number", "number"],
                                     interactive=False,
                                     wrap=True,
-                                    height=400,
                                     visible=True,
                                 )
 
