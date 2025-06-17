@@ -1841,8 +1841,8 @@ def create_gradio_interface():
                                     )
                                     contestant_filter = gr.Dropdown(
                                         label="📋 Filter by Contestant",
-                                        choices=[],
-                                        value=None,
+                                        choices=["All"],
+                                        value="All",
                                         container=True,
                                         scale=1
                                     )
@@ -1886,7 +1886,7 @@ def create_gradio_interface():
                     """Update contestant filter choices based on timeline data."""
                     try:
                         if not timeline_data:
-                            return gr.Dropdown(choices=['All'])
+                            return gr.Dropdown(choices=['All'], value='All')
                         
                         # Extract unique contestants from timeline data
                         contestants = set()
@@ -1895,10 +1895,10 @@ def create_gradio_interface():
                                 contestants.add(row[0])  # Contestant name is first column
                         
                         choices = ['All'] + sorted(list(contestants))
-                        return gr.Dropdown(choices=choices)
+                        return gr.Dropdown(choices=choices, value='All')
                     except Exception as e:
                         logger.error(f"Error updating contestant filter: {e}")
-                        return gr.Dropdown(choices=['All'])
+                        return gr.Dropdown(choices=['All'], value='All')
 
                 def refresh_video_dropdown():
                     """Refresh the video dropdown with current videos."""
