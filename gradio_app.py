@@ -1867,7 +1867,6 @@ def create_gradio_interface():
                             None,
                             "Please select a video from the dropdown",
                             [],  # Empty timeline data
-                            ['All'],  # Default contestant choices
                             "No video selected",  # Timeline stats
                         )
 
@@ -1875,29 +1874,41 @@ def create_gradio_interface():
                     video_path = get_app().get_video_path_from_title(dropdown_title)
                     video_output, summary, (timeline_data, contestant_choices, timeline_stats) = get_app().process_uploaded_video(video_path)
                     
-                    return video_output, summary, timeline_data, contestant_choices, timeline_stats
+                    return video_output, summary, timeline_data, timeline_stats
 
                 def filter_timeline_by_search(timeline_data, search_query, filter_contestant):
                     """Filter timeline data based on search and filter inputs."""
-                    filtered_data = get_app()._filter_timeline_data(timeline_data, search_query, filter_contestant)
-                    return filtered_data
+                    try:
+                        if not timeline_data:
+                            return []
+                        filtered_data = get_app()._filter_timeline_data(timeline_data, search_query, filter_contestant)
+                        return filtered_data
+                    except Exception as e:
+                        logger.error(f"Error filtering timeline data: {e}")
+                        return timeline_data if timeline_data else []
 
                 def update_contestant_filter(timeline_data):
                     """Update contestant filter choices based on timeline data."""
                     try:
-                        if not timeline_data:
-                            return gr.Dropdown(choices=['All'], value='All')
+                        # Always start with 'All' as the default choice
+                        choices = ['All']
                         
-                        # Extract unique contestants from timeline data
-                        contestants = set()
-                        for row in timeline_data:
-                            if len(row) > 0:
-                                contestants.add(row[0])  # Contestant name is first column
+                        if timeline_data and len(timeline_data) > 0:
+                            # Extract unique contestants from timeline data
+                            contestants = set()
+                            for row in timeline_data:
+                                if row and len(row) > 0 and row[0]:  # Check row exists and has content
+                                    contestants.add(str(row[0]))  # Contestant name is first column
+                            
+                            # Add sorted contestants to choices
+                            if contestants:
+                                choices.extend(sorted(list(contestants)))
                         
-                        choices = ['All'] + sorted(list(contestants))
                         return gr.Dropdown(choices=choices, value='All')
                     except Exception as e:
                         logger.error(f"Error updating contestant filter: {e}")
+                        import traceback
+                        traceback.print_exc()
                         return gr.Dropdown(choices=['All'], value='All')
 
                 def refresh_video_dropdown():
@@ -1912,7 +1923,7 @@ def create_gradio_interface():
                 video_button.click(
                     process_selected_video,
                     inputs=[video_dropdown],
-                    outputs=[video_output, video_results, full_timeline_data, contestant_filter, timeline_stats],
+                    outputs=[video_output, video_results, full_timeline_data, timeline_stats],
                 ).then(
                     lambda data: data,  # Pass through the full timeline data to display
                     inputs=[full_timeline_data],
