@@ -431,10 +431,122 @@ def update_persistent_labels(matches, label_cache, current_frame, persistence_du
     return label_cache
 
 
+def draw_rounded_rectangle(img, pt1, pt2, color, thickness, radius=10):
+    """Draw a rounded rectangle using OpenCV."""
+    x1, y1 = pt1
+    x2, y2 = pt2
+    
+    # Ensure coordinates are in correct order
+    x1, x2 = min(x1, x2), max(x1, x2)
+    y1, y2 = min(y1, y2), max(y1, y2)
+    
+    # Clamp radius to reasonable size
+    radius = min(radius, min(x2-x1, y2-y1) // 4)
+    
+    if radius <= 0:
+        # Fallback to regular rectangle
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
+        return
+    
+    # Draw the rounded rectangle using multiple primitives
+    # Top and bottom horizontal lines
+    cv2.line(img, (x1 + radius, y1), (x2 - radius, y1), color, thickness)
+    cv2.line(img, (x1 + radius, y2), (x2 - radius, y2), color, thickness)
+    
+    # Left and right vertical lines
+    cv2.line(img, (x1, y1 + radius), (x1, y2 - radius), color, thickness)
+    cv2.line(img, (x2, y1 + radius), (x2, y2 - radius), color, thickness)
+    
+    # Corner arcs
+    cv2.ellipse(img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness)
+    cv2.ellipse(img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness)
+    cv2.ellipse(img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness)
+    cv2.ellipse(img, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, thickness)
+
+
+def draw_confidence_bar(img, confidence, bbox, color):
+    """Draw a mini confidence progress bar above the bounding box."""
+    x1, y1, x2, y2 = bbox
+    
+    # Progress bar dimensions
+    bar_width = min(100, x2 - x1)  # Max 100px, or width of bbox
+    bar_height = 6
+    bar_x = x1 + (x2 - x1 - bar_width) // 2  # Center above bbox
+    bar_y = max(5, y1 - 15)  # 15px above bbox, minimum 5px from top
+    
+    # Background bar (gray)
+    cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (100, 100, 100), -1)
+    
+    # Confidence bar (colored based on confidence level)
+    conf_width = int(bar_width * confidence)
+    if conf_width > 0:
+        # Color based on confidence: green for high, yellow for medium, red for low
+        if confidence >= 0.7:
+            conf_color = (0, 255, 0)  # Green
+        elif confidence >= 0.5:
+            conf_color = (0, 255, 255)  # Yellow
+        else:
+            conf_color = (0, 0, 255)  # Red
+            
+        cv2.rectangle(img, (bar_x, bar_y), (bar_x + conf_width, bar_y + bar_height), conf_color, -1)
+    
+    # Border around the bar
+    cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (200, 200, 200), 1)
+    
+    # Confidence percentage text
+    conf_text = f"{int(confidence * 100)}%"
+    text_size = cv2.getTextSize(conf_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
+    text_x = bar_x + bar_width + 5
+    text_y = bar_y + bar_height - 1
+    
+    # Ensure text doesn't go off screen
+    if text_x + text_size[0] > img.shape[1]:
+        text_x = bar_x - text_size[0] - 5
+    
+    cv2.putText(img, conf_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
+
+
+def add_face_thumbnail(img, face_region, position, size=(40, 40)):
+    """Add a small face crop thumbnail next to the label."""
+    try:
+        if face_region is None or face_region.size == 0:
+            return
+            
+        # Resize face crop to thumbnail size
+        face_thumb = cv2.resize(face_region, size, interpolation=cv2.INTER_AREA)
+        
+        x, y = position
+        thumb_h, thumb_w = face_thumb.shape[:2]
+        
+        # Ensure thumbnail fits within image bounds
+        if x + thumb_w > img.shape[1] or y + thumb_h > img.shape[0] or x < 0 or y < 0:
+            return
+            
+        # Create a border around the thumbnail
+        border_size = 2
+        bordered_thumb = cv2.copyMakeBorder(
+            face_thumb, border_size, border_size, border_size, border_size,
+            cv2.BORDER_CONSTANT, value=(255, 255, 255)
+        )
+        
+        # Update dimensions after adding border
+        thumb_h, thumb_w = bordered_thumb.shape[:2]
+        
+        # Check bounds again after border
+        if x + thumb_w > img.shape[1] or y + thumb_h > img.shape[0]:
+            return
+            
+        # Overlay the thumbnail on the image
+        img[y:y+thumb_h, x:x+thumb_w] = bordered_thumb
+        
+    except Exception as e:
+        logger.debug(f"Error adding face thumbnail: {e}")
+
+
 def draw_boxes_and_labels(
-    frame, matches, timestamp="", persistent_labels=None, current_frame=0
+    frame, matches, timestamp="", persistent_labels=None, current_frame=0, enhanced_ui=True
 ):
-    """Draw bounding boxes and labels on detected faces with CJKV character support."""
+    """Draw enhanced bounding boxes and labels on detected faces with modern UI improvements."""
     try:
         # Convert frame to PIL Image for CJKV text rendering
         frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -662,8 +774,17 @@ def draw_boxes_and_labels(
             opacity_factor = adaptive_opacity
             faded_color_bgr = tuple(int(c * opacity_factor) for c in color_bgr)
 
-            # Draw bounding box on original frame using OpenCV
-            cv2.rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness)
+            # Enhanced bounding box drawing
+            if enhanced_ui and name != "Unknown":
+                # Draw rounded rectangle for recognized faces
+                radius = max(5, min(10, min(x2-x1, y2-y1) // 10))
+                draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
+                
+                # Add confidence progress bar above the face
+                draw_confidence_bar(frame, confidence, (x1, y1, x2, y2), faded_color_bgr)
+            else:
+                # Regular rectangle for unknown faces or when enhanced UI is disabled
+                cv2.rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness)
 
             # Add a tiny circle at the center for face indication with adaptive opacity
             center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
@@ -765,6 +886,25 @@ def draw_boxes_and_labels(
                 frame_pil.convert("RGBA"), overlay
             ).convert("RGB")
             draw = ImageDraw.Draw(frame_pil)
+
+            # Add face thumbnail if enhanced UI is enabled and face is recognized
+            if enhanced_ui and name != "Unknown":
+                try:
+                    # Extract face crop from the original frame
+                    face_crop = frame[max(0, y1):min(frame.shape[0], y2), max(0, x1):min(frame.shape[1], x2)]
+                    if face_crop.size > 0:
+                        # Position thumbnail to the left of the label
+                        thumb_x = max(0, label_x - 50)  # 50px to the left
+                        thumb_y = label_y
+                        
+                        # Ensure thumbnail doesn't overlap with bounding box
+                        if thumb_x + 45 > x1 and thumb_y + 45 > y1 and thumb_x < x2 and thumb_y < y2:
+                            # Move thumbnail to the right of the label instead
+                            thumb_x = min(frame.shape[1] - 45, label_x + text_width + 10)
+                        
+                        add_face_thumbnail(frame, face_crop, (thumb_x, thumb_y), size=(40, 40))
+                except Exception as e:
+                    logger.debug(f"Error adding face thumbnail for {name}: {e}")
 
             # Draw text with adaptive brightness
             text_brightness = int(255 * adaptive_opacity)
@@ -1404,7 +1544,7 @@ class FaceRecognitionApp:
                 # Always draw persistent labels, even if no new matches
                 if matches or label_persistence_cache:
                     frame = draw_boxes_and_labels(
-                        frame, matches, time_str, label_persistence_cache, frame_count
+                        frame, matches, time_str, label_persistence_cache, frame_count, enhanced_ui=self.config.ui.enhanced_ui
                     )
 
                 # Add frame info overlay (small, unobtrusive) using OpenCV for ASCII text
@@ -1583,6 +1723,7 @@ class FaceRecognitionApp:
         max_faces,
         use_gpu,
         enable_chromadb,
+        enhanced_ui,
     ):
         """Update system settings."""
         try:
@@ -1592,6 +1733,7 @@ class FaceRecognitionApp:
             self.config.recognition.max_faces_per_frame = max_faces
             self.config.recognition.use_gpu = use_gpu
             self.config.recognition.enable_chromadb = enable_chromadb
+            self.config.ui.enhanced_ui = enhanced_ui
 
             # Save configuration
             save_config()
@@ -2005,6 +2147,14 @@ def create_gradio_interface():
                                 label="🗄 Enable ChromaDB",
                                 info="Use vector database for fast search",
                             )
+                            
+                        with gr.Group():
+                            gr.Markdown("### 🎨 UI Settings")
+                            enhanced_ui = gr.Checkbox(
+                                value=True,
+                                label="✨ Enhanced UI",
+                                info="Enable rounded corners, confidence bars, and face thumbnails",
+                            )
 
                             settings_button = gr.Button(
                                 "💾 Save Settings", variant="primary", size="lg"
@@ -2024,6 +2174,7 @@ def create_gradio_interface():
                         max_faces,
                         use_gpu,
                         enable_chromadb,
+                        enhanced_ui,
                     ],
                     outputs=[settings_status],
                 )
@@ -2373,7 +2524,8 @@ def create_gradio_interface():
                             matches, 
                             f"Frame {frame_number} ({time_str})",
                             {},  # No persistent labels needed for single frame analysis
-                            frame_number
+                            frame_number,
+                            enhanced_ui=get_app().config.ui.enhanced_ui
                         )
                         
                         # Convert BGR to RGB for Gradio display

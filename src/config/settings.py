@@ -46,6 +46,7 @@ class UIConfig:
     enable_batch_processing: bool = True
     results_per_page: int = 20
     auto_refresh_interval: int = 5  # seconds
+    enhanced_ui: bool = True  # Enable enhanced face recognition UI features
 
     def __post_init__(self):
         if self.theme not in ["light", "dark"]:
