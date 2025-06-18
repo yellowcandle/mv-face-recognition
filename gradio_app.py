@@ -37,8 +37,11 @@ try:
     HF_SPACES_GPU = True
 except ImportError:
     # Fallback decorator for local development
-    def spaces_gpu_decorator(func):
-        return func
+    def spaces_gpu_decorator(duration=None):
+        """Fallback decorator that accepts duration parameter but does nothing locally."""
+        def decorator(func):
+            return func
+        return decorator
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
     HF_SPACES_GPU = False
 
