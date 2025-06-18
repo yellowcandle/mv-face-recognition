@@ -59,19 +59,17 @@ jobs:
           try:
               import shutil
               
-              # Clone the HF Space repository with auth
+              # Create fresh directory for clean deployment (avoiding accumulated repository size)
+              print('Creating fresh HF Space deployment directory...')
               clone_url = f'https://yellowcandle:{os.environ[\"HF_TOKEN\"]}@huggingface.co/spaces/yellowcandle/mv-face-recognition'
-              result = os.system(f'git clone {clone_url} hf_space')
-              if result != 0:
-                  print('Failed to clone HF Space, creating fresh directory')
-                  os.makedirs('hf_space', exist_ok=True)
-                  os.chdir('hf_space')
-                  os.system(f'git init')
-                  os.system(f'git remote add origin {clone_url}')
-              else:
-                  os.chdir('hf_space')
               
-              # Configure git and LFS
+              # Start fresh to avoid accumulated repository size issues
+              os.makedirs('hf_space_fresh', exist_ok=True)
+              os.chdir('hf_space_fresh')
+              os.system(f'git init')
+              os.system(f'git remote add origin {clone_url}')
+              
+              # Configure git and LFS for fresh deployment
               os.system('git config user.email \"action@github.com\"')
               os.system('git config user.name \"GitHub Action\"')
               os.system('git lfs install')
@@ -162,7 +160,7 @@ jobs:
               with open('HF_DEPLOYMENT_INFO.md', 'w') as f:
                   f.write('''# HF Spaces Deployment Information
               
-              This is a minimal deployment optimized for HF Spaces 1GB storage limit.
+              This is a FRESH minimal deployment to reset repository size and fit HF Spaces 1GB limit.
               
               ## What's Included:
               - ✅ **Videos**: 3 optimized 720p MV videos with ASCII filenames (~94MB)
@@ -199,8 +197,9 @@ jobs:
               os.system('git add .')
               os.system('git commit -m \"Deploy optimized version for HF Spaces 1GB limit\" || echo \"No changes to commit\"')
               
-              # Push to HF Space
-              result = os.system('git push origin main --force')
+              # Force push to completely replace repository content and reset size
+              print('Force pushing to reset HF Space repository size...')
+              result = os.system('git push origin main --force --set-upstream')
               
               if result == 0:
                   print('Successfully deployed optimized version to HF Spaces!')
