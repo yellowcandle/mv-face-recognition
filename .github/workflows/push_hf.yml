@@ -110,12 +110,10 @@ jobs:
                   '../gradio_app.py', '../config.json', '../chroma_db.py',
                   '../contestant_info.csv', '../fonts/',
                   '../src/', 
-                  '../cache/chromadb/',  # Essential ChromaDB database
-                  '../cache/embeddings/',  # Essential embeddings (~850K)
                   '../source/videos_hf_clean/',  # ~194MB - clean ASCII-named videos only
-                  '../scripts/optimize_videos_for_hf.py',  # Essential script only
-                  # Note: Excluding photos (112MB), cache backups (14MB), 
-                  # other video dirs (1.8GB), and other scripts to stay under 1GB limit
+                  # Note: Excluding ALL cache files initially (~16MB) to fit under 1GB limit
+                  # HF Space will generate embeddings on-demand during first use
+                  # Also excluding photos (112MB), cache backups (14MB), other video dirs (1.8GB)
               ]
               
               # Copy essential files
@@ -140,8 +138,7 @@ jobs:
                   './source/videos_hf_optimized',  # 194MB duplicate
                   './source/videos_optimized',  # 630MB optimized videos
                   './source/photo',  # 112MB photos
-                  './cache/chromadb_backup_20250523_132112',  # 6.6MB backup
-                  './cache/chromadb_backup_comprehensive_20250523_135126',  # 6.6MB backup
+                  './cache/',  # ALL cache files (~16MB) - will be generated on-demand
               ]
               
               for dir_path in large_dirs_to_remove:
@@ -162,15 +159,15 @@ jobs:
               This is a minimal deployment optimized for HF Spaces 1GB storage limit.
               
               ## What's Included:
-              - ✅ **Videos**: 5 optimized 720p MV videos with ASCII filenames (~200MB)
-              - ✅ **Embeddings**: Pre-computed face embeddings cache (~16MB)
-              - ✅ **ChromaDB**: Vector database with contestant data
-              - ✅ **Source Code**: Full application functionality
-              - ✅ **Fonts**: Chinese/Japanese text rendering support
+              - ✅ **Videos**: 5 optimized 720p MV videos with ASCII filenames (~194MB)
+              - ✅ **Source Code**: Full application functionality (~50MB)
+              - ✅ **Fonts**: Chinese/Japanese text rendering support (~4MB)
               
               ## What's Excluded (to fit 1GB limit):
               - ❌ **Photos**: Contestant reference photos (112MB)
                 - *Solution*: Users can upload photos via Gradio interface
+              - ❌ **Cache**: Pre-computed embeddings and ChromaDB (~16MB)
+                - *Solution*: Generated automatically on first use
               
               ## Video Optimizations:
               - **Filenames**: ASCII names (e.g., mv1_zao_xing_zhi_zhan.mp4)
@@ -186,8 +183,8 @@ jobs:
               **Full version with all assets**: Available in GitHub repository
               ''')
               
-              # Set up Git LFS for remaining files
-              os.system('git lfs track \"*.npy\" \"*.sqlite3\" \"*.jpg\" \"*.jpeg\" \"*.png\"')
+              # Set up Git LFS for video files only (no cache files in HF deployment)
+              os.system('git lfs track \"*.mp4\" \"*.mov\" \"*.avi\"')
               
               # Add and commit
               os.system('git add .')
