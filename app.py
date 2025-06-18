@@ -9,6 +9,15 @@ import sys
 import logging
 from pathlib import Path
 
+# Hugging Face Spaces GPU support
+try:
+    import spaces
+except ImportError:
+    # Fallback decorator for local development
+    def spaces_gpu_decorator(func):
+        return func
+    spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
+
 # Suppress warnings for cleaner deployment
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
 os.environ["INSIGHTFACE_DISABLE_LOGGING"] = "1"

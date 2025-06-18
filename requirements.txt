@@ -43,6 +43,7 @@ yt-dlp>=2024.1.0
 numba>=0.58.0
 
 # Additional HF Spaces requirements
+spaces>=0.12.0
 fastapi>=0.100.0
 python-multipart>=0.0.6
 websockets>=11.0
