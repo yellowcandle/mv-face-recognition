@@ -110,10 +110,12 @@ jobs:
                   '../gradio_app.py', '../config.json', '../chroma_db.py',
                   '../contestant_info.csv', '../fonts/',
                   '../src/', 
-                  '../source/videos_hf_clean/',  # ~194MB - clean ASCII-named videos only
-                  # Note: Excluding ALL cache files initially (~16MB) to fit under 1GB limit
-                  # HF Space will generate embeddings on-demand during first use
-                  # Also excluding photos (112MB), cache backups (14MB), other video dirs (1.8GB)
+                  # Only include first 3 videos to minimize deployment size
+                  '../source/videos_hf_clean/mv1_zao_xing_zhi_zhan.mp4',  # 33MB
+                  '../source/videos_hf_clean/mv2_shi_fa_zhi_zhan.mp4',   # 30MB  
+                  '../source/videos_hf_clean/mv3_nv_tuan_zhi_zhan.mp4',  # 31MB
+                  # Note: Skipping mv4 (45MB) and mv5 (55MB) for now to stay minimal
+                  # Also excluding cache files, photos, other video dirs
               ]
               
               # Copy essential files
@@ -127,6 +129,10 @@ jobs:
                                   shutil.rmtree(dest)
                               shutil.copytree(src, dest)
                           else:
+                              # Create destination directory if needed
+                              dest_dir = os.path.dirname(dest)
+                              if dest_dir and not os.path.exists(dest_dir):
+                                  os.makedirs(dest_dir, exist_ok=True)
                               shutil.copy2(src, dest)
                           print(f'Copied: {src} -> {dest}')
                       except Exception as e:
@@ -159,7 +165,8 @@ jobs:
               This is a minimal deployment optimized for HF Spaces 1GB storage limit.
               
               ## What's Included:
-              - ✅ **Videos**: 5 optimized 720p MV videos with ASCII filenames (~194MB)
+              - ✅ **Videos**: 3 optimized 720p MV videos with ASCII filenames (~94MB)
+                - mv1_zao_xing_zhi_zhan.mp4, mv2_shi_fa_zhi_zhan.mp4, mv3_nv_tuan_zhi_zhan.mp4
               - ✅ **Source Code**: Full application functionality (~50MB)
               - ✅ **Fonts**: Chinese/Japanese text rendering support (~4MB)
               
@@ -168,6 +175,8 @@ jobs:
                 - *Solution*: Users can upload photos via Gradio interface
               - ❌ **Cache**: Pre-computed embeddings and ChromaDB (~16MB)
                 - *Solution*: Generated automatically on first use
+              - ❌ **Videos 4-5**: mv4_ji_xian_pai_mv.mp4 (45MB), mv5_bo_qian_re_shen.mp4 (55MB)
+                - *Solution*: Can be added later once initial deployment succeeds
               
               ## Video Optimizations:
               - **Filenames**: ASCII names (e.g., mv1_zao_xing_zhi_zhan.mp4)
