@@ -1563,23 +1563,55 @@ class FaceRecognitionApp:
             ax.set_title("UMAP Generation Error", fontsize=16)
             return fig
 
-    @spaces.GPU(duration=300)  # 5 minutes for video processing
-    @gpu_safe_decorator
     def process_uploaded_video(self, video_path, progress=gr.Progress()):
-        """Process an uploaded video file."""
+        """Process an uploaded video file with ZeroGPU quota awareness."""
         if not video_path:
             return None, "No video provided"
 
+        # Try GPU processing first, fallback to CPU if quota exceeded
+        if HF_SPACES_GPU:
+            try:
+                return self._process_video_gpu(video_path, progress)
+            except Exception as e:
+                if "quota" in str(e).lower() or "exceeded" in str(e).lower():
+                    logger.warning(f"GPU quota exceeded, falling back to CPU: {e}")
+                    quota_msg = "\n\n⚠️ GPU quota exceeded - switched to CPU processing (slower but functional)"
+                    result = self._process_video_cpu(video_path, progress)
+                    if result and len(result) >= 2:
+                        return (result[0], result[1] + quota_msg, *result[2:])
+                    return result
+                else:
+                    raise  # Re-raise if it's not a quota issue
+        else:
+            return self._process_video_cpu(video_path, progress)
+
+    @spaces.GPU(duration=300)  # 5 minutes for video processing
+    @gpu_safe_decorator
+    def _process_video_gpu(self, video_path, progress=gr.Progress()):
+        """GPU-accelerated video processing."""
+        return self._process_video_core(video_path, progress, use_gpu=True)
+
+    def _process_video_cpu(self, video_path, progress=gr.Progress()):
+        """CPU-only video processing fallback."""
+        return self._process_video_core(video_path, progress, use_gpu=False)
+
+    def _process_video_core(self, video_path, progress=gr.Progress(), use_gpu=True):
+        """Core video processing logic that works with both GPU and CPU."""
         try:
             self.processing_video = True
             results = []
             
             # ZeroGPU timeout management
-            if HF_SPACES_GPU:
+            if HF_SPACES_GPU and use_gpu:
                 print("🚀 Processing on ZeroGPU - optimizing for time limits...")
                 # Reduce frame skip for faster processing on GPU
                 original_frame_skip = self.config.recognition.frame_skip
                 self.config.recognition.frame_skip = max(5, original_frame_skip)  # Process fewer frames
+            elif HF_SPACES_GPU and not use_gpu:
+                print("🔧 Processing on CPU - using conservative settings...")
+                # More aggressive frame skipping for CPU processing
+                original_frame_skip = self.config.recognition.frame_skip
+                self.config.recognition.frame_skip = max(10, original_frame_skip)  # Process even fewer frames
 
             # Cache for persistent labels (keeps labels visible for multiple frames)
             label_persistence_cache = {}  # {face_id: {'name': str, 'bbox': tuple, 'expire_frame': int}}
@@ -1667,8 +1699,8 @@ class FaceRecognitionApp:
                 matches = []
                 should_process = frame_count % self.config.recognition.frame_skip == 0
 
-                # GPU memory management for ZeroGPU
-                if HF_SPACES_GPU and frame_count % 100 == 0:  # Every 100 frames
+                # GPU memory management for ZeroGPU (only if using GPU)
+                if HF_SPACES_GPU and use_gpu and frame_count % 100 == 0:  # Every 100 frames
                     try:
                         import torch
                         if torch.cuda.is_available():
@@ -1823,8 +1855,8 @@ class FaceRecognitionApp:
             if HF_SPACES_GPU and 'original_frame_skip' in locals():
                 self.config.recognition.frame_skip = original_frame_skip
             
-            # Final GPU cleanup
-            if HF_SPACES_GPU:
+            # Final GPU cleanup (only if we used GPU)
+            if HF_SPACES_GPU and use_gpu:
                 try:
                     import torch
                     if torch.cuda.is_available():
@@ -1866,8 +1898,8 @@ class FaceRecognitionApp:
             if HF_SPACES_GPU and 'original_frame_skip' in locals():
                 self.config.recognition.frame_skip = original_frame_skip
             
-            # GPU cleanup on error
-            if HF_SPACES_GPU:
+            # GPU cleanup on error (only if we used GPU)
+            if HF_SPACES_GPU and use_gpu:
                 try:
                     import torch
                     if torch.cuda.is_available():
