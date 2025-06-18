@@ -1613,23 +1613,35 @@ class FaceRecognitionApp:
             width = width if width % 2 == 0 else width - 1
             height = height if height % 2 == 0 else height - 1
 
-            # Try H.264 codec first, fallback to mp4v if not available
+            # Try multiple codecs with broader compatibility for different environments
             codecs_to_try = [
-                cv2.VideoWriter_fourcc(*"avc1"),  # H.264
-                cv2.VideoWriter_fourcc(*"mp4v"),  # MPEG-4
+                cv2.VideoWriter_fourcc(*"mp4v"),  # MPEG-4 (most compatible)
                 cv2.VideoWriter_fourcc(*"XVID"),  # Xvid
+                cv2.VideoWriter_fourcc(*"MJPG"),  # Motion JPEG (very compatible)
+                cv2.VideoWriter_fourcc(*"X264"),  # X264 (alternative H.264)
+                cv2.VideoWriter_fourcc(*"avc1"),  # H.264 (Apple format)
             ]
 
             out = None
-            for fourcc in codecs_to_try:
+            successful_codec = None
+            for i, fourcc in enumerate(codecs_to_try):
+                codec_names = ["mp4v", "XVID", "MJPG", "X264", "avc1"]
+                codec_name = codec_names[i] if i < len(codec_names) else f"codec_{i}"
+                
                 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
                 if out.isOpened():
+                    successful_codec = codec_name
+                    logger.info(f"✅ Video writer initialized with {codec_name} codec")
                     break
+                else:
+                    logger.debug(f"❌ Failed to initialize with {codec_name} codec")
                 out.release()
 
             if not out or not out.isOpened():
                 cap.release()
-                return None, "Error: Could not initialize video writer with any codec"
+                logger.warning("⚠️ No video codec available - processing without video output")
+                # Continue processing for analysis but without video output
+                out = None
 
             frame_count = 0
 
@@ -1757,7 +1769,8 @@ class FaceRecognitionApp:
                 if frame.shape[1] != width or frame.shape[0] != height:
                     frame = cv2.resize(frame, (width, height))
 
-                out.write(frame)
+                if out is not None:
+                    out.write(frame)
 
                 # Update progress
                 progress(
@@ -1766,7 +1779,8 @@ class FaceRecognitionApp:
                 )
 
             cap.release()
-            out.release()
+            if out is not None:
+                out.release()
 
             # Create results summary and timeline data
             if results:
@@ -1840,8 +1854,8 @@ class FaceRecognitionApp:
                 )
 
             return (
-                output_path,
-                summary,
+                output_path if out is not None else None,
+                summary + ("\n\n⚠️ Video output not available - no compatible codec found" if out is None else ""),
                 (timeline_data, contestant_choices, timeline_stats_html),
             )
 
