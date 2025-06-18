@@ -23,7 +23,7 @@ tags:
 models:
   - buffalo_l
 datasets: []
-short_description: AI-powered face recognition system for video analysis with modern Gradio interface
+short_description: AI face recognition for video analysis with Gradio
 ---
 
 # 全民造星IV MV 人臉識別
