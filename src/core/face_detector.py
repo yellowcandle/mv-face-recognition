@@ -17,10 +17,11 @@ logger = logging.getLogger(__name__)
 class FaceDetector:
     """Face detection and analysis using InsightFace."""
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, force_cpu_only=False):
         """Initialize the face detector with configuration."""
         self.config = config or get_config()
         self.app = None
+        self.force_cpu_only = force_cpu_only
         self._initialize_detector()
 
     def _initialize_detector(self):
@@ -29,16 +30,17 @@ class FaceDetector:
             # Configure providers based on hardware availability
             providers = self._get_providers()
 
-            # ZeroGPU specific initialization
-            try:
-                import spaces
-                # Ensure we're in a GPU context
-                if torch.cuda.is_available():
-                    torch.cuda.init()
-                    torch.cuda.empty_cache()
-                    logger.info("ZeroGPU context initialized")
-            except ImportError:
-                pass
+            # ZeroGPU specific initialization (skip if force_cpu_only)
+            if not self.force_cpu_only:
+                try:
+                    import spaces
+                    # Ensure we're in a GPU context
+                    if torch.cuda.is_available():
+                        torch.cuda.init()
+                        torch.cuda.empty_cache()
+                        logger.info("ZeroGPU context initialized")
+                except ImportError:
+                    pass
 
             self.app = FaceAnalysis(
                 providers=providers,
@@ -86,6 +88,12 @@ class FaceDetector:
     def _get_providers(self) -> List[str]:
         """Get the appropriate ONNX providers based on hardware."""
         providers = []
+
+        # Force CPU-only mode if requested
+        if self.force_cpu_only:
+            logger.info("Force CPU-only mode: Using CPU providers only")
+            providers.append("CPUExecutionProvider")
+            return providers
 
         # Check if running on ZeroGPU first
         try:
