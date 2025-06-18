@@ -18,8 +18,13 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install huggingface_hub
-        run: pip install huggingface_hub
+      - name: Install dependencies
+        run: |
+          pip install huggingface_hub
+          # Install Git LFS
+          sudo apt-get update
+          sudo apt-get install git-lfs
+          git lfs install
       
       - name: Sync to Hugging Face Space
         env:
@@ -63,11 +68,16 @@ jobs:
               import shutil
               import os
               
-              # Essential files for HF Spaces
+              # Essential files for HF Spaces including data assets
               files_to_copy = [
                   'app.py', 'requirements.txt', 'packages.txt',
-                  'Dockerfile', 'src/', 
-                  'gradio_app.py', 'config.json', 'chroma_db.py'
+                  'Dockerfile', 'src/', '.gitattributes',
+                  'gradio_app.py', 'config.json', 'chroma_db.py',
+                  'contestant_info.csv', 'fonts/',
+                  # Data assets for face recognition
+                  'source/', 'cache/', 
+                  # Optional results (comment out if too large)
+                  # 'comparison_results/', 'debug_masks/', 'output_frames/'
               ]
               
               for file_path in files_to_copy:
@@ -85,9 +95,18 @@ jobs:
                   shutil.copy2('README.md', './hf_space/README.md')
                   print('Copied: README.md (with HF Space metadata)')
               
+              # Copy .gitattributes for Git LFS
+              if os.path.exists('.gitattributes'):
+                  shutil.copy2('.gitattributes', './hf_space/.gitattributes')
+                  print('Copied: .gitattributes (for Git LFS)')
+              
+              # Initialize Git LFS in the HF space directory
+              os.chdir('./hf_space')
+              os.system('git lfs track \"*.mp4\" \"*.mov\" \"*.avi\" \"*.jpg\" \"*.jpeg\" \"*.png\" \"*.npy\" \"*.sqlite3\"')
+              
               # Push changes
-              repo.push_to_hub(commit_message='Auto-sync from GitHub')
-              print('Successfully synced to Hugging Face Space!')
+              repo.push_to_hub(commit_message='Auto-sync from GitHub with data assets')
+              print('Successfully synced to Hugging Face Space with all data assets!')
               
           except Exception as e:
               print(f'Sync error: {e}')
