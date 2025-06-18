@@ -80,7 +80,6 @@ try:
     from src.config.settings import get_config, save_config
     from src.core.face_detector import FaceDetector
     from src.services.visualization import VisualizationService
-    from chroma_db import get_contestant_collection
 except ImportError as e:
     print(f"Import warning: {e}")
     # Fallback imports for development
@@ -1167,6 +1166,7 @@ class FaceRecognitionApp:
             "total_processed": 0,
             "faces_detected": 0,
             "faces_recognized": 0,
+            "frames_skipped_no_faces": 0,
             "last_updated": datetime.now(),
         }
 
@@ -1268,7 +1268,9 @@ class FaceRecognitionApp:
             from src.config.video_titles import VIDEO_TITLE_MAPPING, get_video_display_title
         except ImportError:
             VIDEO_TITLE_MAPPING = {}
-            get_video_display_title = lambda x: x
+            
+            def get_video_display_title(x):
+                return x
         
         # Try different video directories in order of preference - prioritize original resolution
         videos_dirs = [
@@ -1321,9 +1323,17 @@ class FaceRecognitionApp:
                             if filename in VIDEO_TITLE_MAPPING:
                                 display_title = VIDEO_TITLE_MAPPING[filename]
                             else:
-                                # Fallback to original title mapping or filename
+                                # For original title mapping (title -> URL), we need to find by filename
                                 file_stem = video_file.stem
-                                display_title = video_titles.get(file_stem, file_stem)
+                                # Search for matching title in video_titles dict (title -> URL mapping)
+                                display_title = None
+                                for title in video_titles.keys():
+                                    if title == file_stem:
+                                        display_title = title
+                                        break
+                                # If not found, use the filename stem as fallback
+                                if display_title is None:
+                                    display_title = file_stem
                             
                             # Add to available videos list
                             video_files.append(display_title)
@@ -1743,6 +1753,7 @@ class FaceRecognitionApp:
             self.processing_stats["total_processed"] = 0
             self.processing_stats["faces_detected"] = 0
             self.processing_stats["faces_recognized"] = 0
+            self.processing_stats["frames_skipped_no_faces"] = 0
 
             # Process frames
             progress(0, desc="Processing video...")
@@ -1771,16 +1782,24 @@ class FaceRecognitionApp:
                         pass
 
                 if should_process:
-                    # Increment processed frame count
+                    # Increment processed frame count (this frame passed frame skip)
                     self.processing_stats["total_processed"] += 1
-
-                    # Process frame for recognition
-                    matches = process_frame(
-                        frame,
-                        self.known_embeddings,
-                        self.config.recognition.similarity_threshold,
-                        detector=_global_detector,
-                    )
+                    
+                    # Quick pre-filter: check if frame has faces before expensive processing
+                    has_faces = _global_detector.has_faces_quick(frame)
+                    
+                    if has_faces:
+                        # Process frame for recognition
+                        matches = process_frame(
+                            frame,
+                            self.known_embeddings,
+                            self.config.recognition.similarity_threshold,
+                            detector=_global_detector,
+                        )
+                    else:
+                        # Skip frame - no faces detected in quick check
+                        matches = []
+                        self.processing_stats["frames_skipped_no_faces"] += 1
 
                     # Update persistent labels cache
                     label_persistence_cache = update_persistent_labels(
@@ -1883,6 +1902,7 @@ class FaceRecognitionApp:
                 summary = "📊 Processing Summary:\n"
                 summary += f"• Total frames: {total_frames}\n"
                 summary += f"• Frames processed: {self.processing_stats['total_processed']} (every {self.config.recognition.frame_skip})\n"
+                summary += f"• Frames skipped (no faces): {self.processing_stats['frames_skipped_no_faces']}\n"
                 summary += (
                     f"• Faces detected: {self.processing_stats['faces_detected']}\n"
                 )
@@ -1903,6 +1923,7 @@ class FaceRecognitionApp:
                 summary = "📊 Processing Summary:\n"
                 summary += f"• Total frames: {total_frames}\n"
                 summary += f"• Frames processed: {self.processing_stats['total_processed']} (every {self.config.recognition.frame_skip})\n"
+                summary += f"• Frames skipped (no faces): {self.processing_stats['frames_skipped_no_faces']}\n"
                 summary += (
                     f"• Faces detected: {self.processing_stats['faces_detected']}\n"
                 )
@@ -2059,8 +2080,15 @@ class FaceRecognitionApp:
 
             # Save configuration
             save_config()
+            
+            # Reinitialize face detector if detection settings changed
+            global _global_detector
+            if _global_detector is not None:
+                # Create new detector with updated settings
+                _global_detector = FaceDetector(self.config)
+                logger.info("Face detector reinitialized with updated settings")
 
-            return "Settings updated successfully!"
+            return "Settings updated successfully! Face detector reinitialized."
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")

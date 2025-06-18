@@ -218,6 +218,55 @@ class FaceDetector:
 
         return filtered
 
+    def has_faces_quick(self, image: np.ndarray, min_confidence: float = 0.3) -> bool:
+        """
+        Quickly check if image contains faces without full detection.
+        Uses lower confidence threshold for fast pre-filtering.
+        
+        Args:
+            image: Input image as numpy array (BGR format)
+            min_confidence: Minimum confidence for face detection
+            
+        Returns:
+            True if faces are likely present, False otherwise
+        """
+        if image is None or image.size == 0:
+            return False
+            
+        try:
+            # Use smaller image for faster detection
+            height, width = image.shape[:2]
+            if height > 480 or width > 640:
+                # Resize to smaller resolution for quick check
+                scale = min(480/height, 640/width)
+                new_height = int(height * scale)
+                new_width = int(width * scale)
+                image = cv2.resize(image, (new_width, new_height))
+            
+            # Convert to RGB for InsightFace
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            if self.app is None:
+                return False
+                
+            # Use InsightFace with lower threshold for quick detection
+            faces = self.app.get(rgb_image, max_num=1)  # Only need to find one face
+            
+            # Check if any face meets minimum confidence
+            for face in faces:
+                if hasattr(face, 'det_score') and face.det_score >= min_confidence:
+                    return True
+                elif not hasattr(face, 'det_score'):
+                    # If no confidence score available, assume it's valid
+                    return True
+                    
+            return False
+            
+        except Exception as e:
+            logger.debug(f"Error in quick face detection: {e}")
+            # If error occurs, assume faces might be present to avoid skipping
+            return True
+
     def extract_face_embedding(
         self, image: np.ndarray, normalize: bool = True
     ) -> Optional[np.ndarray]:
