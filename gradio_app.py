@@ -61,7 +61,9 @@ def get_face_detector():
     return _global_detector
 
 
-def process_frame(frame, known_embeddings, similarity_threshold=0.5, return_similarities=False):
+def process_frame(
+    frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
+):
     """Process a video frame and detect/recognize faces with adaptive scaling."""
     try:
         detector = get_face_detector()
@@ -104,7 +106,7 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5, return_simi
 
         matches = []
         frame_similarities = []  # Store all similarity scores for plotting
-        
+
         for face_idx, face in enumerate(faces):
             try:
                 face_embedding = None
@@ -168,15 +170,19 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5, return_simi
 
                             # Calculate cosine similarity
                             similarity = np.dot(face_embedding, known_embedding)
-                            
+
                             # Store similarity data for plotting
                             if return_similarities:
-                                face_similarities.append({
-                                    'face_id': f'Face_{face_idx + 1}',
-                                    'name': name,
-                                    'similarity': float(similarity),
-                                    'bbox': face.bbox.tolist() if hasattr(face, 'bbox') else None
-                                })
+                                face_similarities.append(
+                                    {
+                                        "face_id": f"Face_{face_idx + 1}",
+                                        "name": name,
+                                        "similarity": float(similarity),
+                                        "bbox": face.bbox.tolist()
+                                        if hasattr(face, "bbox")
+                                        else None,
+                                    }
+                                )
 
                             if (
                                 similarity > similarity_threshold
@@ -191,7 +197,7 @@ def process_frame(frame, known_embeddings, similarity_threshold=0.5, return_simi
                     # Add all similarities for this face to the frame data
                     if return_similarities:
                         frame_similarities.extend(face_similarities)
-                    
+
                     matches.append((face, best_match))
             except Exception as e:
                 logger.warning(f"Error processing face: {e}")
@@ -435,51 +441,67 @@ def draw_rounded_rectangle(img, pt1, pt2, color, thickness, radius=10):
     """Draw a rounded rectangle using OpenCV."""
     x1, y1 = pt1
     x2, y2 = pt2
-    
+
     # Ensure coordinates are in correct order
     x1, x2 = min(x1, x2), max(x1, x2)
     y1, y2 = min(y1, y2), max(y1, y2)
-    
+
     # Clamp radius to reasonable size
-    radius = min(radius, min(x2-x1, y2-y1) // 4)
-    
+    radius = min(radius, min(x2 - x1, y2 - y1) // 4)
+
     if radius <= 3:
         # Fallback to regular rectangle if radius is too small
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
         return
-    
+
     # Draw the rounded rectangle using multiple primitives
     # Top and bottom horizontal lines
     cv2.line(img, (x1 + radius, y1), (x2 - radius, y1), color, thickness)
     cv2.line(img, (x1 + radius, y2), (x2 - radius, y2), color, thickness)
-    
+
     # Left and right vertical lines
     cv2.line(img, (x1, y1 + radius), (x1, y2 - radius), color, thickness)
     cv2.line(img, (x2, y1 + radius), (x2, y2 - radius), color, thickness)
-    
+
     # Corner arcs - make them more visible
-    cv2.ellipse(img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness)
-    cv2.ellipse(img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness)
-    cv2.ellipse(img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness)
-    cv2.ellipse(img, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, thickness)
-    
+    cv2.ellipse(
+        img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness
+    )
+    cv2.ellipse(
+        img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness
+    )
+    cv2.ellipse(
+        img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness
+    )
+    cv2.ellipse(
+        img, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, thickness
+    )
+
     # Add a distinctive marker to make it obvious this is enhanced UI
-    cv2.circle(img, (x2 - 10, y1 + 10), 3, (0, 255, 255), -1)  # Yellow dot in top-right corner
+    cv2.circle(
+        img, (x2 - 10, y1 + 10), 3, (0, 255, 255), -1
+    )  # Yellow dot in top-right corner
 
 
 def draw_confidence_bar(img, confidence, bbox, color):
     """Draw a mini confidence progress bar above the bounding box."""
     x1, y1, x2, y2 = bbox
-    
+
     # Progress bar dimensions - make it more visible
     bar_width = min(120, x2 - x1)  # Max 120px, or width of bbox
     bar_height = 8  # Slightly taller
     bar_x = x1 + (x2 - x1 - bar_width) // 2  # Center above bbox
     bar_y = max(5, y1 - 20)  # 20px above bbox, minimum 5px from top
-    
+
     # Background bar (gray)
-    cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (100, 100, 100), -1)
-    
+    cv2.rectangle(
+        img,
+        (bar_x, bar_y),
+        (bar_x + bar_width, bar_y + bar_height),
+        (100, 100, 100),
+        -1,
+    )
+
     # Confidence bar (colored based on confidence level)
     conf_width = int(bar_width * confidence)
     if conf_width > 0:
@@ -490,23 +512,40 @@ def draw_confidence_bar(img, confidence, bbox, color):
             conf_color = (0, 255, 255)  # Yellow
         else:
             conf_color = (0, 0, 255)  # Red
-            
-        cv2.rectangle(img, (bar_x, bar_y), (bar_x + conf_width, bar_y + bar_height), conf_color, -1)
-    
+
+        cv2.rectangle(
+            img,
+            (bar_x, bar_y),
+            (bar_x + conf_width, bar_y + bar_height),
+            conf_color,
+            -1,
+        )
+
     # Border around the bar
-    cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (200, 200, 200), 1)
-    
+    cv2.rectangle(
+        img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (200, 200, 200), 1
+    )
+
     # Confidence percentage text
     conf_text = f"{int(confidence * 100)}%"
     text_size = cv2.getTextSize(conf_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
     text_x = bar_x + bar_width + 5
     text_y = bar_y + bar_height - 1
-    
+
     # Ensure text doesn't go off screen
     if text_x + text_size[0] > img.shape[1]:
         text_x = bar_x - text_size[0] - 5
-    
-    cv2.putText(img, conf_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
+
+    cv2.putText(
+        img,
+        conf_text,
+        (text_x, text_y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.4,
+        color,
+        1,
+        cv2.LINE_AA,
+    )
 
 
 def add_face_thumbnail(img, face_region, position, size=(40, 40)):
@@ -514,40 +553,50 @@ def add_face_thumbnail(img, face_region, position, size=(40, 40)):
     try:
         if face_region is None or face_region.size == 0:
             return
-            
+
         # Resize face crop to thumbnail size
         face_thumb = cv2.resize(face_region, size, interpolation=cv2.INTER_AREA)
-        
+
         x, y = position
         thumb_h, thumb_w = face_thumb.shape[:2]
-        
+
         # Ensure thumbnail fits within image bounds
         if x + thumb_w > img.shape[1] or y + thumb_h > img.shape[0] or x < 0 or y < 0:
             return
-            
+
         # Create a border around the thumbnail
         border_size = 2
         bordered_thumb = cv2.copyMakeBorder(
-            face_thumb, border_size, border_size, border_size, border_size,
-            cv2.BORDER_CONSTANT, value=(255, 255, 255)
+            face_thumb,
+            border_size,
+            border_size,
+            border_size,
+            border_size,
+            cv2.BORDER_CONSTANT,
+            value=(255, 255, 255),
         )
-        
+
         # Update dimensions after adding border
         thumb_h, thumb_w = bordered_thumb.shape[:2]
-        
+
         # Check bounds again after border
         if x + thumb_w > img.shape[1] or y + thumb_h > img.shape[0]:
             return
-            
+
         # Overlay the thumbnail on the image
-        img[y:y+thumb_h, x:x+thumb_w] = bordered_thumb
-        
+        img[y : y + thumb_h, x : x + thumb_w] = bordered_thumb
+
     except Exception as e:
         logger.debug(f"Error adding face thumbnail: {e}")
 
 
 def draw_boxes_and_labels(
-    frame, matches, timestamp="", persistent_labels=None, current_frame=0, enhanced_ui=True
+    frame,
+    matches,
+    timestamp="",
+    persistent_labels=None,
+    current_frame=0,
+    enhanced_ui=True,
 ):
     """Draw enhanced bounding boxes and labels on detected faces with modern UI improvements."""
     try:
@@ -782,15 +831,33 @@ def draw_boxes_and_labels(
             if enhanced_ui:
                 if name != "Unknown":
                     # Enhanced features for recognized faces
-                    radius = max(8, min(15, min(x2-x1, y2-y1) // 8))  # Larger radius for visibility
-                    draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
-                    
+                    radius = max(
+                        8, min(15, min(x2 - x1, y2 - y1) // 8)
+                    )  # Larger radius for visibility
+                    draw_rounded_rectangle(
+                        frame,
+                        (x1, y1),
+                        (x2, y2),
+                        faded_color_bgr,
+                        box_thickness,
+                        radius,
+                    )
+
                     # Add confidence progress bar above the face
-                    draw_confidence_bar(frame, confidence, (x1, y1, x2, y2), faded_color_bgr)
+                    draw_confidence_bar(
+                        frame, confidence, (x1, y1, x2, y2), faded_color_bgr
+                    )
                 else:
                     # Enhanced unknown faces still get rounded corners but no confidence bar
-                    radius = max(5, min(10, min(x2-x1, y2-y1) // 10))
-                    draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
+                    radius = max(5, min(10, min(x2 - x1, y2 - y1) // 10))
+                    draw_rounded_rectangle(
+                        frame,
+                        (x1, y1),
+                        (x2, y2),
+                        faded_color_bgr,
+                        box_thickness,
+                        radius,
+                    )
             else:
                 # Regular rectangle when enhanced UI is disabled
                 cv2.rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness)
@@ -900,19 +967,31 @@ def draw_boxes_and_labels(
             if enhanced_ui and name != "Unknown":
                 try:
                     # Extract face crop from the original frame
-                    face_crop = frame[max(0, y1):min(frame.shape[0], y2), max(0, x1):min(frame.shape[1], x2)]
+                    face_crop = frame[
+                        max(0, y1) : min(frame.shape[0], y2),
+                        max(0, x1) : min(frame.shape[1], x2),
+                    ]
                     if face_crop.size > 0:
                         # Position thumbnail to the left of the label
                         thumb_x = max(0, label_x - 50)  # 50px to the left
                         thumb_y = label_y
-                        
+
                         # Ensure thumbnail doesn't overlap with bounding box
-                        if thumb_x + 45 > x1 and thumb_y + 45 > y1 and thumb_x < x2 and thumb_y < y2:
+                        if (
+                            thumb_x + 45 > x1
+                            and thumb_y + 45 > y1
+                            and thumb_x < x2
+                            and thumb_y < y2
+                        ):
                             # Move thumbnail to the right of the label instead
-                            thumb_x = min(frame.shape[1] - 45, label_x + text_width + 10)
-                        
-                        add_face_thumbnail(frame, face_crop, (thumb_x, thumb_y), size=(40, 40))
-                except Exception as e:
+                            thumb_x = min(
+                                frame.shape[1] - 45, label_x + text_width + 10
+                            )
+
+                        add_face_thumbnail(
+                            frame, face_crop, (thumb_x, thumb_y), size=(40, 40)
+                        )
+                except Exception:
                     pass  # Silently handle thumbnail errors
 
             # Draw text with adaptive brightness
@@ -1177,7 +1256,7 @@ class FaceRecognitionApp:
 
             # Group data by contestant
             grouped_data = timeline_df.groupby("Name")
-            
+
             # Create statistics
             recognition_count = len(timeline_df)
             unique_people = timeline_df["Name"].nunique()
@@ -1185,16 +1264,19 @@ class FaceRecognitionApp:
             # Load contestant info for enhanced display
             contestant_info_map = {}
             try:
-                if hasattr(self, 'contestant_info') and self.contestant_info is not None:
+                if (
+                    hasattr(self, "contestant_info")
+                    and self.contestant_info is not None
+                ):
                     for _, row in self.contestant_info.iterrows():
-                        name = row.get('暱稱', '')
-                        full_name = row.get('姓名', '')
-                        number = row.get('編號', '')
+                        name = row.get("暱稱", "")
+                        full_name = row.get("姓名", "")
+                        number = row.get("編號", "")
                         if name:
                             contestant_info_map[name] = {
-                                'full_name': full_name,
-                                'nickname': name,
-                                'number': number
+                                "full_name": full_name,
+                                "nickname": name,
+                                "number": number,
                             }
             except Exception as e:
                 logger.warning(f"Could not load contestant info: {e}")
@@ -1207,33 +1289,35 @@ class FaceRecognitionApp:
             for contestant_name, contestant_data in grouped_data:
                 appearances = len(contestant_data)
                 contestant_data = contestant_data.sort_values("Frame")
-                
+
                 # Get contestant info
                 contestant_display = contestant_name
                 search_terms = [contestant_name.lower()]
-                
+
                 if contestant_name in contestant_info_map:
                     info = contestant_info_map[contestant_name]
-                    if info['full_name'] and info['full_name'] != contestant_name:
+                    if info["full_name"] and info["full_name"] != contestant_name:
                         contestant_display += f" ({info['full_name']})"
-                        search_terms.append(info['full_name'].lower())
-                    if info['number']:
+                        search_terms.append(info["full_name"].lower())
+                    if info["number"]:
                         contestant_display += f" #{info['number']}"
-                        search_terms.append(str(info['number']).lower())
-                
+                        search_terms.append(str(info["number"]).lower())
+
                 contestant_choices.append(contestant_display)
                 search_data[contestant_name] = search_terms
-                
+
                 # Add rows for this contestant
                 for i, (_, row) in enumerate(contestant_data.iterrows()):
                     sequence_num = i + 1
-                    timeline_data.append([
-                        contestant_display,
-                        row["Time"],
-                        row["Frame"],
-                        sequence_num,
-                        appearances
-                    ])
+                    timeline_data.append(
+                        [
+                            contestant_display,
+                            row["Time"],
+                            row["Frame"],
+                            sequence_num,
+                            appearances,
+                        ]
+                    )
 
             # Create statistics HTML
             stats_html = f"""
@@ -1249,7 +1333,7 @@ class FaceRecognitionApp:
                         <div style='font-size: 0.9em; opacity: 0.9;'>Contestants Detected</div>
                     </div>
                     <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;'>
-                        <div style='font-size: 1.2em; font-weight: bold;'>{recognition_count/unique_people:.1f}</div>
+                        <div style='font-size: 1.2em; font-weight: bold;'>{recognition_count / unique_people:.1f}</div>
                         <div style='font-size: 0.9em; opacity: 0.9;'>Avg per Contestant</div>
                     </div>
                 </div>
@@ -1553,7 +1637,12 @@ class FaceRecognitionApp:
                 # Always draw persistent labels, even if no new matches
                 if matches or label_persistence_cache:
                     frame = draw_boxes_and_labels(
-                        frame, matches, time_str, label_persistence_cache, frame_count, enhanced_ui=self.config.ui.enhanced_ui
+                        frame,
+                        matches,
+                        time_str,
+                        label_persistence_cache,
+                        frame_count,
+                        enhanced_ui=self.config.ui.enhanced_ui,
                     )
 
                 # Add frame info overlay (small, unobtrusive) using OpenCV for ASCII text
@@ -1638,9 +1727,9 @@ class FaceRecognitionApp:
 
             # Create timeline data for native Gradio components
             timeline_data = []
-            contestant_choices = ['All']
+            contestant_choices = ["All"]
             timeline_stats_html = "Process a video to see interactive timeline"
-            
+
             if results:
                 results_df = pd.DataFrame(results)
                 # Fix column names for timeline
@@ -1650,11 +1739,17 @@ class FaceRecognitionApp:
                     "Time",
                     "Name",
                 ]  # Rename to match expected format
-                
-                # Create timeline data using native Gradio components
-                timeline_data, contestant_choices, timeline_stats_html = self._create_timeline_data(timeline_df)
 
-            return output_path, summary, (timeline_data, contestant_choices, timeline_stats_html)
+                # Create timeline data using native Gradio components
+                timeline_data, contestant_choices, timeline_stats_html = (
+                    self._create_timeline_data(timeline_df)
+                )
+
+            return (
+                output_path,
+                summary,
+                (timeline_data, contestant_choices, timeline_stats_html),
+            )
 
         except Exception as e:
             self.processing_video = False
@@ -1792,63 +1887,65 @@ class FaceRecognitionApp:
         try:
             if results_df is None or results_df.empty:
                 return [], [], "No timeline data available"
-            
+
             # Group by contestant and calculate statistics
             timeline_data = []
             contestant_stats = {}
-            
+
             for _, row in results_df.iterrows():
-                frame = int(row.get('Frame', 0))
-                time_str = str(row.get('Time', '00:00'))
-                name = str(row.get('Name', 'Unknown'))
-                
-                if name == 'Unknown':
+                frame = int(row.get("Frame", 0))
+                time_str = str(row.get("Time", "00:00"))
+                name = str(row.get("Name", "Unknown"))
+
+                if name == "Unknown":
                     continue
-                    
+
                 # Track sequences for each contestant
                 if name not in contestant_stats:
                     contestant_stats[name] = {
-                        'appearances': 0,
-                        'sequences': [],
-                        'current_sequence_start': frame,
-                        'last_frame': frame
+                        "appearances": 0,
+                        "sequences": [],
+                        "current_sequence_start": frame,
+                        "last_frame": frame,
                     }
-                
+
                 stats = contestant_stats[name]
-                stats['appearances'] += 1
-                
+                stats["appearances"] += 1
+
                 # Detect sequence breaks (gap > 30 frames indicates new sequence)
-                if frame - stats['last_frame'] > 30:
+                if frame - stats["last_frame"] > 30:
                     # End previous sequence
-                    if stats['current_sequence_start'] is not None:
-                        stats['sequences'].append((stats['current_sequence_start'], stats['last_frame']))
+                    if stats["current_sequence_start"] is not None:
+                        stats["sequences"].append(
+                            (stats["current_sequence_start"], stats["last_frame"])
+                        )
                     # Start new sequence
-                    stats['current_sequence_start'] = frame
-                
-                stats['last_frame'] = frame
-                
+                    stats["current_sequence_start"] = frame
+
+                stats["last_frame"] = frame
+
                 # Add to timeline data
-                sequence_num = len(stats['sequences']) + 1
-                timeline_data.append([
-                    name,
-                    time_str,
-                    frame,
-                    sequence_num,
-                    stats['appearances']
-                ])
-            
+                sequence_num = len(stats["sequences"]) + 1
+                timeline_data.append(
+                    [name, time_str, frame, sequence_num, stats["appearances"]]
+                )
+
             # Close any open sequences
             for name, stats in contestant_stats.items():
-                if stats['current_sequence_start'] is not None:
-                    stats['sequences'].append((stats['current_sequence_start'], stats['last_frame']))
-            
+                if stats["current_sequence_start"] is not None:
+                    stats["sequences"].append(
+                        (stats["current_sequence_start"], stats["last_frame"])
+                    )
+
             # Get unique contestants for filter dropdown
-            contestant_choices = ['All'] + sorted(list(contestant_stats.keys()))
-            
+            contestant_choices = ["All"] + sorted(list(contestant_stats.keys()))
+
             # Create summary statistics
             total_contestants = len(contestant_stats)
-            total_appearances = sum(stats['appearances'] for stats in contestant_stats.values())
-            
+            total_appearances = sum(
+                stats["appearances"] for stats in contestant_stats.values()
+            )
+
             stats_html = f"""
             <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; margin: 10px 0;">
                 <h4>📊 Recognition Statistics</h4>
@@ -1857,9 +1954,9 @@ class FaceRecognitionApp:
                 <p><strong>📋 Timeline Entries:</strong> {len(timeline_data)}</p>
             </div>
             """
-            
+
             return timeline_data, contestant_choices, stats_html
-            
+
         except Exception as e:
             logger.error(f"Error creating timeline data: {e}")
             return [], [], f"Error creating timeline: {str(e)}"
@@ -1869,23 +1966,26 @@ class FaceRecognitionApp:
         try:
             if not timeline_data:
                 return []
-            
+
             filtered_data = timeline_data.copy()
-            
+
             # Apply contestant filter
-            if filter_contestant and filter_contestant != 'All':
-                filtered_data = [row for row in filtered_data if row[0] == filter_contestant]
-            
+            if filter_contestant and filter_contestant != "All":
+                filtered_data = [
+                    row for row in filtered_data if row[0] == filter_contestant
+                ]
+
             # Apply search query
             if search_query:
                 search_lower = search_query.lower().strip()
                 filtered_data = [
-                    row for row in filtered_data 
+                    row
+                    for row in filtered_data
                     if search_lower in row[0].lower()  # Search in contestant name
                 ]
-            
+
             return filtered_data
-            
+
         except Exception as e:
             logger.error(f"Error filtering timeline data: {e}")
             return timeline_data if timeline_data else []
@@ -1982,30 +2082,42 @@ def create_gradio_interface():
                             # Timeline components for interactive navigation
                             with gr.Group():
                                 gr.Markdown("### 🎯 Recognition Timeline by Contestant")
-                                
+
                                 with gr.Row():
                                     contestant_search = gr.Textbox(
                                         label="🔍 Search Contestants",
                                         placeholder="Search by name, nickname, or number...",
                                         container=True,
-                                        scale=2
+                                        scale=2,
                                     )
                                     contestant_filter = gr.Dropdown(
                                         label="📋 Filter by Contestant",
                                         choices=["All"],
                                         value="All",
                                         container=True,
-                                        scale=1
+                                        scale=1,
                                     )
-                                
+
                                 timeline_stats = gr.HTML(
                                     value="Process a video to see recognition statistics",
                                     visible=True,
                                 )
-                                
+
                                 recognition_timeline = gr.Dataframe(
-                                    headers=["👤 Contestant", "⏰ Time", "🎬 Frame", "📊 Sequence", "📍 Appearances"],
-                                    datatype=["str", "str", "number", "number", "number"],
+                                    headers=[
+                                        "👤 Contestant",
+                                        "⏰ Time",
+                                        "🎬 Frame",
+                                        "📊 Sequence",
+                                        "📍 Appearances",
+                                    ],
+                                    datatype=[
+                                        "str",
+                                        "str",
+                                        "number",
+                                        "number",
+                                        "number",
+                                    ],
                                     interactive=False,
                                     wrap=True,
                                     visible=True,
@@ -2023,16 +2135,24 @@ def create_gradio_interface():
 
                     # Convert title to actual file path
                     video_path = get_app().get_video_path_from_title(dropdown_title)
-                    video_output, summary, (timeline_data, contestant_choices, timeline_stats) = get_app().process_uploaded_video(video_path)
-                    
+                    (
+                        video_output,
+                        summary,
+                        (timeline_data, contestant_choices, timeline_stats),
+                    ) = get_app().process_uploaded_video(video_path)
+
                     return video_output, summary, timeline_data, timeline_stats
 
-                def filter_timeline_by_search(timeline_data, search_query, filter_contestant):
+                def filter_timeline_by_search(
+                    timeline_data, search_query, filter_contestant
+                ):
                     """Filter timeline data based on search and filter inputs."""
                     try:
                         if not timeline_data:
                             return []
-                        filtered_data = get_app()._filter_timeline_data(timeline_data, search_query, filter_contestant)
+                        filtered_data = get_app()._filter_timeline_data(
+                            timeline_data, search_query, filter_contestant
+                        )
                         return filtered_data
                     except Exception as e:
                         logger.error(f"Error filtering timeline data: {e}")
@@ -2042,25 +2162,30 @@ def create_gradio_interface():
                     """Update contestant filter choices based on timeline data."""
                     try:
                         # Always start with 'All' as the default choice
-                        choices = ['All']
-                        
+                        choices = ["All"]
+
                         if timeline_data and len(timeline_data) > 0:
                             # Extract unique contestants from timeline data
                             contestants = set()
                             for row in timeline_data:
-                                if row and len(row) > 0 and row[0]:  # Check row exists and has content
-                                    contestants.add(str(row[0]))  # Contestant name is first column
-                            
+                                if (
+                                    row and len(row) > 0 and row[0]
+                                ):  # Check row exists and has content
+                                    contestants.add(
+                                        str(row[0])
+                                    )  # Contestant name is first column
+
                             # Add sorted contestants to choices
                             if contestants:
                                 choices.extend(sorted(list(contestants)))
-                        
-                        return gr.Dropdown(choices=choices, value='All')
+
+                        return gr.Dropdown(choices=choices, value="All")
                     except Exception as e:
                         logger.error(f"Error updating contestant filter: {e}")
                         import traceback
+
                         traceback.print_exc()
-                        return gr.Dropdown(choices=['All'], value='All')
+                        return gr.Dropdown(choices=["All"], value="All")
 
                 def refresh_video_dropdown():
                     """Refresh the video dropdown with current videos."""
@@ -2074,28 +2199,33 @@ def create_gradio_interface():
                 video_button.click(
                     process_selected_video,
                     inputs=[video_dropdown],
-                    outputs=[video_output, video_results, full_timeline_data, timeline_stats],
+                    outputs=[
+                        video_output,
+                        video_results,
+                        full_timeline_data,
+                        timeline_stats,
+                    ],
                 ).then(
                     lambda data: data,  # Pass through the full timeline data to display
                     inputs=[full_timeline_data],
-                    outputs=[recognition_timeline]
+                    outputs=[recognition_timeline],
                 ).then(
                     update_contestant_filter,
                     inputs=[full_timeline_data],
-                    outputs=[contestant_filter]
+                    outputs=[contestant_filter],
                 )
 
                 # Add event handlers for search and filter functionality
                 contestant_search.change(
                     filter_timeline_by_search,
                     inputs=[full_timeline_data, contestant_search, contestant_filter],
-                    outputs=[recognition_timeline]
+                    outputs=[recognition_timeline],
                 )
 
                 contestant_filter.change(
                     filter_timeline_by_search,
                     inputs=[full_timeline_data, contestant_search, contestant_filter],
-                    outputs=[recognition_timeline]
+                    outputs=[recognition_timeline],
                 )
 
                 refresh_videos_btn.click(
@@ -2156,7 +2286,7 @@ def create_gradio_interface():
                                 label="🗄 Enable ChromaDB",
                                 info="Use vector database for fast search",
                             )
-                            
+
                         with gr.Group():
                             gr.Markdown("### 🎨 UI Settings")
                             enhanced_ui = gr.Checkbox(
@@ -2187,7 +2317,6 @@ def create_gradio_interface():
                     ],
                     outputs=[settings_status],
                 )
-
 
             # UMAP Visualization Tab
             with gr.Tab("🗺️ UMAP Visualization"):
@@ -2383,7 +2512,7 @@ def create_gradio_interface():
                                 show_label=True,
                                 interactive=True,
                             )
-                            
+
                             with gr.Row():
                                 frame_number_input = gr.Number(
                                     label="Frame Number",
@@ -2393,17 +2522,19 @@ def create_gradio_interface():
                                     step=1,
                                     interactive=True,
                                 )
-                                
+
                                 analyze_frame_btn = gr.Button(
                                     "🔍 Analyze Frame", variant="primary", size="lg"
                                 )
-                            
+
                             similarity_status = gr.HTML(
                                 "Select a video and enter a frame number to analyze"
                             )
-                            
+
                             with gr.Row():
-                                prev_frame_btn = gr.Button("⬅️ Previous Frame", size="sm")
+                                prev_frame_btn = gr.Button(
+                                    "⬅️ Previous Frame", size="sm"
+                                )
                                 next_frame_btn = gr.Button("Next Frame ➡️", size="sm")
 
                         with gr.Group():
@@ -2433,7 +2564,7 @@ def create_gradio_interface():
                                 show_label=True,
                                 container=True,
                             )
-                            
+
                             with gr.Row():
                                 timeline_window_size = gr.Slider(
                                     minimum=50,
@@ -2441,11 +2572,13 @@ def create_gradio_interface():
                                     value=100,
                                     step=10,
                                     label="Timeline Window Size (frames)",
-                                    info="Number of frames to show around current frame"
+                                    info="Number of frames to show around current frame",
                                 )
-                                
+
                                 generate_timeline_btn = gr.Button(
-                                    "📈 Generate Timeline", variant="secondary", size="lg"
+                                    "📈 Generate Timeline",
+                                    variant="secondary",
+                                    size="lg",
                                 )
 
                 # Store video analysis data
@@ -2455,89 +2588,108 @@ def create_gradio_interface():
                     """Analyze a single frame and return similarity data with frame preview."""
                     if not video_title:
                         return None, None, "Please select a video"
-                    
+
                     if not frame_number or frame_number < 1:
                         return None, None, "Please enter a valid frame number"
 
                     try:
                         app = get_app()
-                        
+
                         # Get video path
                         video_path = app.get_video_path_from_title(video_title)
-                        
+
                         import cv2
+
                         cap = cv2.VideoCapture(video_path)
-                        
+
                         if not cap.isOpened():
                             return None, None, f"❌ Could not open video: {video_title}"
-                        
+
                         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                         fps = cap.get(cv2.CAP_PROP_FPS)
-                        
+
                         if frame_number > total_frames:
                             cap.release()
-                            return None, None, f"❌ Frame {frame_number} exceeds video length ({total_frames} frames)"
-                        
+                            return (
+                                None,
+                                None,
+                                f"❌ Frame {frame_number} exceeds video length ({total_frames} frames)",
+                            )
+
                         # Seek to the specific frame
                         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
                         ret, frame = cap.read()
                         cap.release()
-                        
+
                         if not ret:
                             return None, None, f"❌ Could not read frame {frame_number}"
-                        
+
                         # Keep original frame for preview
                         original_frame = frame.copy()
-                        
+
                         # Process the frame with similarity data
                         matches, frame_similarities = process_frame(
-                            frame, 
-                            app.known_embeddings, 
+                            frame,
+                            app.known_embeddings,
                             app.config.recognition.similarity_threshold,
-                            return_similarities=True
+                            return_similarities=True,
                         )
-                        
+
                         # Create annotated frame preview even if no similarities
                         timestamp = frame_number / fps if fps > 0 else 0
-                        time_str = f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
-                        
+                        time_str = (
+                            f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
+                        )
+
                         # Draw face detection boxes and labels on the frame
                         annotated_frame = draw_boxes_and_labels(
-                            original_frame, 
-                            matches, 
+                            original_frame,
+                            matches,
                             f"Frame {frame_number} ({time_str})",
                             {},  # No persistent labels needed for single frame analysis
                             frame_number,
-                            enhanced_ui=get_app().config.ui.enhanced_ui
+                            enhanced_ui=get_app().config.ui.enhanced_ui,
                         )
-                        
+
                         # Convert BGR to RGB for Gradio display
                         preview_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-                        
+
                         if not frame_similarities:
-                            return None, preview_frame, f"Frame {frame_number}: No faces detected or no similarities above threshold"
-                        
+                            return (
+                                None,
+                                preview_frame,
+                                f"Frame {frame_number}: No faces detected or no similarities above threshold",
+                            )
+
                         # Generate similarity plot
-                        similarity_fig = app.visualization_service.create_similarity_plot(
-                            frame_similarities, frame_number, max_faces=5
+                        similarity_fig = (
+                            app.visualization_service.create_similarity_plot(
+                                frame_similarities, frame_number, max_faces=5
+                            )
                         )
-                        
-                        detected_faces = len(set([s['face_id'] for s in frame_similarities]))
+
+                        detected_faces = len(
+                            set([s["face_id"] for s in frame_similarities])
+                        )
                         total_comparisons = len(frame_similarities)
-                        
+
                         status_msg = f"✅ Frame {frame_number}: Found {detected_faces} faces, {total_comparisons} similarity comparisons"
-                        
+
                         return similarity_fig, preview_frame, status_msg
-                        
+
                     except Exception as e:
                         logger.error(f"Error analyzing frame {frame_number}: {e}")
-                        return None, None, f"❌ Error analyzing frame {frame_number}: {str(e)}"
+                        return (
+                            None,
+                            None,
+                            f"❌ Error analyzing frame {frame_number}: {str(e)}",
+                        )
 
                 def navigate_frame(video_title, current_frame, direction):
                     """Navigate to previous or next frame."""
                     if not video_title or not current_frame:
                         return current_frame
-                    
+
                     new_frame = current_frame + direction
                     return max(1, new_frame)  # Ensure frame number is at least 1
 
@@ -2545,55 +2697,65 @@ def create_gradio_interface():
                     """Generate timeline analysis for the video around the current frame."""
                     if not video_title:
                         return None, "Please select a video"
-                    
+
                     try:
                         app = get_app()
                         video_path = app.get_video_path_from_title(video_title)
-                        
+
                         import cv2
+
                         cap = cv2.VideoCapture(video_path)
-                        
+
                         if not cap.isOpened():
                             return None, f"❌ Could not open video: {video_title}"
-                        
+
                         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                        
+
                         # Determine frame range around current frame
                         start_frame = max(1, current_frame - window_size // 2)
                         end_frame = min(total_frames, current_frame + window_size // 2)
-                        
+
                         timeline_data = []
-                        
+
                         # Process frames in the range
-                        for frame_num in range(start_frame, end_frame + 1, max(1, window_size // 50)):
+                        for frame_num in range(
+                            start_frame, end_frame + 1, max(1, window_size // 50)
+                        ):
                             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num - 1)
                             ret, frame = cap.read()
-                            
+
                             if ret:
                                 matches, frame_similarities = process_frame(
-                                    frame, 
-                                    app.known_embeddings, 
+                                    frame,
+                                    app.known_embeddings,
                                     app.config.recognition.similarity_threshold,
-                                    return_similarities=True
+                                    return_similarities=True,
                                 )
-                                
-                                timeline_data.append({
-                                    'frame': frame_num,
-                                    'similarities': frame_similarities
-                                })
-                        
+
+                                timeline_data.append(
+                                    {
+                                        "frame": frame_num,
+                                        "similarities": frame_similarities,
+                                    }
+                                )
+
                         cap.release()
-                        
+
                         if not timeline_data:
                             return None, "No timeline data generated"
-                        
+
                         # Generate timeline plot
-                        timeline_fig = app.visualization_service.create_frame_timeline_plot(
-                            timeline_data, current_frame, window_size
+                        timeline_fig = (
+                            app.visualization_service.create_frame_timeline_plot(
+                                timeline_data, current_frame, window_size
+                            )
                         )
-                        
-                        return timeline_fig, f"✅ Generated timeline for {len(timeline_data)} frames around frame {current_frame}"
-                        
+
+                        return (
+                            timeline_fig,
+                            f"✅ Generated timeline for {len(timeline_data)} frames around frame {current_frame}",
+                        )
+
                     except Exception as e:
                         logger.error(f"Error generating timeline: {e}")
                         return None, f"❌ Error generating timeline: {str(e)}"
@@ -2627,7 +2789,11 @@ def create_gradio_interface():
 
                 generate_timeline_btn.click(
                     generate_timeline_analysis,
-                    inputs=[similarity_video_dropdown, frame_number_input, timeline_window_size],
+                    inputs=[
+                        similarity_video_dropdown,
+                        frame_number_input,
+                        timeline_window_size,
+                    ],
                     outputs=[timeline_plot, similarity_status],
                 )
 

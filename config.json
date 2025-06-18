@@ -1,8 +1,8 @@
 {
   "recognition": {
-    "similarity_threshold": 0.1,
-    "detection_threshold": 0.05,
-    "frame_skip": 15,
+    "similarity_threshold": 0.14,
+    "detection_threshold": 0.11,
+    "frame_skip": 10,
     "max_faces_per_frame": 50,
     "use_gpu": true,
     "enable_chromadb": true,
@@ -22,7 +22,8 @@
     "enable_live_camera": true,
     "enable_batch_processing": true,
     "results_per_page": 20,
-    "auto_refresh_interval": 5
+    "auto_refresh_interval": 5,
+    "enhanced_ui": true
   },
   "storage": {
     "chroma_db_path": ".chroma_db",
