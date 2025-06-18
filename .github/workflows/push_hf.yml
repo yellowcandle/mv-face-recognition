@@ -109,10 +109,12 @@ jobs:
                   '../Dockerfile', '../README.md', '../.gitattributes',
                   '../gradio_app.py', '../config.json', '../chroma_db.py',
                   '../contestant_info.csv', '../fonts/',
-                  '../src/', '../cache/',  # 16MB - essential embeddings/DB
+                  '../src/', 
+                  '../cache/chromadb/',  # Essential ChromaDB database
+                  '../cache/embeddings/',  # Essential embeddings
                   '../source/videos_hf_clean/',  # ~200MB - clean ASCII-named videos
                   '../scripts/',  # Include optimization scripts
-                  # Note: Excluding photos (112MB) to stay under 1GB limit
+                  # Note: Excluding photos (112MB) and cache backups (14MB) to stay under 1GB limit
                   # Users can upload photos through Gradio interface
               ]
               
