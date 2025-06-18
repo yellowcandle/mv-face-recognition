@@ -66,7 +66,7 @@ jobs:
               # Start fresh to avoid accumulated repository size issues
               os.makedirs('hf_space_fresh', exist_ok=True)
               os.chdir('hf_space_fresh')
-              os.system(f'git init')
+              os.system(f'git init --initial-branch=main')
               os.system(f'git remote add origin {clone_url}')
               
               # Configure git and LFS for fresh deployment
@@ -195,7 +195,7 @@ jobs:
               
               # Add and commit
               os.system('git add .')
-              os.system('git commit -m \"Deploy optimized version for HF Spaces 1GB limit\" || echo \"No changes to commit\"')
+              os.system('git commit -m \"Initial minimal deployment: 3 videos + source code (~148MB)\" || echo \"No changes to commit\"')
               
               # Force push to completely replace repository content and reset size
               print('Force pushing to reset HF Space repository size...')
