@@ -103,16 +103,17 @@ jobs:
                               print(f'Optimizing: {video_file}')
                               subprocess.run(cmd, capture_output=True)
               
-              # Essential files for HF Spaces (under 1GB total)
+              # Essential files for HF Spaces (minimal deployment under 1GB)
               essential_files = [
                   '../app.py', '../requirements.txt', '../packages.txt',
                   '../Dockerfile', '../README.md', '../.gitattributes',
                   '../gradio_app.py', '../config.json', '../chroma_db.py',
                   '../contestant_info.csv', '../fonts/',
                   '../src/', '../cache/',  # 16MB - essential embeddings/DB
-                  '../source/photo/contestants/',  # 112MB - contestant photos
-                  '../source/videos_hf_optimized/',  # ~200MB - optimized 720p videos
+                  '../source/videos_hf_clean/',  # ~200MB - clean ASCII-named videos
                   '../scripts/',  # Include optimization scripts
+                  # Note: Excluding photos (112MB) to stay under 1GB limit
+                  # Users can upload photos through Gradio interface
               ]
               
               # Copy essential files
@@ -131,21 +132,35 @@ jobs:
                       except Exception as e:
                           print(f'Error copying {src}: {e}')
               
-              # Create a note about video optimization
-              with open('VIDEO_OPTIMIZATION.md', 'w') as f:
-                  f.write('''# Video Optimization for HF Spaces
+              # Create deployment notes
+              with open('HF_DEPLOYMENT_INFO.md', 'w') as f:
+                  f.write('''# HF Spaces Deployment Information
               
-              This deployment includes optimized 720p versions of the MV videos to fit within HF Spaces 1GB limit.
+              This is a minimal deployment optimized for HF Spaces 1GB storage limit.
               
-              **Optimizations applied:**
-              - Resolution: 3840x1600 → 1280x534 (720p equivalent)
-              - Video codec: VP9 → H.264 (better compatibility)
-              - File size: ~90% reduction (310MB → 30MB per video)
-              - Quality: CRF 30 (good balance of quality vs size)
+              ## What's Included:
+              - ✅ **Videos**: 5 optimized 720p MV videos with ASCII filenames (~200MB)
+              - ✅ **Embeddings**: Pre-computed face embeddings cache (~16MB)
+              - ✅ **ChromaDB**: Vector database with contestant data
+              - ✅ **Source Code**: Full application functionality
+              - ✅ **Fonts**: Chinese/Japanese text rendering support
               
-              **Face recognition quality:** Maintained at 720p resolution for accurate detection.
+              ## What's Excluded (to fit 1GB limit):
+              - ❌ **Photos**: Contestant reference photos (112MB)
+                - *Solution*: Users can upload photos via Gradio interface
               
-              **Original videos:** Available in the main GitHub repository.
+              ## Video Optimizations:
+              - **Filenames**: ASCII names (e.g., mv1_zao_xing_zhi_zhan.mp4)
+              - **Display**: Original Chinese/Japanese titles in interface
+              - **Quality**: 720p (1280x534) for optimal face recognition
+              - **Compression**: H.264, CRF 30 (~90% size reduction)
+              
+              ## Usage:
+              1. Upload contestant photos through the interface
+              2. Select videos from the optimized collection
+              3. Run face recognition analysis
+              
+              **Full version with all assets**: Available in GitHub repository
               ''')
               
               # Set up Git LFS for remaining files

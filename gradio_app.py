@@ -1148,9 +1148,17 @@ class FaceRecognitionApp:
 
     def get_available_videos(self):
         """Get list of available videos with titles from the source directory."""
-        # Try HF Spaces optimized videos first, then fall back to full videos
+        # Import video title mapping
+        try:
+            from src.config.video_titles import VIDEO_TITLE_MAPPING, get_video_display_title
+        except ImportError:
+            VIDEO_TITLE_MAPPING = {}
+            get_video_display_title = lambda x: x
+        
+        # Try different video directories in order of preference
         videos_dirs = [
-            Path("source/videos_hf_optimized"),  # For HF Spaces deployment
+            Path("source/videos_hf_clean"),  # For HF Spaces deployment (clean ASCII names)
+            Path("source/videos_hf_optimized"),  # For HF Spaces deployment (original names)
             Path("source/videos"),  # For local development
             Path("/Users/swong/dev/mv-face-recognition/source/videos")  # Absolute path fallback
         ]
@@ -1159,6 +1167,7 @@ class FaceRecognitionApp:
         for dir_path in videos_dirs:
             if dir_path.exists():
                 videos_dir = dir_path
+                print(f"📁 Using videos directory: {videos_dir}")
                 break
         
         if not videos_dir:
@@ -1191,56 +1200,19 @@ class FaceRecognitionApp:
                         frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
                         if frame_count > 0:
                             # Find the corresponding title for this video file
-                            file_stem = video_file.stem  # filename without extension
-
-                            # First check if the filename exactly matches a title
-                            matching_title = None
-                            if file_stem in video_titles:
-                                matching_title = file_stem
+                            filename = video_file.name  # full filename with extension
+                            
+                            # Use video title mapping if available (for clean ASCII names)
+                            if filename in VIDEO_TITLE_MAPPING:
+                                display_title = VIDEO_TITLE_MAPPING[filename]
                             else:
-                                # Map numbered video files to titles from videos_dl.py
-                                video_number_mapping = {
-                                    "v1": list(video_titles.keys())[0]
-                                    if len(video_titles) > 0
-                                    else None,
-                                    "v2": list(video_titles.keys())[1]
-                                    if len(video_titles) > 1
-                                    else None,
-                                    "v3": list(video_titles.keys())[2]
-                                    if len(video_titles) > 2
-                                    else None,
-                                    "v4": list(video_titles.keys())[3]
-                                    if len(video_titles) > 3
-                                    else None,
-                                }
-
-                                # Check if this is a numbered video file
-                                matching_title = video_number_mapping.get(file_stem)
-
-                                if not matching_title:
-                                    # Look for matching title in video_titles by content
-                                    for title in video_titles.keys():
-                                        # Check if the filename matches the title (with some normalization)
-                                        if file_stem in title or title in file_stem:
-                                            matching_title = title
-                                            break
-
-                            if matching_title:
-                                # Prefer the properly named file over numbered versions
-                                if (
-                                    matching_title not in title_to_path_mapping
-                                    or file_stem == matching_title
-                                ):
-                                    if matching_title not in video_files:
-                                        video_files.append(matching_title)
-                                    title_to_path_mapping[matching_title] = str(
-                                        video_file
-                                    )
-                            else:
-                                # If no title found, use filename
-                                display_title = f"📹 {file_stem}"
-                                video_files.append(display_title)
-                                title_to_path_mapping[display_title] = str(video_file)
+                                # Fallback to original title mapping or filename
+                                file_stem = video_file.stem
+                                display_title = video_titles.get(file_stem, file_stem)
+                            
+                            # Add to available videos list
+                            video_files.append(display_title)
+                            title_to_path_mapping[display_title] = str(video_file)
                         cap.release()
                     else:
                         # Mark as checked and log warning only once
