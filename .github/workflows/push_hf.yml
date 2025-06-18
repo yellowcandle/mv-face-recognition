@@ -111,11 +111,11 @@ jobs:
                   '../contestant_info.csv', '../fonts/',
                   '../src/', 
                   '../cache/chromadb/',  # Essential ChromaDB database
-                  '../cache/embeddings/',  # Essential embeddings
-                  '../source/videos_hf_clean/',  # ~200MB - clean ASCII-named videos
-                  '../scripts/',  # Include optimization scripts
-                  # Note: Excluding photos (112MB) and cache backups (14MB) to stay under 1GB limit
-                  # Users can upload photos through Gradio interface
+                  '../cache/embeddings/',  # Essential embeddings (~850K)
+                  '../source/videos_hf_clean/',  # ~194MB - clean ASCII-named videos only
+                  '../scripts/optimize_videos_for_hf.py',  # Essential script only
+                  # Note: Excluding photos (112MB), cache backups (14MB), 
+                  # other video dirs (1.8GB), and other scripts to stay under 1GB limit
               ]
               
               # Copy essential files
@@ -133,6 +133,27 @@ jobs:
                           print(f'Copied: {src} -> {dest}')
                       except Exception as e:
                           print(f'Error copying {src}: {e}')
+              
+              # Explicitly remove any large directories that shouldn't be there
+              large_dirs_to_remove = [
+                  './source/videos',  # 1.2GB original videos
+                  './source/videos_hf_optimized',  # 194MB duplicate
+                  './source/videos_optimized',  # 630MB optimized videos
+                  './source/photo',  # 112MB photos
+                  './cache/chromadb_backup_20250523_132112',  # 6.6MB backup
+                  './cache/chromadb_backup_comprehensive_20250523_135126',  # 6.6MB backup
+              ]
+              
+              for dir_path in large_dirs_to_remove:
+                  if os.path.exists(dir_path):
+                      try:
+                          if os.path.isdir(dir_path):
+                              shutil.rmtree(dir_path)
+                          else:
+                              os.remove(dir_path)
+                          print(f'Removed large directory: {dir_path}')
+                      except Exception as e:
+                          print(f'Error removing {dir_path}: {e}')
               
               # Create deployment notes
               with open('HF_DEPLOYMENT_INFO.md', 'w') as f:
