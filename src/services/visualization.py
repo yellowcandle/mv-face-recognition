@@ -99,11 +99,29 @@ class VisualizationService:
         logger.info(f"Configured matplotlib fonts: {font_list[:3]}...")
 
     def _load_fonts(self):
-        """Loads fonts for PIL ImageDraw."""
-        font_path = os.path.join(self.fonts_dir, "SourceHanSansTC-VF.ttf")
-        if not os.path.exists(font_path):
+        """Loads fonts for PIL ImageDraw with multiple fallback paths."""
+        # Debug: Log current working directory and font directory
+        logger.info("Current working directory: %s", os.getcwd())
+        logger.info("Font directory setting: %s", self.fonts_dir)
+        
+        # Try multiple possible font locations
+        font_locations = [
+            os.path.join(self.fonts_dir, "SourceHanSansTC-VF.ttf"),  # Relative to project
+            os.path.join("fonts", "SourceHanSansTC-VF.ttf"),  # Direct relative path
+            "./fonts/SourceHanSansTC-VF.ttf",  # Current directory relative
+            "fonts/SourceHanSansTC-VF.ttf",  # No leading ./
+        ]
+        
+        font_path = None
+        for location in font_locations:
+            if os.path.exists(location):
+                font_path = location
+                break
+        
+        if not font_path:
             logger.warning(
-                "Font file not found: %s. Using default PIL font.", font_path
+                "Font file not found in any of these locations: %s. Using default PIL font.", 
+                font_locations
             )
             self.label_font = ImageFont.load_default()
             self.timestamp_font = ImageFont.load_default()
@@ -111,6 +129,7 @@ class VisualizationService:
             try:
                 self.label_font = ImageFont.truetype(font_path, 60)
                 self.timestamp_font = ImageFont.truetype(font_path, 40)
+                logger.info("Successfully loaded font from: %s", font_path)
             except Exception as e:
                 logger.error(
                     "Error loading font from %s: %s. Using default PIL font.",
