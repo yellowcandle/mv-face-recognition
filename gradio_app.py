@@ -34,11 +34,36 @@ from PIL import Image, ImageDraw, ImageFont
 # Hugging Face Spaces GPU support
 try:
     import spaces
+    HF_SPACES_GPU = True
 except ImportError:
     # Fallback decorator for local development
     def spaces_gpu_decorator(func):
         return func
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
+    HF_SPACES_GPU = False
+
+# GPU error handling decorator
+def gpu_safe_decorator(func):
+    """Decorator to handle GPU errors and fallback to CPU."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if "GPU" in str(e) or "CUDA" in str(e) or "ZeroGPU" in str(e):
+                print(f"GPU error in {func.__name__}: {e}")
+                print("Falling back to CPU processing...")
+                # Clear GPU memory if possible
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except:
+                    pass
+                # Re-run without GPU acceleration
+                return func(*args, **kwargs)
+            else:
+                raise e
+    return wrapper
 
 # Import our modular components
 try:
@@ -71,6 +96,7 @@ def get_face_detector():
 
 
 @spaces.GPU
+@gpu_safe_decorator
 def process_frame(
     frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
 ):
@@ -1497,6 +1523,7 @@ class FaceRecognitionApp:
             return fig
 
     @spaces.GPU
+    @gpu_safe_decorator
     def process_uploaded_video(self, video_path, progress=gr.Progress()):
         """Process an uploaded video file."""
         if not video_path:
@@ -1505,6 +1532,13 @@ class FaceRecognitionApp:
         try:
             self.processing_video = True
             results = []
+            
+            # ZeroGPU timeout management
+            if HF_SPACES_GPU:
+                print("🚀 Processing on ZeroGPU - optimizing for time limits...")
+                # Reduce frame skip for faster processing on GPU
+                original_frame_skip = self.config.recognition.frame_skip
+                self.config.recognition.frame_skip = max(5, original_frame_skip)  # Process fewer frames
 
             # Cache for persistent labels (keeps labels visible for multiple frames)
             label_persistence_cache = {}  # {face_id: {'name': str, 'bbox': tuple, 'expire_frame': int}}
@@ -1579,6 +1613,15 @@ class FaceRecognitionApp:
                 # Process frame for face detection and recognition
                 matches = []
                 should_process = frame_count % self.config.recognition.frame_skip == 0
+
+                # GPU memory management for ZeroGPU
+                if HF_SPACES_GPU and frame_count % 100 == 0:  # Every 100 frames
+                    try:
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    except:
+                        pass
 
                 if should_process:
                     # Increment processed frame count
@@ -1720,6 +1763,20 @@ class FaceRecognitionApp:
                 summary += "❌ No faces recognized in video"
 
             self.processing_video = False
+            
+            # Restore original frame skip setting
+            if HF_SPACES_GPU and 'original_frame_skip' in locals():
+                self.config.recognition.frame_skip = original_frame_skip
+            
+            # Final GPU cleanup
+            if HF_SPACES_GPU:
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        print("🧹 Final GPU memory cleanup completed")
+                except:
+                    pass
 
             # Create timeline data for native Gradio components
             timeline_data = []
@@ -1749,6 +1806,21 @@ class FaceRecognitionApp:
 
         except Exception as e:
             self.processing_video = False
+            
+            # Restore original frame skip setting if error occurred
+            if HF_SPACES_GPU and 'original_frame_skip' in locals():
+                self.config.recognition.frame_skip = original_frame_skip
+            
+            # GPU cleanup on error
+            if HF_SPACES_GPU:
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        print("🧹 GPU memory cleanup after error")
+                except:
+                    pass
+            
             logger.error(f"Video processing error: {e}")
             return (
                 None,

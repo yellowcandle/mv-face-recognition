@@ -12,11 +12,15 @@ from pathlib import Path
 # Hugging Face Spaces GPU support
 try:
     import spaces
+    HF_SPACES_GPU = True
+    print("✅ ZeroGPU support detected")
 except ImportError:
     # Fallback decorator for local development
     def spaces_gpu_decorator(func):
         return func
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
+    HF_SPACES_GPU = False
+    print("💻 Running without ZeroGPU support")
 
 # Suppress warnings for cleaner deployment
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
