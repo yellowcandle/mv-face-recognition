@@ -1218,12 +1218,12 @@ class FaceRecognitionApp:
             VIDEO_TITLE_MAPPING = {}
             get_video_display_title = lambda x: x
         
-        # Try different video directories in order of preference
+        # Try different video directories in order of preference - prioritize original resolution
         videos_dirs = [
+            Path("source/videos"),  # For local development - original resolution
+            Path("/Users/swong/dev/mv-face-recognition/source/videos"),  # Absolute path fallback
             Path("source/videos_hf_clean"),  # For HF Spaces deployment (clean ASCII names)
-            Path("source/videos_hf_optimized"),  # For HF Spaces deployment (original names)
-            Path("source/videos"),  # For local development
-            Path("/Users/swong/dev/mv-face-recognition/source/videos")  # Absolute path fallback
+            Path("source/videos_hf_optimized")  # For HF Spaces deployment (optimized 720p)
         ]
         
         videos_dir = None
