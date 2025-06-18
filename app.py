@@ -134,8 +134,6 @@ def main():
             max_threads=10,
             # Security settings for public deployment
             auth=None,  # Can be configured for private access
-            # Analytics
-            analytics_enabled=False,
         )
 
     except Exception as e:
