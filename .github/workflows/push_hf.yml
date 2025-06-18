@@ -55,58 +55,32 @@ jobs:
           except Exception as e:
               print(f'Space creation info: {e}')
           
-          # Clone and sync
+          # Use git-based sync to avoid file encoding issues
           try:
-              repo = Repository(
-                  local_dir='./hf_space',
-                  clone_from='yellowcandle/mv-face-recognition',
-                  repo_type='space',
-                  token=os.environ['HF_TOKEN']
-              )
+              # Clone the HF Space repository
+              os.system('git clone https://huggingface.co/spaces/yellowcandle/mv-face-recognition hf_space')
+              os.chdir('hf_space')
               
-              # Copy files
-              import shutil
-              import os
+              # Configure git and LFS
+              os.system('git config user.email \"action@github.com\"')
+              os.system('git config user.name \"GitHub Action\"')
+              os.system('git lfs install')
               
-              # Essential files for HF Spaces including data assets
-              files_to_copy = [
-                  'app.py', 'requirements.txt', 'packages.txt',
-                  'Dockerfile', 'src/', '.gitattributes',
-                  'gradio_app.py', 'config.json', 'chroma_db.py',
-                  'contestant_info.csv', 'fonts/',
-                  # Data assets for face recognition
-                  'source/', 'cache/', 
-                  # Optional results (comment out if too large)
-                  # 'comparison_results/', 'debug_masks/', 'output_frames/'
-              ]
+              # Add remote for source repository
+              os.system('git remote add source https://github.com/yellowcandle/mv-face-recognition.git')
+              os.system('git fetch source main')
               
-              for file_path in files_to_copy:
-                  if os.path.exists(file_path):
-                      if os.path.isdir(file_path):
-                          if os.path.exists(f'./hf_space/{file_path}'):
-                              shutil.rmtree(f'./hf_space/{file_path}')
-                          shutil.copytree(file_path, f'./hf_space/{file_path}')
-                      else:
-                          shutil.copy2(file_path, f'./hf_space/{file_path}')
-                      print(f'Copied: {file_path}')
+              # Reset to match source repository
+              os.system('git reset --hard source/main')
               
-              # Copy README.md with YAML metadata for HF Space
-              if os.path.exists('README.md'):
-                  shutil.copy2('README.md', './hf_space/README.md')
-                  print('Copied: README.md (with HF Space metadata)')
+              # Push to HF Space
+              push_cmd = f'git push https://yellowcandle:{os.environ[\"HF_TOKEN\"]}@huggingface.co/spaces/yellowcandle/mv-face-recognition main --force'
+              result = os.system(push_cmd)
               
-              # Copy .gitattributes for Git LFS
-              if os.path.exists('.gitattributes'):
-                  shutil.copy2('.gitattributes', './hf_space/.gitattributes')
-                  print('Copied: .gitattributes (for Git LFS)')
-              
-              # Initialize Git LFS in the HF space directory
-              os.chdir('./hf_space')
-              os.system('git lfs track \"*.mp4\" \"*.mov\" \"*.avi\" \"*.jpg\" \"*.jpeg\" \"*.png\" \"*.npy\" \"*.sqlite3\"')
-              
-              # Push changes
-              repo.push_to_hub(commit_message='Auto-sync from GitHub with data assets')
-              print('Successfully synced to Hugging Face Space with all data assets!')
+              if result == 0:
+                  print('Successfully synced to Hugging Face Space using git!')
+              else:
+                  print(f'Git push failed with code: {result}')
               
           except Exception as e:
               print(f'Sync error: {e}')
