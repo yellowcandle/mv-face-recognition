@@ -1,1 +1,2 @@
 - NO NEED TO IMPLEMENT WEBCAM face recognition
+- Only process files in /source/videos directory, no webcam processing required
