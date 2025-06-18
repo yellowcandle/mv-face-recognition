@@ -83,25 +83,36 @@ _font_cache_info = ""
 
 
 def get_face_detector():
-    """Get or create the global face detector instance."""
+    """Get global face detector instance - ZeroGPU compliant version."""
     global _global_detector
+    
+    # On ZeroGPU, never initialize detector in main process
+    if HF_SPACES_GPU:
+        # Return None - detector will be initialized inside GPU functions
+        return None
+    
+    # For non-ZeroGPU environments, use lazy initialization
     if _global_detector is None:
         try:
             config = get_config()
-            
-            # Initialize detector (GPU context will be handled by ONNX providers)
-            if HF_SPACES_GPU:
-                print("🚀 Initializing face detector for ZeroGPU...")
-            
             _global_detector = FaceDetector(config)
-            
-            if HF_SPACES_GPU:
-                print("✅ Face detector initialized for ZeroGPU")
-                
+            logger.info("✅ Face detector initialized")
         except Exception as e:
             logger.error(f"Failed to initialize face detector: {e}")
             _global_detector = None
     return _global_detector
+
+def create_face_detector_inside_gpu():
+    """Create face detector inside GPU context - ZeroGPU safe."""
+    try:
+        logger.info("🚀 Initializing face detector inside GPU context...")
+        config = get_config()
+        detector = FaceDetector(config)
+        logger.info("✅ Face detector initialized inside GPU context")
+        return detector
+    except Exception as e:
+        logger.error(f"Failed to initialize face detector in GPU context: {e}")
+        return None
 
 
 @spaces.GPU(duration=30)
@@ -133,10 +144,15 @@ def process_frame(
 ):
     """Process a video frame and detect/recognize faces with adaptive scaling."""
     try:
-        # Get detector (initialized with CPU) and move GPU operations inside this function
+        # On ZeroGPU, create detector inside GPU context; otherwise use global detector
         detector = get_face_detector()
         if detector is None:
-            return [] if not return_similarities else ([], [])
+            if HF_SPACES_GPU:
+                # This should not happen since process_frame is called from GPU functions
+                logger.error("Face detector not available in ZeroGPU context")
+                return [] if not return_similarities else ([], [])
+            else:
+                return [] if not return_similarities else ([], [])
             
         # On ZeroGPU, ensure we're using the allocated GPU
         if HF_SPACES_GPU:
@@ -1142,9 +1158,13 @@ class FaceRecognitionApp:
     def _initialize_system(self):
         """Initialize face detection and load contestant data."""
         try:
-            # Initialize face detector
-            self.face_detector = FaceDetector(self.config)
-            logger.info("Face detector initialized successfully")
+            # Initialize face detector (skip on ZeroGPU to avoid CUDA in main process)
+            if not HF_SPACES_GPU:
+                self.face_detector = FaceDetector(self.config)
+                logger.info("Face detector initialized successfully")
+            else:
+                self.face_detector = None
+                logger.info("Face detector initialization deferred for ZeroGPU compliance")
 
             # Initialize visualization service
             try:
@@ -1589,10 +1609,24 @@ class FaceRecognitionApp:
     @gpu_safe_decorator
     def _process_video_gpu(self, video_path, progress=gr.Progress()):
         """GPU-accelerated video processing."""
+        # Initialize face detector inside GPU context for ZeroGPU compliance
+        global _global_detector
+        if _global_detector is None:
+            _global_detector = create_face_detector_inside_gpu()
+            if _global_detector is None:
+                return None, "Failed to initialize face detector in GPU context"
+        
         return self._process_video_core(video_path, progress, use_gpu=True)
 
     def _process_video_cpu(self, video_path, progress=gr.Progress()):
         """CPU-only video processing fallback."""
+        # Ensure face detector is available for CPU processing
+        global _global_detector
+        if _global_detector is None:
+            _global_detector = create_face_detector_inside_gpu()  # This works on CPU too
+            if _global_detector is None:
+                return None, "Failed to initialize face detector for CPU processing"
+        
         return self._process_video_core(video_path, progress, use_gpu=False)
 
     def _process_video_core(self, video_path, progress=gr.Progress(), use_gpu=True):
