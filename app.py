@@ -37,7 +37,6 @@ def check_environment():
     try:
         import gradio
         import cv2
-        import numpy
         import torch
 
         print("✅ Environment check passed")

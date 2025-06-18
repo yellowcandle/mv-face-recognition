@@ -51,9 +51,6 @@ def check_dependencies():
     try:
         import gradio
         import cv2
-        import numpy
-        import pandas
-        import plotly
 
         print("✅ All core dependencies found")
         return True
