@@ -108,12 +108,13 @@ jobs:
                   '../gradio_app.py', '../config.json', '../chroma_db.py',
                   '../contestant_info.csv',
                   '../src/', 
-                  # Only include first 3 videos to minimize deployment size
+                  # Include all 5 videos now that initial deployment succeeded
                   '../source/videos_hf_clean/mv1_zao_xing_zhi_zhan.mp4',  # 33MB
                   '../source/videos_hf_clean/mv2_shi_fa_zhi_zhan.mp4',   # 30MB  
                   '../source/videos_hf_clean/mv3_nv_tuan_zhi_zhan.mp4',  # 31MB
-                  # Note: Excluding fonts (34MB) - will use system fonts on HF Spaces
-                  # Also skipping mv4 (45MB), mv5 (55MB), cache files, photos
+                  '../source/videos_hf_clean/mv4_ji_xian_pai_mv.mp4',    # 45MB
+                  '../source/videos_hf_clean/mv5_bo_qian_re_shen.mp4',   # 55MB
+                  # Note: Still excluding fonts (34MB), cache files, photos
               ]
               
               # Copy essential files
@@ -163,8 +164,9 @@ jobs:
               This is a FRESH minimal deployment to reset repository size and fit HF Spaces 1GB limit.
               
               ## What's Included:
-              - ✅ **Videos**: 3 optimized 720p MV videos with ASCII filenames (~94MB)
+              - ✅ **Videos**: 5 optimized 720p MV videos with ASCII filenames (~194MB)
                 - mv1_zao_xing_zhi_zhan.mp4, mv2_shi_fa_zhi_zhan.mp4, mv3_nv_tuan_zhi_zhan.mp4
+                - mv4_ji_xian_pai_mv.mp4, mv5_bo_qian_re_shen.mp4
               - ✅ **Source Code**: Full application functionality (~50MB)
               
               ## What's Excluded (to fit 1GB limit):
@@ -174,8 +176,6 @@ jobs:
                 - *Solution*: Users can upload photos via Gradio interface
               - ❌ **Cache**: Pre-computed embeddings and ChromaDB (~16MB)
                 - *Solution*: Generated automatically on first use
-              - ❌ **Videos 4-5**: mv4_ji_xian_pai_mv.mp4 (45MB), mv5_bo_qian_re_shen.mp4 (55MB)
-                - *Solution*: Can be added later once initial deployment succeeds
               
               ## Video Optimizations:
               - **Filenames**: ASCII names (e.g., mv1_zao_xing_zhi_zhan.mp4)
@@ -196,7 +196,7 @@ jobs:
               
               # Add and commit
               os.system('git add .')
-              os.system('git commit -m \"Ultra-minimal deployment: 3 videos + source code (~144MB, no fonts)\" || echo \"No changes to commit\"')
+              os.system('git commit -m \"Complete deployment: all 5 videos + source code (~244MB, no fonts)\" || echo \"No changes to commit\"')
               
               # Force push to completely replace repository content and reset size
               print('Force pushing to reset HF Space repository size...')
