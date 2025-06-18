@@ -114,6 +114,22 @@ def create_face_detector_inside_gpu():
         logger.error(f"Failed to initialize face detector in GPU context: {e}")
         return None
 
+def create_cpu_only_face_detector():
+    """Create face detector in CPU-only mode - no CUDA initialization."""
+    try:
+        logger.info("🔧 Initializing face detector in CPU-only mode...")
+        config = get_config()
+        config.recognition.use_gpu = False
+        
+        from src.core.face_detector import FaceDetector
+        detector = FaceDetector(config, force_cpu_only=True)
+        
+        logger.info("✅ Face detector initialized in CPU-only mode")
+        return detector
+    except Exception as e:
+        logger.error(f"Failed to initialize CPU-only face detector: {e}")
+        return None
+
 
 @spaces.GPU(duration=30)
 def test_gpu_allocation():
@@ -1620,12 +1636,12 @@ class FaceRecognitionApp:
 
     def _process_video_cpu(self, video_path, progress=gr.Progress()):
         """CPU-only video processing fallback."""
-        # Ensure face detector is available for CPU processing
+        # Create CPU-only face detector to avoid CUDA initialization
         global _global_detector
         if _global_detector is None:
-            _global_detector = create_face_detector_inside_gpu()  # This works on CPU too
+            _global_detector = create_cpu_only_face_detector()
             if _global_detector is None:
-                return None, "Failed to initialize face detector for CPU processing"
+                return None, "Failed to initialize CPU-only face detector"
         
         return self._process_video_core(video_path, progress, use_gpu=False)
 
