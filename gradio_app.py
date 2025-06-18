@@ -548,6 +548,7 @@ def draw_boxes_and_labels(
 ):
     """Draw enhanced bounding boxes and labels on detected faces with modern UI improvements."""
     try:
+        logger.info(f"Enhanced UI: {enhanced_ui}, processing {len(matches) if matches else 0} faces")
         # Convert frame to PIL Image for CJKV text rendering
         frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(frame_pil)
@@ -776,6 +777,7 @@ def draw_boxes_and_labels(
 
             # Enhanced bounding box drawing
             if enhanced_ui and name != "Unknown":
+                logger.info(f"Enhanced UI: Drawing rounded box for {name} (conf: {confidence:.2f})")
                 # Draw rounded rectangle for recognized faces
                 radius = max(5, min(10, min(x2-x1, y2-y1) // 10))
                 draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
@@ -783,6 +785,7 @@ def draw_boxes_and_labels(
                 # Add confidence progress bar above the face
                 draw_confidence_bar(frame, confidence, (x1, y1, x2, y2), faded_color_bgr)
             else:
+                logger.info(f"Enhanced UI: Regular box for {name} (enhanced_ui={enhanced_ui})")
                 # Regular rectangle for unknown faces or when enhanced UI is disabled
                 cv2.rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness)
 
@@ -890,6 +893,7 @@ def draw_boxes_and_labels(
             # Add face thumbnail if enhanced UI is enabled and face is recognized
             if enhanced_ui and name != "Unknown":
                 try:
+                    logger.info(f"Enhanced UI: Adding thumbnail for {name}")
                     # Extract face crop from the original frame
                     face_crop = frame[max(0, y1):min(frame.shape[0], y2), max(0, x1):min(frame.shape[1], x2)]
                     if face_crop.size > 0:
@@ -904,7 +908,7 @@ def draw_boxes_and_labels(
                         
                         add_face_thumbnail(frame, face_crop, (thumb_x, thumb_y), size=(40, 40))
                 except Exception as e:
-                    logger.debug(f"Error adding face thumbnail for {name}: {e}")
+                    logger.info(f"Enhanced UI: Thumbnail error for {name}: {e}")
 
             # Draw text with adaptive brightness
             text_brightness = int(255 * adaptive_opacity)
@@ -2179,32 +2183,6 @@ def create_gradio_interface():
                     outputs=[settings_status],
                 )
 
-            # Contestant Management Tab
-            with gr.Tab("👥 Contestants"):
-                gr.Markdown("## Manage Contestant Database")
-
-                with gr.Row():
-                    with gr.Column():
-                        gr.Markdown("### Add New Contestant")
-                        new_name = gr.Textbox(label="Contestant Name")
-                        new_image = gr.Image(type="pil", label="Contestant Photo")
-                        add_button = gr.Button("Add Contestant", variant="primary")
-                        add_status = gr.Textbox(label="Status", interactive=False)
-
-                    with gr.Column():
-                        gr.Markdown("### Current Contestants")
-                        contestant_list = gr.JSON(label="Contestants Database")
-
-                add_button.click(
-                    get_app().add_contestant_embedding,
-                    inputs=[new_name, new_image],
-                    outputs=[add_status],
-                )
-
-                # Load contestant list on tab load
-                demo.load(
-                    lambda: get_app().get_contestant_list(), outputs=[contestant_list]
-                )
 
             # UMAP Visualization Tab
             with gr.Tab("🗺️ UMAP Visualization"):
