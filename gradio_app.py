@@ -127,7 +127,6 @@ def test_gpu_allocation():
         return f"❌ ZeroGPU test failed: {e}"
 
 
-@spaces.GPU(duration=60)  # 60 second GPU allocation
 @gpu_safe_decorator
 def process_frame(
     frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
