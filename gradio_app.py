@@ -1148,8 +1148,21 @@ class FaceRecognitionApp:
 
     def get_available_videos(self):
         """Get list of available videos with titles from the source directory."""
-        videos_dir = Path("/Users/swong/dev/mv-face-recognition/source/videos")
-        if not videos_dir.exists():
+        # Try HF Spaces optimized videos first, then fall back to full videos
+        videos_dirs = [
+            Path("source/videos_hf_optimized"),  # For HF Spaces deployment
+            Path("source/videos"),  # For local development
+            Path("/Users/swong/dev/mv-face-recognition/source/videos")  # Absolute path fallback
+        ]
+        
+        videos_dir = None
+        for dir_path in videos_dirs:
+            if dir_path.exists():
+                videos_dir = dir_path
+                break
+        
+        if not videos_dir:
+            print("⚠️ No videos directory found")
             return [], {}
 
         # Get video titles mapping
