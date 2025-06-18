@@ -5,3 +5,6 @@ libxext6
 libxrender-dev
 libgomp1
 ffmpeg
+
+# for HF Space 
+python3-opencv

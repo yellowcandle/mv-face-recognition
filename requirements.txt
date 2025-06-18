@@ -53,3 +53,7 @@ freetype-py>=2.5.1
 
 # Optional dependencies for enhanced functionality
 mediapipe>=0.10.0
+
+# for HF Space 
+--extra-index-url https://download.pytorch.org/whl/cu113
+torch
