@@ -443,8 +443,8 @@ def draw_rounded_rectangle(img, pt1, pt2, color, thickness, radius=10):
     # Clamp radius to reasonable size
     radius = min(radius, min(x2-x1, y2-y1) // 4)
     
-    if radius <= 0:
-        # Fallback to regular rectangle
+    if radius <= 3:
+        # Fallback to regular rectangle if radius is too small
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
         return
     
@@ -457,22 +457,25 @@ def draw_rounded_rectangle(img, pt1, pt2, color, thickness, radius=10):
     cv2.line(img, (x1, y1 + radius), (x1, y2 - radius), color, thickness)
     cv2.line(img, (x2, y1 + radius), (x2, y2 - radius), color, thickness)
     
-    # Corner arcs
+    # Corner arcs - make them more visible
     cv2.ellipse(img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness)
     cv2.ellipse(img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness)
     cv2.ellipse(img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness)
     cv2.ellipse(img, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, thickness)
+    
+    # Add a distinctive marker to make it obvious this is enhanced UI
+    cv2.circle(img, (x2 - 10, y1 + 10), 3, (0, 255, 255), -1)  # Yellow dot in top-right corner
 
 
 def draw_confidence_bar(img, confidence, bbox, color):
     """Draw a mini confidence progress bar above the bounding box."""
     x1, y1, x2, y2 = bbox
     
-    # Progress bar dimensions
-    bar_width = min(100, x2 - x1)  # Max 100px, or width of bbox
-    bar_height = 6
+    # Progress bar dimensions - make it more visible
+    bar_width = min(120, x2 - x1)  # Max 120px, or width of bbox
+    bar_height = 8  # Slightly taller
     bar_x = x1 + (x2 - x1 - bar_width) // 2  # Center above bbox
-    bar_y = max(5, y1 - 15)  # 15px above bbox, minimum 5px from top
+    bar_y = max(5, y1 - 20)  # 20px above bbox, minimum 5px from top
     
     # Background bar (gray)
     cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (100, 100, 100), -1)
@@ -548,7 +551,7 @@ def draw_boxes_and_labels(
 ):
     """Draw enhanced bounding boxes and labels on detected faces with modern UI improvements."""
     try:
-        logger.info(f"Enhanced UI: {enhanced_ui}, processing {len(matches) if matches else 0} faces")
+        # logger.info(f"Enhanced UI: {enhanced_ui}, processing {len(matches) if matches else 0} faces")
         # Convert frame to PIL Image for CJKV text rendering
         frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(frame_pil)
@@ -776,17 +779,20 @@ def draw_boxes_and_labels(
             faded_color_bgr = tuple(int(c * opacity_factor) for c in color_bgr)
 
             # Enhanced bounding box drawing
-            if enhanced_ui and name != "Unknown":
-                logger.info(f"Enhanced UI: Drawing rounded box for {name} (conf: {confidence:.2f})")
-                # Draw rounded rectangle for recognized faces
-                radius = max(5, min(10, min(x2-x1, y2-y1) // 10))
-                draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
-                
-                # Add confidence progress bar above the face
-                draw_confidence_bar(frame, confidence, (x1, y1, x2, y2), faded_color_bgr)
+            if enhanced_ui:
+                if name != "Unknown":
+                    # Enhanced features for recognized faces
+                    radius = max(8, min(15, min(x2-x1, y2-y1) // 8))  # Larger radius for visibility
+                    draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
+                    
+                    # Add confidence progress bar above the face
+                    draw_confidence_bar(frame, confidence, (x1, y1, x2, y2), faded_color_bgr)
+                else:
+                    # Enhanced unknown faces still get rounded corners but no confidence bar
+                    radius = max(5, min(10, min(x2-x1, y2-y1) // 10))
+                    draw_rounded_rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness, radius)
             else:
-                logger.info(f"Enhanced UI: Regular box for {name} (enhanced_ui={enhanced_ui})")
-                # Regular rectangle for unknown faces or when enhanced UI is disabled
+                # Regular rectangle when enhanced UI is disabled
                 cv2.rectangle(frame, (x1, y1), (x2, y2), faded_color_bgr, box_thickness)
 
             # Add a tiny circle at the center for face indication with adaptive opacity
@@ -893,7 +899,6 @@ def draw_boxes_and_labels(
             # Add face thumbnail if enhanced UI is enabled and face is recognized
             if enhanced_ui and name != "Unknown":
                 try:
-                    logger.info(f"Enhanced UI: Adding thumbnail for {name}")
                     # Extract face crop from the original frame
                     face_crop = frame[max(0, y1):min(frame.shape[0], y2), max(0, x1):min(frame.shape[1], x2)]
                     if face_crop.size > 0:
@@ -908,7 +913,7 @@ def draw_boxes_and_labels(
                         
                         add_face_thumbnail(frame, face_crop, (thumb_x, thumb_y), size=(40, 40))
                 except Exception as e:
-                    logger.info(f"Enhanced UI: Thumbnail error for {name}: {e}")
+                    pass  # Silently handle thumbnail errors
 
             # Draw text with adaptive brightness
             text_brightness = int(255 * adaptive_opacity)
