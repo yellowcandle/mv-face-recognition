@@ -48,12 +48,19 @@ class FaceDetector:
                 det_size=self.config.recognition.det_size,
             )
 
-            # Prepare the model with explicit GPU context
-            ctx_id = (
-                0
-                if torch.cuda.is_available() and self.config.recognition.use_gpu
-                else -1
-            )
+            # Prepare the model with appropriate context
+            # On ZeroGPU, use CPU context for InsightFace models
+            try:
+                import spaces
+                ctx_id = -1  # Force CPU context on ZeroGPU
+                logger.info("ZeroGPU: Using CPU context for InsightFace models")
+            except ImportError:
+                # Regular GPU/CPU detection for non-ZeroGPU
+                ctx_id = (
+                    0
+                    if torch.cuda.is_available() and self.config.recognition.use_gpu
+                    else -1
+                )
             
             self.app.prepare(ctx_id=ctx_id, det_size=self.config.recognition.det_size)
 
@@ -80,24 +87,22 @@ class FaceDetector:
         """Get the appropriate ONNX providers based on hardware."""
         providers = []
 
+        # Check if running on ZeroGPU first
+        try:
+            import spaces
+            # ZeroGPU environment detected - use CPU for ONNX models
+            # but PyTorch operations will still use GPU via @spaces.GPU decorator
+            logger.info("ZeroGPU detected: Using CPU providers for ONNX models, GPU for PyTorch operations")
+            providers.append("CPUExecutionProvider")
+            return providers
+        except ImportError:
+            pass
+
+        # Standard GPU detection for non-ZeroGPU environments
         if self.config.recognition.use_gpu:
             if torch.cuda.is_available():
-                # Check if running on ZeroGPU (Hugging Face Spaces)
-                try:
-                    import spaces
-                    # ZeroGPU specific CUDA provider configuration
-                    providers.append(("CUDAExecutionProvider", {
-                        'device_id': 0,
-                        'arena_extend_strategy': 'kSameAsRequested',
-                        'gpu_mem_limit': 3 * 1024 * 1024 * 1024,  # 3GB limit
-                        'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                        'do_copy_in_default_stream': True,
-                    }))
-                    logger.info("ZeroGPU CUDA acceleration enabled with optimized settings")
-                except ImportError:
-                    # Regular CUDA provider for local/standard GPU
-                    providers.append("CUDAExecutionProvider")
-                    logger.info("CUDA GPU acceleration enabled")
+                providers.append("CUDAExecutionProvider")
+                logger.info("CUDA GPU acceleration enabled")
             elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                 providers.append("CoreMLExecutionProvider")
                 logger.info("Apple Silicon GPU acceleration enabled")

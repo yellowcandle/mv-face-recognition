@@ -82,7 +82,6 @@ _global_cjkv_font = None
 _font_cache_info = ""
 
 
-@spaces.GPU
 def get_face_detector():
     """Get or create the global face detector instance."""
     global _global_detector
@@ -90,19 +89,14 @@ def get_face_detector():
         try:
             config = get_config()
             
-            # For ZeroGPU, initialize detector within GPU context
+            # Initialize detector (GPU context will be handled by ONNX providers)
             if HF_SPACES_GPU:
-                print("🚀 Initializing face detector on ZeroGPU...")
-                # Ensure we're in the right GPU context
-                import torch
-                if torch.cuda.is_available():
-                    torch.cuda.set_device(0)
-                    torch.cuda.empty_cache()
+                print("🚀 Initializing face detector for ZeroGPU...")
             
             _global_detector = FaceDetector(config)
             
             if HF_SPACES_GPU:
-                print("✅ Face detector initialized on ZeroGPU")
+                print("✅ Face detector initialized for ZeroGPU")
                 
         except Exception as e:
             logger.error(f"Failed to initialize face detector: {e}")
@@ -110,16 +104,44 @@ def get_face_detector():
     return _global_detector
 
 
-@spaces.GPU
+@spaces.GPU(duration=30)
+def test_gpu_allocation():
+    """Test function to verify ZeroGPU allocation works."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            device_name = torch.cuda.get_device_name(device)
+            memory_allocated = torch.cuda.memory_allocated(device)
+            memory_reserved = torch.cuda.memory_reserved(device)
+            
+            # Simple GPU operation test
+            x = torch.randn(1000, 1000, device='cuda')
+            y = torch.mm(x, x)
+            result = y.sum().item()
+            
+            return f"✅ ZeroGPU test successful!\nDevice: {device_name}\nMemory allocated: {memory_allocated/1024**2:.1f}MB\nMemory reserved: {memory_reserved/1024**2:.1f}MB\nTest result: {result:.2f}"
+        else:
+            return "❌ CUDA not available"
+    except Exception as e:
+        return f"❌ ZeroGPU test failed: {e}"
+
+
+@spaces.GPU(duration=60)  # 60 second GPU allocation
 @gpu_safe_decorator
 def process_frame(
     frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
 ):
     """Process a video frame and detect/recognize faces with adaptive scaling."""
     try:
+        # Get detector (initialized with CPU) and move GPU operations inside this function
         detector = get_face_detector()
         if detector is None:
             return [] if not return_similarities else ([], [])
+            
+        # On ZeroGPU, ensure we're using the allocated GPU
+        if HF_SPACES_GPU and torch.cuda.is_available():
+            torch.cuda.empty_cache()  # Clear any existing memory
 
         # Adaptive resolution scaling for better small face detection
         original_frame = frame.copy()
@@ -1537,7 +1559,7 @@ class FaceRecognitionApp:
             ax.set_title("UMAP Generation Error", fontsize=16)
             return fig
 
-    @spaces.GPU
+    @spaces.GPU(duration=300)  # 5 minutes for video processing
     @gpu_safe_decorator
     def process_uploaded_video(self, video_path, progress=gr.Progress()):
         """Process an uploaded video file."""
