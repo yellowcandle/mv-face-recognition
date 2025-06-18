@@ -82,13 +82,28 @@ _global_cjkv_font = None
 _font_cache_info = ""
 
 
+@spaces.GPU
 def get_face_detector():
     """Get or create the global face detector instance."""
     global _global_detector
     if _global_detector is None:
         try:
             config = get_config()
+            
+            # For ZeroGPU, initialize detector within GPU context
+            if HF_SPACES_GPU:
+                print("🚀 Initializing face detector on ZeroGPU...")
+                # Ensure we're in the right GPU context
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.set_device(0)
+                    torch.cuda.empty_cache()
+            
             _global_detector = FaceDetector(config)
+            
+            if HF_SPACES_GPU:
+                print("✅ Face detector initialized on ZeroGPU")
+                
         except Exception as e:
             logger.error(f"Failed to initialize face detector: {e}")
             _global_detector = None

@@ -29,6 +29,17 @@ class FaceDetector:
             # Configure providers based on hardware availability
             providers = self._get_providers()
 
+            # ZeroGPU specific initialization
+            try:
+                import spaces
+                # Ensure we're in a GPU context
+                if torch.cuda.is_available():
+                    torch.cuda.init()
+                    torch.cuda.empty_cache()
+                    logger.info("ZeroGPU context initialized")
+            except ImportError:
+                pass
+
             self.app = FaceAnalysis(
                 providers=providers,
                 allowed_modules=["detection", "recognition", "landmark_3d_68"],
@@ -37,13 +48,27 @@ class FaceDetector:
                 det_size=self.config.recognition.det_size,
             )
 
-            # Prepare the model
+            # Prepare the model with explicit GPU context
             ctx_id = (
                 0
                 if torch.cuda.is_available() and self.config.recognition.use_gpu
                 else -1
             )
+            
             self.app.prepare(ctx_id=ctx_id, det_size=self.config.recognition.det_size)
+
+            # Verify GPU usage if expected
+            if torch.cuda.is_available() and self.config.recognition.use_gpu:
+                # Check if models are actually using GPU
+                actual_providers = []
+                for model_name, model in self.app.models.items():
+                    if hasattr(model, 'session') and hasattr(model.session, 'get_providers'):
+                        actual_providers.extend(model.session.get_providers())
+                
+                if 'CUDAExecutionProvider' in actual_providers:
+                    logger.info("✅ Models successfully initialized with GPU acceleration")
+                else:
+                    logger.warning("⚠️ Models falling back to CPU despite GPU availability")
 
             logger.info(f"Face detector initialized with providers: {providers}")
 
@@ -57,9 +82,23 @@ class FaceDetector:
 
         if self.config.recognition.use_gpu:
             if torch.cuda.is_available():
-                providers.append("CUDAExecutionProvider")
-                logger.info("CUDA GPU acceleration enabled")
-            elif torch.backends.mps.is_available():
+                # Check if running on ZeroGPU (Hugging Face Spaces)
+                try:
+                    import spaces
+                    # ZeroGPU specific CUDA provider configuration
+                    providers.append(("CUDAExecutionProvider", {
+                        'device_id': 0,
+                        'arena_extend_strategy': 'kSameAsRequested',
+                        'gpu_mem_limit': 3 * 1024 * 1024 * 1024,  # 3GB limit
+                        'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                        'do_copy_in_default_stream': True,
+                    }))
+                    logger.info("ZeroGPU CUDA acceleration enabled with optimized settings")
+                except ImportError:
+                    # Regular CUDA provider for local/standard GPU
+                    providers.append("CUDAExecutionProvider")
+                    logger.info("CUDA GPU acceleration enabled")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                 providers.append("CoreMLExecutionProvider")
                 logger.info("Apple Silicon GPU acceleration enabled")
 
