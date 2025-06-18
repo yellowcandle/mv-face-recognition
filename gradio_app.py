@@ -140,8 +140,13 @@ def process_frame(
             return [] if not return_similarities else ([], [])
             
         # On ZeroGPU, ensure we're using the allocated GPU
-        if HF_SPACES_GPU and torch.cuda.is_available():
-            torch.cuda.empty_cache()  # Clear any existing memory
+        if HF_SPACES_GPU:
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()  # Clear any existing memory
+            except ImportError:
+                pass
 
         # Adaptive resolution scaling for better small face detection
         original_frame = frame.copy()
