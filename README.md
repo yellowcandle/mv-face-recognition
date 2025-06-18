@@ -1,3 +1,31 @@
+---
+title: MV Face Recognition System
+emoji: 🎬
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: "5.0"
+app_file: app.py
+pinned: false
+license: mit
+python_version: "3.11"
+tags:
+  - face-recognition
+  - computer-vision
+  - gradio
+  - pytorch
+  - insightface
+  - video-analysis
+  - ai
+  - deep-learning
+  - opencv
+  - chromadb
+models:
+  - buffalo_l
+datasets: []
+short_description: AI-powered face recognition system for video analysis with modern Gradio interface
+---
+
 # 全民造星IV MV 人臉識別
 
 本項目旨在對ViuTV的全民造星IV選秀節目影片進行人臉識別分析。我們使用先進的人工智能技術，自動識別和追蹤影片中出現的參賽者。

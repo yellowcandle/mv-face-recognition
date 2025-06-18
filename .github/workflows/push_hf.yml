@@ -66,7 +66,7 @@ jobs:
               # Essential files for HF Spaces
               files_to_copy = [
                   'app.py', 'requirements.txt', 'packages.txt',
-                  'README.md', 'Dockerfile', 'src/', 
+                  'Dockerfile', 'src/', 
                   'gradio_app.py', 'config.json', 'chroma_db.py'
               ]
               
@@ -79,6 +79,11 @@ jobs:
                       else:
                           shutil.copy2(file_path, f'./hf_space/{file_path}')
                       print(f'Copied: {file_path}')
+              
+              # Copy README.md with YAML metadata for HF Space
+              if os.path.exists('README.md'):
+                  shutil.copy2('README.md', './hf_space/README.md')
+                  print('Copied: README.md (with HF Space metadata)')
               
               # Push changes
               repo.push_to_hub(commit_message='Auto-sync from GitHub')
