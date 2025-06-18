@@ -57,3 +57,67 @@ pip install opencv-python --only-binary :all:
 ```bash
 python mv-face-recognition.py
 ```
+
+---
+
+## 🚀 Hugging Face Spaces Deployment
+
+[![Gradio](https://img.shields.io/badge/Gradio-5.x-blue)](https://gradio.app/)
+[![Python](https://img.shields.io/badge/Python-3.11+-green)](https://python.org/)
+[![Hugging Face Spaces](https://img.shields.io/badge/🤗-Spaces-yellow)](https://huggingface.co/spaces)
+
+This project is now optimized for deployment on Hugging Face Spaces with a modern web interface.
+
+### 🌐 Web Interface Features
+
+- **🎯 Advanced Face Recognition**: High-accuracy detection using InsightFace
+- **📹 Video Analysis**: Upload and process video files
+- **🖼️ Image Processing**: Analyze still images for face recognition  
+- **📊 Visual Analytics**: Interactive charts and visualizations
+- **🎨 Modern UI**: Clean, responsive interface built with Gradio 5.x
+- **⚡ Real-time Processing**: Optimized for fast inference
+- **🗃️ Vector Database**: ChromaDB integration for face embedding storage
+
+### 🚀 Quick Deployment to Hugging Face Spaces
+
+#### Option 1: Use Existing Space (Recommended)
+Visit the live demo: [Coming Soon - Add your HF Spaces URL here]
+
+#### Option 2: Deploy Your Own Space
+
+1. **Create a new Space** on [huggingface.co/spaces](https://huggingface.co/spaces)
+2. **Select Gradio SDK** with Python 3.11
+3. **Upload these files**:
+   - `app.py` - Main entry point for HF Spaces
+   - `requirements.txt` - Python dependencies
+   - `packages.txt` - System dependencies
+   - `src/` directory - Core modules
+   - Other project files
+
+4. **The Space will automatically build and deploy**
+
+### 📁 Deployment Files Included
+
+- ✅ `app.py` - Optimized entry point for HF Spaces
+- ✅ `requirements.txt` - All necessary Python dependencies
+- ✅ `packages.txt` - System dependencies for Ubuntu
+- ✅ `Dockerfile` - Optional Docker configuration
+- ✅ `README_DEPLOYMENT.md` - Detailed deployment guide
+
+### 🎯 Web Interface Usage
+
+1. **Upload Content**: Drag and drop videos or images
+2. **Configure Settings**: Adjust recognition parameters
+3. **Process & Analyze**: Click process and view real-time results
+4. **Download Results**: Export processed videos or analysis data
+
+### 🛠️ Technology Stack for Web Interface
+
+- **Frontend**: Gradio 5.x with modern styling
+- **AI/ML**: PyTorch, InsightFace, ONNX Runtime
+- **Computer Vision**: OpenCV, MediaPipe
+- **Data**: ChromaDB, Sentence Transformers
+- **Visualization**: Plotly, Matplotlib
+- **Media**: FFmpeg for video processing
+
+For detailed deployment instructions, see `README_DEPLOYMENT.md`.
