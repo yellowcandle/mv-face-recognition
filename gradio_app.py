@@ -31,6 +31,15 @@ from datetime import datetime
 import tempfile
 from PIL import Image, ImageDraw, ImageFont
 
+# Hugging Face Spaces GPU support
+try:
+    import spaces
+except ImportError:
+    # Fallback decorator for local development
+    def spaces_gpu_decorator(func):
+        return func
+    spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
+
 # Import our modular components
 try:
     from src.config.settings import get_config, save_config
@@ -61,6 +70,7 @@ def get_face_detector():
     return _global_detector
 
 
+@spaces.GPU
 def process_frame(
     frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
 ):
@@ -1501,6 +1511,7 @@ class FaceRecognitionApp:
             ax.set_title("UMAP Generation Error", fontsize=16)
             return fig
 
+    @spaces.GPU
     def process_uploaded_video(self, video_path, progress=gr.Progress()):
         """Process an uploaded video file."""
         if not video_path:
