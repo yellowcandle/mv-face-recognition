@@ -156,12 +156,14 @@ def test_gpu_allocation():
 
 @gpu_safe_decorator
 def process_frame(
-    frame, known_embeddings, similarity_threshold=0.5, return_similarities=False
+    frame, known_embeddings, similarity_threshold=0.5, return_similarities=False, detector=None
 ):
     """Process a video frame and detect/recognize faces with adaptive scaling."""
     try:
-        # On ZeroGPU, create detector inside GPU context; otherwise use global detector
-        detector = get_face_detector()
+        # Use provided detector or fall back to global detector
+        if detector is None:
+            detector = get_face_detector()
+            
         if detector is None:
             if HF_SPACES_GPU:
                 # This should not happen since process_frame is called from GPU functions
@@ -1767,6 +1769,7 @@ class FaceRecognitionApp:
                         frame,
                         self.known_embeddings,
                         self.config.recognition.similarity_threshold,
+                        detector=_global_detector,
                     )
 
                     # Update persistent labels cache
@@ -2646,9 +2649,10 @@ def create_gradio_interface():
                             if should_process:
                                 processed_count += 1
 
-                                # Process frame to get face detections
+                                # Process frame to get face detections  
                                 matches = process_frame(
-                                    frame, app.known_embeddings, similarity_threshold
+                                    frame, app.known_embeddings, similarity_threshold,
+                                    detector=_global_detector
                                 )
                                 if matches:
                                     all_matches.extend(matches)
@@ -2838,6 +2842,7 @@ def create_gradio_interface():
                             app.known_embeddings,
                             app.config.recognition.similarity_threshold,
                             return_similarities=True,
+                            detector=_global_detector,
                         )
 
                         # Create annotated frame preview even if no similarities
@@ -2935,6 +2940,7 @@ def create_gradio_interface():
                                     app.known_embeddings,
                                     app.config.recognition.similarity_threshold,
                                     return_similarities=True,
+                                    detector=_global_detector,
                                 )
 
                                 timeline_data.append(
