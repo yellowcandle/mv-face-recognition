@@ -4,6 +4,19 @@ Provides real-time camera processing, image/video analysis, and configuration ma
 """
 
 import warnings
+import gradio as gr
+import pandas as pd
+import logging
+from typing import Optional
+from datetime import datetime
+
+# Import our modular components
+from src.config.settings import get_config, save_config
+from src.core.face_detector import FaceDetector
+from src.services.embedding_service import EmbeddingService
+from src.services.recognition_service import RecognitionService
+from src.services.video_processing_service import VideoProcessingService
+from src.services.visualization import VisualizationService
 
 # Suppress warnings BEFORE any other imports
 warnings.filterwarnings("ignore", message=".*rcond.*")
@@ -16,19 +29,6 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, module="gradio.components.video"
 )
 warnings.filterwarnings("ignore", category=UserWarning, module="gradio")
-
-import gradio as gr
-import cv2
-import numpy as np
-import pandas as pd
-import os
-import logging
-from typing import Optional, Any
-from pathlib import Path
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
-from PIL import Image
 
 # Hugging Face Spaces GPU support
 try:
@@ -45,14 +45,6 @@ except ImportError:
     
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
     HF_SPACES_GPU = False
-
-# Import our modular components
-from src.config.settings import get_config, save_config
-from src.core.face_detector import FaceDetector
-from src.services.embedding_service import EmbeddingService
-from src.services.recognition_service import RecognitionService
-from src.services.video_processing_service import VideoProcessingService
-from src.services.visualization import VisualizationService
 
 # Global instances to avoid re-initialization
 _global_detector: Optional[FaceDetector] = None
