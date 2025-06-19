@@ -4,7 +4,6 @@ Video optimization script for Hugging Face Spaces deployment.
 Downscales videos to reduce file size while maintaining face recognition quality.
 """
 
-import os
 import subprocess
 import shutil
 from pathlib import Path
@@ -37,7 +36,7 @@ def optimize_video(input_path, output_path, target_width=1920, quality=28):
     print(f"Command: {' '.join(cmd)}")
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(f"✅ Successfully optimized: {output_path.name}")
         
         # Show file size reduction
@@ -111,7 +110,7 @@ def main():
                 total_output_size += output_file.stat().st_size
     
     # Summary
-    print(f"\n📊 Optimization Summary:")
+    print("\n📊 Optimization Summary:")
     print(f"   ✅ Successfully optimized: {successful}/{len(video_files) * len(settings)} videos")
     print(f"   📦 Total input size: {total_input_size/1024/1024/1024:.2f}GB")
     print(f"   📦 Total output size: {total_output_size/1024/1024/1024:.2f}GB")
