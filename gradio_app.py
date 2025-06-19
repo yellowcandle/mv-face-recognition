@@ -9,6 +9,8 @@ import pandas as pd
 import logging
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
+import os
 
 # Import our modular components
 from src.config.settings import get_config, save_config
@@ -161,9 +163,28 @@ class FaceRecognitionApp:
             VIDEO_TITLE_MAPPING = {}
         
         videos_dir = self.config.project_root / "source/videos"
+        
+        # Add debugging information
+        logger.info(f"Looking for videos in: {videos_dir}")
+        logger.info(f"Project root: {self.config.project_root}")
+        logger.info(f"Current working directory: {Path.cwd()}")
+        logger.info(f"HF_SPACE_ID: {os.getenv('HF_SPACE_ID', 'Not set')}")
+        
         if not videos_dir.exists():
             logger.warning(f"Videos directory not found: {videos_dir}")
-            return [], {}
+            # Try alternative paths
+            alt_paths = [
+                Path.cwd() / "source" / "videos",
+                Path("/home/user/app/source/videos"),
+                Path("/app/source/videos"),
+            ]
+            for alt_path in alt_paths:
+                if alt_path.exists():
+                    logger.info(f"Found videos in alternative path: {alt_path}")
+                    videos_dir = alt_path
+                    break
+            else:
+                return [], {}
 
         video_files = []
         title_to_path_mapping = {}
@@ -173,6 +194,7 @@ class FaceRecognitionApp:
                 video_files.append(display_title)
                 title_to_path_mapping[display_title] = str(video_file)
         
+        logger.info(f"Found {len(video_files)} video files")
         self.title_to_path_mapping = title_to_path_mapping
         return sorted(video_files), title_to_path_mapping
 
