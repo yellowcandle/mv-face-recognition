@@ -135,19 +135,84 @@ def main():
         
         # Check if contestants directory exists with files
         contestants_dir = Path("source/photo/contestants")
-        if contestants_dir.exists():
-            jpg_files = list(contestants_dir.glob("**/*.jpg"))
-            npy_files = list(contestants_dir.glob("**/*.npy"))
-            print(f"✅ Found {len(jpg_files)} JPG files and {len(npy_files)} NPY files in contestants directory")
-        else:
-            print("📁 Creating contestants directory structure...")
-            contestants_dir.mkdir(parents=True, exist_ok=True)
+        contestants_dir.mkdir(parents=True, exist_ok=True)
+        
+        jpg_files = list(contestants_dir.glob("**/*.jpg"))
+        png_files = list(contestants_dir.glob("**/*.png"))
+        npy_files = list(contestants_dir.glob("**/*.npy"))
+        total_images = len(jpg_files) + len(png_files)
+        
+        print(f"📊 Contestants directory status:")
+        print(f"   - Images: {total_images} (JPG: {len(jpg_files)}, PNG: {len(png_files)})")
+        print(f"   - Embeddings: {len(npy_files)}")
+        
+        if total_images == 0 and len(npy_files) == 0:
+            print("⚠️ Git LFS contestants data not deployed - creating fallback system")
             
-            # Create sample contestant for testing
+            # Create numbered directories for the contestant system
+            print("📁 Creating numbered contestant directories...")
+            for i in range(1, 11):  # Create first 10 contestant slots
+                contestant_dir = contestants_dir / str(i)
+                contestant_dir.mkdir(exist_ok=True)
+                
+                # Create a placeholder README in each directory
+                readme_content = f"""# Contestant {i}
+
+This directory is ready for contestant photos.
+
+To add a contestant:
+1. Upload photos named: {i}-1.jpg, {i}-2.jpg, etc.
+2. Or use the web interface to upload photos
+3. The system will automatically generate embeddings
+
+Supported formats: JPG, JPEG, PNG
+"""
+                (contestant_dir / "README.md").write_text(readme_content)
+            
+            print(f"✅ Created {10} numbered contestant directories for uploads")
+            
+            # Create a basic contestant_info.csv for the numbered directories
+            try:
+                import pandas as pd
+                
+                contestants_data = []
+                for i in range(1, 11):
+                    contestants_data.append({
+                        "編號": i,
+                        "暱稱": f"Contestant {i}",
+                        "姓名": f"Contestant {i}",
+                        "年齡": "Unknown"
+                    })
+                
+                df = pd.DataFrame(contestants_data)
+                csv_path = Path("contestant_info.csv")
+                df.to_csv(csv_path, index=False)
+                print(f"✅ Created basic contestant_info.csv with {len(contestants_data)} entries")
+                
+            except ImportError:
+                # Fallback without pandas
+                csv_content = """編號,暱稱,姓名,年齡
+1,Contestant 1,Contestant 1,Unknown
+2,Contestant 2,Contestant 2,Unknown
+3,Contestant 3,Contestant 3,Unknown
+4,Contestant 4,Contestant 4,Unknown
+5,Contestant 5,Contestant 5,Unknown
+6,Contestant 6,Contestant 6,Unknown
+7,Contestant 7,Contestant 7,Unknown
+8,Contestant 8,Contestant 8,Unknown
+9,Contestant 9,Contestant 9,Unknown
+10,Contestant 10,Contestant 10,Unknown
+"""
+                Path("contestant_info.csv").write_text(csv_content, encoding='utf-8')
+                print("✅ Created basic contestant_info.csv (without pandas)")
+            
+            # Also create the sample directory  
             sample_dir = contestants_dir / "sample"
             sample_dir.mkdir(exist_ok=True)
             (sample_dir / "README.txt").write_text("Sample contestant - upload photos via interface")
-            print(f"✅ Created sample contestant directory: {sample_dir}")
+            
+        elif total_images > 0 or len(npy_files) > 0:
+            print(f"✅ Found contestants data - {total_images} images, {len(npy_files)} embeddings")
         
         # Check and ensure video directories exist with detailed Git LFS verification
         video_dirs = [
