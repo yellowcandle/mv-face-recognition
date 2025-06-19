@@ -89,7 +89,6 @@ def draw_utf8_text(img, text, pos, font_size, color):
         text_height = bbox[3] - bbox[1]
 
         # Create semi-transparent background
-        bg_color = (0, 0, 0)
         padding = 15  # Slightly reduced padding for cleaner look
         bg_left = pos[0]
         bg_top = pos[1]
@@ -319,7 +318,7 @@ def get_segmentation_mask(image):
             # Body region estimation
             body_top = bbox[3]  # Start from bottom of face
             body_height = int(face_height * 3)  # Estimate body height
-            body_width = int(face_width * 1.5)  # Estimate body width
+            int(face_width * 1.5)  # Estimate body width
 
             body_left = max(0, bbox[0] - face_width // 4)
             body_right = min(image.shape[1], bbox[2] + face_width // 4)

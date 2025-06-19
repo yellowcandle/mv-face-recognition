@@ -46,7 +46,7 @@ def download_video(url, output_path):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-    output_file = output_path + ".mp4"
+    output_path + ".mp4"
 
 
 def main():
