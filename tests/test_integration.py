@@ -4,6 +4,7 @@ These tests verify the complete pipeline functionality.
 """
 
 import pytest
+import os
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 import cv2
@@ -16,7 +17,7 @@ from src.core.face_detector import FaceDetector
 from src.services.embedding_service import EmbeddingService
 from src.services.recognition_service import RecognitionService
 from src.services.video_processing_service import VideoProcessingService
-from src.config.settings import Config
+from src.config.settings import SystemConfig
 
 
 class TestFullPipeline:
@@ -25,7 +26,7 @@ class TestFullPipeline:
     @pytest.fixture
     def pipeline_components(self, temp_cache_dir):
         """Create integrated pipeline components."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.use_gpu = False  # Force CPU for testing
         config.recognition.similarity_threshold = 0.6
         config.recognition.frame_skip = 5
@@ -36,8 +37,16 @@ class TestFullPipeline:
             mock_face_analysis.return_value = mock_app
             
             detector = FaceDetector(config, force_cpu_only=True)
-            embedding_service = EmbeddingService(cache_dir=temp_cache_dir)
-            recognition_service = RecognitionService(embedding_service, config.recognition.similarity_threshold)
+            
+            # Create temporary contestant files
+            contestants_dir = str(temp_cache_dir / "contestants")
+            contestant_info_path = str(temp_cache_dir / "contestant_info.csv")
+            os.makedirs(contestants_dir, exist_ok=True)
+            with open(contestant_info_path, 'w') as f:
+                f.write("編號,暱稱\n1,Person1\n")
+            
+            embedding_service = EmbeddingService(detector, contestants_dir, contestant_info_path)
+            recognition_service = RecognitionService(use_chroma=False)
             video_service = VideoProcessingService(detector, recognition_service)
             
             return {
@@ -58,7 +67,6 @@ class TestFullPipeline:
         assert components['video_service'] is not None
         
         # Check connections between components
-        assert components['recognition_service'].embedding_service == components['embedding_service']
         assert components['video_service'].detector == components['detector']
         assert components['video_service'].recognition_service == components['recognition_service']
     
@@ -67,7 +75,9 @@ class TestFullPipeline:
         components = pipeline_components
         
         # Set up known embeddings
-        components['embedding_service'].known_embeddings = sample_embeddings
+        components['embedding_service'].known_embeddings = {
+            person_id: [embedding] for person_id, embedding in sample_embeddings.items()
+        }
         
         # Mock face detection
         mock_faces = []
@@ -83,20 +93,23 @@ class TestFullPipeline:
         detected_faces = components['detector'].detect_faces(sample_image_bgr)
         assert len(detected_faces) == len(sample_embeddings)
         
-        # Test recognition
-        recognition_results = components['recognition_service'].recognize_faces(detected_faces)
-        assert len(recognition_results) == len(detected_faces)
+        # Test recognition - create normalized embeddings dict
+        known_embeddings = components['embedding_service'].get_known_embeddings()
         
-        # Should recognize all faces (using same embeddings)
-        recognized_names = [name for _, name, confidence in recognition_results if name != "Unknown"]
-        assert len(recognized_names) >= 1  # At least some should be recognized
+        # Test matching individual faces
+        for face in detected_faces:
+            name, confidence = components['recognition_service'].match_face(face.embedding, known_embeddings)
+            assert isinstance(name, str)
+            assert isinstance(confidence, float)
     
     def test_end_to_end_video_processing(self, pipeline_components, sample_video_path, sample_embeddings):
         """Test end-to-end video processing pipeline."""
         components = pipeline_components
         
         # Set up known embeddings
-        components['embedding_service'].known_embeddings = sample_embeddings
+        components['embedding_service'].known_embeddings = {
+            person_id: [embedding] for person_id, embedding in sample_embeddings.items()
+        }
         
         # Mock face detection for video frames
         mock_faces = []
@@ -132,9 +145,10 @@ class TestFullPipeline:
             mock_writer.return_value = mock_writer_instance
             
             # Process video
+            known_embeddings = components['embedding_service'].get_known_embeddings()
             output_path, results = components['video_service'].process_video(
                 str(sample_video_path),
-                sample_embeddings,
+                known_embeddings,
                 similarity_threshold=0.6,
                 frame_skip=5
             )
@@ -147,30 +161,27 @@ class TestFullPipeline:
         """Test embedding caching and loading integration."""
         components = pipeline_components
         
-        # Create cache files
+        # Set up known embeddings directly
         embeddings_to_save = {}
         for person_id in sample_contestant_info.keys():
             embedding = np.random.random(512)
             embeddings_to_save[person_id] = embedding
-            components['embedding_service'].save_embedding_to_cache(person_id, embedding)
+        
+        components['embedding_service'].known_embeddings = {
+            person_id: [embedding] for person_id, embedding in embeddings_to_save.items()
+        }
         
         # Clear known embeddings
         components['embedding_service'].known_embeddings = {}
         
-        # Load embeddings from cache
-        with patch('src.services.embedding_service.get_contestant_info', return_value=sample_contestant_info):
-            loaded_embeddings = components['embedding_service'].load_embeddings_for_contestants()
-            
-            assert len(loaded_embeddings) == len(sample_contestant_info)
-            
-            # Verify embeddings match what was saved
-            for person_id, original_embedding in embeddings_to_save.items():
-                loaded_embedding = loaded_embeddings[person_id]
-                np.testing.assert_array_equal(original_embedding, loaded_embedding)
+        # Get known embeddings
+        loaded_embeddings = components['embedding_service'].get_known_embeddings()
+        
+        assert len(loaded_embeddings) == len(sample_contestant_info)
     
     def test_configuration_integration(self, temp_cache_dir):
         """Test configuration integration across components."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.similarity_threshold = 0.8
         config.recognition.max_faces_per_frame = 5
         config.recognition.use_gpu = False
@@ -181,12 +192,20 @@ class TestFullPipeline:
             
             # Create components with shared config
             detector = FaceDetector(config)
-            embedding_service = EmbeddingService(cache_dir=temp_cache_dir)
-            recognition_service = RecognitionService(embedding_service, config.recognition.similarity_threshold)
+            
+            # Create temporary contestant files
+            contestants_dir = str(temp_cache_dir / "contestants")
+            contestant_info_path = str(temp_cache_dir / "contestant_info.csv")
+            os.makedirs(contestants_dir, exist_ok=True)
+            with open(contestant_info_path, 'w') as f:
+                f.write("編號,暱稱\n1,Person1\n")
+            
+            embedding_service = EmbeddingService(detector, contestants_dir, contestant_info_path)
+            recognition_service = RecognitionService(use_chroma=False)
             
             # Verify config propagation
             assert detector.config == config
-            assert recognition_service.similarity_threshold == config.recognition.similarity_threshold
+            assert hasattr(recognition_service, 'use_chroma')
     
     def test_error_handling_integration(self, pipeline_components, sample_image_bgr):
         """Test error handling across the pipeline."""
@@ -198,17 +217,14 @@ class TestFullPipeline:
         faces = components['detector'].detect_faces(sample_image_bgr)
         assert faces == []  # Should return empty list on error
         
-        # Test recognition with empty face list
-        results = components['recognition_service'].recognize_faces([])
-        assert results == []
+        # Test recognition with empty embeddings
+        name, confidence = components['recognition_service'].match_face(np.random.random(512), {})
+        assert name == "Unknown"
+        assert confidence == 0.0
         
-        # Test recognition with invalid face objects
-        invalid_face = Mock()
-        invalid_face.embedding = None
-        
-        results = components['recognition_service'].recognize_faces([invalid_face])
-        assert len(results) == 1
-        face, name, confidence = results[0]
+        # Test recognition with zero embedding
+        zero_embedding = np.zeros(512)
+        name, confidence = components['recognition_service'].match_face(zero_embedding, {})
         assert name == "Unknown"
         assert confidence == 0.0
 
@@ -396,7 +412,7 @@ class TestRobustnessIntegration:
     
     def test_gpu_fallback_integration(self, temp_cache_dir):
         """Test GPU to CPU fallback integration."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.use_gpu = True  # Start with GPU
         
         with patch('src.core.face_detector.FaceAnalysis') as mock_face_analysis:

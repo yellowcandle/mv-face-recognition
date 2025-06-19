@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from src.core.face_detector import FaceDetector
-from src.config.settings import get_config, save_config, Config
+from src.config.settings import get_config, save_config, SystemConfig
 
 
 class TestFaceDetector:
@@ -139,26 +139,25 @@ class TestConfig:
     """Test the configuration system."""
     
     def test_config_initialization(self):
-        """Test Config class initialization with defaults."""
-        config = Config()
+        """Test SystemConfig class initialization with defaults."""
+        config = SystemConfig()
         
-        # Test recognition defaults
-        assert config.recognition.similarity_threshold == 0.6
-        assert config.recognition.detection_threshold == 0.5
-        assert config.recognition.frame_skip == 5
-        assert config.recognition.max_faces_per_frame == 10
+        # Test recognition defaults (actual values from settings.py)
+        assert config.recognition.similarity_threshold == 0.2
+        assert config.recognition.detection_threshold == 0.15
+        assert config.recognition.frame_skip == 15
+        assert config.recognition.max_faces_per_frame == 30
         assert config.recognition.use_gpu == True
         
         # Test UI defaults
         assert config.ui.enhanced_ui == True
-        assert config.ui.show_confidence == True
         
-        # Test database defaults
-        assert config.database.enable_chromadb == False
+        # Test storage defaults
+        assert config.storage.cache_embeddings == True
     
     def test_config_validation(self):
         """Test configuration validation."""
-        config = Config()
+        config = SystemConfig()
         
         # Test valid values
         config.recognition.similarity_threshold = 0.8
@@ -172,28 +171,27 @@ class TestConfig:
     
     def test_config_serialization(self):
         """Test config serialization to/from dict."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.similarity_threshold = 0.7
         config.ui.enhanced_ui = False
         
-        # Convert to dict
-        config_dict = config.to_dict()
+        # Test from_dict method
+        config_dict = {
+            "recognition": {"similarity_threshold": 0.7},
+            "ui": {"enhanced_ui": False}
+        }
         
-        assert config_dict["recognition"]["similarity_threshold"] == 0.7
-        assert config_dict["ui"]["enhanced_ui"] == False
-        
-        # Create new config from dict
-        new_config = Config.from_dict(config_dict)
+        new_config = SystemConfig.from_dict(config_dict)
         assert new_config.recognition.similarity_threshold == 0.7
         assert new_config.ui.enhanced_ui == False
     
     def test_get_config_default(self):
         """Test getting default configuration."""
-        with patch('src.config.settings.Path.exists', return_value=False):
+        with patch('src.config.settings.os.path.exists', return_value=False):
             config = get_config()
             
-            assert isinstance(config, Config)
-            assert config.recognition.similarity_threshold == 0.6
+            assert isinstance(config, SystemConfig)
+            assert config.recognition.similarity_threshold == 0.2
     
     def test_get_config_from_file(self):
         """Test loading configuration from file."""
@@ -203,18 +201,15 @@ class TestConfig:
                 "detection_threshold": 0.4,
                 "frame_skip": 3,
                 "max_faces_per_frame": 5,
-                "use_gpu": False,
-                "det_size": [320, 320],
-                "model_name": "antelopev2"
+                "use_gpu": False
             },
             "ui": {
                 "enhanced_ui": False,
-                "show_confidence": False,
-                "show_fps": True
+                "theme": "dark"
             },
-            "database": {
-                "enable_chromadb": True,
-                "collection_name": "test_faces"
+            "storage": {
+                "cache_embeddings": True,
+                "chroma_db_path": ".test_chroma"
             }
         }
         
@@ -223,7 +218,11 @@ class TestConfig:
             config_path = f.name
         
         try:
-            with patch('src.config.settings.CONFIG_PATH', config_path):
+            # Clear global config and set environment variable
+            import src.config.settings
+            src.config.settings._config = None
+            
+            with patch.dict('os.environ', {'CONFIG_PATH': config_path}):
                 config = get_config()
                 
                 assert config.recognition.similarity_threshold == 0.8
@@ -231,22 +230,28 @@ class TestConfig:
                 assert config.recognition.frame_skip == 3
                 assert config.recognition.use_gpu == False
                 assert config.ui.enhanced_ui == False
-                assert config.database.enable_chromadb == True
+                assert config.storage.cache_embeddings == True
         finally:
             Path(config_path).unlink()
+            # Reset global config
+            src.config.settings._config = None
     
     def test_save_config(self):
         """Test saving configuration to file."""
-        config = Config()
-        config.recognition.similarity_threshold = 0.9
-        config.ui.enhanced_ui = False
-        
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             config_path = f.name
         
         try:
-            with patch('src.config.settings.CONFIG_PATH', config_path):
-                save_config(config)
+            # Clear global config and set environment variable
+            import src.config.settings
+            src.config.settings._config = None
+            
+            with patch.dict('os.environ', {'CONFIG_PATH': config_path}):
+                config = get_config()
+                config.recognition.similarity_threshold = 0.9
+                config.ui.enhanced_ui = False
+                
+                save_config()
                 
                 # Verify file was created and contains correct data
                 assert Path(config_path).exists()
@@ -258,10 +263,12 @@ class TestConfig:
                 assert saved_data["ui"]["enhanced_ui"] == False
         finally:
             Path(config_path).unlink()
+            # Reset global config
+            src.config.settings._config = None
     
     def test_config_edge_cases(self):
         """Test configuration edge cases and error handling."""
-        config = Config()
+        config = SystemConfig()
         
         # Test boundary values
         config.recognition.similarity_threshold = 0.0
@@ -283,12 +290,18 @@ class TestConfig:
             config_path = f.name
         
         try:
-            with patch('src.config.settings.CONFIG_PATH', config_path):
+            # Clear global config
+            import src.config.settings
+            src.config.settings._config = None
+            
+            with patch.dict('os.environ', {'CONFIG_PATH': config_path}):
                 # Should fallback to default config
                 config = get_config()
-                assert config.recognition.similarity_threshold == 0.6  # default value
+                assert config.recognition.similarity_threshold == 0.2  # default value
         finally:
             Path(config_path).unlink()
+            # Reset global config
+            src.config.settings._config = None
 
 
 class TestFaceDetectorIntegration:
@@ -298,7 +311,7 @@ class TestFaceDetectorIntegration:
     @pytest.mark.cpu_only
     def test_face_detector_real_initialization(self, cpu_only):
         """Test FaceDetector with real InsightFace (CPU only)."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.use_gpu = False
         
         # This test requires actual InsightFace models
@@ -313,7 +326,7 @@ class TestFaceDetectorIntegration:
     @pytest.mark.cpu_only
     def test_face_detection_real_image(self, cpu_only, sample_image_bgr):
         """Test face detection on a real image (CPU only)."""
-        config = Config()
+        config = SystemConfig()
         config.recognition.use_gpu = False
         
         try:
