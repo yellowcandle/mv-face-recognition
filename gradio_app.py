@@ -429,13 +429,24 @@ class FaceRecognitionApp:
             logger.warning("No embedding service available - processing without known faces database")
             known_embeddings = {}
         
+        # Wrap progress callback to handle Gradio 5.x compatibility issues
+        def safe_progress_callback(progress_value, desc=None):
+            if progress and hasattr(progress, '__call__'):
+                try:
+                    if desc:
+                        progress(progress_value, desc=desc)
+                    else:
+                        progress(progress_value)
+                except Exception as e:
+                    logger.debug(f"Progress update failed (non-critical): {e}")
+            
         output_video_path, results = self.video_processing_service.process_video(
             video_path,
             known_embeddings,
             self.config.recognition.similarity_threshold,
             self.config.recognition.frame_skip,
             self.config.ui.enhanced_ui,
-            progress
+            safe_progress_callback
         )
         
         self.processing_video = False

@@ -127,12 +127,16 @@ def main():
     if not check_environment():
         print("⚠️ Environment check failed. Some features may not work.")
 
-    # Setup contestants directory for HF Spaces
+    # Initialize HF Spaces environment
     try:
-        from setup_contestants import setup_for_hf_spaces
-        setup_for_hf_spaces()
+        from init_hf_spaces import main as init_hf_spaces
+        init_hf_spaces()
     except Exception as e:
-        print(f"⚠️ Setup warning: {e}")
+        print(f"⚠️ HF Spaces initialization warning: {e}")
+        # Fallback basic directory creation
+        from pathlib import Path
+        for dir_name in ["source/photo/contestants", "source/videos", "cache", "output"]:
+            Path(dir_name).mkdir(parents=True, exist_ok=True)
 
     try:
         demo = create_demo()
