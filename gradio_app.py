@@ -133,14 +133,23 @@ class FaceRecognitionApp:
             return
 
         logger.info("Initializing detector-dependent services...")
-        contestants_dir = self.config.project_root / "source/photo/contestants"
+        contestants_dir = self.get_contestants_directory()
         contestant_info_path = self.config.project_root / "contestant_info.csv"
 
-        self.embedding_service = EmbeddingService(self.face_detector, str(contestants_dir), str(contestant_info_path))
+        if contestants_dir is None:
+            logger.warning("⚠️ Contestants directory not found. Face recognition will work but without known faces database.")
+            # Initialize with dummy paths - EmbeddingService will need to handle this gracefully
+            self.embedding_service = None
+        else:
+            try:
+                self.embedding_service = EmbeddingService(self.face_detector, str(contestants_dir), str(contestant_info_path))
+                # Load embeddings
+                self._load_all_embeddings()
+            except Exception as e:
+                logger.error(f"Failed to initialize embedding service: {e}")
+                self.embedding_service = None
+
         self.video_processing_service = VideoProcessingService(self.face_detector, self.recognition_service)
-        
-        # Load embeddings
-        self._load_all_embeddings()
         logger.info("✅ Detector-dependent services initialized.")
 
     def _load_all_embeddings(self):
@@ -154,6 +163,34 @@ class FaceRecognitionApp:
             logger.info(f"Loaded {len(self.embedding_service.known_embeddings)} contestant embeddings.")
         except Exception as e:
             logger.error(f"Failed to load embeddings: {e}", exc_info=True)
+
+    def get_contestants_directory(self):
+        """Get the contestants directory with fallback logic for different environments."""
+        contestants_dir = self.config.project_root / "source/photo/contestants"
+        
+        # Add debugging information
+        logger.info(f"Looking for contestants in: {contestants_dir}")
+        
+        if not contestants_dir.exists():
+            logger.warning(f"Contestants directory not found: {contestants_dir}")
+            # Try alternative paths based on common deployment scenarios
+            alt_paths = [
+                Path.cwd() / "source" / "photo" / "contestants",
+                Path("/home/user/app") / "source" / "photo" / "contestants",
+                Path("/app") / "source" / "photo" / "contestants",
+                Path(__file__).parent / "source" / "photo" / "contestants",
+                Path(__file__).parent.parent / "source" / "photo" / "contestants",
+            ]
+            
+            for alt_path in alt_paths:
+                if alt_path.exists():
+                    logger.info(f"Found contestants in alternative path: {alt_path}")
+                    return alt_path
+            
+            logger.warning("No contestants directory found in any expected location")
+            return None
+        
+        return contestants_dir
 
     def get_available_videos(self):
         """Get list of available videos with titles from the source directory."""
@@ -275,9 +312,13 @@ class FaceRecognitionApp:
 
     def generate_umap_visualization(self, detected_faces_data):
         """Generate UMAP visualization for detected faces."""
-        if not self.visualization_service or not self.embedding_service:
-            logger.error("Visualization or Embedding service is not initialized.")
+        if not self.visualization_service:
+            logger.error("Visualization service is not initialized.")
             return None
+        
+        if not self.embedding_service:
+            logger.warning("Embedding service not available - UMAP will only show detected faces without known gallery.")
+            # Continue with UMAP generation using only detected faces
         
         try:
             logger.info(f"Starting UMAP generation with {len(detected_faces_data)} face detections")
@@ -288,8 +329,13 @@ class FaceRecognitionApp:
                 logger.warning("No valid embeddings found for UMAP plot.")
                 return None
 
-            gallery_embeddings = self.embedding_service.get_known_embeddings(normalize=False)
-            gallery_names = {name: name for name in gallery_embeddings.keys()}
+            # Handle case where embedding service is not available
+            if self.embedding_service:
+                gallery_embeddings = self.embedding_service.get_known_embeddings(normalize=False)
+                gallery_names = {name: name for name in gallery_embeddings.keys()}
+            else:
+                gallery_embeddings = {}
+                gallery_names = {}
 
             umap_plot = self.visualization_service.generate_umap_plot(
                 detected_embeddings=detected_embeddings,
@@ -359,7 +405,12 @@ class FaceRecognitionApp:
         """Core video processing logic using the VideoProcessingService."""
         self.processing_video = True
         
-        known_embeddings = self.embedding_service.get_known_embeddings()
+        # Handle case where embedding service is not available
+        if self.embedding_service:
+            known_embeddings = self.embedding_service.get_known_embeddings()
+        else:
+            logger.warning("No embedding service available - processing without known faces database")
+            known_embeddings = {}
         
         output_video_path, results = self.video_processing_service.process_video(
             video_path,
@@ -548,7 +599,11 @@ def create_gradio_interface():
 
                     video_path = app.get_video_path_from_title(video_title)
                     
-                    known_embeddings = app.embedding_service.get_known_embeddings()
+                    # Handle case where embedding service is not available
+                    if app.embedding_service:
+                        known_embeddings = app.embedding_service.get_known_embeddings()
+                    else:
+                        known_embeddings = {}
 
                     all_matches = app.video_processing_service.get_all_matches_from_video(
                         video_path,
