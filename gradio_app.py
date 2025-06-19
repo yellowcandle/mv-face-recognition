@@ -278,6 +278,14 @@ class FaceRecognitionApp:
             logger.error(f"Video processing failed: {e}", exc_info=True)
             return None, f"An error occurred: {e}", ([], ["All"], "")
 
+    @spaces.GPU(duration=60)
+    def _warmup_gpu(self):
+        """Warmup function to ensure GPU decorator is registered during startup."""
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        return "GPU warmed up"
+
     @spaces.GPU(duration=300)
     def _process_video_gpu(self, video_path, progress):
         """GPU-accelerated video processing."""
@@ -507,6 +515,15 @@ def create_gradio_interface():
 def launch_app():
     """Launch the Gradio application."""
     try:
+        # Warmup GPU decorator registration for ZeroGPU
+        if HF_SPACES_GPU:
+            app = get_app()
+            try:
+                app._warmup_gpu()
+                logger.info("✅ GPU decorator registered successfully")
+            except Exception as warmup_error:
+                logger.warning(f"GPU warmup failed (continuing anyway): {warmup_error}")
+        
         demo = create_gradio_interface()
         demo.launch(server_name="0.0.0.0", server_port=7860, share=False, debug=True)
     except Exception as e:
