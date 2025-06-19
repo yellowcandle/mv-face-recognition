@@ -1,9 +1,11 @@
 import os
 import cv2
+import json
 import numpy as np
 import pandas as pd
 import logging
 from typing import List, Dict, Optional
+from pathlib import Path
 
 from src.core.face_detector import FaceDetector
 
@@ -27,6 +29,9 @@ class EmbeddingService:
         self.contestants_dir = contestants_dir
         self.contestant_info_path = contestant_info_path
         self.known_embeddings: Dict[str, List[np.ndarray]] = {}
+        
+        # Check for embeddings package first (HF Spaces deployment)
+        self.embeddings_package_path = self._find_embeddings_package()
         
         if not os.path.exists(self.contestants_dir):
             raise FileNotFoundError(f"Contestants directory not found: {self.contestants_dir}")
@@ -81,6 +86,66 @@ class EmbeddingService:
         
         return []
 
+    def _find_embeddings_package(self) -> Optional[str]:
+        """Find the embeddings package file for HF Spaces deployment."""
+        # Look for embeddings package in common locations
+        possible_paths = [
+            Path("embeddings_package.json"),  # Project root
+            Path(__file__).parent.parent.parent / "embeddings_package.json",  # From script location
+            Path("/app/embeddings_package.json"),  # HF Spaces app root
+            Path("/home/user/app/embeddings_package.json"),  # HF Spaces user app
+        ]
+        
+        for path in possible_paths:
+            if path.exists():
+                logger.info(f"📦 Found embeddings package: {path}")
+                return str(path)
+        
+        logger.info("📦 No embeddings package found - will use individual .npy files")
+        return None
+
+    def _load_embeddings_from_package(self) -> bool:
+        """Load embeddings from the consolidated JSON package."""
+        if not self.embeddings_package_path:
+            return False
+        
+        try:
+            logger.info(f"📦 Loading embeddings from package: {self.embeddings_package_path}")
+            
+            with open(self.embeddings_package_path, 'r', encoding='utf-8') as f:
+                package = json.load(f)
+            
+            logger.info(f"📊 Package info: {package['total_embeddings']} embeddings, v{package['version']}")
+            
+            # Load embeddings
+            self.known_embeddings = {}
+            loaded_count = 0
+            
+            for contestant_name, embedding_data in package['embeddings'].items():
+                try:
+                    # Convert back to numpy array
+                    embedding = np.array(embedding_data, dtype=np.float32)
+                    
+                    # Validate embedding
+                    if len(embedding) != 512:
+                        logger.warning(f"⚠️ Invalid embedding size for {contestant_name}: {len(embedding)}")
+                        continue
+                    
+                    # Store as list of embeddings (for consistency with existing format)
+                    self.known_embeddings[contestant_name] = [embedding]
+                    loaded_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to load embedding for {contestant_name}: {e}")
+                    continue
+            
+            logger.info(f"✅ Loaded {loaded_count} embeddings from package")
+            return loaded_count > 0
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load embeddings package: {e}")
+            return False
+
     def compute_and_cache_embedding(self, image_path: str) -> Optional[np.ndarray]:
         """
         Compute face embedding for a single image and cache it.
@@ -112,6 +177,14 @@ class EmbeddingService:
         Load embeddings for a list of selected contestants, computing and caching if necessary.
         """
         logger.info(f"Loading embeddings for {len(selected_contestants)} contestants...")
+        
+        # Try loading from embeddings package first (HF Spaces deployment)
+        if self._load_embeddings_from_package():
+            logger.info("✅ Successfully loaded embeddings from package")
+            return self.known_embeddings
+        
+        # Fallback to individual .npy files (local development)
+        logger.info("📁 Loading embeddings from individual .npy files...")
         
         # Debug: Show what's actually in the contestants directory
         if os.path.exists(self.contestants_dir):

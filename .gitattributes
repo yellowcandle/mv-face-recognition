@@ -17,12 +17,11 @@
 *.bmp filter=lfs diff=lfs merge=lfs -text
 *.tiff filter=lfs diff=lfs merge=lfs -text
 *.webp filter=lfs diff=lfs merge=lfs -text
-*.npy filter=lfs diff=lfs merge=lfs -text
 *.npz filter=lfs diff=lfs merge=lfs -text
 *.pickle filter=lfs diff=lfs merge=lfs -text
 cache/chromadb/*.sqlite3 filter=lfs diff=lfs merge=lfs -text
 source/videos_hf_optimized/*.mp4 filter=lfs diff=lfs merge=lfs -text
 source/videos_hf_clean/*.mp4 filter=lfs diff=lfs merge=lfs -text
-source/photo/contestants/**/*.npy filter=lfs diff=lfs merge=lfs -text
+# Note: .npy embedding files moved to regular Git for HF Spaces compatibility
 source/photo/contestants/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 source/photo/contestants/**/*.png filter=lfs diff=lfs merge=lfs -text
