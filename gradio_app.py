@@ -304,13 +304,27 @@ class FaceRecognitionApp:
             return None
 
     def process_uploaded_video(self, video_path, progress=gr.Progress()):
-        """Process an uploaded video file with ZeroGPU awareness."""
+        """Process an uploaded video file with ZeroGPU awareness and CPU fallback."""
         if not video_path:
             return None, "No video provided", ([], ["All"], "")
 
         try:
             if HF_SPACES_GPU:
-                return self._process_video_gpu(video_path, progress)
+                try:
+                    return self._process_video_gpu(video_path, progress)
+                except Exception as gpu_error:
+                    # Check if this is a GPU quota error
+                    error_msg = str(gpu_error)
+                    if "quota" in error_msg.lower() or "exceeded" in error_msg.lower():
+                        logger.warning(f"⚠️ GPU quota exceeded, automatically switching to CPU processing: {gpu_error}")
+                        result_video, result_summary, result_timeline = self._process_video_cpu(video_path, progress)
+                        # Add note about CPU fallback to the summary
+                        if result_summary and not result_summary.startswith("Video processing failed"):
+                            result_summary = f"⚠️ GPU quota exceeded - processed using CPU instead.\n{result_summary}"
+                        return result_video, result_summary, result_timeline
+                    else:
+                        # Re-raise other GPU errors
+                        raise gpu_error
             else:
                 return self._process_video_cpu(video_path, progress)
         except Exception as e:
@@ -335,6 +349,7 @@ class FaceRecognitionApp:
 
     def _process_video_cpu(self, video_path, progress):
         """CPU-only video processing fallback."""
+        logger.info("🔄 Processing video using CPU (GPU not available or quota exceeded)")
         self._initialize_system(force_cpu=True)
         if not self.video_processing_service:
             return None, "Failed to initialize CPU processing services.", ([], ["All"], "")
