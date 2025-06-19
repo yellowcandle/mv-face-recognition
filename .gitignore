@@ -1,8 +1,11 @@
 .DS_Store
 .env
 
-# to prevent large files from being committed, run video_dl.py to download videos
-source/videos/**
+# Large video files - use Git LFS or exclude for HF Spaces
+source/videos/*.mp4
+source/videos/*.avi
+source/videos/*.mov
+source/videos/*.mkv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -169,4 +172,11 @@ cython_debug/
 git-filter-repo.py
 .DS_Store
 .aider*
-/source/videos
+# Large output directories for HF Spaces optimization
+output/
+output_frames/
+output_mp4s/
+comparison_results/
+debug_masks/
+cache/
+*.log

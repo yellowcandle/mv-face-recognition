@@ -127,6 +127,13 @@ def main():
     if not check_environment():
         print("⚠️ Environment check failed. Some features may not work.")
 
+    # Setup contestants directory for HF Spaces
+    try:
+        from setup_contestants import setup_for_hf_spaces
+        setup_for_hf_spaces()
+    except Exception as e:
+        print(f"⚠️ Setup warning: {e}")
+
     try:
         demo = create_demo()
 
