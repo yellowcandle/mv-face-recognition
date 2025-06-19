@@ -149,21 +149,41 @@ def main():
             (sample_dir / "README.txt").write_text("Sample contestant - upload photos via interface")
             print(f"✅ Created sample contestant directory: {sample_dir}")
         
-        # Ensure video directories exist
+        # Check and ensure video directories exist with detailed Git LFS verification
         video_dirs = [
             "source/videos",
             "source/videos_hf_clean", 
             "source/videos_hf_optimized"
         ]
         
+        total_videos = 0
         for video_dir in video_dirs:
             vid_path = Path(video_dir)
             vid_path.mkdir(parents=True, exist_ok=True)
-            video_count = len(list(vid_path.glob("*.mp4")))
-            if video_count > 0:
-                print(f"✅ Found {video_count} videos in {video_dir}")
+            
+            # Count all video file types
+            mp4_count = len(list(vid_path.glob("*.mp4")))
+            mov_count = len(list(vid_path.glob("*.mov")))
+            avi_count = len(list(vid_path.glob("*.avi")))
+            total_count = mp4_count + mov_count + avi_count
+            
+            if total_count > 0:
+                print(f"✅ Found {total_count} videos in {video_dir} (MP4:{mp4_count}, MOV:{mov_count}, AVI:{avi_count})")
+                total_videos += total_count
+                
+                # Check file sizes to verify Git LFS deployment
+                for video_file in vid_path.glob("*.mp4"):
+                    file_size = video_file.stat().st_size
+                    if file_size < 1000:  # Suspicious small size might indicate LFS pointer file
+                        print(f"⚠️ Suspicious small video file: {video_file.name} ({file_size} bytes)")
+                    else:
+                        print(f"📹 {video_file.name}: {file_size / (1024*1024):.1f} MB")
             else:
-                print(f"📁 Created empty video directory: {video_dir}")
+                print(f"📁 Empty video directory: {video_dir}")
+        
+        print(f"🎬 Total videos found across all directories: {total_videos}")
+        if total_videos == 0:
+            print("⚠️ No video files deployed - Git LFS may not be working on HF Spaces")
         
         # Create other required directories
         for dir_name in ["cache", "output", "output_frames", "output_mp4s"]:

@@ -212,10 +212,20 @@ class FaceRecognitionApp:
         logger.info(f"Current working directory: {Path.cwd()}")
         logger.info(f"Script file location: {Path(__file__).parent}")
         
-        if not videos_dir.exists():
-            logger.warning(f"Videos directory not found: {videos_dir}")
-            # Try alternative paths based on common deployment scenarios  
-            # Prioritize HF Spaces clean video directories first
+        # Check if primary directory has videos (not just if it exists)
+        primary_video_count = 0
+        if videos_dir.exists():
+            primary_video_count = len(list(videos_dir.glob("*.mp4"))) + len(list(videos_dir.glob("*.mov"))) + len(list(videos_dir.glob("*.avi")))
+            logger.info(f"Primary directory has {primary_video_count} video files")
+        
+        if not videos_dir.exists() or primary_video_count == 0:
+            if primary_video_count == 0:
+                logger.warning(f"Primary videos directory is empty: {videos_dir}")
+            else:
+                logger.warning(f"Videos directory not found: {videos_dir}")
+                
+            # Check ALL possible video directories and find the best one
+            logger.info("🔍 Scanning all possible video directories...")
             alt_paths = [
                 Path.cwd() / "source" / "videos_hf_clean",  # HF Spaces optimized videos
                 Path("/home/user/app") / "source" / "videos_hf_clean",
@@ -228,16 +238,22 @@ class FaceRecognitionApp:
                 Path(__file__).parent.parent / "source" / "videos",
             ]
             
+            best_dir = None
+            max_videos = 0
+            
             for alt_path in alt_paths:
-                logger.debug(f"Checking video path: {alt_path} (exists: {alt_path.exists()})")
                 if alt_path.exists():
-                    video_count = len(list(alt_path.glob("*.mp4")))
-                    logger.info(f"Found videos in alternative path: {alt_path} ({video_count} MP4 files)")
-                    if video_count > 0:
-                        videos_dir = alt_path
-                        break
-                    else:
-                        logger.warning(f"Directory exists but no MP4 files found: {alt_path}")
+                    video_count = len(list(alt_path.glob("*.mp4"))) + len(list(alt_path.glob("*.mov"))) + len(list(alt_path.glob("*.avi")))
+                    logger.info(f"📁 {alt_path}: {video_count} video files")
+                    if video_count > max_videos:
+                        max_videos = video_count
+                        best_dir = alt_path
+                else:
+                    logger.debug(f"📁 {alt_path}: does not exist")
+            
+            if best_dir and max_videos > 0:
+                logger.info(f"✅ Using video directory with most files: {best_dir} ({max_videos} videos)")
+                videos_dir = best_dir
             else:
                 # If no videos directory found, check if there are any video folders
                 logger.warning("No standard videos directory found. Checking for any video directories...")
