@@ -110,16 +110,20 @@ class FaceRecognitionApp:
 
         logger.info(f"Initializing system (force_cpu={force_cpu})...")
         try:
-            self.face_detector = get_face_detector(force_cpu=force_cpu)
-            if self.face_detector is None and not HF_SPACES_GPU:
-                 raise RuntimeError("Failed to initialize FaceDetector.")
+            # Only initialize face_detector if not already set (e.g., from GPU context)
+            if self.face_detector is None:
+                self.face_detector = get_face_detector(force_cpu=force_cpu)
+                if self.face_detector is None and not HF_SPACES_GPU:
+                     raise RuntimeError("Failed to initialize FaceDetector.")
 
             # Services that don't depend on a live detector can be initialized now.
-            self.recognition_service = RecognitionService(use_chroma=self.config.recognition.enable_chromadb)
-            self.visualization_service = VisualizationService()
+            if self.recognition_service is None:
+                self.recognition_service = RecognitionService(use_chroma=self.config.recognition.enable_chromadb)
+            if self.visualization_service is None:
+                self.visualization_service = VisualizationService()
             
             # Services that need a detector.
-            if self.face_detector:
+            if self.face_detector and self.video_processing_service is None:
                 self._initialize_detector_dependent_services()
 
         except Exception as e:
@@ -149,7 +153,8 @@ class FaceRecognitionApp:
                 logger.error(f"Failed to initialize embedding service: {e}")
                 self.embedding_service = None
 
-        self.video_processing_service = VideoProcessingService(self.face_detector, self.recognition_service)
+        if self.video_processing_service is None:
+            self.video_processing_service = VideoProcessingService(self.face_detector, self.recognition_service)
         logger.info("✅ Detector-dependent services initialized.")
 
     def _load_all_embeddings(self):
@@ -388,6 +393,18 @@ class FaceRecognitionApp:
     @spaces.GPU(duration=300)
     def _process_video_gpu(self, video_path, progress):
         """GPU-accelerated video processing."""
+        # In ZeroGPU environment, we must initialize the FaceDetector within the GPU context
+        if HF_SPACES_GPU and self.face_detector is None:
+            logger.info("🚀 Initializing FaceDetector within GPU context...")
+            try:
+                config = get_config()
+                config.recognition.use_gpu = True
+                self.face_detector = FaceDetector(config, force_cpu_only=False)
+                logger.info("✅ FaceDetector initialized in GPU context.")
+            except Exception as e:
+                logger.error(f"Failed to initialize FaceDetector in GPU context: {e}", exc_info=True)
+                return None, f"GPU initialization failed: {e}", ([], ["All"], "")
+        
         self._initialize_system(force_cpu=False)
         if not self.video_processing_service:
             return None, "Failed to initialize GPU processing services.", ([], ["All"], "")
