@@ -125,6 +125,13 @@ class EmbeddingService:
                 logger.info(f"   Numbered directories: {len(numbered_dirs)} ({numbered_dirs[:5]}{'...' if len(numbered_dirs) > 5 else ''})")
                 logger.info(f"   Named directories: {len(name_dirs)} ({name_dirs[:5]}{'...' if len(name_dirs) > 5 else ''})")
                 logger.info(f"   Embedding files: {len(embedding_files)} ({embedding_files[:5]}{'...' if len(embedding_files) > 5 else ''})")
+                
+                # If no data found, suggest solution
+                if len(numbered_dirs) == 0 and len(embedding_files) == 0:
+                    logger.warning("⚠️ No contestant data found - Git LFS deployment may have failed")
+                    logger.info("💡 The system will work for face detection, but without known faces database")
+                    logger.info("💡 Users can upload photos via the web interface to build the database")
+                    
             except Exception as e:
                 logger.warning(f"Could not scan contestants directory: {e}")
         self.known_embeddings = {}

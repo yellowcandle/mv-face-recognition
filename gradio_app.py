@@ -165,7 +165,15 @@ class FaceRecognitionApp:
         try:
             all_names = self.embedding_service.contestant_info["暱稱"].tolist()
             self.embedding_service.load_embeddings_for_contestants(all_names)
-            logger.info(f"Loaded {len(self.embedding_service.known_embeddings)} contestant embeddings.")
+            embeddings_count = len(self.embedding_service.known_embeddings)
+            
+            if embeddings_count > 0:
+                logger.info(f"✅ Loaded {embeddings_count} contestant embeddings.")
+            else:
+                logger.warning(f"⚠️ No contestant embeddings loaded from {len(all_names)} contestants.")
+                logger.info("💡 System will work for face detection without known faces database.")
+                logger.info("💡 Upload photos via the interface to build the recognition database.")
+                
         except Exception as e:
             logger.error(f"Failed to load embeddings: {e}", exc_info=True)
 
