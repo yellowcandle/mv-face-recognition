@@ -168,23 +168,40 @@ class FaceRecognitionApp:
         logger.info(f"Looking for videos in: {videos_dir}")
         logger.info(f"Project root: {self.config.project_root}")
         logger.info(f"Current working directory: {Path.cwd()}")
-        logger.info(f"HF_SPACE_ID: {os.getenv('HF_SPACE_ID', 'Not set')}")
+        logger.info(f"Script file location: {Path(__file__).parent}")
         
         if not videos_dir.exists():
             logger.warning(f"Videos directory not found: {videos_dir}")
-            # Try alternative paths
+            # Try alternative paths based on common deployment scenarios
             alt_paths = [
                 Path.cwd() / "source" / "videos",
-                Path("/home/user/app/source/videos"),
-                Path("/app/source/videos"),
+                Path.cwd() / "source" / "videos_hf_clean",  # Alternative video location
+                Path.cwd() / "source" / "videos_hf_optimized",  # Another alternative
+                Path("/home/user/app") / "source" / "videos",
+                Path("/home/user/app") / "source" / "videos_hf_clean",
+                Path("/app") / "source" / "videos",
+                Path(__file__).parent / "source" / "videos",
+                Path(__file__).parent.parent / "source" / "videos",
             ]
+            
             for alt_path in alt_paths:
                 if alt_path.exists():
                     logger.info(f"Found videos in alternative path: {alt_path}")
                     videos_dir = alt_path
                     break
             else:
-                return [], {}
+                # If no videos directory found, check if there are any video folders
+                logger.warning("No standard videos directory found. Checking for any video directories...")
+                source_dir = Path.cwd() / "source"
+                if source_dir.exists():
+                    video_dirs = [d for d in source_dir.iterdir() if d.is_dir() and "video" in d.name.lower()]
+                    if video_dirs:
+                        videos_dir = video_dirs[0]
+                        logger.info(f"Using video directory: {videos_dir}")
+                    else:
+                        return [], {}
+                else:
+                    return [], {}
 
         video_files = []
         title_to_path_mapping = {}
@@ -194,7 +211,7 @@ class FaceRecognitionApp:
                 video_files.append(display_title)
                 title_to_path_mapping[display_title] = str(video_file)
         
-        logger.info(f"Found {len(video_files)} video files")
+        logger.info(f"Found {len(video_files)} video files in {videos_dir}")
         self.title_to_path_mapping = title_to_path_mapping
         return sorted(video_files), title_to_path_mapping
 
