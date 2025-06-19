@@ -39,14 +39,47 @@ class EmbeddingService:
 
     def get_image_paths_for_contestant(self, contestant_number: str) -> List[str]:
         """Retrieve image paths for a specific contestant by their number."""
+        # Try number-based directory first (standard structure)
         contestant_path = os.path.join(self.contestants_dir, str(contestant_number))
-        if not os.path.isdir(contestant_path):
-            return []
-        return [
-            os.path.join(contestant_path, f)
-            for f in os.listdir(contestant_path)
-            if f.lower().endswith((".jpg", ".jpeg", ".png"))
-        ]
+        if os.path.isdir(contestant_path):
+            images = [
+                os.path.join(contestant_path, f)
+                for f in os.listdir(contestant_path)
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            ]
+            if images:
+                return images
+        
+        # Fallback: try to find name-based directory structure
+        # Look up contestant name from number
+        try:
+            contestant_row = self.contestant_info[self.contestant_info["編號"] == int(contestant_number)]
+            if not contestant_row.empty:
+                contestant_name = contestant_row["暱稱"].values[0]
+                
+                # Try various name-based directory patterns
+                name_variations = [
+                    contestant_name,  # Exact name
+                    contestant_name.replace(" ", "_"),  # Spaces to underscores  
+                    contestant_name.replace(" ", ""),   # Remove spaces
+                    f"{contestant_number}_{contestant_name}",  # Number prefix
+                ]
+                
+                for name_var in name_variations:
+                    alt_path = os.path.join(self.contestants_dir, name_var)
+                    if os.path.isdir(alt_path):
+                        images = [
+                            os.path.join(alt_path, f)
+                            for f in os.listdir(alt_path)
+                            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+                        ]
+                        if images:
+                            logger.info(f"Found images for contestant {contestant_number} ({contestant_name}) in name-based directory: {alt_path}")
+                            return images
+        except (ValueError, IndexError, KeyError):
+            pass
+        
+        return []
 
     def compute_and_cache_embedding(self, image_path: str) -> Optional[np.ndarray]:
         """
@@ -79,6 +112,21 @@ class EmbeddingService:
         Load embeddings for a list of selected contestants, computing and caching if necessary.
         """
         logger.info(f"Loading embeddings for {len(selected_contestants)} contestants...")
+        
+        # Debug: Show what's actually in the contestants directory
+        if os.path.exists(self.contestants_dir):
+            try:
+                dir_contents = os.listdir(self.contestants_dir)
+                numbered_dirs = [d for d in dir_contents if os.path.isdir(os.path.join(self.contestants_dir, d)) and d.isdigit()]
+                name_dirs = [d for d in dir_contents if os.path.isdir(os.path.join(self.contestants_dir, d)) and not d.isdigit()]
+                embedding_files = [f for f in dir_contents if f.endswith('_embedding.npy')]
+                
+                logger.info(f"📁 Contestants directory contains:")
+                logger.info(f"   Numbered directories: {len(numbered_dirs)} ({numbered_dirs[:5]}{'...' if len(numbered_dirs) > 5 else ''})")
+                logger.info(f"   Named directories: {len(name_dirs)} ({name_dirs[:5]}{'...' if len(name_dirs) > 5 else ''})")
+                logger.info(f"   Embedding files: {len(embedding_files)} ({embedding_files[:5]}{'...' if len(embedding_files) > 5 else ''})")
+            except Exception as e:
+                logger.warning(f"Could not scan contestants directory: {e}")
         self.known_embeddings = {}
 
         for name in selected_contestants:
@@ -91,17 +139,29 @@ class EmbeddingService:
             contestant_path = os.path.join(self.contestants_dir, str(contestant_number))
             
             # Check for a pre-computed aggregate embedding file for the contestant
-            # This is a convention from the original mv-face-recognition.py
-            aggregate_embedding_file = os.path.join(self.contestants_dir, f"{name}_embedding.npy")
-
-            if os.path.exists(aggregate_embedding_file):
-                try:
-                    embedding = np.load(aggregate_embedding_file, allow_pickle=True).flatten()
-                    self.known_embeddings[name] = [embedding]
-                    logger.debug(f"Loaded aggregate embedding for {name} from file.")
-                    continue
-                except Exception as e:
-                    logger.warning(f"Could not load aggregate embedding for {name}: {e}. Will recompute.")
+            # Try multiple naming patterns to handle different Git LFS structures
+            embedding_file_patterns = [
+                f"{name}_embedding.npy",  # Standard pattern
+                f"{name.replace(' ', '_')}_embedding.npy",  # Spaces to underscores
+                f"{name.replace(' ', '')}_embedding.npy",   # Remove spaces
+                f"{contestant_number}_{name}_embedding.npy",  # Number prefix
+            ]
+            
+            embedding_loaded = False
+            for pattern in embedding_file_patterns:
+                aggregate_embedding_file = os.path.join(self.contestants_dir, pattern)
+                if os.path.exists(aggregate_embedding_file):
+                    try:
+                        embedding = np.load(aggregate_embedding_file, allow_pickle=True).flatten()
+                        self.known_embeddings[name] = [embedding]
+                        logger.info(f"✅ Loaded aggregate embedding for {name} from {pattern}")
+                        embedding_loaded = True
+                        break
+                    except Exception as e:
+                        logger.warning(f"Could not load aggregate embedding {pattern} for {name}: {e}")
+            
+            if embedding_loaded:
+                continue
 
             # If no aggregate, compute from individual images
             image_paths = self.get_image_paths_for_contestant(str(contestant_number))
