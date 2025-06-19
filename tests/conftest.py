@@ -146,18 +146,16 @@ def mock_config():
     config.recognition.max_faces_per_frame = 10
     config.recognition.use_gpu = True
     config.recognition.det_size = (640, 640)
-    config.recognition.model_name = "buffalo_l"
     
     # UI settings
     config.ui = Mock()
     config.ui.enhanced_ui = True
-    config.ui.show_confidence = True
-    config.ui.show_fps = True
+    config.ui.theme = "light"
     
-    # Database settings
-    config.database = Mock()
-    config.database.enable_chromadb = False
-    config.database.collection_name = "face_embeddings"
+    # Storage settings
+    config.storage = Mock()
+    config.storage.cache_embeddings = True
+    config.storage.chroma_db_path = ".test_chroma"
     
     return config
 

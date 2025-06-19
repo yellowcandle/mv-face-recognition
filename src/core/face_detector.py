@@ -52,17 +52,27 @@ class FaceDetector:
             )
 
             # Prepare the model with appropriate context
+            # Default to CPU context, then check for specific cases
+            ctx_id = -1  # Default to CPU
+            
             # On ZeroGPU, use CPU context for InsightFace models
             try:
                 import importlib.util
                 if importlib.util.find_spec("spaces") is not None:
                     ctx_id = -1  # Force CPU context on ZeroGPU
                     logger.info("ZeroGPU: Using CPU context for InsightFace models")
+                else:
+                    # Regular GPU/CPU detection for non-ZeroGPU
+                    ctx_id = (
+                        0
+                        if torch.cuda.is_available() and self.config.recognition.use_gpu and not self.force_cpu_only
+                        else -1
+                    )
             except ImportError:
                 # Regular GPU/CPU detection for non-ZeroGPU
                 ctx_id = (
                     0
-                    if torch.cuda.is_available() and self.config.recognition.use_gpu
+                    if torch.cuda.is_available() and self.config.recognition.use_gpu and not self.force_cpu_only
                     else -1
                 )
             

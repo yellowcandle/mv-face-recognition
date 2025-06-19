@@ -389,9 +389,19 @@ def create_gradio_interface():
             with gr.Tab("🎬 Video Processing"):
                 with gr.Row():
                     with gr.Column(scale=1):
+                        # Initialize video dropdown with error handling
+                        try:
+                            video_choices = get_app().get_video_titles_for_dropdown()
+                            logger.info(f"Video dropdown initialized with {len(video_choices)} choices")
+                        except Exception as e:
+                            logger.error(f"Failed to get video choices: {e}")
+                            video_choices = []
+                        
                         video_dropdown = gr.Dropdown(
-                            choices=get_app().get_video_titles_for_dropdown(),
+                            choices=video_choices,
                             label="📹 Choose Video",
+                            info=f"Found {len(video_choices)} videos" if video_choices else "No videos found - check source/videos directory",
+                            interactive=True,
                         )
                         refresh_videos_btn = gr.Button("🔄 Refresh Video List")
                         video_button = gr.Button("▶️ Process Video", variant="primary")
@@ -443,7 +453,25 @@ def create_gradio_interface():
 
                 contestant_search.change(filter_timeline_wrapper, inputs=[contestant_search, contestant_filter, full_timeline_data], outputs=[recognition_timeline])
                 contestant_filter.change(filter_timeline_wrapper, inputs=[contestant_search, contestant_filter, full_timeline_data], outputs=[recognition_timeline])
-                refresh_videos_btn.click(lambda: gr.Dropdown(choices=get_app().get_video_titles_for_dropdown()), outputs=[video_dropdown])
+                def refresh_video_dropdown():
+                    try:
+                        refreshed_choices = get_app().get_video_titles_for_dropdown()
+                        logger.info(f"Refreshed video dropdown with {len(refreshed_choices)} choices")
+                        info_text = f"Found {len(refreshed_choices)} videos" if refreshed_choices else "No videos found - check source/videos directory"
+                        return gr.Dropdown(
+                            choices=refreshed_choices,
+                            info=info_text,
+                            interactive=True
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to refresh video dropdown: {e}")
+                        return gr.Dropdown(
+                            choices=[],
+                            info="Error loading videos - check logs",
+                            interactive=True
+                        )
+                
+                refresh_videos_btn.click(refresh_video_dropdown, outputs=[video_dropdown])
 
             with gr.Tab("⚙️ Settings"):
                 gr.Markdown("## ⚙️ System Configuration")

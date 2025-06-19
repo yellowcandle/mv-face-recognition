@@ -111,7 +111,13 @@ class EmbeddingService:
 
             embeddings_for_contestant = []
             for img_path in image_paths:
-                embedding = self.detector.extract_face_embedding(img_path)
+                # Load the image before extracting embedding
+                img = cv2.imread(img_path)
+                if img is None:
+                    logger.warning(f"Failed to read image: {img_path}")
+                    continue
+                    
+                embedding = self.detector.extract_face_embedding(img)
                 if embedding is not None:
                     embeddings_for_contestant.append(embedding)
             
