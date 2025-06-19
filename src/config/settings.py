@@ -100,7 +100,7 @@ class SystemConfig:
 
     # System paths
     project_root: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent.parent
+        default_factory=lambda: _get_project_root()
     )
     contestants_dir: Path = field(init=False)
     videos_dir: Path = field(init=False)
@@ -203,3 +203,33 @@ def save_config():
     config = get_config()
     config_path = os.getenv("CONFIG_PATH", "config.json")
     config.save_to_file(config_path)
+
+
+def _get_project_root() -> Path:
+    """Get the project root directory, handling different environments."""
+    # Try to find the project root by looking for key directories
+    current_path = Path(__file__).parent
+    
+    # Check if we're in a Hugging Face Spaces environment
+    if os.getenv("HF_SPACE_ID"):
+        # In HF Spaces, the app runs from /home/user/app/
+        # Check if we're in the expected structure
+        hf_app_path = Path("/home/user/app")
+        if hf_app_path.exists():
+            # Check if source/videos exists in the HF Spaces structure
+            hf_videos_path = hf_app_path / "source" / "videos"
+            if hf_videos_path.exists():
+                return hf_app_path
+            # If not, try the current working directory
+            cwd = Path.cwd()
+            if (cwd / "source" / "videos").exists():
+                return cwd
+    
+    # For local development, go up from config file to project root
+    # Look for source/videos directory
+    for parent in [current_path.parent, current_path.parent.parent, current_path.parent.parent.parent]:
+        if (parent / "source" / "videos").exists():
+            return parent
+    
+    # Fallback to the original logic
+    return current_path.parent.parent.parent

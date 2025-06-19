@@ -2,8 +2,31 @@
   "permissions": {
     "allow": [
       "Bash(git checkout:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(ruff check:*)",
+      "Bash(rg:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(chmod:*)",
+      "Bash(python -m pytest --version)",
+      "Bash(python run_tests.py:*)",
+      "Bash(python -m pytest tests/test_services.py::TestEmbeddingService::test_embedding_service_initialization -v)",
+      "Bash(python -m pytest tests/test_services.py::TestRecognitionService::test_recognition_service_initialization -v)",
+      "Bash(python -m pytest tests/test_services.py::TestVideoProcessingService::test_video_processing_service_initialization -v)",
+      "Bash(python -m pytest tests/ -x --tb=short)",
+      "Bash(python -m pytest tests/test_core.py::TestFaceDetector::test_face_detector_initialization -v)",
+      "Bash(python -m pytest tests/ --tb=line -q)",
+      "Bash(python -m pytest tests/ --collect-only -q)",
+      "Bash(python -m pytest tests/ --collect-only)",
+      "Bash(python -m pytest tests/test_services.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_services.py::TestRecognitionService::test_match_face_chroma_enabled -v)",
+      "Bash(python -m pytest tests/test_services.py -q)",
+      "Bash(python:*)",
+      "Bash(rm:*)"
     ]
   },
-  "enableAllProjectMcpServers": false
+  "enableAllProjectMcpServers": true
 }
