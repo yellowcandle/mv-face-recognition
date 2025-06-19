@@ -214,23 +214,30 @@ class FaceRecognitionApp:
         
         if not videos_dir.exists():
             logger.warning(f"Videos directory not found: {videos_dir}")
-            # Try alternative paths based on common deployment scenarios
+            # Try alternative paths based on common deployment scenarios  
+            # Prioritize HF Spaces clean video directories first
             alt_paths = [
-                Path.cwd() / "source" / "videos",
-                Path.cwd() / "source" / "videos_hf_clean",  # Alternative video location
-                Path.cwd() / "source" / "videos_hf_optimized",  # Another alternative
-                Path("/home/user/app") / "source" / "videos",
+                Path.cwd() / "source" / "videos_hf_clean",  # HF Spaces optimized videos
                 Path("/home/user/app") / "source" / "videos_hf_clean",
+                Path.cwd() / "source" / "videos_hf_optimized", 
+                Path("/home/user/app") / "source" / "videos_hf_optimized",
+                Path.cwd() / "source" / "videos",  # Original directory
+                Path("/home/user/app") / "source" / "videos",
                 Path("/app") / "source" / "videos",
                 Path(__file__).parent / "source" / "videos",
                 Path(__file__).parent.parent / "source" / "videos",
             ]
             
             for alt_path in alt_paths:
+                logger.debug(f"Checking video path: {alt_path} (exists: {alt_path.exists()})")
                 if alt_path.exists():
-                    logger.info(f"Found videos in alternative path: {alt_path}")
-                    videos_dir = alt_path
-                    break
+                    video_count = len(list(alt_path.glob("*.mp4")))
+                    logger.info(f"Found videos in alternative path: {alt_path} ({video_count} MP4 files)")
+                    if video_count > 0:
+                        videos_dir = alt_path
+                        break
+                    else:
+                        logger.warning(f"Directory exists but no MP4 files found: {alt_path}")
             else:
                 # If no videos directory found, check if there are any video folders
                 logger.warning("No standard videos directory found. Checking for any video directories...")
@@ -241,6 +248,10 @@ class FaceRecognitionApp:
                         videos_dir = video_dirs[0]
                         logger.info(f"Using video directory: {videos_dir}")
                     else:
+                        logger.warning("No video files found in any location. Creating placeholder structure.")
+                        # Create empty video directories for user uploads
+                        videos_dir = Path.cwd() / "source" / "videos"
+                        videos_dir.mkdir(parents=True, exist_ok=True)
                         return [], {}
                 else:
                     return [], {}

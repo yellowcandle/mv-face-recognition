@@ -127,13 +127,53 @@ def main():
     if not check_environment():
         print("⚠️ Environment check failed. Some features may not work.")
 
-    # Initialize HF Spaces environment
+    # Initialize HF Spaces environment - inline to avoid import issues
     try:
-        from init_hf_spaces import main as init_hf_spaces
-        init_hf_spaces()
+        from pathlib import Path
+        
+        print("🚀 Initializing HF Spaces environment...")
+        
+        # Check if contestants directory exists with files
+        contestants_dir = Path("source/photo/contestants")
+        if contestants_dir.exists():
+            jpg_files = list(contestants_dir.glob("**/*.jpg"))
+            npy_files = list(contestants_dir.glob("**/*.npy"))
+            print(f"✅ Found {len(jpg_files)} JPG files and {len(npy_files)} NPY files in contestants directory")
+        else:
+            print("📁 Creating contestants directory structure...")
+            contestants_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create sample contestant for testing
+            sample_dir = contestants_dir / "sample"
+            sample_dir.mkdir(exist_ok=True)
+            (sample_dir / "README.txt").write_text("Sample contestant - upload photos via interface")
+            print(f"✅ Created sample contestant directory: {sample_dir}")
+        
+        # Ensure video directories exist
+        video_dirs = [
+            "source/videos",
+            "source/videos_hf_clean", 
+            "source/videos_hf_optimized"
+        ]
+        
+        for video_dir in video_dirs:
+            vid_path = Path(video_dir)
+            vid_path.mkdir(parents=True, exist_ok=True)
+            video_count = len(list(vid_path.glob("*.mp4")))
+            if video_count > 0:
+                print(f"✅ Found {video_count} videos in {video_dir}")
+            else:
+                print(f"📁 Created empty video directory: {video_dir}")
+        
+        # Create other required directories
+        for dir_name in ["cache", "output", "output_frames", "output_mp4s"]:
+            Path(dir_name).mkdir(parents=True, exist_ok=True)
+        
+        print("✅ HF Spaces environment initialization complete")
+        
     except Exception as e:
         print(f"⚠️ HF Spaces initialization warning: {e}")
-        # Fallback basic directory creation
+        # Minimal fallback
         from pathlib import Path
         for dir_name in ["source/photo/contestants", "source/videos", "cache", "output"]:
             Path(dir_name).mkdir(parents=True, exist_ok=True)
