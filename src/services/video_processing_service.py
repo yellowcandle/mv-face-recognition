@@ -103,10 +103,16 @@ class VideoProcessingService:
             out.write(annotated_frame)
 
             if progress_callback:
-                progress_callback(
-                    frame_count / total_frames,
-                    desc=f"Processing frame {frame_count}/{total_frames}",
-                )
+                try:
+                    # Gradio 5.x progress update
+                    progress_callback(
+                        frame_count / total_frames,
+                        desc=f"Processing frame {frame_count}/{total_frames}",
+                    )
+                except Exception as e:
+                    # Fallback for different progress callback signatures
+                    logger.debug(f"Progress callback error (non-critical): {e}")
+                    pass
 
         cap.release()
         out.release()

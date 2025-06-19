@@ -25,7 +25,10 @@
       "Bash(python -m pytest tests/test_services.py::TestRecognitionService::test_match_face_chroma_enabled -v)",
       "Bash(python -m pytest tests/test_services.py -q)",
       "Bash(python:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:huggingface.co)",
+      "Bash(git lfs track:*)",
+      "Bash(git lfs:*)"
     ]
   },
   "enableAllProjectMcpServers": true
