@@ -235,49 +235,45 @@ class FaceRecognitionDashboard:
 
     def create_video_player_panel(self):
         """Create the video player panel (60% width) with detection overlays."""
-        with gr.Column(scale=3):  # 60% width
-            with gr.Group():
-                gr.Markdown("### 🎥 Video Player", elem_classes=["panel-header"])
-                
-                # Video selection
-                video_titles, self.title_to_path_mapping = self.get_available_videos()
-                video_dropdown = gr.Dropdown(
-                    choices=video_titles,
-                    label="Select Video",
-                    interactive=True
-                )
-                
-                # Video display with overlay
-                video_display = gr.Video(
-                    label="",
-                    show_label=False,
-                    height=400,
-                    interactive=False
-                )
-                
-                # Video controls
-                with gr.Row():
-                    play_btn = gr.Button("▶️ Play", size="sm")
-                    pause_btn = gr.Button("⏸️ Pause", size="sm")
-                    stop_btn = gr.Button("⏹️ Stop", size="sm")
-                    process_btn = gr.Button("🔍 Process Video", variant="primary")
-                
-                # Video info overlay
-                video_info = gr.HTML("""
-                <div style="
-                    display: flex; 
-                    justify-content: space-between; 
-                    background: rgba(0,0,0,0.7); 
-                    color: white; 
-                    padding: 8px 16px; 
-                    border-radius: 4px; 
-                    margin-top: 5px;
-                ">
-                    <span id="fps-display">-- FPS</span>
-                    <span id="resolution-display">--x--</span>
-                </div>
-                """)
-                
+        # Video selection
+        video_titles, self.title_to_path_mapping = self.get_available_videos()
+        video_dropdown = gr.Dropdown(
+            choices=video_titles,
+            label="Select Video",
+            interactive=True
+        )
+        
+        # Video display with 16:9 aspect ratio (following DESIGN.md)
+        video_display = gr.Video(
+            label="",
+            show_label=False,
+            height=480,  # 16:9 aspect ratio for 854x480
+            interactive=False
+        )
+        
+        # Video controls
+        with gr.Row():
+            play_btn = gr.Button("▶️ Play", size="sm")
+            pause_btn = gr.Button("⏸️ Pause", size="sm")
+            stop_btn = gr.Button("⏹️ Stop", size="sm")
+            process_btn = gr.Button("🔍 Process Video", variant="primary")
+        
+        # Video info overlay (frame rate and resolution as per DESIGN.md)
+        video_info = gr.HTML("""
+        <div style="
+            display: flex; 
+            justify-content: space-between; 
+            background: rgba(0,0,0,0.7); 
+            color: white; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            margin-top: 5px;
+        ">
+            <span id="fps-display">-- FPS</span>
+            <span id="resolution-display">--x--</span>
+        </div>
+        """)
+        
         return {
             'video_dropdown': video_dropdown,
             'video_display': video_display,
@@ -290,56 +286,57 @@ class FaceRecognitionDashboard:
 
     def create_face_recognition_panel(self):
         """Create the face recognition panel (40% width) with face tiles grid."""
-        with gr.Column(scale=2):  # 40% width
-            with gr.Group():
-                # Panel header
-                face_count_html = gr.HTML("""
-                <div style="
-                    display: flex; 
-                    justify-content: space-between; 
-                    align-items: center; 
-                    background: #1e293b; 
-                    color: white; 
-                    padding: 15px; 
-                    border-radius: 8px 8px 0 0;
-                ">
-                    <h3 style="margin: 0; color: white;">👥 Detected Faces</h3>
-                    <div style="
-                        background: #3b82f6; 
-                        color: white; 
-                        padding: 4px 12px; 
-                        border-radius: 20px; 
-                        font-weight: bold;
-                    ">
-                        0
-                    </div>
-                </div>
-                """)
-                
-                # Face tiles grid
-                face_tiles_html = gr.HTML("""
-                <div id="face-tiles-container" style="
-                    background: #1e293b; 
-                    padding: 20px; 
-                    max-height: 600px; 
-                    overflow-y: auto;
-                    border-radius: 0 0 8px 8px;
-                ">
-                    <div style="
-                        display: flex; 
-                        flex-direction: column; 
-                        align-items: center; 
-                        justify-content: center; 
-                        height: 200px; 
-                        color: #64748b; 
-                        text-align: center;
-                    ">
-                        <div style="font-size: 48px; margin-bottom: 16px;">👤</div>
-                        <p style="margin: 0; font-size: 16px;">No faces detected</p>
-                        <p style="margin: 4px 0 0 0; font-size: 14px;">Start processing to see faces</p>
-                    </div>
-                </div>
-                """)
+        # Panel header matching DESIGN.md (Dark blue-gray #1e293b background)
+        face_count_html = gr.HTML("""
+        <div style="
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #1e293b; 
+            color: white; 
+            padding: 15px; 
+            border-radius: 8px 8px 0 0;
+        ">
+            <h3 style="margin: 0; color: white;">Detected Faces</h3>
+            <div style="
+                background: #3b82f6; 
+                color: white; 
+                padding: 4px 12px; 
+                border-radius: 20px; 
+                font-weight: bold;
+            ">
+                0
+            </div>
+        </div>
+        """)
+        
+        # Face tiles grid following DESIGN.md specifications:
+        # - 120x120px per tile 
+        # - 3 columns layout with 10px gap
+        # - Color-coded borders (green/yellow/red by confidence)
+        face_tiles_html = gr.HTML("""
+        <div id="face-tiles-container" style="
+            background: #1e293b; 
+            padding: 20px; 
+            max-height: 600px; 
+            overflow-y: auto;
+            border-radius: 0 0 8px 8px;
+        ">
+            <div style="
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                height: 200px; 
+                color: #64748b; 
+                text-align: center;
+            ">
+                <div style="font-size: 48px; margin-bottom: 16px;">👤</div>
+                <p style="margin: 0; font-size: 16px;">No faces detected</p>
+                <p style="margin: 4px 0 0 0; font-size: 14px;">Start processing to see faces</p>
+            </div>
+        </div>
+        """)
         
         return {
             'face_count_html': face_count_html,
@@ -348,74 +345,75 @@ class FaceRecognitionDashboard:
 
     def create_similarity_scores_panel(self):
         """Create the similarity scores panel (bottom) with confidence chart."""
-        with gr.Group():
-            gr.Markdown("### 📊 Recognition Confidence Scores", elem_classes=["panel-header"])
+        # Horizontal bar chart as specified in DESIGN.md
+        # Background: Dark gray (#374151), Height: 200px
+        similarity_chart = gr.HTML("""
+        <div style="
+            background: #374151; 
+            padding: 20px; 
+            border-radius: 8px; 
+            height: 200px;
+            position: relative;
+            margin-top: 10px;
+        ">
+            <h3 style="margin: 0 0 15px 0; color: white; font-size: 18px;">Recognition Confidence Scores</h3>
             
-            # Chart container
-            similarity_chart = gr.HTML("""
-            <div id="similarity-chart-container" style="
-                background: #374151; 
-                padding: 20px; 
-                border-radius: 8px; 
-                height: 200px;
-                position: relative;
+            <div style="
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                height: 120px; 
+                color: #9ca3af; 
+                text-align: center;
             ">
-                <div style="
-                    display: flex; 
-                    flex-direction: column; 
-                    align-items: center; 
-                    justify-content: center; 
-                    height: 100%; 
-                    color: #9ca3af; 
-                    text-align: center;
-                ">
-                    <div style="font-size: 32px; margin-bottom: 12px;">📊</div>
-                    <p style="margin: 0; font-size: 14px; font-weight: 500;">No recognition data</p>
-                    <p style="margin: 4px 0 0 0; font-size: 12px;">Confidence scores will appear here when faces are recognized</p>
-                </div>
-                
-                <!-- Chart legend -->
-                <div style="
-                    position: absolute; 
-                    bottom: 10px; 
-                    left: 10px; 
-                    background: rgba(0,0,0,0.8); 
-                    padding: 8px 12px; 
-                    border-radius: 6px; 
-                    font-size: 12px; 
-                    color: white;
-                    display: none;
-                " id="chart-legend">
-                    <div style="display: flex; gap: 16px;">
-                        <span><span style="color: #22c55e;">●</span> High (90%+)</span>
-                        <span><span style="color: #eab308;">●</span> Med (70-90%)</span>
-                        <span><span style="color: #ef4444;">●</span> Low (&lt;70%)</span>
-                    </div>
-                </div>
-                
-                <!-- Real-time indicator -->
-                <div style="
-                    position: absolute; 
-                    top: 10px; 
-                    right: 10px; 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 6px; 
-                    font-size: 12px; 
-                    color: #9ca3af;
-                    display: none;
-                " id="realtime-indicator">
-                    <div style="
-                        width: 6px; 
-                        height: 6px; 
-                        background: #22c55e; 
-                        border-radius: 50%; 
-                        animation: pulse 1.5s infinite;
-                    "></div>
-                    Real-time updates
+                <div style="font-size: 32px; margin-bottom: 12px;">📊</div>
+                <p style="margin: 0; font-size: 14px; font-weight: 500;">No recognition data</p>
+                <p style="margin: 4px 0 0 0; font-size: 12px;">Confidence scores will appear here when faces are recognized</p>
+            </div>
+            
+            <!-- Chart legend -->
+            <div style="
+                position: absolute; 
+                bottom: 10px; 
+                left: 10px; 
+                background: rgba(0,0,0,0.8); 
+                padding: 8px 12px; 
+                border-radius: 6px; 
+                font-size: 12px; 
+                color: white;
+                display: none;
+            " id="chart-legend">
+                <div style="display: flex; gap: 16px;">
+                    <span><span style="color: #22c55e;">●</span> High (90%+)</span>
+                    <span><span style="color: #eab308;">●</span> Med (70-90%)</span>
+                    <span><span style="color: #ef4444;">●</span> Low (&lt;70%)</span>
                 </div>
             </div>
-            """)
+            
+            <!-- Real-time indicator -->
+            <div style="
+                position: absolute; 
+                top: 10px; 
+                right: 10px; 
+                display: flex; 
+                align-items: center; 
+                gap: 6px; 
+                font-size: 12px; 
+                color: #9ca3af;
+                display: none;
+            " id="realtime-indicator">
+                <div style="
+                    width: 6px; 
+                    height: 6px; 
+                    background: #22c55e; 
+                    border-radius: 50%; 
+                    animation: pulse 1.5s infinite;
+                "></div>
+                Real-time updates
+            </div>
+        </div>
+        """)
         
         return similarity_chart
 
@@ -523,10 +521,35 @@ class FaceRecognitionDashboard:
         self.similarity_scores = recognized_faces[-10:]
 
     def _generate_face_tiles_html(self):
-        """Generate HTML for face tiles grid."""
+        """Generate HTML for face tiles grid following DESIGN.md specifications."""
         if not self.face_tiles_data:
             return """
             <div style="
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+                background: #1e293b; 
+                color: white; 
+                padding: 15px; 
+                border-radius: 8px 8px 0 0;
+            ">
+                <h3 style="margin: 0; color: white;">Detected Faces</h3>
+                <div style="
+                    background: #3b82f6; 
+                    color: white; 
+                    padding: 4px 12px; 
+                    border-radius: 20px; 
+                    font-weight: bold;
+                ">
+                    0
+                </div>
+            </div>
+            <div style="
+                background: #1e293b; 
+                padding: 20px; 
+                max-height: 600px; 
+                overflow-y: auto;
+                border-radius: 0 0 8px 8px;
                 display: flex; 
                 flex-direction: column; 
                 align-items: center; 
@@ -544,6 +567,7 @@ class FaceRecognitionDashboard:
         # Update face count
         face_count = len(self.face_tiles_data)
         
+        # DESIGN.md specifications: 3 columns, 120x120px tiles, 10px gap
         tiles_html = f'''
         <div style="
             display: flex; 
@@ -554,7 +578,7 @@ class FaceRecognitionDashboard:
             padding: 15px; 
             border-radius: 8px 8px 0 0;
         ">
-            <h3 style="margin: 0; color: white;">👥 Detected Faces</h3>
+            <h3 style="margin: 0; color: white;">Detected Faces</h3>
             <div style="
                 background: #3b82f6; 
                 color: white; 
@@ -572,15 +596,24 @@ class FaceRecognitionDashboard:
             overflow-y: auto;
             border-radius: 0 0 8px 8px;
         ">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div style="
+                display: grid; 
+                grid-template-columns: repeat(3, 120px); 
+                gap: 10px; 
+                justify-content: start;
+            ">
         '''
         
         for tile in self.face_tiles_data:
             confidence_pct = int(tile['confidence'] * 100)
             is_selected = tile['id'] == self.selected_face_id
             
+            # DESIGN.md Face Tile Specifications:
+            # - Size: 120x120px per tile
+            # - Border: 2px solid, color-coded by confidence
+            # - Content: Cropped face image (100x100px), Name/ID, Confidence %, Timestamp
             tiles_html += f"""
-            <div style="
+            <div class="face-tile" style="
                 width: 120px; 
                 height: 120px; 
                 border: 2px solid {tile['border_color']}; 
@@ -588,8 +621,11 @@ class FaceRecognitionDashboard:
                 background: #2d3748; 
                 cursor: pointer; 
                 transition: transform 0.2s;
+                position: relative;
+                overflow: hidden;
                 {'transform: scale(1.05); box-shadow: 0 0 0 2px #3b82f6;' if is_selected else ''}
             " onclick="selectFace('{tile['id']}')">
+                <!-- Face crop area (100x100px as per DESIGN.md) -->
                 <div style="
                     width: 100px; 
                     height: 80px; 
@@ -602,20 +638,35 @@ class FaceRecognitionDashboard:
                     color: #a0aec0; 
                     font-size: 24px;
                     position: relative;
+                    overflow: hidden;
                 ">
+                    <!-- TODO: Replace with actual face crop image -->
                     👤
-                    {f'<div style="position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;"></div>' if is_selected else ''}
+                    {f'<div style="position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; animation: pulse 1.5s infinite;"></div>' if is_selected else ''}
                 </div>
+                
+                <!-- Name/ID label and metadata -->
                 <div style="
                     text-align: center; 
                     color: white; 
                     font-size: 10px; 
                     padding: 0 4px;
+                    position: absolute;
+                    bottom: 4px;
+                    left: 0;
+                    right: 0;
                 ">
-                    <div style="font-weight: bold; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <div style="
+                        font-weight: bold; 
+                        margin-bottom: 2px; 
+                        white-space: nowrap; 
+                        overflow: hidden; 
+                        text-overflow: ellipsis;
+                        font-size: 11px;
+                    ">
                         {tile['name']}
                     </div>
-                    <div style="color: #a0aec0;">
+                    <div style="color: #a0aec0; font-size: 9px;">
                         {confidence_pct}% • {tile['timestamp']}
                     </div>
                 </div>
@@ -739,15 +790,46 @@ def create_dashboard_interface():
     """Create the main dashboard interface according to DESIGN.md specifications."""
     dashboard = FaceRecognitionDashboard()
     
-    # Custom CSS for the dashboard
+    # Custom CSS following DESIGN.md specifications
     css = """
-    .panel-header h3 {
-        color: white !important;
-        margin: 0 !important;
-    }
-    
     .gradio-container {
         max-width: none !important;
+        background: #000000 !important;
+    }
+    
+    /* DESIGN.md Layout Specifications */
+    .main-container {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .header-bar {
+        height: 60px;
+        background: #2a2a2a;
+        color: white;
+    }
+    
+    .content-area {
+        flex: 1;
+        display: flex;
+    }
+    
+    .video-panel {
+        width: 60%;
+        background: #000000;
+        padding: 10px;
+    }
+    
+    .face-panel {
+        width: 40%;
+        background: #1e293b;
+        padding: 10px;
+    }
+    
+    .similarity-panel {
+        height: 200px;
+        background: #374151;
     }
     
     @keyframes pulse {
@@ -755,44 +837,33 @@ def create_dashboard_interface():
         50% { opacity: 0.5; }
     }
     
+    /* Face tile grid specifications from DESIGN.md */
+    .face-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 120px);
+        gap: 10px;
+        max-height: 500px;
+        overflow-y: auto;
+        padding: 10px;
+    }
+    
+    .face-tile {
+        width: 120px;
+        height: 120px;
+        border: 2px solid;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
     .face-tile:hover {
         transform: scale(1.05);
     }
     
-    /* Enhanced dashboard styling */
-    .dashboard-panel {
-        background: #1f2937;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .video-controls {
-        background: rgba(0, 0, 0, 0.8);
-        border-radius: 8px;
-        padding: 12px;
-        margin-top: 10px;
-    }
-    
-    .face-grid {
-        max-height: 500px;
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: #4b5563 #1f2937;
-    }
-    
-    .face-grid::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    .face-grid::-webkit-scrollbar-track {
-        background: #1f2937;
-    }
-    
-    .face-grid::-webkit-scrollbar-thumb {
-        background: #4b5563;
-        border-radius: 4px;
-    }
+    /* Confidence color coding from DESIGN.md */
+    .confidence-high { border-color: #22c55e; }    /* Green: >90% */
+    .confidence-medium { border-color: #eab308; }  /* Yellow: 70-90% */
+    .confidence-low { border-color: #ef4444; }     /* Red: <70% */
     """
     
     with gr.Blocks(
@@ -800,21 +871,23 @@ def create_dashboard_interface():
         css=css,
         theme=gr.themes.Soft(primary_hue="blue", secondary_hue="gray")
     ) as demo:
-        # Header Bar (60px height)
+        # Header Bar (60px height) - DESIGN.md specification
         header = dashboard.create_header_component()
         
-        # Main Content Area
-        with gr.Row():
-            # Video Player Panel (60% width)
-            video_components = dashboard.create_video_player_panel()
+        # Main Content Area - Two-column layout as per DESIGN.md
+        with gr.Row(elem_classes=["content-area"]):
+            # Video Player Panel (60% width) - DESIGN.md specification
+            with gr.Column(scale=3, elem_classes=["video-panel"]):
+                video_components = dashboard.create_video_player_panel()
             
-            # Face Recognition Panel (40% width)  
-            face_components = dashboard.create_face_recognition_panel()
+            # Face Recognition Panel (40% width) - DESIGN.md specification  
+            with gr.Column(scale=2, elem_classes=["face-panel"]):
+                face_components = dashboard.create_face_recognition_panel()
         
-        # Similarity Scores Panel (200px height)
+        # Similarity Scores Panel (200px height) - DESIGN.md specification
         similarity_chart = dashboard.create_similarity_scores_panel()
         
-        # Add JavaScript for face interaction
+        # Add JavaScript for face interaction as specified in DESIGN.md
         js_code = """
         <script>
         function selectFace(faceId) {
@@ -830,17 +903,17 @@ def create_dashboard_interface():
             event.target.closest('[onclick*="selectFace"]').style.transform = 'scale(1.05)';
             event.target.closest('[onclick*="selectFace"]').style.boxShadow = '0 0 0 2px #3b82f6';
             
-            // Could trigger video highlighting here
+            // Highlight corresponding detection in video (DESIGN.md requirement)
             highlightVideoDetection(faceId);
         }
         
         function highlightVideoDetection(faceId) {
-            // This would highlight the corresponding detection in the video
+            // Highlight the corresponding detection in video panel
             console.log('Highlighting video detection for:', faceId);
             // Implementation would depend on video overlay system
         }
         
-        // Update timestamps every second
+        // Update timestamps every second for real-time display
         setInterval(() => {
             const timestampElements = document.querySelectorAll('[id*="timestamp"]');
             const now = new Date().toLocaleString();
@@ -867,7 +940,7 @@ def create_dashboard_interface():
             ]
         )
         
-        # Refresh video list
+        # Refresh video list functionality
         refresh_btn = gr.Button("🔄 Refresh Videos", size="sm")
         refresh_btn.click(
             lambda: gr.Dropdown(choices=dashboard.get_available_videos()[0]),
