@@ -1263,6 +1263,10 @@ class FaceRecognitionApp:
 
     def get_available_videos(self):
         """Get list of available videos with titles from the source directory."""
+        # Cache check to prevent redundant scanning
+        if hasattr(self, '_cached_videos') and hasattr(self, '_cached_mapping'):
+            return self._cached_videos, self._cached_mapping
+            
         # Import video title mapping
         try:
             from src.config.video_titles import VIDEO_TITLE_MAPPING, get_video_display_title
@@ -1274,17 +1278,18 @@ class FaceRecognitionApp:
         
         # Try different video directories in order of preference - prioritize original resolution
         videos_dirs = [
+            Path("source/videos_optimized"),
             Path("source/videos"),  # For local development - original resolution
             Path("/Users/swong/dev/mv-face-recognition/source/videos"),  # Absolute path fallback
-            Path("source/videos_hf_clean"),  # For HF Spaces deployment (clean ASCII names)
-            Path("source/videos_hf_optimized")  # For HF Spaces deployment (optimized 720p)
         ]
         
         videos_dir = None
         for dir_path in videos_dirs:
             if dir_path.exists():
                 videos_dir = dir_path
-                print(f"📁 Using videos directory: {videos_dir}")
+                if not hasattr(self, '_videos_dir_logged'):
+                    print(f"📁 Using videos directory: {videos_dir}")
+                    self._videos_dir_logged = True
                 break
         
         if not videos_dir:
@@ -1350,6 +1355,11 @@ class FaceRecognitionApp:
 
         # Store the mapping in the instance
         self.title_to_path_mapping = title_to_path_mapping
+        
+        # Cache the results to prevent redundant scanning
+        self._cached_videos = video_files
+        self._cached_mapping = title_to_path_mapping
+        
         return video_files, title_to_path_mapping
 
     def get_video_titles_for_dropdown(self):
