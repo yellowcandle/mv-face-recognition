@@ -206,79 +206,37 @@ class FaceRecognitionApp:
         return contestants_dir
 
     def get_available_videos(self):
-        """Get list of available videos with titles from the source directory."""
+        """
+        Get list of available videos, prioritizing 'videos_hf_optimized' directory.
+        """
         try:
             from src.config.video_titles import VIDEO_TITLE_MAPPING
         except ImportError:
             VIDEO_TITLE_MAPPING = {}
+
+        # Define search paths with priority
+        search_paths = [
+            self.config.project_root / "source" / "videos_hf_optimized",
+            Path("/home/user/app") / "source" / "videos_hf_optimized",
+            self.config.project_root / "source" / "videos_hf_clean",
+            Path("/home/user/app") / "source" / "videos_hf_clean",
+            self.config.project_root / "source" / "videos",
+            Path("/home/user/app") / "source" / "videos",
+        ]
+
+        videos_dir = None
+        for path in search_paths:
+            if path.exists() and any(path.glob("*.mp4")):
+                logger.info(f"✅ Using video directory: {path}")
+                videos_dir = path
+                break
         
-        videos_dir = self.config.project_root / "source/videos"
-        
-        # Add debugging information
-        logger.info(f"Looking for videos in: {videos_dir}")
-        logger.info(f"Project root: {self.config.project_root}")
-        logger.info(f"Current working directory: {Path.cwd()}")
-        logger.info(f"Script file location: {Path(__file__).parent}")
-        
-        # Check if primary directory has videos (not just if it exists)
-        primary_video_count = 0
-        if videos_dir.exists():
-            primary_video_count = len(list(videos_dir.glob("*.mp4"))) + len(list(videos_dir.glob("*.mov"))) + len(list(videos_dir.glob("*.avi")))
-            logger.info(f"Primary directory has {primary_video_count} video files")
-        
-        if not videos_dir.exists() or primary_video_count == 0:
-            if primary_video_count == 0:
-                logger.warning(f"Primary videos directory is empty: {videos_dir}")
-            else:
-                logger.warning(f"Videos directory not found: {videos_dir}")
-                
-            # Check ALL possible video directories and find the best one
-            logger.info("🔍 Scanning all possible video directories...")
-            alt_paths = [
-                Path.cwd() / "source" / "videos_hf_clean",  # HF Spaces optimized videos
-                Path("/home/user/app") / "source" / "videos_hf_clean",
-                Path.cwd() / "source" / "videos_hf_optimized", 
-                Path("/home/user/app") / "source" / "videos_hf_optimized",
-                Path.cwd() / "source" / "videos",  # Original directory
-                Path("/home/user/app") / "source" / "videos",
-                Path("/app") / "source" / "videos",
-                Path(__file__).parent / "source" / "videos",
-                Path(__file__).parent.parent / "source" / "videos",
-            ]
-            
-            best_dir = None
-            max_videos = 0
-            
-            for alt_path in alt_paths:
-                if alt_path.exists():
-                    video_count = len(list(alt_path.glob("*.mp4"))) + len(list(alt_path.glob("*.mov"))) + len(list(alt_path.glob("*.avi")))
-                    logger.info(f"📁 {alt_path}: {video_count} video files")
-                    if video_count > max_videos:
-                        max_videos = video_count
-                        best_dir = alt_path
-                else:
-                    logger.debug(f"📁 {alt_path}: does not exist")
-            
-            if best_dir and max_videos > 0:
-                logger.info(f"✅ Using video directory with most files: {best_dir} ({max_videos} videos)")
-                videos_dir = best_dir
-            else:
-                # If no videos directory found, check if there are any video folders
-                logger.warning("No standard videos directory found. Checking for any video directories...")
-                source_dir = Path.cwd() / "source"
-                if source_dir.exists():
-                    video_dirs = [d for d in source_dir.iterdir() if d.is_dir() and "video" in d.name.lower()]
-                    if video_dirs:
-                        videos_dir = video_dirs[0]
-                        logger.info(f"Using video directory: {videos_dir}")
-                    else:
-                        logger.warning("No video files found in any location. Creating placeholder structure.")
-                        # Create empty video directories for user uploads
-                        videos_dir = Path.cwd() / "source" / "videos"
-                        videos_dir.mkdir(parents=True, exist_ok=True)
-                        return [], {}
-                else:
-                    return [], {}
+        if not videos_dir:
+            logger.warning("No videos found in any of the prioritized directories.")
+            # Fallback to creating an empty directory for uploads
+            videos_dir = self.config.project_root / "source" / "videos"
+            videos_dir.mkdir(parents=True, exist_ok=True)
+            return [], {}
 
         video_files = []
         title_to_path_mapping = {}
@@ -607,7 +565,9 @@ def create_gradio_interface():
                     process_video_wrapper,
                     inputs=[video_dropdown],
                     outputs=[video_output, video_results, full_timeline_data, timeline_bundle_state]
-                ).then(
+                )
+                
+                timeline_bundle_state.change(
                     update_timeline_display,
                     inputs=[timeline_bundle_state],
                     outputs=[recognition_timeline, contestant_filter, timeline_stats]
