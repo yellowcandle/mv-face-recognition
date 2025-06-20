@@ -18,7 +18,10 @@ models/
 
 # Large data files
 recognized_frames/
-*.mp4
+source/videos/*.mp4
+# source/videos_optimized/
+source/videos_hf_clean/
+source/videos_hf_optimized/
 *.avi
 *.mov
 *.mkv
