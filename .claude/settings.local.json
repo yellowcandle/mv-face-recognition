@@ -28,7 +28,9 @@
       "Bash(rm:*)",
       "WebFetch(domain:huggingface.co)",
       "Bash(git lfs track:*)",
-      "Bash(git lfs:*)"
+      "Bash(git lfs:*)",
+      "Bash(cp:*)",
+      "Bash(git show:*)"
     ]
   },
   "enableAllProjectMcpServers": true
