@@ -74,17 +74,31 @@ def check_environment():
 def create_demo():
     """Create and return the Gradio demo."""
     try:
-        from gradio_app import create_gradio_interface
+        # Try the new dashboard interface first
+        from dashboard_gradio import create_dashboard_interface
 
-        print("🌐 Creating Gradio 5.x interface...")
-        demo = create_gradio_interface()
+        print("🌐 Creating Face Recognition Dashboard...")
+        demo = create_dashboard_interface()
 
-        print("✅ Interface created successfully")
+        print("✅ Dashboard interface created successfully")
         return demo
 
     except ImportError as e:
-        print(f"⚠️ Module import warning: {e}")
-        print("🔄 Creating fallback interface...")
+        print(f"⚠️ Dashboard import failed: {e}")
+        print("🔄 Trying original interface...")
+        
+        try:
+            from gradio_app import create_gradio_interface
+
+            print("🌐 Creating Gradio 5.x interface...")
+            demo = create_gradio_interface()
+
+            print("✅ Interface created successfully")
+            return demo
+
+        except ImportError as e2:
+            print(f"⚠️ Module import warning: {e2}")
+            print("🔄 Creating fallback interface...")
 
         # Fallback minimal interface if imports fail
         import gradio as gr
