@@ -19,6 +19,7 @@ from src.services.embedding_service import EmbeddingService
 from src.services.recognition_service import RecognitionService
 from src.services.video_processing_service import VideoProcessingService
 from src.services.visualization import VisualizationService
+from src.services.dataset_service import VideoDatasetManager
 
 # Suppress warnings BEFORE any other imports
 warnings.filterwarnings("ignore", message=".*rcond.*")
@@ -99,6 +100,7 @@ class FaceRecognitionApp:
         self.recognition_service: Optional[RecognitionService] = None
         self.video_processing_service: Optional[VideoProcessingService] = None
         self.visualization_service: Optional[VisualizationService] = None
+        self.dataset_manager: Optional[VideoDatasetManager] = None
 
         # UI state
         self.processing_video = False
@@ -121,6 +123,8 @@ class FaceRecognitionApp:
                 self.recognition_service = RecognitionService(use_chroma=self.config.recognition.enable_chromadb)
             if self.visualization_service is None:
                 self.visualization_service = VisualizationService()
+            if self.dataset_manager is None:
+                self.dataset_manager = VideoDatasetManager()
             
             # Services that need a detector.
             if self.face_detector and self.video_processing_service is None:
@@ -205,61 +209,68 @@ class FaceRecognitionApp:
         
         return contestants_dir
 
-    def get_available_videos(self):
+    def get_available_videos(self, quality="720p"):
         """
-        Get list of available videos, prioritizing 'videos_hf_optimized' directory.
+        Get list of available videos using the dataset manager with quality selection.
         """
         try:
             from src.config.video_titles import VIDEO_TITLE_MAPPING
         except ImportError:
             VIDEO_TITLE_MAPPING = {}
 
-        # Define search paths with priority
-        search_paths = [
-            self.config.project_root / "source" / "videos_hf_optimized",
-            Path("/home/user/app") / "source" / "videos_hf_optimized",
-            self.config.project_root / "source" / "videos_hf_clean",
-            Path("/home/user/app") / "source" / "videos_hf_clean",
-            self.config.project_root / "source" / "videos",
-            Path("/home/user/app") / "source" / "videos",
-        ]
+        # Initialize dataset manager if not already done
+        if self.dataset_manager is None:
+            self.dataset_manager = VideoDatasetManager()
 
-        videos_dir = None
-        for path in search_paths:
-            if path.exists() and any(path.glob("*.mp4")):
-                logger.info(f"✅ Using video directory: {path}")
-                videos_dir = path
-                break
-        
-        if not videos_dir:
-            logger.warning("No videos found in any of the prioritized directories.")
-            # Fallback to creating an empty directory for uploads
-            videos_dir = self.config.project_root / "source" / "videos"
-            videos_dir.mkdir(parents=True, exist_ok=True)
+        # Get videos from dataset manager
+        try:
+            videos = self.dataset_manager.get_available_videos(quality)
+            
+            video_files = []
+            title_to_path_mapping = {}
+            
+            for video in videos:
+                filename = video['filename']
+                display_title = VIDEO_TITLE_MAPPING.get(filename, Path(filename).stem)
+                video_files.append(display_title)
+                
+                # Use full_path if available (local files), otherwise use filename for dataset files
+                path = video.get('full_path', filename)
+                title_to_path_mapping[display_title] = path
+            
+            logger.info(f"Found {len(video_files)} video files ({quality}) via dataset manager")
+            self.title_to_path_mapping = title_to_path_mapping
+            return sorted(video_files), title_to_path_mapping
+            
+        except Exception as e:
+            logger.error(f"Error getting videos from dataset manager: {e}")
+            # Fallback to empty list
             return [], {}
 
-        video_files = []
-        title_to_path_mapping = {}
-        for ext in ["*.mp4", "*.mov", "*.avi"]:
-            for video_file in videos_dir.glob(ext):
-                display_title = VIDEO_TITLE_MAPPING.get(video_file.name, video_file.stem)
-                video_files.append(display_title)
-                title_to_path_mapping[display_title] = str(video_file)
-        
-        logger.info(f"Found {len(video_files)} video files in {videos_dir}")
-        self.title_to_path_mapping = title_to_path_mapping
-        return sorted(video_files), title_to_path_mapping
-
-    def get_video_titles_for_dropdown(self):
+    def get_video_titles_for_dropdown(self, quality="720p"):
         """Get just the video titles for the dropdown."""
-        video_titles, _ = self.get_available_videos()
+        video_titles, _ = self.get_available_videos(quality)
         return video_titles
 
-    def get_video_path_from_title(self, title):
+    def get_video_path_from_title(self, title, quality="720p"):
         """Get the file path from the selected title."""
         if not self.title_to_path_mapping:
-            self.get_available_videos()
-        return self.title_to_path_mapping.get(title, title)
+            self.get_available_videos(quality)
+        
+        path = self.title_to_path_mapping.get(title, title)
+        
+        # If we have a dataset manager and the path is not a full path, try to get it
+        if self.dataset_manager and not Path(path).exists():
+            try:
+                # Try to extract video ID from title for dataset lookup
+                video_id = title.split("-")[0] if "-" in title else title[:3]
+                dataset_path = self.dataset_manager.get_video_path(video_id, quality)
+                if dataset_path:
+                    return dataset_path
+            except Exception as e:
+                logger.warning(f"Could not get video path from dataset: {e}")
+        
+        return path
 
     def _create_timeline_data(self, results_df):
         """Create timeline data for native Gradio Dataframe component."""
@@ -526,6 +537,11 @@ def create_gradio_interface():
                             choices=get_app().get_video_titles_for_dropdown(),
                             label="📹 Choose Video",
                         )
+                        quality_dropdown = gr.Dropdown(
+                            choices=["480p", "720p", "1080p"],
+                            value="720p",
+                            label="🎬 Video Quality"
+                        )
                         refresh_videos_btn = gr.Button("🔄 Refresh Video List")
                         video_button = gr.Button("▶️ Process Video", variant="primary")
                     with gr.Column(scale=2):
@@ -544,9 +560,9 @@ def create_gradio_interface():
                     )
 
                 # Event Handlers for Video Processing
-                def process_video_wrapper(dropdown_title, progress=gr.Progress()):
+                def process_video_wrapper(dropdown_title, quality="720p", progress=gr.Progress()):
                     app = get_app()
-                    video_path = app.get_video_path_from_title(dropdown_title)
+                    video_path = app.get_video_path_from_title(dropdown_title, quality)
                     if not video_path:
                         return None, "Please select a video.", ([], ["All"], "")
                     
@@ -563,7 +579,7 @@ def create_gradio_interface():
 
                 video_button.click(
                     process_video_wrapper,
-                    inputs=[video_dropdown],
+                    inputs=[video_dropdown, quality_dropdown],
                     outputs=[video_output, video_results, full_timeline_data, timeline_bundle_state]
                 )
                 
@@ -578,7 +594,8 @@ def create_gradio_interface():
 
                 contestant_search.change(filter_timeline_wrapper, inputs=[contestant_search, contestant_filter, full_timeline_data], outputs=[recognition_timeline])
                 contestant_filter.change(filter_timeline_wrapper, inputs=[contestant_search, contestant_filter, full_timeline_data], outputs=[recognition_timeline])
-                refresh_videos_btn.click(lambda: gr.Dropdown(choices=get_app().get_video_titles_for_dropdown()), outputs=[video_dropdown])
+                refresh_videos_btn.click(lambda quality: gr.Dropdown(choices=get_app().get_video_titles_for_dropdown(quality)), inputs=[quality_dropdown], outputs=[video_dropdown])
+                quality_dropdown.change(lambda quality: gr.Dropdown(choices=get_app().get_video_titles_for_dropdown(quality)), inputs=[quality_dropdown], outputs=[video_dropdown])
 
             with gr.Tab("⚙️ Settings"):
                 gr.Markdown("## ⚙️ System Configuration")

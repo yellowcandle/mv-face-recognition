@@ -1,0 +1,109 @@
+{
+  "dataset_info": {
+    "name": "MV Face Recognition Video Dataset",
+    "version": "1.0",
+    "description": "Multi-quality video dataset for face recognition in music videos",
+    "total_videos": 5,
+    "created": "2025-06-20"
+  },
+  "quality_configs": {
+    "480p": {
+      "resolution": "854x480",
+      "total_size_mb": 148,
+      "avg_bitrate": "~742 kbps",
+      "description": "Fast processing, mobile-friendly",
+      "use_case": "Quick demos, mobile users, slow connections"
+    },
+    "720p": {
+      "resolution": "1280x720", 
+      "total_size_mb": 194,
+      "avg_bitrate": "~1024 kbps",
+      "description": "Balanced quality and performance",
+      "use_case": "Standard processing, balanced speed/quality"
+    },
+    "1080p": {
+      "resolution": "1920x1080",
+      "total_size_mb": 1200,
+      "avg_bitrate": "~2000+ kbps", 
+      "description": "Best quality, high detail",
+      "use_case": "High-quality analysis, detailed recognition"
+    }
+  },
+  "videos": [
+    {
+      "id": "mv1",
+      "title": "《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅",
+      "duration": "4:24",
+      "sizes": {
+        "480p": "27MB",
+        "720p": "33MB", 
+        "1080p": "310MB"
+      },
+      "filenames": {
+        "480p": "1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_480p.mp4",
+        "720p": "1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_720p.mp4",
+        "1080p": "1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅.mp4"
+      }
+    },
+    {
+      "id": "mv2", 
+      "title": "《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅",
+      "duration": "4:33",
+      "sizes": {
+        "480p": "26MB",
+        "720p": "30MB",
+        "1080p": "316MB" 
+      },
+      "filenames": {
+        "480p": "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅_480p.mp4",
+        "720p": "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅_720p.mp4",
+        "1080p": "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅.mp4"
+      }
+    },
+    {
+      "id": "mv3",
+      "title": "《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅", 
+      "duration": "4:17",
+      "sizes": {
+        "480p": "27MB",
+        "720p": "31MB",
+        "1080p": "316MB"
+      },
+      "filenames": {
+        "480p": "3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅_480p.mp4",
+        "720p": "3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅_720p.mp4",
+        "1080p": "3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅.mp4"
+      }
+    },
+    {
+      "id": "mv4",
+      "title": "《全民造星IV》極限拍MV",
+      "duration": "5:48", 
+      "sizes": {
+        "480p": "31MB",
+        "720p": "45MB",
+        "1080p": "130MB"
+      },
+      "filenames": {
+        "480p": "4-《全民造星IV》極限拍MV_480p.mp4",
+        "720p": "4-《全民造星IV》極限拍MV_720p.mp4",
+        "1080p": "4-《全民造星IV》極限拍MV.mp4"
+      }
+    },
+    {
+      "id": "mv5",
+      "title": "《全民造星IV》播前熱身！率先表演《前傳》",
+      "duration": "3:27",
+      "sizes": {
+        "480p": "37MB", 
+        "720p": "55MB",
+        "1080p": "114MB"
+      },
+      "filenames": {
+        "480p": "5-《全民造星IV》播前熱身！率先表演《前傳》_480p.mp4",
+        "720p": "5-《全民造星IV》播前熱身！率先表演《前傳》_720p.mp4", 
+        "1080p": "5-《全民造星IV》播前熱身！率先表演《前傳》.mp4"
+      }
+    }
+  ]
+}
