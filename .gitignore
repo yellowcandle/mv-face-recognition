@@ -6,6 +6,35 @@ source/videos/*.mp4
 source/videos/*.avi
 source/videos/*.mov
 source/videos/*.mkv
+dataset_staging/videos/**/*.mp4
+dataset_staging/videos/**/*.avi
+dataset_staging/videos/**/*.mov
+dataset_staging/videos/**/*.mkv
+source/videos_hf_clean/*.mp4
+source/videos_hf_optimized/*.mp4
+
+# Embedding files and model artifacts
+*.npy
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+models/
+chroma_db/
+*.db
+*.sqlite
+
+# Large font files
+fonts/*.ttf
+fonts/*.otf
+fonts/*.woff
+fonts/*.woff2
+
+# Dataset and staging directories (exclude large files)
+dataset_staging/videos/original_1080p/
+dataset_staging/videos/optimized_720p/
+dataset_staging/videos/optimized_480p/
+source/photo/raw/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

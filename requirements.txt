@@ -56,3 +56,7 @@ mediapipe>=0.10.0
 
 # HF Spaces ZeroGPU support
 spaces>=0.12.0
+
+# HF Dataset support for scalable video storage
+datasets>=3.0.0
+huggingface_hub>=0.20.0
