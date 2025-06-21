@@ -79,14 +79,12 @@ class HFDatasetCreator:
             print(f"❌ Error creating repository: {e}")
             return False
     
-    def prepare_video_datasets(self):
-        """Prepare video datasets for each quality"""
-        datasets = {}
-        
+    def upload_videos_individually(self):
+        """Upload videos one by one to avoid memory issues"""
         qualities = ["480p", "720p", "1080p"]
         
         for quality in qualities:
-            print(f"📹 Preparing {quality} video dataset...")
+            print(f"📹 Uploading {quality} videos...")
             
             quality_dir = self.videos_dir / {
                 "480p": "optimized_480p",
@@ -105,27 +103,46 @@ class HFDatasetCreator:
                 print(f"⚠️ No videos found in {quality_dir}")
                 continue
             
-            # Create dataset entries
-            dataset_entries = []
-            for video_file in video_files:
+            # Upload each video individually
+            for i, video_file in enumerate(video_files):
+                file_size = video_file.stat().st_size
+                size_mb = round(file_size / (1024*1024), 1)
+                
+                print(f"  📤 Uploading: {video_file.name} ({size_mb}MB) [{i+1}/{len(video_files)}]")
+                
+                # Load only this video into memory
                 with open(video_file, 'rb') as f:
                     video_data = f.read()
                 
+                # Create single-video dataset
                 entry = {
                     'video': video_data,
                     'filename': video_file.name,
                     'quality': quality,
-                    'size_bytes': len(video_data),
-                    'size_mb': round(len(video_data) / (1024*1024), 1)
+                    'size_bytes': file_size,
+                    'size_mb': size_mb
                 }
-                dataset_entries.append(entry)
-                print(f"  ✅ Added: {video_file.name} ({entry['size_mb']}MB)")
-            
-            # Create Dataset
-            datasets[f"videos_{quality}"] = Dataset.from_list(dataset_entries)
-            print(f"✅ Created {quality} dataset with {len(dataset_entries)} videos")
-        
-        return datasets
+                
+                single_dataset = Dataset.from_list([entry])
+                
+                try:
+                    # Upload this video
+                    single_dataset.push_to_hub(
+                        self.dataset_name,
+                        config_name=f"videos_{quality}",
+                        split=f"video_{i:02d}",
+                        private=False
+                    )
+                    print(f"  ✅ Uploaded: {video_file.name}")
+                    
+                except Exception as e:
+                    print(f"  ❌ Error uploading {video_file.name}: {e}")
+                    return False
+                
+                # Clear from memory
+                del video_data, entry, single_dataset
+                
+        return True
     
     def prepare_metadata_dataset(self):
         """Prepare metadata dataset"""
@@ -272,42 +289,40 @@ Total duration: ~22 minutes across all videos.
         if not self.create_repository():
             return False
         
-        # Step 3: Prepare datasets
-        print("\n📦 Preparing datasets...")
+        # Step 3: Upload videos individually (memory efficient)
+        print("\n📤 Uploading videos (memory efficient approach)...")
+        if not self.upload_videos_individually():
+            print("\n❌ Video upload failed")
+            return False
         
-        video_datasets = self.prepare_video_datasets()
+        # Step 4: Prepare and upload metadata and embeddings
+        print("\n📦 Preparing metadata and embeddings...")
+        
         metadata_dataset = self.prepare_metadata_dataset()
         contestant_datasets = self.prepare_contestant_data()
         
-        # Combine all datasets
-        all_datasets = {}
-        all_datasets.update(video_datasets)
-        
+        # Combine non-video datasets
+        other_datasets = {}
         if metadata_dataset:
-            all_datasets['metadata'] = metadata_dataset
+            other_datasets['metadata'] = metadata_dataset
+        other_datasets.update(contestant_datasets)
         
-        all_datasets.update(contestant_datasets)
+        if other_datasets:
+            print(f"\n📊 Non-video dataset summary:")
+            for name, dataset in other_datasets.items():
+                print(f"  - {name}: {len(dataset)} items")
+            
+            print(f"\n🚀 Uploading metadata and embeddings...")
+            if not self.upload_dataset(other_datasets):
+                print("\n❌ Metadata/embeddings upload failed")
+                return False
         
-        if not all_datasets:
-            print("❌ No datasets prepared")
-            return False
-        
-        print(f"\n📊 Dataset summary:")
-        for name, dataset in all_datasets.items():
-            print(f"  - {name}: {len(dataset)} items")
-        
-        # Step 4: Create README
+        # Step 5: Create README
         self.create_dataset_card()
         
-        # Step 5: Upload
-        print(f"\n🚀 Uploading to {self.dataset_name}...")
-        if self.upload_dataset(all_datasets):
-            print("\n🎉 Dataset creation completed successfully!")
-            print(f"📍 Dataset URL: https://huggingface.co/datasets/{self.dataset_name}")
-            return True
-        else:
-            print("\n❌ Dataset upload failed")
-            return False
+        print("\n🎉 Dataset creation completed successfully!")
+        print(f"📍 Dataset URL: https://huggingface.co/datasets/{self.dataset_name}")
+        return True
 
 def main():
     """Main function"""
