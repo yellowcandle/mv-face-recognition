@@ -1,6 +1,6 @@
 {
   "name": "mv-face-recognition",
-  "buildCommand": "python -m pip install --no-cache-dir -r requirements.txt",
+  "buildCommand": "./build.sh",
   "startCommand": "python app.py",
   "framework": "python",
   "runtime": "python3.11",
@@ -32,5 +32,15 @@
   "resources": {
     "memory": "4Gi",
     "storage": "20Gi"
+  },
+  "build": {
+    "commands": [
+      "chmod +x build.sh",
+      "./build.sh"
+    ],
+    "env": {
+      "PYTHONPATH": "/app",
+      "PIP_NO_CACHE_DIR": "1"
+    }
   }
 }
