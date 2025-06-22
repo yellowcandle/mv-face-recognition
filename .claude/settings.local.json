@@ -31,7 +31,9 @@
       "Bash(git lfs:*)",
       "Bash(cp:*)",
       "Bash(git show:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)"
     ]
   },
   "enableAllProjectMcpServers": true

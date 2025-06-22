@@ -82,6 +82,43 @@ def get_video_files() -> Dict[str, str]:
     
     return video_files
 
+
+def _initialize_services():
+    """Initialize all services. Called both from main and when imported."""
+    global app_config, video_manager, face_recognition_service, visualization_service
+    
+    if app_config is None:
+        app_config = get_config()
+    
+    if face_recognition_service is None:
+        face_recognition_service = FaceRecognitionService(app_config)
+    
+    if visualization_service is None:
+        visualization_service = VisualizationService(str(app_config.paths.font_path.parent))
+    
+    if video_manager is None:
+        # Initialize video manager with YouTube integration
+        video_manager = get_video_manager(enable_youtube=True)
+        
+        # Download videos for better user experience
+        logger.info("🎬 Initializing video downloads...")
+        try:
+            # Check if we're in HF Spaces or local environment
+            is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
+            quality = "480p" if is_hf_spaces else "720p"  # Use lower quality for HF Spaces
+            
+            cache_status = video_manager.get_cache_status()
+            if cache_status['cached_videos'] < cache_status['total_videos']:
+                logger.info(f"📥 Downloading {cache_status['total_videos'] - cache_status['cached_videos']} missing videos...")
+                downloaded = video_manager.download_all_videos(max_workers=1, quality=quality)
+                logger.info(f"✅ Video initialization complete: {len(downloaded)} videos available")
+            else:
+                logger.info("✅ All videos already cached and ready")
+        except Exception as e:
+            logger.error(f"⚠️ Error during video initialization: {e}")
+            logger.info("🔄 Videos will be downloaded on-demand during usage")
+
+
 def get_video_frame(video_path: str, frame_num: int) -> np.ndarray:
     """Extract a specific frame from a video file."""
     cap = cv2.VideoCapture(video_path)
@@ -185,7 +222,11 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
 
 def create_gradio_interface():
     """Create the Gradio interface for video frame analysis."""
-    global app_config, video_manager
+    global app_config, video_manager, face_recognition_service, visualization_service
+    
+    # Initialize services if not already done (for when called from app.py)
+    if app_config is None or video_manager is None:
+        _initialize_services()
     
     # Get initial video list
     video_files_map = get_video_files()
@@ -341,30 +382,7 @@ if __name__ == "__main__":
     )
     
     # Initialize configuration and services
-    app_config = get_config()
-    face_recognition_service = FaceRecognitionService(app_config)
-    visualization_service = VisualizationService(str(app_config.paths.font_path.parent))
-    
-    # Initialize video manager with YouTube integration
-    video_manager = get_video_manager(enable_youtube=True)
-    
-    # Download videos for better user experience
-    logger.info("🎬 Initializing video downloads...")
-    try:
-        # Check if we're in HF Spaces or local environment
-        is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
-        quality = "480p" if is_hf_spaces else "720p"  # Use lower quality for HF Spaces
-        
-        cache_status = video_manager.get_cache_status()
-        if cache_status['cached_videos'] < cache_status['total_videos']:
-            logger.info(f"📥 Downloading {cache_status['total_videos'] - cache_status['cached_videos']} missing videos...")
-            downloaded = video_manager.download_all_videos(max_workers=1, quality=quality)
-            logger.info(f"✅ Video initialization complete: {len(downloaded)} videos available")
-        else:
-            logger.info("✅ All videos already cached and ready")
-    except Exception as e:
-        logger.error(f"⚠️ Error during video initialization: {e}")
-        logger.info("🔄 Videos will be downloaded on-demand during usage")
+    _initialize_services()
 
     # Create and launch Gradio interface
     demo = create_gradio_interface()
