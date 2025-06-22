@@ -75,17 +75,21 @@ def get_video_files() -> Dict[str, str]:
     # Get available videos (will download if missing and YouTube enabled)
     for video_name in video_names:
         logger.debug(f"Processing video: {video_name}")
-        video_path = video_manager.get_video_path(video_name, download_if_missing=True)
+        video_path = video_manager.get_video_path(video_name, download_if_missing=False)  # Don't auto-download to avoid errors
         if video_path:
             video_files[video_name] = video_path
             logger.debug(f"✅ Video available: {video_name} -> {video_path}")
         else:
-            # Add as unavailable but still show in dropdown
-            video_files[f"{video_name} (downloading...)"] = ""
-            logger.debug(f"⏳ Video downloading: {video_name}")
+            # Always show videos in dropdown even if not available
+            video_files[f"📥 {video_name} (Click to download)"] = ""
+            logger.debug(f"📥 Video needs download: {video_name}")
     
+    # If no videos at all, show helpful message
     if not video_files:
-        video_files["⏳ Videos are downloading - please wait and refresh"] = ""
+        video_files["❌ No videos in catalog - check video service"] = ""
+    # Add a manual download option
+    elif all(not path for path in video_files.values()):
+        video_files["ℹ️ Videos need manual download - upload your own videos"] = ""
     
     logger.info(f"Returning {len(video_files)} video entries for dropdown")
     return video_files
@@ -168,10 +172,19 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
 
     video_files_map = get_video_files()
 
-    # Check if a valid video is selected
-    if not video_name or video_name not in video_files_map or not video_files_map[video_name]:
+    # Handle uploaded videos
+    if video_name and video_name.startswith("📁 Uploaded:"):
+        # Extract the actual file path (this would be stored differently in a real implementation)
+        # For now, we'll handle this case by showing a placeholder
         empty_fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "Please select a valid video.", ha='center', va='center')
+        ax.text(0.5, 0.5, "Uploaded video processing\nnot yet implemented.\nPlease select from dropdown.", ha='center', va='center')
+        placeholder_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        return placeholder_img, empty_fig, [], []
+
+    # Check if a valid video is selected
+    if not video_name or video_name not in video_files_map:
+        empty_fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "Please select a video from the dropdown.", ha='center', va='center')
         placeholder_img = np.zeros((480, 640, 3), dtype=np.uint8) # Black image
         draw = ImageDraw.Draw(Image.fromarray(placeholder_img))
         try:
@@ -179,6 +192,25 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
         except (IOError, AttributeError):
             font = ImageFont.load_default()
         draw.text((50, 230), "Please select a video", font=font, fill=(255,255,255))
+        return np.array(placeholder_img), empty_fig, [], []
+    
+    # Check if video needs to be downloaded
+    if not video_files_map[video_name]:
+        empty_fig, ax = plt.subplots()
+        if "download" in video_name.lower():
+            message = "Video needs to be downloaded.\nYouTube downloads currently blocked on HF Spaces.\nPlease upload your own video files."
+        else:
+            message = "Video file not available.\nPlease try uploading your own video."
+        ax.text(0.5, 0.5, message, ha='center', va='center', fontsize=10)
+        placeholder_img = np.zeros((480, 640, 3), dtype=np.uint8) # Black image
+        draw = ImageDraw.Draw(Image.fromarray(placeholder_img))
+        try:
+            font = ImageFont.truetype(os.path.join(app_config.paths.font_path.parent, app_config.paths.font_path.name), 16)
+        except (IOError, AttributeError):
+            font = ImageFont.load_default()
+        draw.text((20, 200), "Video Download Required", font=font, fill=(255,255,255))
+        draw.text((20, 230), "YouTube blocked on HF Spaces", font=font, fill=(200,200,200))
+        draw.text((20, 260), "Upload your own videos instead", font=font, fill=(150,150,255))
         return np.array(placeholder_img), empty_fig, [], []
 
     video_path = video_files_map[video_name]
@@ -245,7 +277,15 @@ def create_gradio_interface():
     
     # Add cache status display
     cache_status = video_manager.get_cache_status() if video_manager else {}
-    cache_info = f"Videos: {cache_status.get('cached_videos', 0)}/{cache_status.get('total_videos', 0)} cached" if cache_status else "Video manager not initialized"
+    if cache_status:
+        cached = cache_status.get('cached_videos', 0)
+        total = cache_status.get('total_videos', 0)
+        if cached == 0 and total > 0:
+            cache_info = f"⚠️ Videos: {cached}/{total} cached (YouTube blocked on HF Spaces - upload your own videos)"
+        else:
+            cache_info = f"Videos: {cached}/{total} cached"
+    else:
+        cache_info = "Video manager not initialized"
     
     with gr.Blocks(title="Face Recognition Explorer") as demo:
         gr.Markdown("# Face Recognition Explorer")
@@ -255,6 +295,12 @@ def create_gradio_interface():
         with gr.Row():
             with gr.Column(scale=3):
                 video_dropdown = gr.Dropdown(choices=video_names, label="Select Video")
+                gr.Markdown("**Or upload your own video:**")
+                video_upload = gr.File(
+                    label="Upload Video File", 
+                    file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"],
+                    type="filepath"
+                )
                 frame_slider = gr.Slider(minimum=0, maximum=100, value=0, step=1, label="Frame Number")
                 with gr.Row():
                     prev_btn = gr.Button("Previous Frame")
@@ -274,6 +320,42 @@ def create_gradio_interface():
         all_labels = gr.State([])
         auto_advance_state = gr.State(False)
         total_frames_state = gr.State(1)
+
+        def load_uploaded_video(uploaded_file):
+            """Handle uploaded video file."""
+            if uploaded_file is None:
+                return {
+                    video_dropdown: None,
+                    frame_slider: gr.Slider(maximum=0, value=0),
+                    all_embeddings: [],
+                    all_labels: [],
+                    total_frames_state: 1
+                }
+            
+            try:
+                cap = cv2.VideoCapture(uploaded_file)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                cap.release()
+                
+                # Update the dropdown to show uploaded file
+                updated_choices = list(get_video_files().keys()) + [f"📁 Uploaded: {uploaded_file.split('/')[-1]}"]
+                
+                return {
+                    video_dropdown: gr.Dropdown(choices=updated_choices, value=f"📁 Uploaded: {uploaded_file.split('/')[-1]}"),
+                    frame_slider: gr.Slider(maximum=total_frames-1, value=0),
+                    all_embeddings: [],
+                    all_labels: [],
+                    total_frames_state: total_frames
+                }
+            except Exception as e:
+                logger.error(f"Error loading uploaded video: {e}")
+                return {
+                    video_dropdown: None,
+                    frame_slider: gr.Slider(maximum=0, value=0),
+                    all_embeddings: [],
+                    all_labels: [],
+                    total_frames_state: 1
+                }
 
         def load_video(video_name):
             """Initialize when video is selected."""
@@ -318,6 +400,12 @@ def create_gradio_interface():
             load_video,
             inputs=[video_dropdown],
             outputs=[frame_slider, all_embeddings, all_labels, total_frames_state]
+        )
+        
+        video_upload.change(
+            load_uploaded_video,
+            inputs=[video_upload],
+            outputs=[video_dropdown, frame_slider, all_embeddings, all_labels, total_frames_state]
         )
         
         frame_slider.change(
