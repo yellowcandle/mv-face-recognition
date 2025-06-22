@@ -268,6 +268,35 @@ Supported formats: JPG, JPEG, PNG
         for dir_name in ["cache", "output", "output_frames", "output_mp4s"]:
             Path(dir_name).mkdir(parents=True, exist_ok=True)
         
+        # Initialize ChromaDB from embeddings package if available
+        try:
+            embeddings_pkg_path = Path("embeddings_package.json")
+            if embeddings_pkg_path.exists():
+                print("📦 Initializing ChromaDB from embeddings package...")
+                # Import and run the ChromaDB initialization
+                from scripts.create_chroma_from_package import initialize_chromadb_from_package
+                initialize_chromadb_from_package()
+                print("✅ ChromaDB initialized from embeddings package")
+            else:
+                print("⚠️ No embeddings package found - ChromaDB will be disabled")
+        except Exception as e:
+            print(f"⚠️ ChromaDB initialization failed: {e} - will fall back to standard search")
+        
+        # Download fonts if needed for HF Spaces
+        try:
+            font_path = Path("fonts/SourceHanSansTC-VF.ttf")
+            if not font_path.exists():
+                print("🔤 Downloading fonts for better Chinese text rendering...")
+                from scripts.download_fonts import ensure_fonts_available
+                if ensure_fonts_available():
+                    print("✅ Fonts downloaded successfully")
+                else:
+                    print("⚠️ Font download failed - using system fonts")
+            else:
+                print("✅ Custom fonts available")
+        except Exception as e:
+            print(f"⚠️ Font setup failed: {e} - using system fonts")
+        
         print("✅ HF Spaces environment initialization complete")
         
     except Exception as e:

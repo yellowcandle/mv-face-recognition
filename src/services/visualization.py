@@ -119,12 +119,45 @@ class VisualizationService:
                 break
         
         if not font_path:
-            logger.warning(
-                "Font file not found in any of these locations: %s. Using default PIL font.", 
-                font_locations
-            )
-            self.label_font = ImageFont.load_default()
-            self.timestamp_font = ImageFont.load_default()
+            # Check if running on HF Spaces (suppress warning)
+            is_hf_spaces = os.environ.get('SPACE_ID') is not None or os.path.exists('/home/user')
+            if not is_hf_spaces:
+                logger.warning(
+                    "Font file not found in any of these locations: %s. Using default PIL font.", 
+                    font_locations
+                )
+            else:
+                logger.info("HF Spaces environment detected - using default font (custom font will be available after deployment)")
+            
+            # Try to use system fonts as fallback
+            try:
+                # Try to find a reasonable system font
+                system_fonts = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    "/usr/share/fonts/TTF/dejavu/DejaVuSans.ttf", 
+                    "/System/Library/Fonts/Arial.ttf",
+                    "/System/Library/Fonts/Helvetica.ttf"
+                ]
+                
+                system_font_path = None
+                for sys_font in system_fonts:
+                    if os.path.exists(sys_font):
+                        system_font_path = sys_font
+                        break
+                
+                if system_font_path:
+                    self.label_font = ImageFont.truetype(system_font_path, 60)
+                    self.timestamp_font = ImageFont.truetype(system_font_path, 40)
+                    logger.info(f"Using system font: {system_font_path}")
+                else:
+                    self.label_font = ImageFont.load_default()
+                    self.timestamp_font = ImageFont.load_default()
+                    logger.info("Using PIL default font")
+                    
+            except Exception:
+                self.label_font = ImageFont.load_default()
+                self.timestamp_font = ImageFont.load_default()
+                logger.info("Using PIL default font")
         else:
             try:
                 self.label_font = ImageFont.truetype(font_path, 60)
