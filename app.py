@@ -242,6 +242,14 @@ Supported formats: JPG, JPEG, PNG
             print(f"   - Cache directory: {cache_status['cache_directory']}")
             print(f"   - Cache size: {cache_status['cache_size_mb']:.1f} MB")
             
+            # Set the global video manager for gradio_app to use
+            try:
+                import src.gradio_app
+                src.gradio_app.video_manager = video_manager
+                print("✅ Video manager shared with Gradio interface")
+            except Exception as e:
+                print(f"⚠️ Failed to share video manager: {e}")
+            
             # Download videos for HF Spaces if needed
             is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
             if is_hf_spaces and cache_status['cached_videos'] < cache_status['total_videos']:

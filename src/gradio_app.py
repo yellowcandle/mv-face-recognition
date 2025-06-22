@@ -57,29 +57,37 @@ def get_video_files() -> Dict[str, str]:
     """
     global video_manager
     
+    logger.info(f"get_video_files called, video_manager: {video_manager}")
+    
     if video_manager is None:
         logger.error("Video manager not initialized")
-        return {"Video manager not initialized - please restart": ""}
+        return {"❌ Video manager not initialized - please restart": ""}
     
     video_files = {}
     video_names = video_manager.get_video_list()
     
+    logger.info(f"Video catalog contains {len(video_names)} videos: {video_names}")
+    
     if not video_names:
         logger.warning("No videos available in catalog")
-        return {"No videos available in catalog": ""}
+        return {"❌ No videos available in catalog": ""}
     
     # Get available videos (will download if missing and YouTube enabled)
     for video_name in video_names:
+        logger.debug(f"Processing video: {video_name}")
         video_path = video_manager.get_video_path(video_name, download_if_missing=True)
         if video_path:
             video_files[video_name] = video_path
+            logger.debug(f"✅ Video available: {video_name} -> {video_path}")
         else:
             # Add as unavailable but still show in dropdown
             video_files[f"{video_name} (downloading...)"] = ""
+            logger.debug(f"⏳ Video downloading: {video_name}")
     
     if not video_files:
-        video_files["Videos are downloading - please wait and refresh"] = ""
+        video_files["⏳ Videos are downloading - please wait and refresh"] = ""
     
+    logger.info(f"Returning {len(video_files)} video entries for dropdown")
     return video_files
 
 
@@ -97,7 +105,8 @@ def _initialize_services():
         visualization_service = VisualizationService(str(app_config.paths.font_path.parent))
     
     if video_manager is None:
-        # Initialize video manager with YouTube integration
+        # Initialize video manager with YouTube integration (only if not already set by app.py)
+        logger.info("🎬 Initializing video manager from gradio_app...")
         video_manager = get_video_manager(enable_youtube=True)
         
         # Download videos for better user experience
@@ -117,6 +126,8 @@ def _initialize_services():
         except Exception as e:
             logger.error(f"⚠️ Error during video initialization: {e}")
             logger.info("🔄 Videos will be downloaded on-demand during usage")
+    else:
+        logger.info("✅ Video manager already initialized (shared from app.py)")
 
 
 def get_video_frame(video_path: str, frame_num: int) -> np.ndarray:
