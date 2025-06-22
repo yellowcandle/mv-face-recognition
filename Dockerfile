@@ -8,30 +8,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Ret
     build-essential \
     cmake \
     pkg-config \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
+    libgl1-mesa-dev \
+    libglib2.0-dev \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgcc-s1 \
     ffmpeg \
-    libopencv-dev \
     wget \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Copy requirements and install Python dependencies to a temporary location
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim
 
-# Install only runtime dependencies
+# Install only runtime dependencies (no build tools)
 RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -41,17 +41,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Ret
     libgomp1 \
     libgcc-s1 \
     ffmpeg \
-    python3-opencv \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove -y \
+    && apt-get clean
 
-# Create app user for security
-RUN useradd --create-home --shell /bin/bash app
+# Copy installed packages from builder stage
+COPY --from=builder /install /usr/local
 
 # Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /home/app/.local
+# Create app user for security
+RUN useradd --create-home --shell /bin/bash app
 
 # Copy application code
 COPY --chown=app:app . .
@@ -64,7 +66,6 @@ RUN mkdir -p cache output source/videos source/photo/contestants fonts \
 USER app
 
 # Set Python path
-ENV PATH=/home/app/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
 # Environment variables for production
@@ -79,8 +80,10 @@ ENV INSIGHTFACE_DISABLE_LOGGING=1
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Expose port
-EXPOSE 8080
+# Expose ports
+EXPOSE 8080 8081
+# Port 8080: Health check endpoint
+# Port 8081: Main Gradio interface
 
 # Start command
 CMD ["python", "app.py"]
