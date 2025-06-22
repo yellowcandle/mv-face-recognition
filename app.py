@@ -88,7 +88,7 @@ def create_demo():
         print("🔄 Trying original interface...")
         
         try:
-            from gradio_app import create_gradio_interface
+            from src.gradio_app import create_gradio_interface
 
             print("🌐 Creating Gradio 5.x interface...")
             demo = create_gradio_interface()
