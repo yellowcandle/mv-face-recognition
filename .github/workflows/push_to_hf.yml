@@ -21,4 +21,5 @@ jobs:
           git config --global user.email "4060163+yellowcandle@users.noreply.github.com"
           git config --global user.name "yellowcandle"
           git remote add hf https://user:${HF_TOKEN}@huggingface.co/spaces/yellowcandle/mv-face-recognition
-          git push hf main --force
+          git fetch origin hf-clean:hf-clean
+          git push hf hf-clean:main --force
