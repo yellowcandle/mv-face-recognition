@@ -21,6 +21,8 @@ services:
       - ./fonts:/app/fonts
       - ./config.json:/app/config.json:ro
       - ./contestant_info.csv:/app/contestant_info.csv:ro
+      # Separate volume for videos
+      - videos_data:/app/source/videos
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -45,3 +47,4 @@ services:
 volumes:
   app_cache:
   app_output:
+  videos_data:
