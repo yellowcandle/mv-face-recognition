@@ -228,41 +228,56 @@ Supported formats: JPG, JPEG, PNG
         elif total_images > 0 or len(npy_files) > 0:
             print(f"✅ Found contestants data - {total_images} images, {len(npy_files)} embeddings")
         
-        # Check and ensure video directories exist with detailed Git LFS verification
-        video_dirs = [
-            "source/videos",
-            "source/videos_hf_clean", 
-            "source/videos_hf_optimized"
-        ]
-        
-        total_videos = 0
-        for video_dir in video_dirs:
-            vid_path = Path(video_dir)
-            vid_path.mkdir(parents=True, exist_ok=True)
+        # Initialize video management system (YouTube integration)
+        try:
+            print("🎬 Initializing video management system...")
+            from src.services.video_service import get_video_manager
             
-            # Count all video file types
-            mp4_count = len(list(vid_path.glob("*.mp4")))
-            mov_count = len(list(vid_path.glob("*.mov")))
-            avi_count = len(list(vid_path.glob("*.avi")))
-            total_count = mp4_count + mov_count + avi_count
+            video_manager = get_video_manager(enable_youtube=True)
+            cache_status = video_manager.get_cache_status()
             
-            if total_count > 0:
-                print(f"✅ Found {total_count} videos in {video_dir} (MP4:{mp4_count}, MOV:{mov_count}, AVI:{avi_count})")
-                total_videos += total_count
-                
-                # Check file sizes to verify Git LFS deployment
-                for video_file in vid_path.glob("*.mp4"):
-                    file_size = video_file.stat().st_size
-                    if file_size < 1000:  # Suspicious small size might indicate LFS pointer file
-                        print(f"⚠️ Suspicious small video file: {video_file.name} ({file_size} bytes)")
-                    else:
-                        print(f"📹 {video_file.name}: {file_size / (1024*1024):.1f} MB")
+            print(f"📊 Video cache status:")
+            print(f"   - Total videos in catalog: {cache_status['total_videos']}")
+            print(f"   - Cached videos: {cache_status['cached_videos']}")
+            print(f"   - Cache directory: {cache_status['cache_directory']}")
+            print(f"   - Cache size: {cache_status['cache_size_mb']:.1f} MB")
+            
+            # Download videos for HF Spaces if needed
+            is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
+            if is_hf_spaces and cache_status['cached_videos'] < cache_status['total_videos']:
+                print("📥 HF Spaces detected - downloading videos from YouTube...")
+                try:
+                    # Download in background with reduced quality for faster startup
+                    downloaded_videos = video_manager.download_all_videos(
+                        max_workers=1,  # Conservative for HF Spaces
+                        quality="480p"   # Smaller files for faster download
+                    )
+                    print(f"✅ Downloaded {len(downloaded_videos)} videos from YouTube")
+                except Exception as e:
+                    print(f"⚠️ Video download failed: {e} - will continue without videos")
+            
+            elif cache_status['cached_videos'] > 0:
+                print(f"✅ Found {cache_status['cached_videos']} videos in cache")
             else:
-                print(f"📁 Empty video directory: {video_dir}")
-        
-        print(f"🎬 Total videos found across all directories: {total_videos}")
-        if total_videos == 0:
-            print("⚠️ No video files deployed - Git LFS may not be working on HF Spaces")
+                print("⚠️ No videos available - some features may be limited")
+                
+        except Exception as e:
+            print(f"⚠️ Video system initialization failed: {e}")
+            # Fallback: check for any existing video files
+            print("🔍 Checking for existing video files...")
+            video_dirs = ["source/videos", "source/videos_hf_clean", "source/videos_hf_optimized"]
+            total_videos = 0
+            
+            for video_dir in video_dirs:
+                vid_path = Path(video_dir)
+                vid_path.mkdir(parents=True, exist_ok=True)
+                mp4_count = len(list(vid_path.glob("*.mp4")))
+                if mp4_count > 0:
+                    print(f"📁 Found {mp4_count} videos in {video_dir}")
+                    total_videos += mp4_count
+                    
+            if total_videos == 0:
+                print("⚠️ No video files found - application will work with image uploads only")
         
         # Create other required directories
         for dir_name in ["cache", "output", "output_frames", "output_mp4s"]:
