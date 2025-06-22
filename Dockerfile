@@ -4,7 +4,7 @@
 FROM python:3.11-slim as builder
 
 # Install system dependencies for building
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     build-essential \
     cmake \
     pkg-config \
@@ -32,7 +32,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 FROM python:3.11-slim
 
 # Install only runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
