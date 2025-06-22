@@ -16,27 +16,27 @@ VIDEO_CATALOG = {
     "1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅": {
         "url": "https://youtu.be/IpuMy0PcPAE",
         "title": "全民造星IV主題曲《前傳》MV - 造星の駅",
-        "quality": "720p"
+        "quality": "1080p"
     },
     "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅": {
         "url": "https://youtu.be/2thpVqZsKHA", 
         "title": "全民造星IV主題曲《前傳》MV - 始発の駅",
-        "quality": "720p"
+        "quality": "1080p"
     },
     "3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅": {
         "url": "https://youtu.be/O8MOUs0sz4U",
         "title": "全民造星IV主題曲《前傳》MV - 女團の駅", 
-        "quality": "720p"
+        "quality": "1080p"
     },
     "4-《全民造星IV》極限拍MV": {
         "url": "https://youtu.be/gizlTwFUL1M",
         "title": "全民造星IV極限拍MV",
-        "quality": "720p"
+        "quality": "1080p"
     },
     "5-《全民造星IV》播前熱身！率先表演《前傳》": {
         "url": "https://youtu.be/3oreuR2L2GA",
         "title": "全民造星IV播前熱身表演《前傳》",
-        "quality": "720p"
+        "quality": "1080p"
     }
 }
 
@@ -85,7 +85,7 @@ def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
             "1080p": "best[height<=1080][ext=mp4]/best[ext=mp4]"
         }
         
-        format_selector = format_selectors.get(quality, format_selectors["720p"])
+        format_selector = format_selectors.get(quality, format_selectors["1080p"])
         
         ydl_opts = {
             "outtmpl": output_path + ".%(ext)s",
@@ -120,7 +120,7 @@ def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
         return False
 
 
-def download_all_videos(download_dir: Optional[str] = None, quality: str = "720p") -> Dict[str, str]:
+def download_all_videos(download_dir: Optional[str] = None, quality: str = "1080p") -> Dict[str, str]:
     """
     Download all videos from the catalog.
     
@@ -205,8 +205,8 @@ def main():
     parser.add_argument(
         "--quality",
         choices=["480p", "720p", "1080p"],
-        default="720p",
-        help="Video quality to download (default: 720p)"
+        default="1080p",
+        help="Video quality to download (default: 1080p)"
     )
     parser.add_argument(
         "--output-dir",

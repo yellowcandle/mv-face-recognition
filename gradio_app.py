@@ -112,10 +112,10 @@ class FaceRecognitionApp:
 
         logger.info(f"Initializing system (force_cpu={force_cpu})...")
         try:
-            # Only initialize face_detector if not already set (e.g., from GPU context)
+            # Initialize face_detector if not already set
             if self.face_detector is None:
                 self.face_detector = get_face_detector(force_cpu=force_cpu)
-                if self.face_detector is None and not HF_SPACES_GPU:
+                if self.face_detector is None:
                      raise RuntimeError("Failed to initialize FaceDetector.")
 
             # Services that don't depend on a live detector can be initialized now.
@@ -364,49 +364,36 @@ class FaceRecognitionApp:
             return None, "No video provided", ([], ["All"], "")
 
         try:
-            if HF_SPACES_GPU:
+            # Try GPU first if available, fallback to CPU
+            import torch
+            if torch.cuda.is_available():
                 try:
                     return self._process_video_gpu(video_path, progress)
                 except Exception as gpu_error:
-                    # Check if this is a GPU quota error
-                    error_msg = str(gpu_error)
-                    if "quota" in error_msg.lower() or "exceeded" in error_msg.lower():
-                        logger.warning(f"⚠️ GPU quota exceeded, automatically switching to CPU processing: {gpu_error}")
-                        result_video, result_summary, result_timeline = self._process_video_cpu(video_path, progress)
-                        # Add note about CPU fallback to the summary
-                        if result_summary and not result_summary.startswith("Video processing failed"):
-                            result_summary = f"⚠️ GPU quota exceeded - processed using CPU instead.\n{result_summary}"
-                        return result_video, result_summary, result_timeline
-                    else:
-                        # Re-raise other GPU errors
-                        raise gpu_error
+                    logger.warning(f"⚠️ GPU processing failed, switching to CPU: {gpu_error}")
+                    result_video, result_summary, result_timeline = self._process_video_cpu(video_path, progress)
+                    # Add note about CPU fallback to the summary
+                    if result_summary and not result_summary.startswith("Video processing failed"):
+                        result_summary = f"⚠️ GPU processing failed - processed using CPU instead.\n{result_summary}"
+                    return result_video, result_summary, result_timeline
             else:
                 return self._process_video_cpu(video_path, progress)
         except Exception as e:
             logger.error(f"Video processing failed: {e}", exc_info=True)
             return None, f"An error occurred: {e}", ([], ["All"], "")
 
-    @spaces.GPU(duration=60)
-    def _warmup_gpu(self):
-        """Warmup function to ensure GPU decorator is registered during startup."""
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        return "GPU warmed up"
-
-    @spaces.GPU(duration=300)
     def _process_video_gpu(self, video_path, progress):
         """GPU-accelerated video processing."""
-        # In ZeroGPU environment, we must initialize the FaceDetector within the GPU context
-        if HF_SPACES_GPU and self.face_detector is None:
-            logger.info("🚀 Initializing FaceDetector within GPU context...")
+        # Initialize FaceDetector for GPU processing
+        if self.face_detector is None:
+            logger.info("🚀 Initializing FaceDetector for GPU processing...")
             try:
                 config = get_config()
                 config.recognition.use_gpu = True
                 self.face_detector = FaceDetector(config, force_cpu_only=False)
-                logger.info("✅ FaceDetector initialized in GPU context.")
+                logger.info("✅ FaceDetector initialized for GPU.")
             except Exception as e:
-                logger.error(f"Failed to initialize FaceDetector in GPU context: {e}", exc_info=True)
+                logger.error(f"Failed to initialize FaceDetector for GPU: {e}", exc_info=True)
                 return None, f"GPU initialization failed: {e}", ([], ["All"], "")
         
         self._initialize_system(force_cpu=False)
@@ -416,7 +403,7 @@ class FaceRecognitionApp:
 
     def _process_video_cpu(self, video_path, progress):
         """CPU-only video processing fallback."""
-        logger.info("🔄 Processing video using CPU (GPU not available or quota exceeded)")
+        logger.info("🔄 Processing video using CPU (GPU not available or failed)")
         self._initialize_system(force_cpu=True)
         if not self.video_processing_service:
             return None, "Failed to initialize CPU processing services.", ([], ["All"], "")
@@ -518,9 +505,8 @@ def get_app():
     global app_instance
     if app_instance is None:
         app_instance = FaceRecognitionApp()
-        # Initialize for non-GPU environments immediately
-        if not HF_SPACES_GPU:
-            app_instance._initialize_system()
+        # Initialize system for standard cloud deployment
+        app_instance._initialize_system()
     return app_instance
 
 def create_gradio_interface():
@@ -539,7 +525,7 @@ def create_gradio_interface():
                         )
                         quality_dropdown = gr.Dropdown(
                             choices=["480p", "720p", "1080p"],
-                            value="720p",
+                            value="1080p",
                             label="🎬 Video Quality"
                         )
                         refresh_videos_btn = gr.Button("🔄 Refresh Video List")
@@ -664,17 +650,14 @@ def create_gradio_interface():
 def launch_app():
     """Launch the Gradio application."""
     try:
-        # Warmup GPU decorator registration for ZeroGPU
-        if HF_SPACES_GPU:
-            app = get_app()
-            try:
-                app._warmup_gpu()
-                logger.info("✅ GPU decorator registered successfully")
-            except Exception as warmup_error:
-                logger.warning(f"GPU warmup failed (continuing anyway): {warmup_error}")
-        
         demo = create_gradio_interface()
-        demo.launch(server_name="0.0.0.0", server_port=7860, share=False, debug=True)
+        port = int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 8080)))
+        demo.launch(
+            server_name="0.0.0.0", 
+            server_port=port, 
+            share=False, 
+            debug=os.environ.get("GRADIO_DEBUG", "false").lower() == "true"
+        )
     except Exception as e:
         logger.error(f"Failed to launch app: {e}", exc_info=True)
 
