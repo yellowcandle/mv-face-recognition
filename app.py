@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Hugging Face Spaces entry point for MV Face Recognition System.
-Optimized for Gradio 5.x deployment on Hugging Face Spaces.
+Zeabur deployment entry point for MV Face Recognition System.
+Optimized for Gradio 5.x deployment on Zeabur cloud platform.
 """
 
 import os
@@ -9,18 +9,9 @@ import sys
 import logging
 from pathlib import Path
 
-# Hugging Face Spaces GPU support
-try:
-    import spaces
-    HF_SPACES_GPU = True
-    print("✅ ZeroGPU support detected")
-except ImportError:
-    # Fallback decorator for local development
-    def spaces_gpu_decorator(func):
-        return func
-    spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
-    HF_SPACES_GPU = False
-    print("💻 Running without ZeroGPU support")
+# Standard cloud deployment - no special GPU handling needed
+HF_SPACES_GPU = False
+print("☁️ Running on Zeabur cloud platform")
 
 # Suppress warnings for cleaner deployment
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
@@ -32,7 +23,7 @@ sys.path.insert(0, str(project_root))
 
 
 def setup_logging():
-    """Configure logging for Hugging Face Spaces."""
+    """Configure logging for Zeabur deployment."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -131,9 +122,9 @@ def create_demo():
 
 
 def main():
-    """Main entry point for Hugging Face Spaces."""
+    """Main entry point for Zeabur deployment."""
     print("=" * 60)
-    print("🎬 MV Face Recognition System - Gradio 5.x")
+    print("🎬 MV Face Recognition System - Zeabur Cloud")
     print("=" * 60)
 
     setup_logging()
@@ -141,11 +132,11 @@ def main():
     if not check_environment():
         print("⚠️ Environment check failed. Some features may not work.")
 
-    # Initialize HF Spaces environment - inline to avoid import issues
+    # Initialize Zeabur environment
     try:
         from pathlib import Path
         
-        print("🚀 Initializing HF Spaces environment...")
+        print("🚀 Initializing Zeabur environment...")
         
         # Check if contestants directory exists with files
         contestants_dir = Path("source/photo/contestants")
@@ -161,7 +152,7 @@ def main():
         print(f"   - Embeddings: {len(npy_files)}")
         
         if total_images == 0 and len(npy_files) == 0:
-            print("⚠️ Git LFS contestants data not deployed - creating fallback system")
+            print("⚠️ No contestants data found - creating fallback system")
             
             # Create numbered directories for the contestant system
             print("📁 Creating numbered contestant directories...")
@@ -250,15 +241,15 @@ Supported formats: JPG, JPEG, PNG
             except Exception as e:
                 print(f"⚠️ Failed to share video manager: {e}")
             
-            # Download videos for HF Spaces if needed
-            is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
-            if is_hf_spaces and cache_status['cached_videos'] < cache_status['total_videos']:
-                print("📥 HF Spaces detected - downloading videos from YouTube...")
+            # Download videos for Zeabur if needed
+            is_cloud_deploy = os.environ.get('PORT') or os.path.exists('/app')
+            if is_cloud_deploy and cache_status['cached_videos'] < cache_status['total_videos']:
+                print("💮 Zeabur cloud detected - downloading videos from YouTube...")
                 try:
-                    # Download in background with reduced quality for faster startup
+                    # Download with standard quality for cloud deployment
                     downloaded_videos = video_manager.download_all_videos(
-                        max_workers=1,  # Conservative for HF Spaces
-                        quality="480p"   # Smaller files for faster download
+                        max_workers=2,  # Better performance on Zeabur
+                        quality="720p"   # Standard quality for better UX
                     )
                     print(f"✅ Downloaded {len(downloaded_videos)} videos from YouTube")
                 except Exception as e:
@@ -305,7 +296,7 @@ Supported formats: JPG, JPEG, PNG
         except Exception as e:
             print(f"⚠️ ChromaDB initialization failed: {e} - will fall back to standard search")
         
-        # Download fonts if needed for HF Spaces
+        # Download fonts if needed for Zeabur
         try:
             font_path = Path("fonts/SourceHanSansTC-VF.ttf")
             if not font_path.exists():
@@ -320,10 +311,10 @@ Supported formats: JPG, JPEG, PNG
         except Exception as e:
             print(f"⚠️ Font setup failed: {e} - using system fonts")
         
-        print("✅ HF Spaces environment initialization complete")
+        print("✅ Zeabur environment initialization complete")
         
     except Exception as e:
-        print(f"⚠️ HF Spaces initialization warning: {e}")
+        print(f"⚠️ Zeabur initialization warning: {e}")
         # Minimal fallback
         from pathlib import Path
         for dir_name in ["source/photo/contestants", "source/videos", "cache", "output"]:
@@ -332,12 +323,13 @@ Supported formats: JPG, JPEG, PNG
     try:
         demo = create_demo()
 
-        # Launch configuration optimized for Hugging Face Spaces
-        print("🚀 Launching on Hugging Face Spaces...")
+        # Launch configuration optimized for Zeabur deployment
+        port = int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 8080)))
+        print(f"🚀 Launching on Zeabur cloud (port {port})...")
         demo.launch(
-            # Hugging Face Spaces configuration
+            # Zeabur cloud configuration
             server_name="0.0.0.0",
-            server_port=7860,
+            server_port=port,
             share=False,
             debug=False,
             show_error=True,
@@ -345,8 +337,8 @@ Supported formats: JPG, JPEG, PNG
             # Gradio 5.x specific options
             favicon_path=None,
             ssl_verify=False,
-            # Performance optimizations
-            max_threads=10,
+            # Performance optimizations for cloud
+            max_threads=20,
             # Security settings for public deployment
             auth=None,  # Can be configured for private access
         )
@@ -370,7 +362,8 @@ Supported formats: JPG, JPEG, PNG
             </div>
             """)
 
-        error_demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+        port = int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 8080)))
+        error_demo.launch(server_name="0.0.0.0", server_port=port, share=False)
 
 
 if __name__ == "__main__":

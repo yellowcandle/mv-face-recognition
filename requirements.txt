@@ -1,5 +1,5 @@
 # Core dependencies for MV Face Recognition System
-# Optimized for Hugging Face Spaces deployment with Gradio 5.x
+# Optimized for Zeabur deployment with Gradio 5.x
 
 # Web Interface - Gradio 5.x
 gradio>=5.0.0
@@ -42,21 +42,15 @@ yt-dlp>=2024.1.0
 # Performance
 numba>=0.58.0
 
-# Additional HF Spaces requirements
+# Web server and API
 fastapi>=0.100.0
 python-multipart>=0.0.6
 websockets>=11.0
 pydantic>=2.0.0
+uvicorn>=0.22.0
 
 # Font support for multilingual text
 freetype-py>=2.5.1
 
 # Optional dependencies for enhanced functionality
 mediapipe>=0.10.0
-
-# HF Spaces ZeroGPU support
-spaces>=0.12.0
-
-# HF Dataset support for scalable video storage
-datasets>=3.0.0
-huggingface_hub>=0.20.0

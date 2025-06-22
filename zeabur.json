@@ -1,0 +1,36 @@
+{
+  "name": "mv-face-recognition",
+  "buildCommand": "python -m pip install --no-cache-dir -r requirements.txt",
+  "startCommand": "python app.py",
+  "framework": "python",
+  "runtime": "python3.11",
+  "port": 8080,
+  "env": {
+    "GRADIO_SERVER_NAME": "0.0.0.0",
+    "GRADIO_SERVER_PORT": "8080",
+    "GRADIO_SHARE": "false",
+    "GRADIO_DEBUG": "false",
+    "NO_ALBUMENTATIONS_UPDATE": "1",
+    "INSIGHTFACE_DISABLE_LOGGING": "1",
+    "PYTHONPATH": "/app"
+  },
+  "dockerFile": "Dockerfile",
+  "regions": ["us-west1"],
+  "plan": "pro",
+  "volume": {
+    "cache": "/app/cache",
+    "output": "/app/output",
+    "source": "/app/source"
+  },
+  "healthCheck": {
+    "path": "/health",
+    "port": 8080,
+    "initialDelaySeconds": 60,
+    "timeoutSeconds": 10,
+    "periodSeconds": 30
+  },
+  "resources": {
+    "memory": "4Gi",
+    "storage": "20Gi"
+  }
+}
