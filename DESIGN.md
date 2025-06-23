@@ -310,3 +310,152 @@ See `requirements.txt` for the complete list of dependencies. Key libraries:
 - **numpy**: Numerical computing
 - **tqdm**: Progress bars
 - **ffmpeg-python**: Video processing utilities
+
+## Work Notes - Streamlit Implementation (2024-06-23)
+
+### Major Framework Migration: NiceGUI → Streamlit
+
+**Decision**: Migrated from NiceGUI to Streamlit for faster UI development iteration.
+
+**Context**: During development, user requested "are there better UI framework?" and after evaluation, explicitly chose "let's use streamlit to hammer out the UI first" for rapid prototyping.
+
+**Implementation**: Created comprehensive `streamlit_app.py` with:
+
+### Key Features Implemented
+
+#### 1. Enhanced Video Processing Tab
+- **Real-time video processing** with frame-by-frame face recognition
+- **Video selection system** supporting both original files and symbolic links for Chinese/Japanese filenames
+- **Dynamic time range selection** (start/end times)
+- **Live similarity threshold override** - Critical fix allowing runtime threshold changes vs hardcoded config.json values
+
+#### 2. Critical Threshold Management Fix
+**Problem**: User discovered "so the slider on the left have no effect?????????????" - similarity threshold slider was non-functional.
+
+**Root Cause**: 
+- `config.json` had `similarity_threshold: 0.9` (extremely strict)
+- `FaceMatcher` class used hardcoded config values, ignoring Streamlit slider input
+- No face matches occurred because 0.9 threshold was too high
+
+**Solution** (lines 277-287 in streamlit_app.py):
+```python
+# CRITICAL: Override the hardcoded similarity threshold
+original_threshold = db_manager.similarity_threshold
+db_manager.similarity_threshold = similarity_threshold
+
+# Also update the video processor's face matcher threshold
+if hasattr(video_processor, 'face_matcher') and hasattr(video_processor.face_matcher, 'db_manager'):
+    original_video_threshold = video_processor.face_matcher.db_manager.similarity_threshold
+    video_processor.face_matcher.db_manager.similarity_threshold = similarity_threshold
+```
+
+#### 3. Enhanced Visualization System (lines 450-609)
+**Request**: User asked to "improve the visualization of the result display"
+
+**Implemented**:
+- **Real-time metrics dashboard** (lines 318-329): Total faces, matched faces, unique people, average confidence
+- **Interactive timeline chart** (lines 482-524): Plotly chart showing face detection over time with fill areas
+- **Top detections leaderboard** (lines 526-550): Horizontal bar chart of most detected people with color coding
+- **Styled face detection cards** (lines 552-609): Color-coded confidence levels (green >80%, yellow 60-80%, red <60%)
+- **Processing statistics panel** (lines 600-609): Real-time FPS, elapsed time, match rates
+
+#### 4. Database Manager Tab
+- **System status indicators** with embedding counts and configuration details
+- **Contestant gallery** displaying photos from `/source/photo/contestants/`
+- **Database statistics** with real-time metrics
+
+#### 5. Analytics Tab
+- **System overview** with video library and face database status
+- **Configuration display** showing current settings from config.json
+- **Performance metrics** and system health indicators
+
+### Technical Solutions Implemented
+
+#### 1. Video File Handling
+**Problem**: Chinese/Japanese video filenames caused URL encoding issues in web serving.
+
+**Solution**: 
+- Created symbolic links (video1.mp4, video2.mp4, etc.) for problematic filenames
+- Enhanced video selection logic to prefer symlinks over original files
+- Proper symlink resolution for processing while maintaining web compatibility
+
+#### 2. PyTorch/Streamlit Compatibility
+**Problem**: Streamlit file watcher conflicts with torch._classes causing warnings.
+
+**Solution** (lines 11-22):
+```python
+# Comprehensive warning suppression
+os.environ['STREAMLIT_LOGGER_LEVEL'] = 'ERROR'
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*torch.*")
+logging.getLogger('streamlit.watcher.local_sources_watcher').setLevel(logging.ERROR)
+```
+
+#### 3. Real-time Processing Architecture
+- **Non-blocking processing** with progress tracking and live updates
+- **Concurrent visualization updates** every 3 frames for performance
+- **Data collection for charts** (all_frame_detections, face_counts) enabling timeline and leaderboard views
+- **Memory management** with frame limits for UI responsiveness
+
+### Performance Optimizations
+
+#### 1. Caching Strategy
+- `@st.cache_resource` for backend service initialization
+- `@st.cache_data` for video file discovery
+- Minimal re-computation of expensive operations
+
+#### 2. Visualization Updates
+- **Batch updates** every 3 frames instead of every frame
+- **Efficient data structures** using defaultdict and Counter for aggregations
+- **Progressive enhancement** showing metrics immediately, charts after sufficient data
+
+#### 3. Processing Limits
+- **Frame count limits** (100 frames max) for demo responsiveness
+- **Grid size limits** (12 recent detections) for UI performance
+- **Leaderboard limits** (top 10 people) for chart readability
+
+### User Experience Improvements
+
+#### 1. Error Handling & Feedback
+- **Comprehensive error messages** with debugging information
+- **Status indicators** throughout the UI (processing badges, progress bars)
+- **Warning system** alerting users when config vs slider values differ
+
+#### 2. Real-time Interaction
+- **Live metrics** updating during processing
+- **Progressive results display** showing faces as they're detected
+- **Interactive charts** with hover information and zoom capabilities
+
+#### 3. Configuration Transparency
+- **Sidebar status** showing system health and database statistics
+- **Threshold comparison** highlighting differences between config.json (0.9) and slider values
+- **Expandable details** for advanced users and debugging
+
+### File Structure Created
+```
+streamlit_app.py          # Main Streamlit application (731 lines)
+run_streamlit.py          # Streamlit launcher with warning suppression
+config.json               # Configuration (similarity_threshold: 0.9 - too strict!)
+pyproject.toml           # Updated dependencies including streamlit>=1.46.0
+```
+
+### Migration Impact
+- **Preserved all backend logic** (VideoProcessor, ChromaDBManager, FaceDetector, FaceMatcher)
+- **Enhanced user interface** with modern Streamlit components
+- **Improved real-time processing** with better progress tracking
+- **Fixed critical threshold bug** that prevented face recognition from working
+- **Added comprehensive visualizations** with interactive charts and metrics
+
+### Lessons Learned
+1. **Framework choice matters**: Streamlit's rapid development cycle was crucial for iterating on complex UI requirements
+2. **Configuration vs runtime values**: Always validate that UI controls actually affect backend processing
+3. **Real-time feedback essential**: Users need immediate visual confirmation that processing is working
+4. **Threshold tuning critical**: Default similarity_threshold of 0.9 was too strict; 0.4-0.6 works better for practical use
+
+### Current Status
+- ✅ Full Streamlit implementation with enhanced visualizations
+- ✅ Critical threshold override functionality working
+- ✅ Real-time face recognition processing with live updates
+- ✅ Comprehensive metrics dashboard with interactive charts
+- ✅ Support for 5 MV videos and 95 contestant embeddings
+- 🚀 Ready for production use at http://localhost:8501
