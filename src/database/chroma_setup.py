@@ -56,26 +56,55 @@ class ChromaDBManager:
                 # Extract name from filename (remove "_embedding.npy")
                 name = npy_file.stem.replace("_embedding", "")
 
-                # Load embedding
-                embedding = np.load(npy_file)
+                # Try different loading approaches
+                embedding = None
+                
+                # First try: standard numpy load
+                try:
+                    embedding = np.load(npy_file, allow_pickle=False)
+                except:
+                    # Second try: allow pickle
+                    try:
+                        embedding = np.load(npy_file, allow_pickle=True)
+                        # If it's a pickled object, extract the array
+                        if hasattr(embedding, 'item') and callable(embedding.item):
+                            embedding = embedding.item()
+                        if isinstance(embedding, dict) and 'embedding' in embedding:
+                            embedding = embedding['embedding']
+                        elif isinstance(embedding, dict) and 'data' in embedding:
+                            embedding = embedding['data']
+                    except:
+                        # Third try: load as binary and try to parse
+                        try:
+                            with open(npy_file, 'rb') as f:
+                                data = f.read()
+                                # Skip this file if we can't load it
+                                logger.warning(f"Skipping {name}: Could not load embedding file")
+                                continue
+                        except:
+                            logger.warning(f"Skipping {name}: Could not read file")
+                            continue
 
-                # Validate and reshape embedding
-                if embedding.ndim == 2 and embedding.shape == (1, 512):
-                    # Reshape from (1, 512) to (512,)
-                    embedding = embedding.flatten()
-                    embeddings[name] = embedding
-                    logger.debug(
-                        f"Loaded and reshaped embedding for {name}: shape {embedding.shape}"
-                    )
-                elif embedding.ndim == 1 and len(embedding) == 512:
-                    embeddings[name] = embedding
-                    logger.debug(
-                        f"Loaded embedding for {name}: shape {embedding.shape}"
-                    )
-                else:
-                    logger.warning(
-                        f"Invalid embedding shape for {name}: {embedding.shape}"
-                    )
+                if embedding is not None:
+                    # Ensure it's a numpy array
+                    if not isinstance(embedding, np.ndarray):
+                        embedding = np.array(embedding)
+                    
+                    # Validate and reshape embedding
+                    if embedding.ndim == 2 and embedding.shape == (1, 512):
+                        # Reshape from (1, 512) to (512,)
+                        embedding = embedding.flatten()
+                        embeddings[name] = embedding
+                        logger.debug(f"Loaded and reshaped embedding for {name}: shape {embedding.shape}")
+                    elif embedding.ndim == 1 and len(embedding) == 512:
+                        embeddings[name] = embedding
+                        logger.debug(f"Loaded embedding for {name}: shape {embedding.shape}")
+                    elif embedding.ndim == 1 and len(embedding) > 0:
+                        # Accept other sizes but warn
+                        embeddings[name] = embedding
+                        logger.warning(f"Non-standard embedding size for {name}: {embedding.shape}")
+                    else:
+                        logger.warning(f"Invalid embedding shape for {name}: {embedding.shape}")
 
             except Exception as e:
                 logger.error(f"Error loading {npy_file}: {e}")

@@ -9,8 +9,8 @@ from src.database.chroma_setup import ChromaDBManager
 def create():
     """Create the dashboard page content."""
     
-    video_processor: VideoProcessor = app.storage.general.get('video_processor')
-    db_manager: ChromaDBManager = app.storage.general.get('db_manager')
+    video_processor: VideoProcessor = getattr(app, 'video_processor', None)
+    db_manager: ChromaDBManager = getattr(app, 'db_manager', None)
 
     with ui.row().classes('w-full justify-around'):
         with ui.card().classes('w-1/3 text-center'):

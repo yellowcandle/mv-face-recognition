@@ -1,4 +1,4 @@
-m#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 MV Face Recognition - NiceGUI Edition
 A modern, real-time UI for face recognition in music videos.
@@ -26,12 +26,13 @@ except ImportError as e:
 
 # --- App Setup ---
 
-@app.on_start
+@app.on_startup
 async def startup():
     """Initialize backend services on application startup."""
     try:
-        app.storage.general['video_processor'] = VideoProcessor()
-        app.storage.general['db_manager'] = ChromaDBManager()
+        # Store in app but not in storage.general (which needs to be JSON serializable)
+        app.video_processor = VideoProcessor()
+        app.db_manager = ChromaDBManager()
         logger.info("Backend services initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize backend services: {e}")
