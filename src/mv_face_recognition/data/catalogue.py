@@ -1,7 +1,7 @@
-import os
 import csv
-from collections import defaultdict
 import glob
+import os
+from collections import defaultdict
 
 # Paths
 CSV_PATH = "video_recognition_results.csv"

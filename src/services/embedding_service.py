@@ -1,11 +1,11 @@
-import os
-import cv2
 import json
+import logging
+import os
+from pathlib import Path
+
+import cv2
 import numpy as np
 import pandas as pd
-import logging
-from typing import List, Dict, Optional
-from pathlib import Path
 
 from src.core.face_detector import FaceDetector
 
@@ -28,21 +28,21 @@ class EmbeddingService:
         self.detector = detector
         self.contestants_dir = contestants_dir
         self.contestant_info_path = contestant_info_path
-        self.known_embeddings: Dict[str, List[np.ndarray]] = {}
-        
+        self.known_embeddings: dict[str, list[np.ndarray]] = {}
+
         # Check for embeddings package first (HF Spaces deployment)
         self.embeddings_package_path = self._find_embeddings_package()
-        
+
         if not os.path.exists(self.contestants_dir):
             raise FileNotFoundError(f"Contestants directory not found: {self.contestants_dir}")
-        
+
         try:
             self.contestant_info = pd.read_csv(self.contestant_info_path)
         except FileNotFoundError:
             logger.error(f"Contestant info file not found: {self.contestant_info_path}")
             raise
 
-    def get_image_paths_for_contestant(self, contestant_number: str) -> List[str]:
+    def get_image_paths_for_contestant(self, contestant_number: str) -> list[str]:
         """Retrieve image paths for a specific contestant by their number."""
         # Try number-based directory first (standard structure)
         contestant_path = os.path.join(self.contestants_dir, str(contestant_number))
@@ -54,22 +54,22 @@ class EmbeddingService:
             ]
             if images:
                 return images
-        
+
         # Fallback: try to find name-based directory structure
         # Look up contestant name from number
         try:
             contestant_row = self.contestant_info[self.contestant_info["編號"] == int(contestant_number)]
             if not contestant_row.empty:
                 contestant_name = contestant_row["暱稱"].values[0]
-                
+
                 # Try various name-based directory patterns
                 name_variations = [
                     contestant_name,  # Exact name
-                    contestant_name.replace(" ", "_"),  # Spaces to underscores  
+                    contestant_name.replace(" ", "_"),  # Spaces to underscores
                     contestant_name.replace(" ", ""),   # Remove spaces
                     f"{contestant_number}_{contestant_name}",  # Number prefix
                 ]
-                
+
                 for name_var in name_variations:
                     alt_path = os.path.join(self.contestants_dir, name_var)
                     if os.path.isdir(alt_path):
@@ -83,10 +83,10 @@ class EmbeddingService:
                             return images
         except (ValueError, IndexError, KeyError):
             pass
-        
+
         return []
 
-    def _find_embeddings_package(self) -> Optional[str]:
+    def _find_embeddings_package(self) -> str | None:
         """Find the embeddings package file for HF Spaces deployment."""
         # Look for embeddings package in common locations
         possible_paths = [
@@ -95,12 +95,12 @@ class EmbeddingService:
             Path("/app/embeddings_package.json"),  # HF Spaces app root
             Path("/home/user/app/embeddings_package.json"),  # HF Spaces user app
         ]
-        
+
         for path in possible_paths:
             if path.exists():
                 logger.info(f"📦 Found embeddings package: {path}")
                 return str(path)
-        
+
         logger.info("📦 No embeddings package found - will use individual .npy files")
         return None
 
@@ -108,45 +108,45 @@ class EmbeddingService:
         """Load embeddings from the consolidated JSON package."""
         if not self.embeddings_package_path:
             return False
-        
+
         try:
             logger.info(f"📦 Loading embeddings from package: {self.embeddings_package_path}")
-            
-            with open(self.embeddings_package_path, 'r', encoding='utf-8') as f:
+
+            with open(self.embeddings_package_path, encoding='utf-8') as f:
                 package = json.load(f)
-            
+
             logger.info(f"📊 Package info: {package['total_embeddings']} embeddings, v{package['version']}")
-            
+
             # Load embeddings
             self.known_embeddings = {}
             loaded_count = 0
-            
+
             for contestant_name, embedding_data in package['embeddings'].items():
                 try:
                     # Convert back to numpy array
                     embedding = np.array(embedding_data, dtype=np.float32)
-                    
+
                     # Validate embedding
                     if len(embedding) != 512:
                         logger.warning(f"⚠️ Invalid embedding size for {contestant_name}: {len(embedding)}")
                         continue
-                    
+
                     # Store as list of embeddings (for consistency with existing format)
                     self.known_embeddings[contestant_name] = [embedding]
                     loaded_count += 1
-                    
+
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to load embedding for {contestant_name}: {e}")
                     continue
-            
+
             logger.info(f"✅ Loaded {loaded_count} embeddings from package")
             return loaded_count > 0
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to load embeddings package: {e}")
             return False
 
-    def compute_and_cache_embedding(self, image_path: str) -> Optional[np.ndarray]:
+    def compute_and_cache_embedding(self, image_path: str) -> np.ndarray | None:
         """
         Compute face embedding for a single image and cache it.
         This is a simplified version for single image processing.
@@ -172,20 +172,20 @@ class EmbeddingService:
 
         return embedding
 
-    def load_embeddings_for_contestants(self, selected_contestants: List[str]):
+    def load_embeddings_for_contestants(self, selected_contestants: list[str]):
         """
         Load embeddings for a list of selected contestants, computing and caching if necessary.
         """
         logger.info(f"Loading embeddings for {len(selected_contestants)} contestants...")
-        
+
         # Try loading from embeddings package first (HF Spaces deployment)
         if self._load_embeddings_from_package():
             logger.info("✅ Successfully loaded embeddings from package")
             return self.known_embeddings
-        
+
         # Fallback to individual .npy files (local development)
         logger.info("📁 Loading embeddings from individual .npy files...")
-        
+
         # Debug: Show what's actually in the contestants directory
         if os.path.exists(self.contestants_dir):
             try:
@@ -193,18 +193,18 @@ class EmbeddingService:
                 numbered_dirs = [d for d in dir_contents if os.path.isdir(os.path.join(self.contestants_dir, d)) and d.isdigit()]
                 name_dirs = [d for d in dir_contents if os.path.isdir(os.path.join(self.contestants_dir, d)) and not d.isdigit()]
                 embedding_files = [f for f in dir_contents if f.endswith('_embedding.npy')]
-                
-                logger.info(f"📁 Contestants directory contains:")
+
+                logger.info("📁 Contestants directory contains:")
                 logger.info(f"   Numbered directories: {len(numbered_dirs)} ({numbered_dirs[:5]}{'...' if len(numbered_dirs) > 5 else ''})")
                 logger.info(f"   Named directories: {len(name_dirs)} ({name_dirs[:5]}{'...' if len(name_dirs) > 5 else ''})")
                 logger.info(f"   Embedding files: {len(embedding_files)} ({embedding_files[:5]}{'...' if len(embedding_files) > 5 else ''})")
-                
+
                 # If no data found, suggest solution
                 if len(numbered_dirs) == 0 and len(embedding_files) == 0:
                     logger.warning("⚠️ No contestant data found - Git LFS deployment may have failed")
                     logger.info("💡 The system will work for face detection, but without known faces database")
                     logger.info("💡 Users can upload photos via the web interface to build the database")
-                    
+
             except Exception as e:
                 logger.warning(f"Could not scan contestants directory: {e}")
         self.known_embeddings = {}
@@ -217,7 +217,7 @@ class EmbeddingService:
 
             contestant_number = contestant_row["編號"].values[0]
             contestant_path = os.path.join(self.contestants_dir, str(contestant_number))
-            
+
             # Check for a pre-computed aggregate embedding file for the contestant
             # Try multiple naming patterns to handle different Git LFS structures
             embedding_file_patterns = [
@@ -226,7 +226,7 @@ class EmbeddingService:
                 f"{name.replace(' ', '')}_embedding.npy",   # Remove spaces
                 f"{contestant_number}_{name}_embedding.npy",  # Number prefix
             ]
-            
+
             embedding_loaded = False
             for pattern in embedding_file_patterns:
                 aggregate_embedding_file = os.path.join(self.contestants_dir, pattern)
@@ -239,7 +239,7 @@ class EmbeddingService:
                         break
                     except Exception as e:
                         logger.warning(f"Could not load aggregate embedding {pattern} for {name}: {e}")
-            
+
             if embedding_loaded:
                 continue
 
@@ -256,11 +256,11 @@ class EmbeddingService:
                 if img is None:
                     logger.warning(f"Failed to read image: {img_path}")
                     continue
-                    
+
                 embedding = self.detector.extract_face_embedding(img)
                 if embedding is not None:
                     embeddings_for_contestant.append(embedding)
-            
+
             if embeddings_for_contestant:
                 self.known_embeddings[name] = embeddings_for_contestant
                 logger.debug(f"Computed and loaded {len(embeddings_for_contestant)} embeddings for {name}.")
@@ -270,7 +270,7 @@ class EmbeddingService:
         logger.info(f"Finished loading embeddings for {len(self.known_embeddings)} contestants.")
         return self.known_embeddings
 
-    def get_known_embeddings(self, normalize: bool = True) -> Dict[str, np.ndarray]:
+    def get_known_embeddings(self, normalize: bool = True) -> dict[str, np.ndarray]:
         """
         Returns the loaded embeddings as a dictionary of names to numpy matrices.
         Each matrix has shape (n_embeddings, 512).
@@ -279,11 +279,11 @@ class EmbeddingService:
         for name, embs_list in self.known_embeddings.items():
             if not embs_list:
                 continue
-            
+
             emb_mat = np.vstack(embs_list).astype(np.float32)
             if normalize:
                 emb_mat /= np.linalg.norm(emb_mat, axis=1, keepdims=True) + 1e-10
-            
+
             processed_embeddings[name] = emb_mat
-            
+
         return processed_embeddings

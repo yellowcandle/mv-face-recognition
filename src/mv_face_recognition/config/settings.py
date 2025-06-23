@@ -3,11 +3,11 @@ Configuration management for MV Face Recognition system.
 Provides centralized settings with validation and environment support.
 """
 
+import json
 import os
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
 from pathlib import Path
-import json
+from typing import Any
 
 
 @dataclass
@@ -24,7 +24,7 @@ class RecognitionConfig:
         1280,
         1280,
     )  # Larger detection size for better small face detection
-    providers: List[str] = field(
+    providers: list[str] = field(
         default_factory=lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"]
     )
 
@@ -124,13 +124,13 @@ class SystemConfig:
     def load_from_file(cls, config_path: str) -> "SystemConfig":
         """Load configuration from JSON file."""
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_dict = json.load(f)
                 return cls.from_dict(config_dict)
         return cls()
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "SystemConfig":
+    def from_dict(cls, config_dict: dict[str, Any]) -> "SystemConfig":
         """Create configuration from dictionary."""
         recognition_config = RecognitionConfig(**config_dict.get("recognition", {}))
         ui_config = UIConfig(**config_dict.get("ui", {}))

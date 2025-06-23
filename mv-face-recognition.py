@@ -1,16 +1,17 @@
 import os
 
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # Suppress albumentations update warning
+import argparse
+import logging
 import shutil
+import sys
+
 import cv2
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import argparse
-import sys
 import torch
-import logging
 from rich.logging import RichHandler
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

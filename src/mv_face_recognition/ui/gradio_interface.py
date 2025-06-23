@@ -17,18 +17,19 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", category=UserWarning, module="gradio")
 
-import gradio as gr
+import logging
+import os
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import cv2
+import gradio as gr
 import numpy as np
 import pandas as pd
-import os
-import logging
-from typing import Optional, Any
-from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
-import tempfile
 from PIL import Image, ImageDraw, ImageFont
 
 # Hugging Face Spaces GPU support
@@ -41,14 +42,14 @@ except ImportError:
         """Fallback decorator that accepts any arguments but does nothing locally."""
         def decorator(func):
             return func
-        
+
         # If called with a function directly (no parentheses), return the function
         if len(args) == 1 and callable(args[0]) and not kwargs:
             return args[0]
-        
+
         # If called with parameters (with parentheses), return the decorator
         return decorator
-    
+
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
     HF_SPACES_GPU = False
 
@@ -94,12 +95,12 @@ _font_cache_info = ""
 def get_face_detector():
     """Get global face detector instance - ZeroGPU compliant version."""
     global _global_detector
-    
+
     # On ZeroGPU, never initialize detector in main process
     if HF_SPACES_GPU:
         # Return None - detector will be initialized inside GPU functions
         return None
-    
+
     # For non-ZeroGPU environments, use lazy initialization
     if _global_detector is None:
         try:
@@ -129,10 +130,10 @@ def create_cpu_only_face_detector():
         logger.info("🔧 Initializing face detector in CPU-only mode...")
         config = get_config()
         config.recognition.use_gpu = False
-        
+
         from src.core.face_detector import FaceDetector
         detector = FaceDetector(config, force_cpu_only=True)
-        
+
         logger.info("✅ Face detector initialized in CPU-only mode")
         return detector
     except Exception as e:
@@ -150,12 +151,12 @@ def test_gpu_allocation():
             device_name = torch.cuda.get_device_name(device)
             memory_allocated = torch.cuda.memory_allocated(device)
             memory_reserved = torch.cuda.memory_reserved(device)
-            
+
             # Simple GPU operation test
             x = torch.randn(1000, 1000, device='cuda')
             y = torch.mm(x, x)
             result = y.sum().item()
-            
+
             return f"✅ ZeroGPU test successful!\nDevice: {device_name}\nMemory allocated: {memory_allocated/1024**2:.1f}MB\nMemory reserved: {memory_reserved/1024**2:.1f}MB\nTest result: {result:.2f}"
         else:
             return "❌ CUDA not available"
@@ -172,7 +173,7 @@ def process_frame(
         # Use provided detector or fall back to global detector
         if detector is None:
             detector = get_face_detector()
-            
+
         if detector is None:
             if HF_SPACES_GPU:
                 # This should not happen since process_frame is called from GPU functions
@@ -180,7 +181,7 @@ def process_frame(
                 return [] if not return_similarities else ([], [])
             else:
                 return [] if not return_similarities else ([], [])
-            
+
         # On ZeroGPU, ensure we're using the allocated GPU
         if HF_SPACES_GPU:
             try:
@@ -370,7 +371,7 @@ def calculate_label_positions(labels_to_draw, frame_width, frame_height):
     """Calculate optimal label positions to avoid collisions."""
     positioned_labels = []
 
-    for i, label_info in enumerate(labels_to_draw):
+    for _i, label_info in enumerate(labels_to_draw):
         bbox = label_info["bbox"]
         x1, y1, x2, y2 = bbox
 
@@ -875,7 +876,7 @@ def draw_boxes_and_labels(
 
         # Add persistent labels (from previous frames)
         if persistent_labels:
-            for face_key, label_data in persistent_labels.items():
+            for _face_key, label_data in persistent_labels.items():
                 # Check if this persistent label overlaps with current detections
                 overlaps = False
                 for face, _ in matches:
@@ -1159,7 +1160,7 @@ class FaceRecognitionApp:
     def __init__(self):
         """Initialize the application."""
         self.config = get_config()
-        self.face_detector: Optional[Any] = None
+        self.face_detector: Any | None = None
         self.known_embeddings = {}
         self.contestant_info = None
         self.processing_stats = {
@@ -1266,23 +1267,26 @@ class FaceRecognitionApp:
         # Cache check to prevent redundant scanning
         if hasattr(self, '_cached_videos') and hasattr(self, '_cached_mapping'):
             return self._cached_videos, self._cached_mapping
-            
+
         # Import video title mapping
         try:
-            from src.config.video_titles import VIDEO_TITLE_MAPPING, get_video_display_title
+            from src.config.video_titles import (
+                VIDEO_TITLE_MAPPING,
+                get_video_display_title,
+            )
         except ImportError:
             VIDEO_TITLE_MAPPING = {}
-            
+
             def get_video_display_title(x):
                 return x
-        
+
         # Try different video directories in order of preference - prioritize original resolution
         videos_dirs = [
             Path("source/videos_optimized"),
             Path("source/videos"),  # For local development - original resolution
             Path("/Users/swong/dev/mv-face-recognition/source/videos"),  # Absolute path fallback
         ]
-        
+
         videos_dir = None
         for dir_path in videos_dirs:
             if dir_path.exists():
@@ -1291,7 +1295,7 @@ class FaceRecognitionApp:
                     print(f"📁 Using videos directory: {videos_dir}")
                     self._videos_dir_logged = True
                 break
-        
+
         if not videos_dir:
             print("⚠️ No videos directory found")
             return [], {}
@@ -1323,7 +1327,7 @@ class FaceRecognitionApp:
                         if frame_count > 0:
                             # Find the corresponding title for this video file
                             filename = video_file.name  # full filename with extension
-                            
+
                             # Use video title mapping if available (for clean ASCII names)
                             if filename in VIDEO_TITLE_MAPPING:
                                 display_title = VIDEO_TITLE_MAPPING[filename]
@@ -1339,7 +1343,7 @@ class FaceRecognitionApp:
                                 # If not found, use the filename stem as fallback
                                 if display_title is None:
                                     display_title = file_stem
-                            
+
                             # Add to available videos list
                             video_files.append(display_title)
                             title_to_path_mapping[display_title] = str(video_file)
@@ -1355,11 +1359,11 @@ class FaceRecognitionApp:
 
         # Store the mapping in the instance
         self.title_to_path_mapping = title_to_path_mapping
-        
+
         # Cache the results to prevent redundant scanning
         self._cached_videos = video_files
         self._cached_mapping = title_to_path_mapping
-        
+
         return video_files, title_to_path_mapping
 
     def get_video_titles_for_dropdown(self):
@@ -1663,7 +1667,7 @@ class FaceRecognitionApp:
             _global_detector = create_face_detector_inside_gpu()
             if _global_detector is None:
                 return None, "Failed to initialize face detector in GPU context"
-        
+
         return self._process_video_core(video_path, progress, use_gpu=True)
 
     def _process_video_cpu(self, video_path, progress=gr.Progress()):
@@ -1674,7 +1678,7 @@ class FaceRecognitionApp:
             _global_detector = create_cpu_only_face_detector()
             if _global_detector is None:
                 return None, "Failed to initialize CPU-only face detector"
-        
+
         return self._process_video_core(video_path, progress, use_gpu=False)
 
     def _process_video_core(self, video_path, progress=gr.Progress(), use_gpu=True):
@@ -1682,7 +1686,7 @@ class FaceRecognitionApp:
         try:
             self.processing_video = True
             results = []
-            
+
             # ZeroGPU timeout management
             if HF_SPACES_GPU and use_gpu:
                 print("🚀 Processing on ZeroGPU - optimizing for time limits...")
@@ -1741,7 +1745,7 @@ class FaceRecognitionApp:
             for i, fourcc in enumerate(codecs_to_try):
                 codec_names = ["mp4v", "XVID", "MJPG", "X264", "avc1"]
                 codec_name = codec_names[i] if i < len(codec_names) else f"codec_{i}"
-                
+
                 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
                 if out.isOpened():
                     successful_codec = codec_name
@@ -1794,10 +1798,10 @@ class FaceRecognitionApp:
                 if should_process:
                     # Increment processed frame count (this frame passed frame skip)
                     self.processing_stats["total_processed"] += 1
-                    
+
                     # Quick pre-filter: check if frame has faces before expensive processing
                     has_faces = _global_detector.has_faces_quick(frame)
-                    
+
                     if has_faces:
                         # Process frame for recognition
                         matches = process_frame(
@@ -1944,11 +1948,11 @@ class FaceRecognitionApp:
                 summary += "❌ No faces recognized in video"
 
             self.processing_video = False
-            
+
             # Restore original frame skip setting
             if HF_SPACES_GPU and 'original_frame_skip' in locals():
                 self.config.recognition.frame_skip = original_frame_skip
-            
+
             # Final GPU cleanup (only if we used GPU)
             if HF_SPACES_GPU and use_gpu:
                 try:
@@ -1987,11 +1991,11 @@ class FaceRecognitionApp:
 
         except Exception as e:
             self.processing_video = False
-            
+
             # Restore original frame skip setting if error occurred
             if HF_SPACES_GPU and 'original_frame_skip' in locals():
                 self.config.recognition.frame_skip = original_frame_skip
-            
+
             # GPU cleanup on error (only if we used GPU)
             if HF_SPACES_GPU and use_gpu:
                 try:
@@ -2001,7 +2005,7 @@ class FaceRecognitionApp:
                         print("🧹 GPU memory cleanup after error")
                 except Exception:
                     pass
-            
+
             logger.error(f"Video processing error: {e}")
             return (
                 None,
@@ -2090,7 +2094,7 @@ class FaceRecognitionApp:
 
             # Save configuration
             save_config()
-            
+
             # Reinitialize face detector if detection settings changed
             global _global_detector
             if _global_detector is not None:
@@ -2194,7 +2198,7 @@ class FaceRecognitionApp:
                     )
 
             # Get unique contestants for filter dropdown
-            contestant_choices = ["All"] + sorted(list(contestant_stats.keys()))
+            contestant_choices = ["All"] + sorted(contestant_stats.keys())
 
             # Create summary statistics
             total_contestants = len(contestant_stats)
@@ -2433,7 +2437,7 @@ def create_gradio_interface():
 
                             # Add sorted contestants to choices
                             if contestants:
-                                choices.extend(sorted(list(contestants)))
+                                choices.extend(sorted(contestants))
 
                         return gr.Dropdown(choices=choices, value="All")
                     except Exception as e:
@@ -2614,28 +2618,28 @@ def create_gradio_interface():
                             **Steps:**
                             1. 📹 Select a video from the dropdown
                             2. ⚙️ Adjust frame skip in Settings tab if desired (default: every 15 frames)
-                            3. 🗺️ Click "Generate UMAP" button  
+                            3. 🗺️ Click "Generate UMAP" button
                             4. ⏳ Wait for processing (respects your frame skip setting)
                             5. 📊 View the 2D embedding visualization
-                            
+
                             **Settings-Based Processing:**
                             - Uses your current **Frame Skip** setting from Settings tab
                             - Uses your current **Similarity Threshold** setting
                             - Applies improved **Detection Threshold** (0.15) and **Adaptive Resolution**
                             - Processing time depends on frame skip: lower skip = more frames = longer processing
-                            
+
                             **Frame Skip Examples:**
                             - **Skip 15** (default): ~2000 frames for 30min video → ~2-3 minutes processing
-                            - **Skip 30**: ~1000 frames for 30min video → ~1-2 minutes processing  
+                            - **Skip 30**: ~1000 frames for 30min video → ~1-2 minutes processing
                             - **Skip 1**: All frames → much longer but most comprehensive
-                            
+
                             **Legend:**
                             - **Red stars** ⭐: Currently detected faces
                             - **Colored squares** 🟩: Known gallery faces (matched)
                             - **Gray circles** ⚪: Gallery faces (unmatched)
                             - **Green arrows** ➡️: Similarity connections (>0.5)
                             - **Line thickness**: Proportional to similarity score
-                            
+
                             **💡 Tip:** Adjust frame skip in Settings for balance between speed and completeness.
                             """)
 
@@ -2697,7 +2701,7 @@ def create_gradio_interface():
                             if should_process:
                                 processed_count += 1
 
-                                # Process frame to get face detections  
+                                # Process frame to get face detections
                                 matches = process_frame(
                                     frame, app.known_embeddings, similarity_threshold,
                                     detector=_global_detector
@@ -2731,7 +2735,7 @@ def create_gradio_interface():
                         umap_fig = app.generate_umap_visualization(all_matches)
 
                         unique_faces = len(
-                            set([name for _, name in all_matches if name != "Unknown"])
+                            {name for _, name in all_matches if name != "Unknown"}
                         )
 
                         return (
@@ -2927,7 +2931,7 @@ def create_gradio_interface():
                         )
 
                         detected_faces = len(
-                            set([s["face_id"] for s in frame_similarities])
+                            {s["face_id"] for s in frame_similarities}
                         )
                         total_comparisons = len(frame_similarities)
 

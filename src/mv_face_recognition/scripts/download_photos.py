@@ -1,4 +1,5 @@
 import os
+
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm  # Import tqdm for progress bar
@@ -29,7 +30,7 @@ def extract_photos_from_html_files(html_files):
         album_dir = os.path.join(base_photo_dir, album_name)
         os.makedirs(album_dir, exist_ok=True)
 
-        with open(html_file, "r", encoding="utf-8") as file:
+        with open(html_file, encoding="utf-8") as file:
             content = file.read()
 
         soup = BeautifulSoup(content, "html.parser")
@@ -61,7 +62,7 @@ def extract_photos_from_html_files(html_files):
         album_dir = os.path.join(base_photo_dir, album_name)
         os.makedirs(album_dir, exist_ok=True)
 
-        with open(html_file, "r", encoding="utf-8") as file:
+        with open(html_file, encoding="utf-8") as file:
             content = file.read()
 
         soup = BeautifulSoup(content, "html.parser")

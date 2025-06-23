@@ -3,16 +3,16 @@ Drawing utilities for face recognition video processing.
 Provides basic drawing functions for bounding boxes, labels, and timestamps.
 """
 
+
 import cv2
 import numpy as np
-from typing import Tuple, Optional
 
 
-def draw_bounding_box(frame: np.ndarray, bbox: Tuple[int, int, int, int], 
-                     color: Tuple[int, int, int], padding: int = 0) -> None:
+def draw_bounding_box(frame: np.ndarray, bbox: tuple[int, int, int, int],
+                     color: tuple[int, int, int], padding: int = 0) -> None:
     """
     Draw a bounding box on the frame.
-    
+
     Args:
         frame: The image frame to draw on
         bbox: Bounding box coordinates (x1, y1, x2, y2)
@@ -24,32 +24,32 @@ def draw_bounding_box(frame: np.ndarray, bbox: Tuple[int, int, int, int],
     y1 -= padding
     x2 += padding
     y2 += padding
-    
+
     # Ensure coordinates are within frame bounds
     h, w = frame.shape[:2]
     x1 = max(0, x1)
     y1 = max(0, y1)
     x2 = min(w, x2)
     y2 = min(h, y2)
-    
+
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
 
-def draw_timestamp(frame: np.ndarray, timestamp: str, 
-                  position: Optional[Tuple[int, int]] = None) -> np.ndarray:
+def draw_timestamp(frame: np.ndarray, timestamp: str,
+                  position: tuple[int, int] | None = None) -> np.ndarray:
     """
     Draw timestamp on the frame.
-    
+
     Args:
         frame: The image frame to draw on
         timestamp: Timestamp string to display
         position: Position to place the timestamp (x, y). If None, places at bottom-right
-        
+
     Returns:
         Frame with timestamp drawn
     """
     h, w = frame.shape[:2]
-    
+
     if position is None:
         # Default to bottom-right corner
         font_scale = 0.7
@@ -58,14 +58,14 @@ def draw_timestamp(frame: np.ndarray, timestamp: str,
             timestamp, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
         )
         position = (w - text_width - 10, h - 10)
-    
+
     # Draw text background for better visibility
     font_scale = 0.7
     thickness = 2
     (text_width, text_height), baseline = cv2.getTextSize(
         timestamp, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
     )
-    
+
     # Background rectangle
     cv2.rectangle(
         frame,
@@ -74,7 +74,7 @@ def draw_timestamp(frame: np.ndarray, timestamp: str,
         (0, 0, 0),  # Black background
         -1
     )
-    
+
     # Text
     cv2.putText(
         frame,
@@ -85,16 +85,16 @@ def draw_timestamp(frame: np.ndarray, timestamp: str,
         (0, 255, 255),  # Yellow text
         thickness
     )
-    
+
     return frame
 
 
-def draw_label(frame: np.ndarray, text: str, position: Tuple[int, int],
-              color: Tuple[int, int, int] = (0, 255, 0), 
+def draw_label(frame: np.ndarray, text: str, position: tuple[int, int],
+              color: tuple[int, int, int] = (0, 255, 0),
               font_scale: float = 0.6, thickness: int = 2) -> None:
     """
     Draw a text label on the frame.
-    
+
     Args:
         frame: The image frame to draw on
         text: Text to display

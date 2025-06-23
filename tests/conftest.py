@@ -3,21 +3,22 @@ Pytest configuration and fixtures for MV Face Recognition System tests.
 """
 
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
-import numpy as np
+from unittest.mock import Mock
+
 import cv2
+import numpy as np
 import pytest
-from PIL import Image
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Suppress warnings for cleaner test output
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -42,7 +43,7 @@ def sample_image():
     # Create a 640x480 RGB image with a gradient pattern
     width, height = 640, 480
     image = np.zeros((height, width, 3), dtype=np.uint8)
-    
+
     # Create a simple gradient pattern
     for y in range(height):
         for x in range(width):
@@ -51,7 +52,7 @@ def sample_image():
                 int(255 * y / height),  # Green channel
                 128  # Blue channel
             ]
-    
+
     return image
 
 
@@ -104,11 +105,11 @@ def mock_faces_list(mock_face_detection):
 def sample_video_path(test_data_dir):
     """Create a sample test video file."""
     video_path = test_data_dir / "test_video.mp4"
-    
+
     # Create a simple test video using OpenCV
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(str(video_path), fourcc, 10.0, (640, 480))
-    
+
     # Write 30 frames (3 seconds at 10 fps)
     for i in range(30):
         # Create a frame with moving rectangle
@@ -117,7 +118,7 @@ def sample_video_path(test_data_dir):
         cv2.rectangle(frame, (x, 200), (x + 100, 300), (0, 255, 0), -1)
         cv2.putText(frame, f"Frame {i}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         out.write(frame)
-    
+
     out.release()
     return video_path
 
@@ -137,7 +138,7 @@ def sample_embeddings():
 def mock_config():
     """Create a mock configuration object."""
     config = Mock()
-    
+
     # Recognition settings
     config.recognition = Mock()
     config.recognition.similarity_threshold = 0.6
@@ -146,17 +147,17 @@ def mock_config():
     config.recognition.max_faces_per_frame = 10
     config.recognition.use_gpu = True
     config.recognition.det_size = (640, 640)
-    
+
     # UI settings
     config.ui = Mock()
     config.ui.enhanced_ui = True
     config.ui.theme = "light"
-    
+
     # Storage settings
     config.storage = Mock()
     config.storage.cache_embeddings = True
     config.storage.chroma_db_path = ".test_chroma"
-    
+
     return config
 
 
@@ -167,14 +168,14 @@ def mock_face_detector(mock_config):
     detector.config = mock_config
     detector.app = Mock()
     detector.force_cpu_only = False
-    
+
     # Mock the get method to return faces
     def mock_get(image, max_num=0):
         # Return mock faces based on image
         if isinstance(image, np.ndarray) and image.size > 0:
             return [Mock() for _ in range(min(2, max_num or 2))]
         return []
-    
+
     detector.app.get = mock_get
     return detector
 
@@ -199,7 +200,7 @@ def mock_recognition_service(mock_embedding_service):
     service = Mock()
     service.embedding_service = mock_embedding_service
     service.similarity_threshold = 0.6
-    
+
     def mock_recognize_faces(faces):
         results = []
         for i, face in enumerate(faces):
@@ -208,7 +209,7 @@ def mock_recognition_service(mock_embedding_service):
             else:
                 results.append((face, "Unknown", 0.0))
         return results
-    
+
     service.recognize_faces = mock_recognize_faces
     return service
 
@@ -219,7 +220,7 @@ def mock_video_processing_service(mock_face_detector, mock_recognition_service):
     service = Mock()
     service.detector = mock_face_detector
     service.recognition_service = mock_recognition_service
-    
+
     def mock_process_video(video_path, **kwargs):
         # Return mock results
         return "output_video.mp4", [
@@ -227,7 +228,7 @@ def mock_video_processing_service(mock_face_detector, mock_recognition_service):
             {"frame": 10, "timestamp": 1.0, "faces": 1},
             {"frame": 20, "timestamp": 2.0, "faces": 3},
         ]
-    
+
     service.process_video = mock_process_video
     return service
 
@@ -245,17 +246,17 @@ def sample_contestant_info():
     """Create sample contestant information."""
     return {
         "person_1": {
-            "name": "Test Person 1", 
+            "name": "Test Person 1",
             "age": 25,
             "description": "Test contestant 1"
         },
         "person_2": {
-            "name": "Test Person 2", 
+            "name": "Test Person 2",
             "age": 30,
             "description": "Test contestant 2"
         },
         "person_3": {
-            "name": "Test Person 3", 
+            "name": "Test Person 3",
             "age": 28,
             "description": "Test contestant 3"
         },
@@ -268,7 +269,7 @@ def setup_test_environment(monkeypatch, temp_cache_dir):
     # Set test environment
     monkeypatch.setenv("TESTING", "1")
     monkeypatch.setenv("CACHE_DIR", str(temp_cache_dir))
-    
+
     # Mock HuggingFace Spaces detection to avoid GPU requirements
     monkeypatch.setenv("HF_SPACES_GPU", "0")
 

@@ -1,8 +1,9 @@
-import chromadb
-from chromadb.config import Settings
+import logging
 import os
 from pathlib import Path
-import logging
+
+import chromadb
+from chromadb.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,22 +16,22 @@ def get_chroma_client():
         "cache/chromadb",  # Alternative cache path
         "/tmp/chroma_db",  # Hugging Face Spaces temp path
     ]
-    
+
     chroma_path = None
     for path in possible_paths:
         if Path(path).exists() and any(Path(path).iterdir()):
             chroma_path = path
             logger.info(f"Found ChromaDB data at: {path}")
             break
-    
+
     if chroma_path is None:
         # Create new ChromaDB in temp directory for HF Spaces
         chroma_path = "/tmp/chroma_db" if os.path.exists("/tmp") else ".chroma_db"
         logger.info(f"Creating new ChromaDB at: {chroma_path}")
-    
+
     try:
         return chromadb.PersistentClient(
-            path=chroma_path, 
+            path=chroma_path,
             settings=Settings(
                 allow_reset=True,
                 anonymized_telemetry=False,  # Disable telemetry for HF Spaces

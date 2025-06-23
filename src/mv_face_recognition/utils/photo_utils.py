@@ -1,7 +1,8 @@
 import re
 
+
 def extract_img_urls(file_path):
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_path, encoding="utf-8") as file:
         content = file.read()
 
     pattern = r'https://scontent-[^"]+\.(?:jpg|png)'

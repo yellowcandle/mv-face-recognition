@@ -1,4 +1,5 @@
 import os
+
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
@@ -426,7 +427,7 @@ for face_idx, face in enumerate(faces):
     )
 
     # Draw top matches that meet threshold
-    for i, (match_name, score) in enumerate(top_3):
+    for _i, (match_name, score) in enumerate(top_3):
         if score >= confidence_threshold:
             # Create label with score
             label = f"{match_name} ({score:.2f})"

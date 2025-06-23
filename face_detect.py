@@ -1,9 +1,10 @@
 import os
+import warnings
+
 import cv2
 import numpy as np
 import pandas as pd
 import tqdm
-import warnings
 from insightface.app import FaceAnalysis
 
 # Suppress the specific FutureWarning from numpy.linalg.lstsq

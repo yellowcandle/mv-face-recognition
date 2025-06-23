@@ -1,11 +1,12 @@
-import cv2
-import mediapipe as mp
-import insightface
-import numpy as np
-import time
-from pathlib import Path
 import os
 import sys
+import time
+from pathlib import Path
+
+import cv2
+import insightface
+import mediapipe as mp
+import numpy as np
 import pandas as pd
 
 
@@ -108,7 +109,7 @@ class FaceDetectionComparison:
         min_dist = float("inf")
         best_match = {"name": "Unknown"}
 
-        for contestant_id, data in self.contestant_db.items():
+        for _contestant_id, data in self.contestant_db.items():
             dist = np.linalg.norm(face_embedding - data["embedding"])
             if dist < min_dist and dist < 0.6:  # Threshold for matching
                 min_dist = dist
