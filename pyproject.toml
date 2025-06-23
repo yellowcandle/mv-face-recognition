@@ -189,3 +189,10 @@ module = [
     "yt_dlp.*",
 ]
 ignore_missing_imports = true
+
+[tool.pyrefly]
+# Configure pyrefly to handle this project's mixed structure
+import_roots = [
+    ".",  # Root directory for top-level imports
+    "src",  # src directory for src.* imports
+]
