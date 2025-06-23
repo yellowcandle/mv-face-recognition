@@ -1,3 +1,0 @@
-"""
-Core face recognition modules.
-"""
