@@ -1,169 +1,310 @@
-Face Recognition Dashboard UI Specification
-Overall Layout
+# MV Face Recognition - Design Document
 
-Viewport: Full screen application (1920x1080 recommended)
-Layout: Two-column main layout with bottom panel
-Color Scheme: Dark theme with blue accents
-Responsive: Should adapt to different screen sizes
+## Overview
 
-Component Structure
-Main Container (Full Screen)
-┌─────────────────────────────────────────────────────────────────┐
-│ Header Bar (60px height)                                       │
-├─────────────────────────────────────────────────────────────────┤
-│                    Main Content Area                           │
-│ ┌─────────────────────┐ ┌─────────────────────────────────────┐ │
-│ │                     │ │                                     │ │
-│ │   Video Player      │ │    Face Recognition Panel          │ │
-│ │   (60% width)       │ │    (40% width)                     │ │
-│ │                     │ │                                     │ │
-│ │                     │ │                                     │ │
-│ └─────────────────────┘ └─────────────────────────────────────┘ │
-├─────────────────────────────────────────────────────────────────┤
-│ Similarity Scores Panel (200px height)                         │
-└─────────────────────────────────────────────────────────────────┘
-Component Specifications
-1. Header Bar (Top - 60px height)
+This document describes the architecture and design decisions for the clean rewrite of the MV Face Recognition system. The system processes video files for face recognition, specifically targeting videos in the `/source/videos/` directory.
 
-Background: Dark gray (#2a2a2a)
-Content:
+## Architecture
 
-App title: "Face Recognition Dashboard" (left aligned)
-Current timestamp (right aligned)
-Status indicator (center) - "LIVE" badge when processing
+### Core Requirements
 
+- **No webcam processing**: Only process video files from `/source/videos/` directory
+- **Preserve existing data**: Keep `/source/photo/contestants/` with existing photos and embeddings
+- **Preserve documentation**: Keep `/docs/` functionality and README.md intact
+- **Use ChromaDB**: For fast similarity search of face embeddings
 
+### System Components
 
-2. Video Player Panel (Left - 60% width)
+```
+app.py (Streamlit UI)
+├── src/
+│   ├── core/
+│   │   ├── face_detector.py (InsightFace detection)
+│   │   └── face_matcher.py (ChromaDB similarity search)
+│   ├── services/
+│   │   └── video_processor.py (Video processing pipeline)
+│   └── database/
+│       └── chroma_setup.py (ChromaDB management)
+├── config.json (Configuration)
+├── requirements.txt (Minimal dependencies)
+└── data/ (Generated ChromaDB storage)
+```
 
-Background: Black (#000000)
-Content:
+## Technology Stack
 
-Live video stream display (16:9 aspect ratio preferred)
-Video controls overlay (play/pause, timeline, volume)
-Detection overlay: Green bounding boxes around detected faces
-Each bounding box labeled with confidence score
+### Core Technologies
+- **Streamlit**: Web interface for video processing
+- **InsightFace**: Face detection and embedding generation
+- **ChromaDB**: Vector database for fast similarity search
+- **OpenCV**: Video processing and image manipulation
+- **PyTorch**: Deep learning backend
 
+### Key Dependencies
+```
+streamlit>=1.28.0      # Web interface
+insightface>=0.7.3     # Face detection/recognition
+chromadb>=0.4.0        # Vector database
+opencv-python>=4.8.0   # Video/image processing
+torch>=2.0.0           # ML backend
+```
 
-Features:
+## Design Decisions
 
-Full-screen toggle button
-Frame rate display (bottom left corner)
-Resolution indicator (bottom right corner)
+### 1. Frontend Choice: Streamlit
 
+**Decision**: Use Streamlit instead of Gradio or custom React frontend
 
+**Rationale**:
+- Better suited for data visualization and charts
+- Excellent integration with pandas/plotly for result analysis
+- Faster development cycle for data-heavy applications
+- Built-in support for file downloads and progress tracking
 
-3. Face Recognition Panel (Right - 40% width)
+**Alternatives Considered**:
+- Gradio: Simpler but less flexible for complex data display
+- FastAPI + HTML: More work, overkill for this use case
 
-Background: Dark blue-gray (#1e293b)
-Header: "Detected Faces" with count badge
-Content: Grid layout of face tiles
+### 2. Database Choice: ChromaDB
 
-Face Tile Specifications:
+**Decision**: Use ChromaDB for vector similarity search
 
-Size: 120x120px per tile
-Layout: 3 columns, auto rows with 10px gap
-Border: 2px solid, color-coded by confidence:
+**Rationale**:
+- Significantly faster than numpy-based similarity search for 96+ contestants
+- Persistent storage eliminates need to reload embeddings on each run
+- Built-in similarity thresholding and result limiting
+- Excellent performance for batch processing of video frames
 
-Green (#22c55e): High confidence (>90%)
-Yellow (#eab308): Medium confidence (70-90%)
-Red (#ef4444): Low confidence (<70%)
+**Performance Comparison**:
+- Numpy dot product: O(n) for each query, ~5ms for 96 contestants
+- ChromaDB: ~1ms for each query with built-in optimizations
 
+### 3. Video Processing Strategy
 
-Content per tile:
+**Decision**: Frame-by-frame processing with configurable skip intervals
 
-Cropped face image (100x100px)
-Name/ID label (if recognized)
-Confidence percentage
-Timestamp of detection
+**Architecture**:
+```python
+def process_video():
+    for frame_num, frame in extract_frames(skip=5):
+        faces = detect_faces(frame)
+        for face in faces:
+            embedding = face['embedding']
+            match = match_face(embedding)  # ChromaDB search
+            annotate_frame(frame, face, match)
+```
 
+**Benefits**:
+- Memory efficient (process one frame at a time)
+- Configurable frame skip for speed vs accuracy trade-off
+- Real-time progress tracking
+- Handles videos of any length
 
-Interaction: Click to highlight corresponding detection in video
+### 4. Configuration Management
 
-4. Similarity Scores Panel (Bottom - 200px height)
+**Decision**: Single JSON configuration file
 
-Background: Dark gray (#374151)
-Title: "Recognition Confidence Scores"
-Content: Horizontal bar chart showing confidence scores for each detected person
-Chart Specifications:
-
-X-axis: Person names/IDs
-Y-axis: Confidence percentage (0-100%)
-Bars colored same as tile borders (green/yellow/red)
-Real-time updates as new faces are detected
-Maximum 10 most recent detections shown
-
-
-
-Data Flow Requirements
-Input Data Structure:
-json{
-  "video_frame": "base64_encoded_image",
-  "timestamp": "ISO_timestamp",
-  "detections": [
-    {
-      "face_id": "unique_identifier",
-      "bounding_box": {"x": 0, "y": 0, "width": 100, "height": 100},
-      "face_crop": "base64_encoded_face_image",
-      "recognition": {
-        "name": "John Doe",
-        "confidence": 0.95,
-        "database_id": "person_123"
-      }
+**Structure**:
+```json
+{
+    "face_detection": {
+        "model_name": "buffalo_l",
+        "detection_threshold": 0.5,
+        "input_size": [640, 640]
+    },
+    "face_matching": {
+        "similarity_threshold": 0.6,
+        "max_results": 5
+    },
+    "video_processing": {
+        "frame_skip": 5,
+        "output_fps": 24
     }
-  ]
 }
-Real-time Updates:
+```
 
-Video frame updates: 30 FPS
-Face detection updates: As new faces are detected
-Similarity scores: Update every 1 second with latest data
+**Benefits**:
+- Runtime configuration changes through UI
+- Easy to backup and restore settings
+- Clear separation of concerns
 
-Technical Requirements
-Frontend Framework Suggestions:
+## Data Flow
 
-React with TypeScript for component structure
-WebSocket for real-time data streaming
-Canvas API for video overlay drawings
-Chart.js or D3.js for similarity scores visualization
+### 1. System Initialization
+```
+1. Load config.json
+2. Initialize InsightFace model (buffalo_l)
+3. Load existing .npy embeddings into ChromaDB
+4. Launch Streamlit interface
+```
 
-Key Features to Implement:
+### 2. Video Processing Pipeline
+```
+1. User selects video from /source/videos/
+2. Configure processing parameters (time range, thresholds)
+3. Extract frames with configurable skip interval
+4. For each frame:
+   a. Detect faces using InsightFace
+   b. Extract embeddings for detected faces
+   c. Search ChromaDB for similar faces
+   d. Record matches above similarity threshold
+5. Generate results summary and optional outputs:
+   a. Annotated video with bounding boxes and names
+   b. CSV file with detailed frame-by-frame results
+```
 
-Real-time video streaming with overlay capabilities
-Dynamic face tile management (add/remove/update)
-Interactive face highlighting between video and tiles
-Responsive grid layout for face tiles
-Animated bar chart for similarity scores
-Dark theme with accessibility considerations
+### 3. Data Structures
 
-Performance Considerations:
+**Face Detection Result**:
+```python
+{
+    'bbox': [x1, y1, x2, y2],
+    'confidence': 0.95,
+    'landmarks': [[x, y], ...],
+    'embedding': np.array([512 dimensions])
+}
+```
 
-Limit face tiles to maximum 50 active detections
-Implement virtual scrolling for large number of faces
-Optimize video rendering to prevent memory leaks
-Debounce similarity score updates to prevent excessive re-renders
+**Recognition Result**:
+```python
+{
+    'matched': True,
+    'contestant_name': 'Alice',
+    'similarity_score': 0.85,
+    'confidence_level': 'high'
+}
+```
 
-User Interactions
+## Performance Optimizations
 
-Video Panel:
+### 1. ChromaDB Vector Search
+- Pre-populated database eliminates embedding reload overhead
+- Cosine similarity search optimized for 512-dimensional embeddings
+- Configurable similarity thresholds reduce false positives
 
-Click on detection box → Highlight corresponding face tile
-Double-click → Enter full-screen mode
-Hover over detection → Show detailed info tooltip
+### 2. Video Processing
+- Frame skipping reduces processing time (5x speedup with skip=5)
+- Memory-efficient single-frame processing
+- Optional time range selection for targeted analysis
 
+### 3. Caching Strategy
+- ChromaDB provides persistent storage
+- Embedding cache in face matcher for repeated queries
+- Video metadata cached for UI responsiveness
 
-Face Tiles:
+## Error Handling
 
-Click → Highlight detection in video and show in chart
-Right-click → Context menu (edit name, remove, etc.)
-Hover → Show detailed recognition information
+### 1. Graceful Degradation
+- Missing videos: Clear error messages with available alternatives
+- Face detection failures: Continue processing other frames
+- ChromaDB connection issues: Fallback to numpy-based matching
 
+### 2. User Feedback
+- Progress bars for long-running operations
+- Detailed error messages with suggested solutions
+- System status indicators in UI
 
-Similarity Chart:
+## Security Considerations
 
-Hover over bar → Show detailed confidence breakdown
-Click bar → Focus on corresponding face tile and video detection
+### 1. File Access
+- Restricted to `/source/videos/` directory only
+- No arbitrary file system access
+- Input validation for video file types
 
+### 2. Configuration
+- Bounded input ranges for all parameters
+- Validation of configuration values
+- Safe defaults for all settings
 
+## Extensibility
 
-This specification provides clear guidance for implementation while maintaining the core functionality of your original mockup.
+### 1. Adding New Detection Models
+```python
+# Easy to swap InsightFace models
+class FaceDetector:
+    def __init__(self, model_name="buffalo_l"):
+        self.app = FaceAnalysis(name=model_name)
+```
+
+### 2. Alternative Databases
+```python
+# ChromaDB manager can be replaced
+class VectorDatabase:
+    def search_similar_faces(self, embedding):
+        pass  # Interface for other vector databases
+```
+
+### 3. Output Formats
+- CSV export already implemented
+- JSON export can be easily added
+- Integration with external systems via API
+
+## Testing Strategy
+
+### 1. Unit Tests
+- Face detection accuracy with known images
+- ChromaDB embedding storage and retrieval
+- Video frame extraction validation
+
+### 2. Integration Tests
+- End-to-end video processing pipeline
+- Configuration persistence and loading
+- UI component functionality
+
+### 3. Performance Tests
+- Video processing speed benchmarks
+- Memory usage monitoring
+- ChromaDB query performance
+
+## Deployment
+
+### 1. Local Development
+```bash
+uv sync                    # Install dependencies
+streamlit run app.py       # Launch application
+```
+
+### 2. Production Considerations
+- Docker containerization possible
+- GPU acceleration for InsightFace
+- Horizontal scaling for batch processing
+
+## Future Enhancements
+
+### 1. Real-time Processing
+- Live video stream processing
+- Webcam integration (if requirements change)
+
+### 2. Advanced Analytics
+- Contestant appearance timelines
+- Co-appearance analysis
+- Confidence score distributions
+
+### 3. Export Options
+- Video highlights generation
+- Automated report generation
+- Integration with external databases
+
+## Changelog
+
+### v1.0.0 - Clean Rewrite (2024-06-23)
+- Complete rewrite from scratch
+- Streamlit-based interface
+- ChromaDB integration for fast similarity search
+- Support for 5 MV videos in `/source/videos/`
+- 96 contestants with pre-computed embeddings
+- Configurable processing parameters
+- CSV and annotated video export
+
+## Dependencies
+
+See `requirements.txt` for the complete list of dependencies. Key libraries:
+
+- **streamlit**: Web interface framework
+- **insightface**: Face detection and recognition
+- **chromadb**: Vector database for similarity search
+- **opencv-python**: Video and image processing
+- **torch**: Machine learning framework
+- **pandas**: Data manipulation and analysis
+- **numpy**: Numerical computing
+- **tqdm**: Progress bars
+- **ffmpeg-python**: Video processing utilities
