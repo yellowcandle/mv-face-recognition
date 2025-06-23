@@ -4,10 +4,9 @@ Test runner for MV Face Recognition System.
 Provides convenient commands for running different types of tests.
 """
 
-import sys
-import subprocess
 import argparse
-from pathlib import Path
+import subprocess
+import sys
 
 
 def run_command(cmd, description):
@@ -16,9 +15,9 @@ def run_command(cmd, description):
     print(f"🔥 {description}")
     print(f"{'='*60}")
     print(f"Running: {' '.join(cmd)}")
-    
+
     try:
-        result = subprocess.run(cmd, check=True, capture_output=False)
+        subprocess.run(cmd, check=True, capture_output=False)
         print(f"✅ {description} - PASSED")
         return True
     except subprocess.CalledProcessError as e:
@@ -29,7 +28,7 @@ def run_command(cmd, description):
 def main():
     parser = argparse.ArgumentParser(description="Run tests for MV Face Recognition System")
     parser.add_argument(
-        "test_type", 
+        "test_type",
         choices=["all", "unit", "integration", "core", "services", "utils", "slow", "fast", "cpu", "gpu"],
         nargs="?",
         default="fast",
@@ -41,36 +40,36 @@ def main():
     parser.add_argument("--parallel", "-p", action="store_true", help="Run tests in parallel")
     parser.add_argument("--failed", "-f", action="store_true", help="Run only failed tests from last run")
     parser.add_argument("--benchmark", "-b", action="store_true", help="Run benchmark tests")
-    
+
     args = parser.parse_args()
-    
+
     # Base pytest command
     cmd = ["python", "-m", "pytest"]
-    
+
     # Add verbose flag
     if args.verbose:
         cmd.append("-v")
     else:
         cmd.append("-q")
-    
+
     # Add coverage
     if args.coverage:
         cmd.extend(["--cov=src", "--cov-report=term-missing"])
         if args.html:
             cmd.append("--cov-report=html")
-    
+
     # Add parallel execution
     if args.parallel:
         cmd.extend(["-n", "auto"])
-    
+
     # Add failed tests only
     if args.failed:
         cmd.append("--lf")
-    
+
     # Add benchmark support
     if args.benchmark:
         cmd.append("--benchmark-only")
-    
+
     # Select test type
     if args.test_type == "all":
         cmd.append("tests/")
@@ -92,18 +91,18 @@ def main():
         cmd.extend(["-m", "cpu_only", "tests/"])
     elif args.test_type == "gpu":
         cmd.extend(["-m", "gpu", "tests/"])
-    
+
     # Run the tests
     success = run_command(cmd, f"Running {args.test_type} tests")
-    
+
     # Additional commands based on results
     if success and args.coverage and args.html:
-        print(f"\n📊 Coverage report generated in htmlcov/index.html")
-    
+        print("\n📊 Coverage report generated in htmlcov/index.html")
+
     if not success:
-        print(f"\n💡 To run only failed tests next time, use: python run_tests.py --failed")
+        print("\n💡 To run only failed tests next time, use: python run_tests.py --failed")
         print(f"💡 For more verbose output, use: python run_tests.py {args.test_type} --verbose")
-    
+
     sys.exit(0 if success else 1)
 
 

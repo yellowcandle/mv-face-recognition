@@ -4,9 +4,9 @@ Launch script for the MV Face Recognition Gradio Interface.
 This script provides an easy way to start the web interface.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -50,17 +50,17 @@ def check_dependencies():
     """Check if required dependencies are installed."""
     try:
         import importlib.util
-        
+
         missing_deps = []
         for dep in ["gradio", "cv2"]:
             if importlib.util.find_spec(dep) is None:
                 missing_deps.append(dep)
-        
+
         if missing_deps:
             print(f"❌ Missing dependencies: {', '.join(missing_deps)}")
             print("Please install dependencies with: pip install -r requirements.txt")
             return False
-            
+
         print("✅ All core dependencies found")
         return True
     except Exception as e:

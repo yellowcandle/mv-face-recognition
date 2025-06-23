@@ -1,18 +1,17 @@
 import logging
 import os
 import platform
-from typing import Dict, List, Optional
 
 # Set matplotlib backend before importing pyplot to avoid NSWindow threading issues on macOS
 import matplotlib
 
 matplotlib.use("Agg")  # Use non-interactive backend
 
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import numpy as np
 import umap.umap_ as umap
+from matplotlib.figure import Figure
 from PIL import ImageFont
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class VisualizationService:
     including drawing annotations on frames, generating UMAP plots, and managing fonts.
     """
 
-    def __init__(self, fonts_dir: Optional[str] = None):
+    def __init__(self, fonts_dir: str | None = None):
         self.fonts_dir = (
             fonts_dir
             if fonts_dir
@@ -103,7 +102,7 @@ class VisualizationService:
         # Debug: Log current working directory and font directory
         logger.info("Current working directory: %s", os.getcwd())
         logger.info("Font directory setting: %s", self.fonts_dir)
-        
+
         # Try multiple possible font locations
         font_locations = [
             os.path.join(self.fonts_dir, "SourceHanSansTC-VF.ttf"),  # Relative to project
@@ -111,40 +110,40 @@ class VisualizationService:
             "./fonts/SourceHanSansTC-VF.ttf",  # Current directory relative
             "fonts/SourceHanSansTC-VF.ttf",  # No leading ./
         ]
-        
+
         font_path = None
         for location in font_locations:
             if os.path.exists(location):
                 font_path = location
                 break
-        
+
         if not font_path:
             # Check if running on HF Spaces (suppress warning)
             is_hf_spaces = os.environ.get('SPACE_ID') is not None or os.path.exists('/home/user')
             if not is_hf_spaces:
                 logger.warning(
-                    "Font file not found in any of these locations: %s. Using default PIL font.", 
+                    "Font file not found in any of these locations: %s. Using default PIL font.",
                     font_locations
                 )
             else:
                 logger.info("HF Spaces environment detected - using default font (custom font will be available after deployment)")
-            
+
             # Try to use system fonts as fallback
             try:
                 # Try to find a reasonable system font
                 system_fonts = [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/TTF/dejavu/DejaVuSans.ttf", 
+                    "/usr/share/fonts/TTF/dejavu/DejaVuSans.ttf",
                     "/System/Library/Fonts/Arial.ttf",
                     "/System/Library/Fonts/Helvetica.ttf"
                 ]
-                
+
                 system_font_path = None
                 for sys_font in system_fonts:
                     if os.path.exists(sys_font):
                         system_font_path = sys_font
                         break
-                
+
                 if system_font_path:
                     self.label_font = ImageFont.truetype(system_font_path, 60)
                     self.timestamp_font = ImageFont.truetype(system_font_path, 40)
@@ -153,7 +152,7 @@ class VisualizationService:
                     self.label_font = ImageFont.load_default()
                     self.timestamp_font = ImageFont.load_default()
                     logger.info("Using PIL default font")
-                    
+
             except Exception:
                 self.label_font = ImageFont.load_default()
                 self.timestamp_font = ImageFont.load_default()
@@ -174,10 +173,10 @@ class VisualizationService:
 
     def generate_umap_plot(
         self,
-        detected_embeddings: List[np.ndarray],
-        gallery_embeddings: Dict[str, List[np.ndarray]],
-        gallery_names: Dict[str, str],
-        detected_labels: List[str],
+        detected_embeddings: list[np.ndarray],
+        gallery_embeddings: dict[str, list[np.ndarray]],
+        gallery_names: dict[str, str],
+        detected_labels: list[str],
         show_current_only: bool = False,
     ) -> Figure:
         """
@@ -237,14 +236,14 @@ class VisualizationService:
         for name in gallery_embeddings.keys():
             all_contestant_names.add(name)
 
-        contestants_list = sorted(list(all_contestant_names))
+        contestants_list = sorted(all_contestant_names)
 
         # Ensure we have enough colors, repeat the palette if needed
         extended_palette = color_palette * (
             (len(contestants_list) // len(color_palette)) + 1
         )
         contestant_color_map = dict(
-            zip(contestants_list, extended_palette[: len(contestants_list)])
+            zip(contestants_list, extended_palette[: len(contestants_list)], strict=False)
         )
 
         # Debug logging
@@ -380,7 +379,7 @@ class VisualizationService:
         else:
             embeddings_2d = embeddings_2d_raw
 
-        if not isinstance(embeddings_2d, (np.ndarray, np.generic)):
+        if not isinstance(embeddings_2d, np.ndarray | np.generic):
             embeddings_2d = embeddings_2d.toarray()
 
         # Create enhanced scatter plot
@@ -447,12 +446,12 @@ class VisualizationService:
                         fontsize=10,
                         ha="center",
                         va="bottom",
-                        bbox=dict(
-                            boxstyle="round,pad=0.3",
-                            fc="white",
-                            alpha=0.8,
-                            edgecolor=person_color,
-                        ),
+                        bbox={
+                            "boxstyle": "round,pad=0.3",
+                            "fc": "white",
+                            "alpha": 0.8,
+                            "edgecolor": person_color,
+                        },
                         fontweight="bold",
                     )
 
@@ -498,7 +497,7 @@ class VisualizationService:
                 )
 
                 # Add labels for current detections
-                for pos, label in zip(positions, labels):
+                for pos, label in zip(positions, labels, strict=False):
                     ax.annotate(
                         label,
                         pos,
@@ -506,12 +505,12 @@ class VisualizationService:
                         textcoords="offset points",
                         fontsize=9,
                         fontweight="bold",
-                        bbox=dict(
-                            boxstyle="round,pad=0.3",
-                            facecolor=contestant_color,
-                            alpha=0.8,
-                            edgecolor="white",
-                        ),
+                        bbox={
+                            "boxstyle": "round,pad=0.3",
+                            "facecolor": contestant_color,
+                            "alpha": 0.8,
+                            "edgecolor": "white",
+                        },
                         color="white",
                         zorder=4,
                     )
@@ -521,7 +520,7 @@ class VisualizationService:
             curr_x, curr_y = embeddings_2d[curr_idx]
             curr_color = all_colors[curr_idx]
 
-            for match_idx, match_name, similarity in top_matches:
+            for match_idx, _match_name, similarity in top_matches:
                 if similarity > 0.5:  # Only show significant matches
                     match_x, match_y = embeddings_2d[match_idx]
 
@@ -534,15 +533,15 @@ class VisualizationService:
                         "",
                         xy=(match_x, match_y),
                         xytext=(curr_x, curr_y),
-                        arrowprops=dict(
-                            facecolor=curr_color,
-                            edgecolor=curr_color,
-                            arrowstyle="->",
-                            linewidth=linewidth,
-                            alpha=alpha,
-                            shrinkA=8,
-                            shrinkB=8,
-                        ),
+                        arrowprops={
+                            "facecolor": curr_color,
+                            "edgecolor": curr_color,
+                            "arrowstyle": "->",
+                            "linewidth": linewidth,
+                            "alpha": alpha,
+                            "shrinkA": 8,
+                            "shrinkB": 8,
+                        },
                         zorder=2,
                     )
 
@@ -554,12 +553,12 @@ class VisualizationService:
                         fontsize=8,
                         ha="center",
                         va="center",
-                        bbox=dict(
-                            boxstyle="round,pad=0.2",
-                            facecolor="white",
-                            alpha=0.9,
-                            edgecolor=curr_color,
-                        ),
+                        bbox={
+                            "boxstyle": "round,pad=0.2",
+                            "facecolor": "white",
+                            "alpha": 0.9,
+                            "edgecolor": curr_color,
+                        },
                         zorder=5,
                     )
 
@@ -659,9 +658,9 @@ class VisualizationService:
             transform=ax.transAxes,
             fontsize=10,
             verticalalignment="top",
-            bbox=dict(
-                boxstyle="round,pad=0.5", facecolor="white", alpha=0.9, edgecolor="gray"
-            ),
+            bbox={
+                "boxstyle": "round,pad=0.5", "facecolor": "white", "alpha": 0.9, "edgecolor": "gray"
+            },
         )
 
         plt.tight_layout()
@@ -669,7 +668,7 @@ class VisualizationService:
 
     def create_similarity_plot(
         self,
-        frame_similarities: List[Dict],
+        frame_similarities: list[dict],
         frame_number: int = None,
         max_faces: int = 5,
     ) -> Figure:
@@ -787,7 +786,7 @@ class VisualizationService:
             ax.set_xlim(0, 1.0)
 
             # Add value labels on bars
-            for j, (bar, score) in enumerate(zip(bars, scores)):
+            for _j, (bar, score) in enumerate(zip(bars, scores, strict=False)):
                 width = bar.get_width()
                 label_x = width + 0.01 if width < 0.8 else width - 0.01
                 ha = "left" if width < 0.8 else "right"
@@ -839,7 +838,7 @@ class VisualizationService:
 
     def create_frame_timeline_plot(
         self,
-        timeline_data: List[Dict],
+        timeline_data: list[dict],
         current_frame: int = None,
         window_size: int = 100,
     ) -> Figure:

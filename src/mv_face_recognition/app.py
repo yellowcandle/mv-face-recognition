@@ -4,9 +4,9 @@ Hugging Face Spaces entry point for MV Face Recognition System.
 Optimized for Gradio 5.x deployment on Hugging Face Spaces.
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 # Hugging Face Spaces GPU support
@@ -48,8 +48,8 @@ def setup_logging():
 def check_environment():
     """Check if running environment is suitable."""
     try:
-        import gradio
         import cv2
+        import gradio
         import torch
 
         print("✅ Environment check passed")

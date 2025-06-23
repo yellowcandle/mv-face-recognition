@@ -3,12 +3,13 @@ Face detection module using InsightFace.
 Handles face detection, landmark extraction, and preprocessing.
 """
 
+import logging
+
 import cv2
 import numpy as np
 import torch
-import logging
-from typing import List, Optional, Tuple
 from insightface.app import FaceAnalysis
+
 from ..config.settings import get_config
 
 logger = logging.getLogger(__name__)
@@ -65,17 +66,17 @@ class FaceDetector:
                     if torch.cuda.is_available() and self.config.recognition.use_gpu
                     else -1
                 )
-            
+
             self.app.prepare(ctx_id=ctx_id, det_size=self.config.recognition.det_size)
 
             # Verify GPU usage if expected
             if torch.cuda.is_available() and self.config.recognition.use_gpu:
                 # Check if models are actually using GPU
                 actual_providers = []
-                for model_name, model in self.app.models.items():
+                for _model_name, model in self.app.models.items():
                     if hasattr(model, 'session') and hasattr(model.session, 'get_providers'):
                         actual_providers.extend(model.session.get_providers())
-                
+
                 if 'CUDAExecutionProvider' in actual_providers:
                     logger.info("✅ Models successfully initialized with GPU acceleration")
                 else:
@@ -87,7 +88,7 @@ class FaceDetector:
             logger.error(f"Failed to initialize face detector: {e}")
             raise RuntimeError(f"Face detector initialization failed: {e}")
 
-    def _get_providers(self) -> List[str]:
+    def _get_providers(self) -> list[str]:
         """Get the appropriate ONNX providers based on hardware."""
         providers = []
 
@@ -121,7 +122,7 @@ class FaceDetector:
         providers.append("CPUExecutionProvider")
         return providers
 
-    def detect_faces(self, image: np.ndarray) -> List:
+    def detect_faces(self, image: np.ndarray) -> list:
         """
         Detect faces in an image.
 
@@ -179,7 +180,7 @@ class FaceDetector:
         # Blend with original to avoid over-sharpening
         return cv2.addWeighted(image, 0.7, sharpened, 0.3, 0)
 
-    def _filter_faces(self, faces: List, image_shape: Tuple[int, ...]) -> List:
+    def _filter_faces(self, faces: list, image_shape: tuple[int, ...]) -> list:
         """Filter detected faces based on quality metrics."""
         if not faces:
             return []
@@ -225,17 +226,17 @@ class FaceDetector:
         """
         Quickly check if image contains faces without full detection.
         Uses lower confidence threshold for fast pre-filtering.
-        
+
         Args:
             image: Input image as numpy array (BGR format)
             min_confidence: Minimum confidence for face detection
-            
+
         Returns:
             True if faces are likely present, False otherwise
         """
         if image is None or image.size == 0:
             return False
-            
+
         try:
             # Use smaller image for faster detection
             height, width = image.shape[:2]
@@ -245,16 +246,16 @@ class FaceDetector:
                 new_height = int(height * scale)
                 new_width = int(width * scale)
                 image = cv2.resize(image, (new_width, new_height))
-            
+
             # Convert to RGB for InsightFace
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            
+
             if self.app is None:
                 return False
-                
+
             # Use InsightFace with lower threshold for quick detection
             faces = self.app.get(rgb_image, max_num=1)  # Only need to find one face
-            
+
             # Check if any face meets minimum confidence
             for face in faces:
                 if hasattr(face, 'det_score') and face.det_score >= min_confidence:
@@ -262,9 +263,9 @@ class FaceDetector:
                 elif not hasattr(face, 'det_score'):
                     # If no confidence score available, assume it's valid
                     return True
-                    
+
             return False
-            
+
         except Exception as e:
             logger.debug(f"Error in quick face detection: {e}")
             # If error occurs, assume faces might be present to avoid skipping
@@ -272,7 +273,7 @@ class FaceDetector:
 
     def extract_face_embedding(
         self, image: np.ndarray, normalize: bool = True
-    ) -> Optional[np.ndarray]:
+    ) -> np.ndarray | None:
         """
         Extract face embedding from a single face image.
 
@@ -375,7 +376,7 @@ class FaceDetector:
 
         return max(0.0, min(1.0, score))
 
-    def batch_detect_faces(self, images: List[np.ndarray]) -> List[List]:
+    def batch_detect_faces(self, images: list[np.ndarray]) -> list[list]:
         """
         Detect faces in multiple images efficiently.
 

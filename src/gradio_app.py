@@ -9,44 +9,37 @@ using the cosine similarity backend and visualization options.
 import logging
 import os
 import sys
-import threading
-import time
-import traceback
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any
-import tempfile
 
 import cv2
-import numpy as np
-import pandas as pd
 import gradio as gr
 
 # Set matplotlib backend before importing pyplot to avoid NSWindow threading issues on macOS
 import matplotlib
+import numpy as np
+
 matplotlib.use('Agg')  # Use non-interactive backend
 
-import umap.umap_ as umap
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.colors import hsv_to_rgb
-from PIL import Image, ImageDraw, ImageFont # Re-add PIL imports for placeholder
+from PIL import Image, ImageDraw, ImageFont  # Re-add PIL imports for placeholder
 
 # Import custom services
 from src.config.config import Config, get_config
 from src.services.face_recognition import FaceRecognitionService
-from src.services.visualization import VisualizationService
 from src.services.video_service import get_video_manager
+from src.services.visualization import VisualizationService
 
 logger = logging.getLogger(__name__)
 
 # Global service instances
 # These will be initialized in the main function
-face_recognition_service: Optional[FaceRecognitionService] = None
-visualization_service: Optional[VisualizationService] = None
-app_config: Optional[Config] = None
+face_recognition_service: FaceRecognitionService | None = None
+visualization_service: VisualizationService | None = None
+app_config: Config | None = None
 video_manager = None
 
-def get_video_files() -> Dict[str, str]:
+def get_video_files() -> dict[str, str]:
     """
     Retrieves a dictionary of available videos using the video manager.
     Downloads videos from YouTube if needed.
@@ -56,22 +49,22 @@ def get_video_files() -> Dict[str, str]:
                         local paths. Downloads missing videos automatically.
     """
     global video_manager
-    
+
     logger.info(f"get_video_files called, video_manager: {video_manager}")
-    
+
     if video_manager is None:
         logger.error("Video manager not initialized")
         return {"❌ Video manager not initialized - please restart": ""}
-    
+
     video_files = {}
     video_names = video_manager.get_video_list()
-    
+
     logger.info(f"Video catalog contains {len(video_names)} videos: {video_names}")
-    
+
     if not video_names:
         logger.warning("No videos available in catalog")
         return {"❌ No videos available in catalog": ""}
-    
+
     # Get available videos (will download if missing and YouTube enabled)
     for video_name in video_names:
         logger.debug(f"Processing video: {video_name}")
@@ -83,14 +76,14 @@ def get_video_files() -> Dict[str, str]:
             # Always show videos in dropdown even if not available
             video_files[f"📥 {video_name} (Click to download)"] = ""
             logger.debug(f"📥 Video needs download: {video_name}")
-    
+
     # If no videos at all, show helpful message
     if not video_files:
         video_files["❌ No videos in catalog - check video service"] = ""
     # Add a manual download option
     elif all(not path for path in video_files.values()):
         video_files["ℹ️ Videos need manual download - upload your own videos"] = ""
-    
+
     logger.info(f"Returning {len(video_files)} video entries for dropdown")
     return video_files
 
@@ -98,28 +91,28 @@ def get_video_files() -> Dict[str, str]:
 def _initialize_services():
     """Initialize all services. Called both from main and when imported."""
     global app_config, video_manager, face_recognition_service, visualization_service
-    
+
     if app_config is None:
         app_config = get_config()
-    
+
     if face_recognition_service is None:
         face_recognition_service = FaceRecognitionService(app_config)
-    
+
     if visualization_service is None:
         visualization_service = VisualizationService(str(app_config.paths.font_path.parent))
-    
+
     if video_manager is None:
         # Initialize video manager with YouTube integration (only if not already set by app.py)
         logger.info("🎬 Initializing video manager from gradio_app...")
         video_manager = get_video_manager(enable_youtube=True)
-        
+
         # Download videos for better user experience
         logger.info("🎬 Initializing video downloads...")
         try:
             # Check if we're in HF Spaces or local environment
             is_hf_spaces = os.environ.get('SPACE_ID') or os.path.exists('/home/user')
             quality = "480p" if is_hf_spaces else "720p"  # Use lower quality for HF Spaces
-            
+
             cache_status = video_manager.get_cache_status()
             if cache_status['cached_videos'] < cache_status['total_videos']:
                 logger.info(f"📥 Downloading {cache_status['total_videos'] - cache_status['cached_videos']} missing videos...")
@@ -144,12 +137,12 @@ def get_video_frame(video_path: str, frame_num: int) -> np.ndarray:
         raise ValueError(f"Could not read frame {frame_num} from {video_path}")
     return frame
 
-def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float, rec_thresh: float, embeddings: List[np.ndarray], labels: List[str], show_current_only: bool, auto_advance_enabled: bool) -> Tuple[np.ndarray, Figure, List[np.ndarray], List[str]]:
+def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float, rec_thresh: float, embeddings: list[np.ndarray], labels: list[str], show_current_only: bool, auto_advance_enabled: bool) -> tuple[np.ndarray, Figure, list[np.ndarray], list[str]]:
     """
     Processes a frame for Gradio display, using the FaceRecognitionService and VisualizationService.
     """
     global face_recognition_service, visualization_service, app_config
-    
+
     # Initial checks for service and config initialization
     assert app_config is not None, "App configuration not initialized."
     assert app_config.paths is not None, "App configuration paths not initialized." # Added assert
@@ -165,7 +158,7 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
         draw = ImageDraw.Draw(Image.fromarray(placeholder_img))
         try:
             font = ImageFont.truetype(os.path.join(app_config.paths.font_path.parent, app_config.paths.font_path.name), 20)
-        except (IOError, AttributeError): # Catch AttributeError if app_config.paths is None
+        except (OSError, AttributeError): # Catch AttributeError if app_config.paths is None
             font = ImageFont.load_default()
         draw.text((50, 230), "Services not initialized", font=font, fill=(255,255,255))
         return np.array(placeholder_img), empty_fig, [], []
@@ -189,11 +182,11 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
         draw = ImageDraw.Draw(Image.fromarray(placeholder_img))
         try:
             font = ImageFont.truetype(os.path.join(app_config.paths.font_path.parent, app_config.paths.font_path.name), 20)
-        except (IOError, AttributeError):
+        except (OSError, AttributeError):
             font = ImageFont.load_default()
         draw.text((50, 230), "Please select a video", font=font, fill=(255,255,255))
         return np.array(placeholder_img), empty_fig, [], []
-    
+
     # Check if video needs to be downloaded
     if not video_files_map[video_name]:
         empty_fig, ax = plt.subplots()
@@ -206,7 +199,7 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
         draw = ImageDraw.Draw(Image.fromarray(placeholder_img))
         try:
             font = ImageFont.truetype(os.path.join(app_config.paths.font_path.parent, app_config.paths.font_path.name), 16)
-        except (IOError, AttributeError):
+        except (OSError, AttributeError):
             font = ImageFont.load_default()
         draw.text((20, 200), "Video Download Required", font=font, fill=(255,255,255))
         draw.text((20, 230), "YouTube blocked on HF Spaces", font=font, fill=(200,200,200))
@@ -266,15 +259,15 @@ def process_frame_for_gradio(video_name: str, frame_num: int, det_thresh: float,
 def create_gradio_interface():
     """Create the Gradio interface for video frame analysis."""
     global app_config, video_manager, face_recognition_service, visualization_service
-    
+
     # Initialize services if not already done (for when called from app.py)
     if app_config is None or video_manager is None:
         _initialize_services()
-    
+
     # Get initial video list
     video_files_map = get_video_files()
     video_names = list(video_files_map.keys())
-    
+
     # Add cache status display
     cache_status = video_manager.get_cache_status() if video_manager else {}
     if cache_status:
@@ -286,18 +279,18 @@ def create_gradio_interface():
             cache_info = f"Videos: {cached}/{total} cached"
     else:
         cache_info = "Video manager not initialized"
-    
+
     with gr.Blocks(title="Face Recognition Explorer") as demo:
         gr.Markdown("# Face Recognition Explorer")
         gr.Markdown("Select a video and navigate frames to analyze face recognition results")
         gr.Markdown(f"📊 **Status:** {cache_info}")
-        
+
         with gr.Row():
             with gr.Column(scale=3):
                 video_dropdown = gr.Dropdown(choices=video_names, label="Select Video")
                 gr.Markdown("**Or upload your own video:**")
                 video_upload = gr.File(
-                    label="Upload Video File", 
+                    label="Upload Video File",
                     file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"],
                     type="filepath"
                 )
@@ -314,7 +307,7 @@ def create_gradio_interface():
         with gr.Row():
             frame_output = gr.Image(label="Processed Frame")
             plot_output = gr.Plot(label="UMAP Embedding Visualization")
-        
+
         # Store embeddings and labels across interactions
         all_embeddings = gr.State([])
         all_labels = gr.State([])
@@ -331,15 +324,15 @@ def create_gradio_interface():
                     all_labels: [],
                     total_frames_state: 1
                 }
-            
+
             try:
                 cap = cv2.VideoCapture(uploaded_file)
                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 cap.release()
-                
+
                 # Update the dropdown to show uploaded file
                 updated_choices = list(get_video_files().keys()) + [f"📁 Uploaded: {uploaded_file.split('/')[-1]}"]
-                
+
                 return {
                     video_dropdown: gr.Dropdown(choices=updated_choices, value=f"📁 Uploaded: {uploaded_file.split('/')[-1]}"),
                     frame_slider: gr.Slider(maximum=total_frames-1, value=0),
@@ -361,7 +354,7 @@ def create_gradio_interface():
             """Initialize when video is selected."""
             # Get fresh video files map in case new videos were downloaded
             current_video_files = get_video_files()
-            
+
             if video_name not in current_video_files or not current_video_files[video_name]:
                 return {
                     frame_slider: gr.Slider(maximum=0, value=0),
@@ -369,7 +362,7 @@ def create_gradio_interface():
                     all_labels: [],
                     total_frames_state: 1
                 }
-            
+
             video_path = current_video_files[video_name]
             cap = cv2.VideoCapture(video_path)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -380,14 +373,14 @@ def create_gradio_interface():
                 all_labels: [],
                 total_frames_state: total_frames
             }
-        
+
         # Define inputs for process_frame_for_gradio
         process_inputs = [
-            video_dropdown, 
-            frame_slider, 
-            det_thresh_slider, 
-            rec_thresh_slider, 
-            all_embeddings, 
+            video_dropdown,
+            frame_slider,
+            det_thresh_slider,
+            rec_thresh_slider,
+            all_embeddings,
             all_labels,
             show_current_only,
             auto_advance_state
@@ -401,19 +394,19 @@ def create_gradio_interface():
             inputs=[video_dropdown],
             outputs=[frame_slider, all_embeddings, all_labels, total_frames_state]
         )
-        
+
         video_upload.change(
             load_uploaded_video,
             inputs=[video_upload],
             outputs=[video_dropdown, frame_slider, all_embeddings, all_labels, total_frames_state]
         )
-        
+
         frame_slider.change(
             process_frame_for_gradio,
             inputs=process_inputs,
             outputs=common_process_outputs
         )
-        
+
         det_thresh_slider.change(
             process_frame_for_gradio,
             inputs=process_inputs,
@@ -425,7 +418,7 @@ def create_gradio_interface():
             inputs=process_inputs,
             outputs=common_process_outputs
         )
-        
+
         show_current_only.change(
             process_frame_for_gradio,
             inputs=process_inputs,
@@ -447,7 +440,7 @@ def create_gradio_interface():
             inputs=process_inputs,
             outputs=common_process_outputs
         )
-        
+
         next_btn.click(
             lambda current_frame, total_frames: min(current_frame + 1, total_frames -1) if total_frames > 0 else 0,
             inputs=[frame_slider, total_frames_state],
@@ -460,7 +453,7 @@ def create_gradio_interface():
 
         # Auto-advance logic: Triggered after processing a frame if auto_advance_state is True
         frame_output.change(
-            lambda current_frame_num, total_frames, auto_advance_enabled: 
+            lambda current_frame_num, total_frames, auto_advance_enabled:
                 min(current_frame_num + 1, total_frames - 1) if auto_advance_enabled and current_frame_num < total_frames - 1 else current_frame_num,
             inputs=[frame_slider, total_frames_state, auto_advance_state],
             outputs=frame_slider,
@@ -479,7 +472,7 @@ if __name__ == "__main__":
             logging.FileHandler("gradio_app.log"),
         ],
     )
-    
+
     # Initialize configuration and services
     _initialize_services()
 

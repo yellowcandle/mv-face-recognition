@@ -1,6 +1,6 @@
-import numpy as np
 import logging
-from typing import Dict, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,8 @@ class RecognitionService:
     def match_face(
         self,
         face_embedding: np.ndarray,
-        known_embeddings: Dict[str, np.ndarray]
-    ) -> Tuple[str, float]:
+        known_embeddings: dict[str, np.ndarray]
+    ) -> tuple[str, float]:
         """
         Compare a face embedding against known embeddings.
 
@@ -88,7 +88,7 @@ class RecognitionService:
                 if max_sim_for_person > best_score:
                     best_score = max_sim_for_person
                     best_match_name = name
-            
+
             logger.debug(f"Vector search match: {best_match_name} (score: {best_score:.3f})")
             return best_match_name, best_score
 

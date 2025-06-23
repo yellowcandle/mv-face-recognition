@@ -4,9 +4,9 @@ Zeabur deployment entry point for MV Face Recognition System.
 Optimized for Gradio 5.x deployment on Zeabur cloud platform.
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 # Standard cloud deployment - no special GPU handling needed
@@ -39,8 +39,8 @@ def setup_logging():
 def check_environment():
     """Check if running environment is suitable."""
     try:
-        import gradio
         import cv2
+        import gradio
         import torch
 
         print("✅ Environment check passed")
@@ -77,7 +77,7 @@ def create_demo():
     except ImportError as e:
         print(f"⚠️ Dashboard import failed: {e}")
         print("🔄 Trying original interface...")
-        
+
         try:
             from src.gradio_app import create_gradio_interface
 
@@ -135,31 +135,31 @@ def main():
     # Initialize Zeabur environment
     try:
         from pathlib import Path
-        
+
         print("🚀 Initializing Zeabur environment...")
-        
+
         # Check if contestants directory exists with files
         contestants_dir = Path("source/photo/contestants")
         contestants_dir.mkdir(parents=True, exist_ok=True)
-        
+
         jpg_files = list(contestants_dir.glob("**/*.jpg"))
         png_files = list(contestants_dir.glob("**/*.png"))
         npy_files = list(contestants_dir.glob("**/*.npy"))
         total_images = len(jpg_files) + len(png_files)
-        
-        print(f"📊 Contestants directory status:")
+
+        print("📊 Contestants directory status:")
         print(f"   - Images: {total_images} (JPG: {len(jpg_files)}, PNG: {len(png_files)})")
         print(f"   - Embeddings: {len(npy_files)}")
-        
+
         if total_images == 0 and len(npy_files) == 0:
             print("⚠️ No contestants data found - creating fallback system")
-            
+
             # Create numbered directories for the contestant system
             print("📁 Creating numbered contestant directories...")
             for i in range(1, 11):  # Create first 10 contestant slots
                 contestant_dir = contestants_dir / str(i)
                 contestant_dir.mkdir(exist_ok=True)
-                
+
                 # Create a placeholder README in each directory
                 readme_content = f"""# Contestant {i}
 
@@ -173,13 +173,13 @@ To add a contestant:
 Supported formats: JPG, JPEG, PNG
 """
                 (contestant_dir / "README.md").write_text(readme_content)
-            
+
             print(f"✅ Created {10} numbered contestant directories for uploads")
-            
+
             # Create a basic contestant_info.csv for the numbered directories
             try:
                 import pandas as pd
-                
+
                 contestants_data = []
                 for i in range(1, 11):
                     contestants_data.append({
@@ -188,12 +188,12 @@ Supported formats: JPG, JPEG, PNG
                         "姓名": f"Contestant {i}",
                         "年齡": "Unknown"
                     })
-                
+
                 df = pd.DataFrame(contestants_data)
                 csv_path = Path("contestant_info.csv")
                 df.to_csv(csv_path, index=False)
                 print(f"✅ Created basic contestant_info.csv with {len(contestants_data)} entries")
-                
+
             except ImportError:
                 # Fallback without pandas
                 csv_content = """編號,暱稱,姓名,年齡
@@ -210,29 +210,29 @@ Supported formats: JPG, JPEG, PNG
 """
                 Path("contestant_info.csv").write_text(csv_content, encoding='utf-8')
                 print("✅ Created basic contestant_info.csv (without pandas)")
-            
-            # Also create the sample directory  
+
+            # Also create the sample directory
             sample_dir = contestants_dir / "sample"
             sample_dir.mkdir(exist_ok=True)
             (sample_dir / "README.txt").write_text("Sample contestant - upload photos via interface")
-            
+
         elif total_images > 0 or len(npy_files) > 0:
             print(f"✅ Found contestants data - {total_images} images, {len(npy_files)} embeddings")
-        
+
         # Initialize video management system (YouTube integration)
         try:
             print("🎬 Initializing video management system...")
             from src.services.video_service import get_video_manager
-            
+
             video_manager = get_video_manager(enable_youtube=True)
             cache_status = video_manager.get_cache_status()
-            
-            print(f"📊 Video cache status:")
+
+            print("📊 Video cache status:")
             print(f"   - Total videos in catalog: {cache_status['total_videos']}")
             print(f"   - Cached videos: {cache_status['cached_videos']}")
             print(f"   - Cache directory: {cache_status['cache_directory']}")
             print(f"   - Cache size: {cache_status['cache_size_mb']:.1f} MB")
-            
+
             # Set the global video manager for gradio_app to use
             try:
                 import src.gradio_app
@@ -240,7 +240,7 @@ Supported formats: JPG, JPEG, PNG
                 print("✅ Video manager shared with Gradio interface")
             except Exception as e:
                 print(f"⚠️ Failed to share video manager: {e}")
-            
+
             # Download videos for Zeabur if needed
             is_cloud_deploy = os.environ.get('PORT') or os.path.exists('/app')
             if is_cloud_deploy and cache_status['cached_videos'] < cache_status['total_videos']:
@@ -254,19 +254,19 @@ Supported formats: JPG, JPEG, PNG
                     print(f"✅ Downloaded {len(downloaded_videos)} videos from YouTube")
                 except Exception as e:
                     print(f"⚠️ Video download failed: {e} - will continue without videos")
-            
+
             elif cache_status['cached_videos'] > 0:
                 print(f"✅ Found {cache_status['cached_videos']} videos in cache")
             else:
                 print("⚠️ No videos available - some features may be limited")
-                
+
         except Exception as e:
             print(f"⚠️ Video system initialization failed: {e}")
             # Fallback: check for any existing video files
             print("🔍 Checking for existing video files...")
             video_dirs = ["source/videos", "source/videos_hf_clean", "source/videos_hf_optimized"]
             total_videos = 0
-            
+
             for video_dir in video_dirs:
                 vid_path = Path(video_dir)
                 vid_path.mkdir(parents=True, exist_ok=True)
@@ -274,28 +274,30 @@ Supported formats: JPG, JPEG, PNG
                 if mp4_count > 0:
                     print(f"📁 Found {mp4_count} videos in {video_dir}")
                     total_videos += mp4_count
-                    
+
             if total_videos == 0:
                 print("⚠️ No video files found - application will work with image uploads only")
-        
+
         # Create other required directories
         for dir_name in ["cache", "output", "output_frames", "output_mp4s"]:
             Path(dir_name).mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize ChromaDB from embeddings package if available
         try:
             embeddings_pkg_path = Path("embeddings_package.json")
             if embeddings_pkg_path.exists():
                 print("📦 Initializing ChromaDB from embeddings package...")
                 # Import and run the ChromaDB initialization
-                from scripts.create_chroma_from_package import initialize_chromadb_from_package
+                from scripts.create_chroma_from_package import (
+                    initialize_chromadb_from_package,
+                )
                 initialize_chromadb_from_package()
                 print("✅ ChromaDB initialized from embeddings package")
             else:
                 print("⚠️ No embeddings package found - ChromaDB will be disabled")
         except Exception as e:
             print(f"⚠️ ChromaDB initialization failed: {e} - will fall back to standard search")
-        
+
         # Download fonts if needed for Zeabur
         try:
             font_path = Path("fonts/SourceHanSansTC-VF.ttf")
@@ -310,9 +312,9 @@ Supported formats: JPG, JPEG, PNG
                 print("✅ Custom fonts available")
         except Exception as e:
             print(f"⚠️ Font setup failed: {e} - using system fonts")
-        
+
         print("✅ Zeabur environment initialization complete")
-        
+
     except Exception as e:
         print(f"⚠️ Zeabur initialization warning: {e}")
         # Minimal fallback

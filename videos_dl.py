@@ -1,12 +1,11 @@
-import yt_dlp
-import os
 import logging
+import os
 import warnings
-import tempfile
-from pathlib import Path
-from typing import Dict, Optional
-from rich.logging import RichHandler
 from argparse import ArgumentParser
+from pathlib import Path
+
+import yt_dlp
+from rich.logging import RichHandler
 
 # Suppress fsspec warnings
 warnings.filterwarnings("ignore", message=".*fsspec.*is yanked.*")
@@ -19,13 +18,13 @@ VIDEO_CATALOG = {
         "quality": "1080p"
     },
     "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅": {
-        "url": "https://youtu.be/2thpVqZsKHA", 
+        "url": "https://youtu.be/2thpVqZsKHA",
         "title": "全民造星IV主題曲《前傳》MV - 始発の駅",
         "quality": "1080p"
     },
     "3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅": {
         "url": "https://youtu.be/O8MOUs0sz4U",
-        "title": "全民造星IV主題曲《前傳》MV - 女團の駅", 
+        "title": "全民造星IV主題曲《前傳》MV - 女團の駅",
         "quality": "1080p"
     },
     "4-《全民造星IV》極限拍MV": {
@@ -49,7 +48,7 @@ def get_download_directory() -> str:
     else:
         # Use local project directory
         download_dir = "./source/videos"
-    
+
     os.makedirs(download_dir, exist_ok=True)
     return download_dir
 
@@ -68,12 +67,12 @@ def setup_logging(level):
 def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
     """
     Download video from YouTube with specified quality.
-    
+
     Args:
         url: YouTube URL
         output_path: Output file path (without extension)
         quality: Video quality preference (480p, 720p, 1080p)
-    
+
     Returns:
         True if download successful, False otherwise
     """
@@ -81,12 +80,12 @@ def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
         # Quality format selection for HF Spaces optimization
         format_selectors = {
             "480p": "best[height<=480][ext=mp4]/best[ext=mp4]",
-            "720p": "best[height<=720][ext=mp4]/best[ext=mp4]", 
+            "720p": "best[height<=720][ext=mp4]/best[ext=mp4]",
             "1080p": "best[height<=1080][ext=mp4]/best[ext=mp4]"
         }
-        
+
         format_selector = format_selectors.get(quality, format_selectors["1080p"])
-        
+
         ydl_opts = {
             "outtmpl": output_path + ".%(ext)s",
             "format": format_selector,
@@ -102,10 +101,10 @@ def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
             "writeautomaticsub": False,
             "ignoreerrors": True,
         }
-        
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        
+
         # Verify file was created
         expected_file = Path(output_path + ".mp4")
         if expected_file.exists() and expected_file.stat().st_size > 1000:
@@ -114,82 +113,82 @@ def download_video(url: str, output_path: str, quality: str = "720p") -> bool:
         else:
             logger.error(f"❌ Download failed or file too small: {output_path}")
             return False
-            
+
     except Exception as e:
         logger.error(f"❌ Error downloading {url}: {e}")
         return False
 
 
-def download_all_videos(download_dir: Optional[str] = None, quality: str = "1080p") -> Dict[str, str]:
+def download_all_videos(download_dir: str | None = None, quality: str = "1080p") -> dict[str, str]:
     """
     Download all videos from the catalog.
-    
+
     Args:
         download_dir: Directory to download videos (uses auto-detection if None)
         quality: Video quality preference
-        
+
     Returns:
         Dictionary mapping video names to local file paths
     """
     if download_dir is None:
         download_dir = get_download_directory()
-    
+
     downloaded_files = {}
-    
+
     logger.info(f"📥 Starting download of {len(VIDEO_CATALOG)} videos to {download_dir}")
-    
+
     for video_name, video_info in VIDEO_CATALOG.items():
         url = video_info["url"]
         output_path = os.path.join(download_dir, video_name)
-        
+
         # Check if file already exists
         expected_file = Path(output_path + ".mp4")
         if expected_file.exists() and expected_file.stat().st_size > 1000:
             logger.info(f"⏭️ Already exists: {video_name}")
             downloaded_files[video_name] = str(expected_file)
             continue
-        
+
         logger.info(f"📹 Downloading: {video_info['title']}")
         if download_video(url, output_path, quality):
             downloaded_files[video_name] = str(expected_file)
         else:
             logger.warning(f"⚠️ Failed to download: {video_name}")
-    
+
     logger.info(f"✅ Download complete: {len(downloaded_files)}/{len(VIDEO_CATALOG)} videos successful")
     return downloaded_files
 
 
-def get_video_path(video_name: str, download_if_missing: bool = True) -> Optional[str]:
+def get_video_path(video_name: str, download_if_missing: bool = True) -> str | None:
     """
     Get local path for a video, downloading if necessary.
-    
+
     Args:
         video_name: Name of the video from VIDEO_CATALOG
         download_if_missing: Whether to download if not found locally
-        
+
     Returns:
         Local file path or None if not available
     """
     if video_name not in VIDEO_CATALOG:
         logger.error(f"Unknown video: {video_name}")
         return None
-    
+
     download_dir = get_download_directory()
     expected_path = Path(download_dir) / f"{video_name}.mp4"
-    
+
     # Check if file exists and is valid
     if expected_path.exists() and expected_path.stat().st_size > 1000:
         return str(expected_path)
-    
+
     # Download if missing and requested
     if download_if_missing:
         logger.info(f"📥 Video not found locally, downloading: {video_name}")
         video_info = VIDEO_CATALOG[video_name]
         output_path = str(expected_path.with_suffix(""))
-        
+
         if download_video(video_info["url"], output_path, video_info["quality"]):
             return str(expected_path)
-    
+
     return None
 
 
@@ -212,9 +211,9 @@ def main():
         "--output-dir",
         help="Output directory for downloads (auto-detected if not specified)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     level = logging.INFO
     if args.log_level:
@@ -222,18 +221,18 @@ def main():
     elif args.verbose:
         level = logging.DEBUG
     setup_logging(level)
-    
+
     # Download videos
     logger.info("🎬 Starting YouTube video downloads for MV Face Recognition...")
     downloaded_files = download_all_videos(
         download_dir=args.output_dir,
         quality=args.quality
     )
-    
+
     if downloaded_files:
         logger.info("🎉 Video download completed successfully!")
         logger.info(f"📁 Videos saved to: {get_download_directory()}")
-        for name, path in downloaded_files.items():
+        for name, _path in downloaded_files.items():
             logger.info(f"  ✅ {name}")
     else:
         logger.error("❌ No videos were downloaded successfully")

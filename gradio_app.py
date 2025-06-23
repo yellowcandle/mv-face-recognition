@@ -3,23 +3,23 @@ Modern Gradio Web Interface for MV Face Recognition System.
 Provides real-time camera processing, image/video analysis, and configuration management.
 """
 
-import warnings
-import gradio as gr
-import pandas as pd
 import logging
-from typing import Optional
+import os
+import warnings
 from datetime import datetime
 from pathlib import Path
-import os
+
+import gradio as gr
+import pandas as pd
 
 # Import our modular components
 from src.config.settings import get_config, save_config
 from src.core.face_detector import FaceDetector
+from src.services.dataset_service import VideoDatasetManager
 from src.services.embedding_service import EmbeddingService
 from src.services.recognition_service import RecognitionService
 from src.services.video_processing_service import VideoProcessingService
 from src.services.visualization import VisualizationService
-from src.services.dataset_service import VideoDatasetManager
 
 # Suppress warnings BEFORE any other imports
 warnings.filterwarnings("ignore", message=".*rcond.*")
@@ -45,14 +45,14 @@ except ImportError:
         if len(args) == 1 and callable(args[0]) and not kwargs:
             return args[0]
         return decorator
-    
+
     spaces = type('spaces', (), {'GPU': spaces_gpu_decorator})()
     HF_SPACES_GPU = False
 
 # Global instances to avoid re-initialization
-_global_detector: Optional[FaceDetector] = None
+_global_detector: FaceDetector | None = None
 
-def get_face_detector(force_cpu=False) -> Optional[FaceDetector]:
+def get_face_detector(force_cpu=False) -> FaceDetector | None:
     """Initializes and returns a global FaceDetector instance."""
     global _global_detector
     if _global_detector is None:
@@ -60,7 +60,7 @@ def get_face_detector(force_cpu=False) -> Optional[FaceDetector]:
             config = get_config()
             if force_cpu:
                 config.recognition.use_gpu = False
-            
+
             # On ZeroGPU, detector must be initialized within a @spaces.GPU function.
             # We return None here, and the GPU-decorated function will create it.
             if HF_SPACES_GPU and not force_cpu:
@@ -93,14 +93,14 @@ class FaceRecognitionApp:
             "last_updated": datetime.now(),
         }
         self.title_to_path_mapping = {}
-        
+
         # Initialize services
-        self.face_detector: Optional[FaceDetector] = None # Will be set in GPU context
-        self.embedding_service: Optional[EmbeddingService] = None
-        self.recognition_service: Optional[RecognitionService] = None
-        self.video_processing_service: Optional[VideoProcessingService] = None
-        self.visualization_service: Optional[VisualizationService] = None
-        self.dataset_manager: Optional[VideoDatasetManager] = None
+        self.face_detector: FaceDetector | None = None # Will be set in GPU context
+        self.embedding_service: EmbeddingService | None = None
+        self.recognition_service: RecognitionService | None = None
+        self.video_processing_service: VideoProcessingService | None = None
+        self.visualization_service: VisualizationService | None = None
+        self.dataset_manager: VideoDatasetManager | None = None
 
         # UI state
         self.processing_video = False
@@ -125,7 +125,7 @@ class FaceRecognitionApp:
                 self.visualization_service = VisualizationService()
             if self.dataset_manager is None:
                 self.dataset_manager = VideoDatasetManager()
-            
+
             # Services that need a detector.
             if self.face_detector and self.video_processing_service is None:
                 self._initialize_detector_dependent_services()
@@ -170,24 +170,24 @@ class FaceRecognitionApp:
             all_names = self.embedding_service.contestant_info["暱稱"].tolist()
             self.embedding_service.load_embeddings_for_contestants(all_names)
             embeddings_count = len(self.embedding_service.known_embeddings)
-            
+
             if embeddings_count > 0:
                 logger.info(f"✅ Loaded {embeddings_count} contestant embeddings.")
             else:
                 logger.warning(f"⚠️ No contestant embeddings loaded from {len(all_names)} contestants.")
                 logger.info("💡 System will work for face detection without known faces database.")
                 logger.info("💡 Upload photos via the interface to build the recognition database.")
-                
+
         except Exception as e:
             logger.error(f"Failed to load embeddings: {e}", exc_info=True)
 
     def get_contestants_directory(self):
         """Get the contestants directory with fallback logic for different environments."""
         contestants_dir = self.config.project_root / "source/photo/contestants"
-        
+
         # Add debugging information
         logger.info(f"Looking for contestants in: {contestants_dir}")
-        
+
         if not contestants_dir.exists():
             logger.warning(f"Contestants directory not found: {contestants_dir}")
             # Try alternative paths based on common deployment scenarios
@@ -198,15 +198,15 @@ class FaceRecognitionApp:
                 Path(__file__).parent / "source" / "photo" / "contestants",
                 Path(__file__).parent.parent / "source" / "photo" / "contestants",
             ]
-            
+
             for alt_path in alt_paths:
                 if alt_path.exists():
                     logger.info(f"Found contestants in alternative path: {alt_path}")
                     return alt_path
-            
+
             logger.warning("No contestants directory found in any expected location")
             return None
-        
+
         return contestants_dir
 
     def get_available_videos(self, quality="720p"):
@@ -225,23 +225,23 @@ class FaceRecognitionApp:
         # Get videos from dataset manager
         try:
             videos = self.dataset_manager.get_available_videos(quality)
-            
+
             video_files = []
             title_to_path_mapping = {}
-            
+
             for video in videos:
                 filename = video['filename']
                 display_title = VIDEO_TITLE_MAPPING.get(filename, Path(filename).stem)
                 video_files.append(display_title)
-                
+
                 # Use full_path if available (local files), otherwise use filename for dataset files
                 path = video.get('full_path', filename)
                 title_to_path_mapping[display_title] = path
-            
+
             logger.info(f"Found {len(video_files)} video files ({quality}) via dataset manager")
             self.title_to_path_mapping = title_to_path_mapping
             return sorted(video_files), title_to_path_mapping
-            
+
         except Exception as e:
             logger.error(f"Error getting videos from dataset manager: {e}")
             # Fallback to empty list
@@ -256,9 +256,9 @@ class FaceRecognitionApp:
         """Get the file path from the selected title."""
         if not self.title_to_path_mapping:
             self.get_available_videos(quality)
-        
+
         path = self.title_to_path_mapping.get(title, title)
-        
+
         # If we have a dataset manager and the path is not a full path, try to get it
         if self.dataset_manager and not Path(path).exists():
             try:
@@ -269,7 +269,7 @@ class FaceRecognitionApp:
                     return dataset_path
             except Exception as e:
                 logger.warning(f"Could not get video path from dataset: {e}")
-        
+
         return path
 
     def _create_timeline_data(self, results_df):
@@ -290,7 +290,7 @@ class FaceRecognitionApp:
                 name = str(row.get("Name", "Unknown"))
                 if name == "Unknown":
                     continue
-                
+
                 if name not in contestant_stats:
                     contestant_stats[name] = {"appearances": 0}
                 contestant_stats[name]["appearances"] += 1
@@ -303,7 +303,7 @@ class FaceRecognitionApp:
                     contestant_stats[name]["appearances"]
                 ])
 
-            contestant_choices = ["All"] + sorted(list(contestant_stats.keys()))
+            contestant_choices = ["All"] + sorted(contestant_stats.keys())
             total_contestants = len(contestant_stats)
             total_appearances = len(results_df)
 
@@ -324,11 +324,11 @@ class FaceRecognitionApp:
         if not self.visualization_service:
             logger.error("Visualization service is not initialized.")
             return None
-        
+
         if not self.embedding_service:
             logger.warning("Embedding service not available - UMAP will only show detected faces without known gallery.")
             # Continue with UMAP generation using only detected faces
-        
+
         try:
             logger.info(f"Starting UMAP generation with {len(detected_faces_data)} face detections")
             detected_embeddings = [face.normed_embedding for face, name, conf in detected_faces_data if face.normed_embedding is not None]
@@ -395,7 +395,7 @@ class FaceRecognitionApp:
             except Exception as e:
                 logger.error(f"Failed to initialize FaceDetector for GPU: {e}", exc_info=True)
                 return None, f"GPU initialization failed: {e}", ([], ["All"], "")
-        
+
         self._initialize_system(force_cpu=False)
         if not self.video_processing_service:
             return None, "Failed to initialize GPU processing services.", ([], ["All"], "")
@@ -412,17 +412,17 @@ class FaceRecognitionApp:
     def _process_video_core(self, video_path, progress):
         """Core video processing logic using the VideoProcessingService."""
         self.processing_video = True
-        
+
         # Handle case where embedding service is not available
         if self.embedding_service:
             known_embeddings = self.embedding_service.get_known_embeddings()
         else:
             logger.warning("No embedding service available - processing without known faces database")
             known_embeddings = {}
-        
+
         # Wrap progress callback to handle Gradio 5.x compatibility issues
         def safe_progress_callback(progress_value, desc=None):
-            if progress and hasattr(progress, '__call__'):
+            if progress and callable(progress):
                 try:
                     if desc:
                         progress(progress_value, desc=desc)
@@ -430,7 +430,7 @@ class FaceRecognitionApp:
                         progress(progress_value)
                 except Exception as e:
                     logger.debug(f"Progress update failed (non-critical): {e}")
-            
+
         output_video_path, results = self.video_processing_service.process_video(
             video_path,
             known_embeddings,
@@ -439,7 +439,7 @@ class FaceRecognitionApp:
             self.config.ui.enhanced_ui,
             safe_progress_callback
         )
-        
+
         self.processing_video = False
 
         if not output_video_path:
@@ -471,12 +471,12 @@ class FaceRecognitionApp:
                 self.config.ui.enhanced_ui,
             ) = args
             save_config()
-            
+
             # Re-initialize services with new settings on next run
             global _global_detector
             _global_detector = None
             self.video_processing_service = None
-            
+
             return "Settings updated successfully! Services will be reinitialized on next run."
         except Exception as e:
             logger.error(f"Settings update error: {e}", exc_info=True)
@@ -486,15 +486,15 @@ class FaceRecognitionApp:
         """Filter timeline data based on search query and contestant filter."""
         if not timeline_data:
             return []
-        
+
         df = pd.DataFrame(timeline_data, columns=["Contestant", "Time", "Frame", "Sequence", "Appearances"])
-        
+
         if filter_contestant and filter_contestant != "All":
             df = df[df["Contestant"] == filter_contestant]
-        
+
         if search_query:
             df = df[df["Contestant"].str.contains(search_query, case=False, na=False)]
-            
+
         return df.values.tolist()
 
 # Global app instance
@@ -551,7 +551,7 @@ def create_gradio_interface():
                     video_path = app.get_video_path_from_title(dropdown_title, quality)
                     if not video_path:
                         return None, "Please select a video.", ([], ["All"], "")
-                    
+
                     output_path, summary, timeline_bundle = app.process_uploaded_video(video_path, progress)
                     timeline_data, _, _ = timeline_bundle
                     return output_path, summary, timeline_data, timeline_bundle
@@ -568,7 +568,7 @@ def create_gradio_interface():
                     inputs=[video_dropdown, quality_dropdown],
                     outputs=[video_output, video_results, full_timeline_data, timeline_bundle_state]
                 )
-                
+
                 timeline_bundle_state.change(
                     update_timeline_display,
                     inputs=[timeline_bundle_state],
@@ -618,13 +618,13 @@ def create_gradio_interface():
                     app = get_app()
                     if not video_title:
                         return None, "Please select a video."
-                    
+
                     # Ensure services are initialized
                     if not app.video_processing_service:
                         app._initialize_system()
 
                     video_path = app.get_video_path_from_title(video_title)
-                    
+
                     # Handle case where embedding service is not available
                     if app.embedding_service:
                         known_embeddings = app.embedding_service.get_known_embeddings()
@@ -639,7 +639,7 @@ def create_gradio_interface():
                     )
                     if not all_matches:
                         return None, "No faces detected in the video."
-                    
+
                     fig = app.generate_umap_visualization(all_matches)
                     return fig, f"✅ Generated UMAP for {len(all_matches)} detected faces."
 
@@ -653,9 +653,9 @@ def launch_app():
         demo = create_gradio_interface()
         port = int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 8080)))
         demo.launch(
-            server_name="0.0.0.0", 
-            server_port=port, 
-            share=False, 
+            server_name="0.0.0.0",
+            server_port=port,
+            share=False,
             debug=os.environ.get("GRADIO_DEBUG", "false").lower() == "true"
         )
     except Exception as e:

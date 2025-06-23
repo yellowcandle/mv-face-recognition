@@ -1,5 +1,5 @@
-from pathlib import Path
 import argparse
+from pathlib import Path
 
 
 def extract_xxx(filename):
@@ -20,7 +20,7 @@ def rename_images(base_dir, dry_run=False):
             continue
 
         xxx_values = [extract_xxx(img.stem) for img in images]
-        sorted_images = sorted(zip(xxx_values, images))
+        sorted_images = sorted(zip(xxx_values, images, strict=False))
 
         for i, (_, img) in enumerate(sorted_images, start=1):
             new_name = f"{folder_name}-{i}{img.suffix}"

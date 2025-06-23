@@ -1,9 +1,10 @@
-import yt_dlp
-import os
 import logging
+import os
 import warnings
-from rich.logging import RichHandler
 from argparse import ArgumentParser
+
+import yt_dlp
+from rich.logging import RichHandler
 
 # Suppress fsspec warnings
 warnings.filterwarnings("ignore", message=".*fsspec.*is yanked.*")

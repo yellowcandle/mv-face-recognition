@@ -3,11 +3,11 @@ Configuration management for MV Face Recognition system.
 Provides centralized settings with validation and environment support.
 """
 
+import json
 import os
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
 from pathlib import Path
-import json
+from typing import Any
 
 
 @dataclass
@@ -24,7 +24,7 @@ class RecognitionConfig:
         1280,
         1280,
     )  # Larger detection size for better small face detection
-    providers: List[str] = field(
+    providers: list[str] = field(
         default_factory=lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"]
     )
 
@@ -124,13 +124,13 @@ class SystemConfig:
     def load_from_file(cls, config_path: str) -> "SystemConfig":
         """Load configuration from JSON file."""
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_dict = json.load(f)
                 return cls.from_dict(config_dict)
         return cls()
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "SystemConfig":
+    def from_dict(cls, config_dict: dict[str, Any]) -> "SystemConfig":
         """Create configuration from dictionary."""
         recognition_config = RecognitionConfig(**config_dict.get("recognition", {}))
         ui_config = UIConfig(**config_dict.get("ui", {}))
@@ -209,35 +209,35 @@ def _get_project_root() -> Path:
     """Get the project root directory, handling different environments."""
     # Try to find the project root by looking for key directories
     current_path = Path(__file__).parent
-    
+
     # Check if we're in a Hugging Face Spaces environment
     # In HF Spaces, the app typically runs from /home/user/app/
     cwd = Path.cwd()
-    
+
     # First, check the current working directory
     if (cwd / "source" / "videos").exists():
         return cwd
-    
+
     # Check common HF Spaces paths
     hf_paths = [
         Path("/home/user/app"),
         Path("/app"),
         cwd,
     ]
-    
+
     for hf_path in hf_paths:
         if hf_path.exists() and (hf_path / "source" / "videos").exists():
             return hf_path
-    
+
     # For local development, go up from config file to project root
     # Look for source/videos directory
     for parent in [current_path.parent, current_path.parent.parent, current_path.parent.parent.parent]:
         if (parent / "source" / "videos").exists():
             return parent
-    
+
     # Last resort: if we find app.py in the current directory, that's likely the project root
     if (cwd / "app.py").exists():
         return cwd
-    
+
     # Fallback to the original logic
     return current_path.parent.parent.parent

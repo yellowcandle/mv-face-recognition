@@ -1,5 +1,7 @@
 import os
+
 import numpy as np
+
 from chroma_db import get_contestant_collection
 
 
