@@ -50,19 +50,21 @@ torch>=2.0.0           # ML backend
 
 ## Design Decisions
 
-### 1. Frontend Choice: Streamlit
+### 1. Frontend Choice: NiceGUI
 
-**Decision**: Use Streamlit instead of Gradio or custom React frontend
+**Decision**: Use NiceGUI for a modern, real-time Python-based UI.
 
 **Rationale**:
-- Better suited for data visualization and charts
-- Excellent integration with pandas/plotly for result analysis
-- Faster development cycle for data-heavy applications
-- Built-in support for file downloads and progress tracking
+- **Modern UI with Python**: Allows for the creation of a modern, responsive UI with Material Design components, all within Python.
+- **Real-time Updates**: Built-in support for WebSockets and server-sent events enables live updates for features like real-time processing previews and dashboards.
+- **Performance**: No page reloads, leading to a smoother and more responsive user experience compared to Streamlit.
+- **Flexibility**: Offers more control over layout and components than Streamlit or Gradio, allowing for a more professional and customized application.
+- **Async Support**: Integrates well with asynchronous backend tasks, which is ideal for video processing.
 
 **Alternatives Considered**:
-- Gradio: Simpler but less flexible for complex data display
-- FastAPI + HTML: More work, overkill for this use case
+- **Streamlit**: Good for rapid prototyping and data-heav-y applications, but less flexible for custom UI and real-time interactivity.
+- **PyQt6**: Powerful for desktop applications, but requires more boilerplate code and is not web-native.
+- **React/Vue + FastAPI**: Offers maximum flexibility but requires separate frontend and backend development, increasing complexity.
 
 ### 2. Database Choice: ChromaDB
 
