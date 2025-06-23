@@ -26,3 +26,7 @@ tqdm>=4.65.0
 # GUI Framework
 PyQt6>=6.6.0
 PyQt6-Qt6>=6.6.0
+nicegui>=1.4.14
+typing-extensions>=4.0.0
+python-socketio>=5.0.0
+python-engineio>=4.0.0

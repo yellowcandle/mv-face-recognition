@@ -8,7 +8,7 @@
         ]
     },
     "face_matching": {
-        "similarity_threshold": 0.1,
+        "similarity_threshold": 0.15,
         "max_results": 5
     },
     "video_processing": {
