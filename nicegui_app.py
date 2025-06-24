@@ -1,4 +1,4 @@
-m#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 MV Face Recognition - NiceGUI Edition
 A modern, real-time UI for face recognition in music videos.
