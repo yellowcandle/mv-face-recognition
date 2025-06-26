@@ -19,7 +19,7 @@ COPY backend/ .
 FROM node:18-alpine as frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 COPY frontend/ .
 RUN npm run build
 
