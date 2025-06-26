@@ -12,6 +12,7 @@ import numpy as np
 import msgpack
 
 from app.core.config import settings
+from app.core.memory_manager import get_memory_manager
 from app.services.face_detector import FaceDetectorAsync
 from app.services.face_matcher import FaceMatcherAsync
 
@@ -38,6 +39,9 @@ class VideoProcessorAsync:
             "detection_threshold": settings.DETECTION_THRESHOLD,
             "similarity_threshold": settings.SIMILARITY_THRESHOLD
         }
+        
+        # Memory management
+        self.memory_manager = get_memory_manager()
         
         logger.info("Async video processor initialized")
     
@@ -89,6 +93,9 @@ class VideoProcessorAsync:
                     
                 frame_start_time = time.time()
                 
+                # Memory monitoring and cleanup
+                await self.memory_manager.cleanup_if_needed()
+                
                 # Calculate timestamp
                 frame_stats["frame_timestamp"] = frame_num / 30.0
                 
@@ -101,15 +108,20 @@ class VideoProcessorAsync:
                 face_results = []
                 current_frame_recognized = 0
                 
-                # Process faces concurrently for better performance
-                face_tasks = []
-                for face in faces:
-                    task = self._process_face_async(face)
-                    face_tasks.append(task)
+                # Process faces with memory-aware concurrency limits
+                max_concurrent_faces = min(len(faces), 4)  # Limit to 4 concurrent face processes
+                face_results = []
                 
-                if face_tasks:
-                    face_results = await asyncio.gather(*face_tasks)
-                    current_frame_recognized = sum(1 for result in face_results if result["matched"])
+                # Process faces in small batches to limit memory usage
+                for i in range(0, len(faces), max_concurrent_faces):
+                    batch = faces[i:i + max_concurrent_faces]
+                    batch_tasks = [self._process_face_async(face) for face in batch]
+                    
+                    if batch_tasks:
+                        batch_results = await asyncio.gather(*batch_tasks)
+                        face_results.extend(batch_results)
+                
+                current_frame_recognized = sum(1 for result in face_results if result["matched"]) if face_results else 0
                 
                 frame_stats["current_frame_recognized"] = current_frame_recognized
                 frame_stats["total_faces_recognized"] += current_frame_recognized
@@ -190,7 +202,7 @@ class VideoProcessorAsync:
         loop = asyncio.get_event_loop()
         
         def _read_video_frames():
-            """Read video frames in a separate thread."""
+            """Read and yield video frames one by one to reduce memory usage."""
             cap = cv2.VideoCapture(str(video_path))
             
             if not cap.isOpened():
@@ -207,7 +219,9 @@ class VideoProcessorAsync:
             # Set starting position
             cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
             
-            frames = []
+            # Process frames in small batches to limit memory usage
+            batch_size = 10  # Process 10 frames at a time
+            frames_batch = []
             frame_num = start_frame
             processed_frames = 0
             
@@ -219,28 +233,52 @@ class VideoProcessorAsync:
                 
                 # Apply frame skipping
                 if processed_frames % self.current_parameters["frame_skip"] == 0:
-                    frames.append((frame_num, frame.copy()))
+                    # Create a copy and resize if too large to save memory
+                    frame_copy = frame.copy()
+                    height, width = frame_copy.shape[:2]
+                    if width > 1920:  # Limit max width to 1920px
+                        scale = 1920 / width
+                        new_width = 1920
+                        new_height = int(height * scale)
+                        frame_copy = cv2.resize(frame_copy, (new_width, new_height))
+                    
+                    frames_batch.append((frame_num, frame_copy))
+                    
+                    # Return batch when full
+                    if len(frames_batch) >= batch_size:
+                        batch_to_return = frames_batch.copy()
+                        frames_batch.clear()
+                        return batch_to_return
                 
                 frame_num += 1
                 processed_frames += 1
             
             cap.release()
-            return frames
+            # Return remaining frames
+            return frames_batch
         
-        # Read frames in executor with cancellation handling
+        # Process frames in small batches to reduce memory usage
         try:
-            frames = await loop.run_in_executor(None, _read_video_frames)
+            while True:
+                frames_batch = await loop.run_in_executor(None, _read_video_frames)
+                if not frames_batch:
+                    break
+                    
+                # Yield frames from batch
+                for frame_num, frame in frames_batch:
+                    if not self.processing_active:
+                        return
+                    yield frame_num, frame
+                    # Small async break to allow other coroutines to run
+                    await asyncio.sleep(0)
+                    
+                # If batch is smaller than expected, we've reached the end
+                if len(frames_batch) < 10:
+                    break
+                    
         except asyncio.CancelledError:
             logger.info("Frame extraction cancelled during shutdown")
             return
-        
-        # Yield frames asynchronously
-        for frame_num, frame in frames:
-            if not self.processing_active:
-                break
-            yield frame_num, frame
-            # Small async break to allow other coroutines to run
-            await asyncio.sleep(0)
     
     async def _create_preview_frame_async(
         self, frame: np.ndarray, face_results: List[Dict]
@@ -249,28 +287,35 @@ class VideoProcessorAsync:
         loop = asyncio.get_event_loop()
         
         def _annotate_frame():
-            # Resize frame for preview (max width 800px)
+            # More aggressive resizing for memory efficiency
             height, width = frame.shape[:2]
-            if width > 800:
-                scale = 800 / width
-                new_width = 800
+            max_width = 640  # Reduced from 800px for better memory usage
+            
+            if width > max_width:
+                scale = max_width / width
+                new_width = max_width
                 new_height = int(height * scale)
-                resized_frame = cv2.resize(frame, (new_width, new_height))
+                resized_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
                 
-                # Scale bounding boxes accordingly
+                # Scale bounding boxes accordingly (create copy to avoid modifying original)
+                scaled_face_results = []
                 for face_result in face_results:
+                    scaled_result = face_result.copy()
                     bbox = face_result["bbox"]
-                    face_result["bbox"] = [
+                    scaled_result["bbox"] = [
                         int(bbox[0] * scale),
                         int(bbox[1] * scale),
                         int(bbox[2] * scale),
                         int(bbox[3] * scale),
                     ]
+                    scaled_face_results.append(scaled_result)
+                face_results_to_use = scaled_face_results
             else:
-                resized_frame = frame
+                resized_frame = frame.copy()  # Ensure we have a copy
+                face_results_to_use = face_results
             
             # Draw annotations
-            for face_result in face_results:
+            for face_result in face_results_to_use:
                 bbox = face_result["bbox"]
                 x1, y1, x2, y2 = bbox
                 
@@ -338,8 +383,9 @@ class VideoProcessorAsync:
         loop = asyncio.get_event_loop()
         
         def _encode():
-            # Encode as JPEG for efficient transmission
-            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            # Encode as JPEG with optimized quality for memory efficiency
+            encode_params = [cv2.IMWRITE_JPEG_QUALITY, 65]  # Reduced from 80 to 65
+            _, buffer = cv2.imencode('.jpg', frame, encode_params)
             return buffer.tobytes()
         
         return await loop.run_in_executor(None, _encode)

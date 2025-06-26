@@ -10,6 +10,7 @@ import numpy as np
 from insightface.app import FaceAnalysis
 
 from app.core.config import settings
+from app.core.memory_manager import get_memory_manager
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,14 @@ class FaceDetectorAsync:
         self.app = None
         self._initialized = False
         
-        # Performance optimizations
+        # Memory-optimized performance cache
         self._detection_cache = {}
-        self._cache_size_limit = 100
+        self._cache_size_limit = 50  # Reduced cache size
+        self._cache_memory_limit = 100 * 1024 * 1024  # 100MB cache limit
+        self._current_cache_size = 0
+        
+        # Memory management
+        self.memory_manager = get_memory_manager()
         
         logger.info(f"Async face detector initialized with model: {self.model_name}")
     
@@ -111,16 +117,26 @@ class FaceDetectorAsync:
                 logger.error(f"Error detecting faces: {e}")
                 return []
         
-        # Run detection in executor
+        # Run detection in executor with memory monitoring
+        await self.memory_manager.cleanup_if_needed()
         result = await loop.run_in_executor(None, _detect_faces)
         
-        # Cache result (with size limit)
-        if len(self._detection_cache) >= self._cache_size_limit:
+        # Cache result with memory-aware eviction
+        result_size = self._estimate_result_size(result)
+        
+        # Check memory limit
+        while (self._current_cache_size + result_size > self._cache_memory_limit or 
+               len(self._detection_cache) >= self._cache_size_limit):
+            if not self._detection_cache:
+                break
             # Remove oldest entry
             oldest_key = next(iter(self._detection_cache))
+            old_result = self._detection_cache[oldest_key]
+            self._current_cache_size -= self._estimate_result_size(old_result)
             del self._detection_cache[oldest_key]
         
         self._detection_cache[image_hash] = result
+        self._current_cache_size += result_size
         
         return result
     
@@ -311,7 +327,7 @@ class FaceDetectorAsync:
         """Update detection threshold."""
         self.detection_threshold = threshold
         # Clear cache when threshold changes
-        self._detection_cache.clear()
+        self.clear_cache()
         logger.info(f"Detection threshold updated to: {threshold}")
     
     def get_model_info(self) -> Dict:
@@ -327,4 +343,23 @@ class FaceDetectorAsync:
     def clear_cache(self):
         """Clear detection cache."""
         self._detection_cache.clear()
+        self._current_cache_size = 0
         logger.info("Detection cache cleared")
+    
+    def _estimate_result_size(self, result: List[Dict]) -> int:
+        """Estimate memory size of detection result in bytes."""
+        size = 0
+        for face in result:
+            # Bbox: 4 ints = 32 bytes
+            size += 32
+            # Confidence: 1 float = 8 bytes
+            size += 8
+            # Landmarks: ~10 points * 2 coords * 4 bytes = 80 bytes
+            if face.get('landmarks'):
+                size += 80
+            # Embedding: 512 floats * 4 bytes = 2048 bytes
+            if face.get('embedding') is not None:
+                size += 2048
+            # Dict overhead
+            size += 100
+        return size
