@@ -33,7 +33,9 @@
       "Bash(git show:*)",
       "Bash(pip install:*)",
       "Bash(gh run view:*)",
-      "Bash(gh run list:*)"
+      "Bash(gh run list:*)",
+      "Bash(npm install)",
+      "Bash(docker build:*)"
     ]
   },
   "enableAllProjectMcpServers": true
