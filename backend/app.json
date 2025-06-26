@@ -1,0 +1,39 @@
+{
+  "name": "MV Face Recognition Backend",
+  "description": "FastAPI backend for MV Face Recognition with real-time processing",
+  "keywords": [
+    "fastapi",
+    "face-recognition",
+    "computer-vision",
+    "websocket",
+    "machine-learning"
+  ],
+  "website": "https://github.com/your-username/mv-face-recognition",
+  "repository": "https://github.com/your-username/mv-face-recognition",
+  "env": {
+    "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": {
+      "description": "Protobuf implementation for ChromaDB compatibility",
+      "value": "python"
+    },
+    "PYTHONUNBUFFERED": {
+      "description": "Ensure Python output is not buffered",
+      "value": "1"
+    },
+    "PORT": {
+      "description": "Port for the FastAPI server",
+      "value": "8000"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  },
+  "stack": "heroku-22"
+}

@@ -1,0 +1,44 @@
+# FastAPI Backend Requirements for MV Face Recognition
+
+# Core FastAPI framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+pydantic-settings>=2.0.0
+
+# Async and WebSocket support
+websockets>=12.0
+python-socketio>=5.10.0
+python-engineio>=4.7.0
+
+# Face recognition and computer vision
+insightface>=0.7.3
+opencv-python>=4.8.0
+torch>=2.0.0
+torchvision>=0.15.0
+onnxruntime>=1.16.0
+
+# Data processing and serialization
+numpy>=1.24.0
+pandas>=2.0.0
+pillow>=10.0.0
+msgpack>=1.0.7
+
+# Vector database for fast similarity search - pin compatible versions
+chromadb>=0.4.0
+protobuf<=3.20.3
+
+# Media processing
+ffmpeg-python>=0.2.0
+
+# Utilities and monitoring
+tqdm>=4.65.0
+python-multipart>=0.0.6
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0
+
+# Optional: Performance monitoring
+uvloop>=0.18.0; sys_platform != "win32"
