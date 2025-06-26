@@ -11,6 +11,7 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 
 from app.core.config import settings
+from app.core.memory_manager import get_memory_manager
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,14 @@ class FaceMatcherAsync:
         self.collection = None
         self._initialized = False
         
-        # Cache for frequent queries
+        # Memory-optimized cache for frequent queries
         self._match_cache = {}
-        self._cache_size_limit = 1000
+        self._cache_size_limit = 500  # Reduced from 1000
+        self._cache_memory_limit = 50 * 1024 * 1024  # 50MB cache limit
+        self._current_cache_size = 0
+        
+        # Memory management
+        self.memory_manager = get_memory_manager()
         
         logger.info("Async face matcher initialized")
     
@@ -214,16 +220,26 @@ class FaceMatcherAsync:
                 logger.error(f"Error searching face embedding: {e}")
                 return None
         
-        # Run search in executor
+        # Run search in executor with memory monitoring
+        await self.memory_manager.cleanup_if_needed()
         result = await loop.run_in_executor(None, _search_embedding)
         
-        # Cache result (with size limit)
-        if len(self._match_cache) >= self._cache_size_limit:
+        # Cache result with memory-aware eviction
+        result_size = self._estimate_result_size(result)
+        
+        # Check memory limit
+        while (self._current_cache_size + result_size > self._cache_memory_limit or 
+               len(self._match_cache) >= self._cache_size_limit):
+            if not self._match_cache:
+                break
             # Remove oldest entry
             oldest_key = next(iter(self._match_cache))
+            old_result = self._match_cache[oldest_key]
+            self._current_cache_size -= self._estimate_result_size(old_result)
             del self._match_cache[oldest_key]
         
         self._match_cache[embedding_hash] = result
+        self._current_cache_size += result_size
         
         return result
     
@@ -384,7 +400,7 @@ class FaceMatcherAsync:
                 )
                 
                 # Clear cache to ensure fresh results
-                self._match_cache.clear()
+                self.clear_cache()
                 
                 logger.info(f"Added contestant {name} to database")
                 return True
@@ -399,13 +415,26 @@ class FaceMatcherAsync:
         """Update similarity threshold."""
         self.similarity_threshold = threshold
         # Clear cache when threshold changes
-        self._match_cache.clear()
+        self.clear_cache()
         logger.info(f"Similarity threshold updated to: {threshold}")
     
     def clear_cache(self):
         """Clear match cache."""
         self._match_cache.clear()
+        self._current_cache_size = 0
         logger.info("Match cache cleared")
+    
+    def _estimate_result_size(self, result) -> int:
+        """Estimate memory size of match result in bytes."""
+        if result is None:
+            return 8  # None reference
+        
+        # Tuple with name (string) and similarity (float)
+        name, similarity = result
+        # String: ~50 chars average * 1 byte = 50 bytes
+        # Float: 8 bytes
+        # Tuple overhead: 16 bytes
+        return len(name.encode('utf-8')) + 8 + 16
     
     async def reset_database_async(self):
         """Reset the database and reload embeddings."""
@@ -428,7 +457,7 @@ class FaceMatcherAsync:
             
             if success:
                 # Clear cache
-                self._match_cache.clear()
+                self.clear_cache()
                 
                 # Reload embeddings
                 await self._load_embeddings_async()
