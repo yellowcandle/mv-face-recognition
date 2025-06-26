@@ -24,9 +24,9 @@ pandas>=2.0.0
 pillow>=10.0.0
 msgpack>=1.0.7
 
-# Vector database for fast similarity search - pin compatible versions
+# Vector database for fast similarity search - updated secure version
 chromadb>=0.4.0
-protobuf<=3.20.3
+protobuf>=3.25.5
 
 # Media processing
 ffmpeg-python>=0.2.0
