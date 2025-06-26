@@ -1,46 +1,65 @@
 {
+  "$schema": "https://zeabur.com/schema.json",
   "name": "mv-face-recognition",
-  "buildCommand": "./build.sh",
-  "startCommand": "python app.py",
-  "framework": "python",
-  "runtime": "python3.11",
-  "port": 8080,
-  "env": {
-    "GRADIO_SERVER_NAME": "0.0.0.0",
-    "GRADIO_SERVER_PORT": "8080",
-    "GRADIO_SHARE": "false",
-    "GRADIO_DEBUG": "false",
-    "NO_ALBUMENTATIONS_UPDATE": "1",
-    "INSIGHTFACE_DISABLE_LOGGING": "1",
-    "PYTHONPATH": "/app"
+  "services": {
+    "backend": {
+      "buildCommand": "cd backend && pip install -r requirements.txt",
+      "startCommand": "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT",
+      "environment": "python",
+      "envVars": {
+        "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": "python",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "domains": [
+        {
+          "domain": "mv-face-recognition-api.zeabur.app"
+        }
+      ],
+      "ports": [
+        {
+          "port": 8000,
+          "type": "HTTP"
+        }
+      ],
+      "regions": ["hkg", "sfo"],
+      "plan": "pro",
+      "rootDirectory": "./backend"
+    },
+    "frontend": {
+      "buildCommand": "cd frontend && npm install && npm run build",
+      "startCommand": "cd frontend && npm run preview -- --host 0.0.0.0 --port $PORT",
+      "environment": "nodejs",
+      "envVars": {
+        "NODE_ENV": "production"
+      },
+      "domains": [
+        {
+          "domain": "mv-face-recognition.zeabur.app"
+        }
+      ],
+      "ports": [
+        {
+          "port": 3000,
+          "type": "HTTP"
+        }
+      ],
+      "regions": ["hkg", "sfo"],
+      "plan": "hobby",
+      "rootDirectory": "./frontend"
+    }
   },
-  "dockerFile": "Dockerfile",
-  "regions": ["us-west1"],
-  "plan": "pro",
-  "volume": {
-    "cache": "/app/cache",
-    "output": "/app/output",
-    "source": "/app/source"
-  },
-  "healthCheck": {
-    "path": "/health",
-    "port": 8080,
-    "initialDelaySeconds": 60,
-    "timeoutSeconds": 10,
-    "periodSeconds": 30
-  },
-  "resources": {
-    "memory": "4Gi",
-    "storage": "20Gi"
-  },
-  "build": {
-    "commands": [
-      "chmod +x build.sh",
-      "./build.sh"
-    ],
-    "env": {
-      "PYTHONPATH": "/app",
-      "PIP_NO_CACHE_DIR": "1"
+  "volumes": {
+    "video-storage": {
+      "size": "10GB",
+      "mountPath": "/app/source/videos"
+    },
+    "contestant-photos": {
+      "size": "1GB", 
+      "mountPath": "/app/source/photo/contestants"
+    },
+    "chroma-db": {
+      "size": "2GB",
+      "mountPath": "/app/data"
     }
   }
 }

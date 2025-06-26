@@ -209,3 +209,5 @@ comparison_results/
 debug_masks/
 cache/
 *.log
+node_modules/
+dist/
