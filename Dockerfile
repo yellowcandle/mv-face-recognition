@@ -19,7 +19,7 @@ COPY backend/ .
 FROM node:18-alpine as frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm ci --omit=dev
+RUN rm -rf node_modules package-lock.json && npm install --omit=dev
 COPY frontend/ .
 RUN npm run build
 
@@ -85,8 +85,7 @@ ENV PORT=80
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 CMD curl -f http://localhost/api/health || exit 1
 
 # Start script
 COPY <<EOF /start.sh
