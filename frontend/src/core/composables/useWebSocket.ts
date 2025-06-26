@@ -151,17 +151,23 @@ export function useWebSocket() {
     }
   }
   
-  // Auto-connect on mount
+  // Auto-connect on mount (only in production or when explicitly enabled)
   onMounted(() => {
-    connect()
+    const shouldConnect = import.meta.env.PROD || import.meta.env.VITE_ENABLE_WEBSOCKET === 'true'
     
-    // Set up ping interval
-    const pingInterval = setInterval(ping, 30000) // Ping every 30 seconds
-    
-    onUnmounted(() => {
-      clearInterval(pingInterval)
-      disconnect()
-    })
+    if (shouldConnect) {
+      connect()
+      
+      // Set up ping interval
+      const pingInterval = setInterval(ping, 30000) // Ping every 30 seconds
+      
+      onUnmounted(() => {
+        clearInterval(pingInterval)
+        disconnect()
+      })
+    } else {
+      console.log('WebSocket disabled in development mode')
+    }
   })
   
   return {

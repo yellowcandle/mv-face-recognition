@@ -168,34 +168,30 @@ export const useVideoProcessingStore = defineStore('videoProcessing', () => {
   
   const downloadAnnotatedVideo = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/process/jobs/${jobId}/download/annotated-video/`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `annotated_${jobId}.mp4`
-        link.click()
-        window.URL.revokeObjectURL(url)
-      }
+      const blob = await ApiService.downloadJobFile(jobId, 'annotated-video')
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `annotated_${jobId}.mp4`
+      link.click()
+      window.URL.revokeObjectURL(url)
     } catch (err) {
+      error.value = 'Failed to download annotated video'
       console.error('Error downloading video:', err)
     }
   }
   
   const downloadCsvResults = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/process/jobs/${jobId}/download/csv/`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `results_${jobId}.csv`
-        link.click()
-        window.URL.revokeObjectURL(url)
-      }
+      const blob = await ApiService.downloadJobFile(jobId, 'csv')
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `results_${jobId}.csv`
+      link.click()
+      window.URL.revokeObjectURL(url)
     } catch (err) {
+      error.value = 'Failed to download CSV results'
       console.error('Error downloading CSV:', err)
     }
   }

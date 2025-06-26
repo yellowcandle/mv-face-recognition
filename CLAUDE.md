@@ -1,4 +1,4 @@
 - NO NEED TO IMPLEMENT WEBCAM face recognition
 - Only process files in /source/videos directory, no webcam processing required
 - pls! do not! overwrite my README.md !!!
-- document your work in DESIGN.md
+- you MUST document your work in DESIGN.md
