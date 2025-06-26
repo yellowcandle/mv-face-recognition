@@ -1,89 +1,104 @@
-# Multi-stage Dockerfile for MV Face Recognition System
-# Optimized for Zeabur deployment with minimal image size
+# Simplified Dockerfile for Zeabur deployment
+# This builds both frontend and backend in a single container
 
-FROM python:3.11-slim as builder
+FROM python:3.11-slim as backend-builder
 
-# Install system dependencies for building
-RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    build-essential \
-    cmake \
-    pkg-config \
-    libgl1-mesa-dev \
-    libglib2.0-dev \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libgcc-s1 \
-    ffmpeg \
-    wget \
-    curl \
-    git \
+# Install system dependencies for backend
+RUN apt-get update && apt-get install -y \
+    gcc g++ cmake libglib2.0-0 libsm6 libxext6 \
+    libxrender-dev libgomp1 ffmpeg wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Setup backend
+WORKDIR /app/backend
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/ .
 
-# Copy requirements and install Python dependencies to a temporary location
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Frontend builder stage
+FROM node:18-alpine as frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production
+COPY frontend/ .
+RUN npm run build
 
-# Production stage
+# Final production stage
 FROM python:3.11-slim
 
-# Install only runtime dependencies (no build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libgcc-s1 \
-    ffmpeg \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get autoremove -y \
-    && apt-get clean
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev \
+    libgomp1 ffmpeg nginx \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder stage
-COPY --from=builder /install /usr/local
-
-# Set working directory
+# Copy backend
 WORKDIR /app
+COPY --from=backend-builder /app/backend ./backend
+COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Create app user for security
-RUN useradd --create-home --shell /bin/bash app
+# Copy frontend build
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Copy application code
-COPY --chown=app:app . .
+# Setup nginx
+COPY <<EOF /etc/nginx/sites-available/default
+server {
+    listen 80;
+    server_name localhost;
 
-# Create necessary directories
-RUN mkdir -p cache output source/videos source/photo/contestants fonts \
-    && chown -R app:app /app
+    # Serve frontend
+    location / {
+        root /app/frontend/dist;
+        try_files \$uri \$uri/ /index.html;
+    }
 
-# Switch to app user
-USER app
+    # Proxy API requests to backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
 
-# Set Python path
-ENV PYTHONPATH=/app
+    # Proxy WebSocket requests
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+    }
+}
+EOF
 
-# Environment variables for production
-ENV GRADIO_SERVER_NAME=0.0.0.0
-ENV GRADIO_SERVER_PORT=8080
-ENV GRADIO_SHARE=False
-ENV GRADIO_DEBUG=False
-ENV NO_ALBUMENTATIONS_UPDATE=1
-ENV INSIGHTFACE_DISABLE_LOGGING=1
+# Create required directories
+RUN mkdir -p /app/source/videos /app/source/photo/contestants /app/backend/data
+
+# Environment variables
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+ENV PYTHONUNBUFFERED=1
+ENV PORT=80
+
+# Expose port
+EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost/api/health || exit 1
 
-# Expose ports
-EXPOSE 8080 8081
-# Port 8080: Health check endpoint
-# Port 8081: Main Gradio interface
+# Start script
+COPY <<EOF /start.sh
+#!/bin/bash
+# Start backend in background
+cd /app/backend
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 &
 
-# Start command
-CMD ["python", "app.py"]
+# Start nginx in foreground
+nginx -g "daemon off;"
+EOF
+
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]

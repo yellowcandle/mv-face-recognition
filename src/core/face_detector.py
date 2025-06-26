@@ -1,138 +1,49 @@
 """
 Face detection module using InsightFace.
-Handles face detection, landmark extraction, and preprocessing.
 """
 
+import json
 import logging
-
+from typing import List, Optional
 import cv2
 import numpy as np
-import torch
 from insightface.app import FaceAnalysis
-
-from ..config.settings import get_config
 
 logger = logging.getLogger(__name__)
 
 
 class FaceDetector:
-    """Face detection and analysis using InsightFace."""
+    """Face detection using InsightFace models."""
 
-    def __init__(self, config=None, force_cpu_only=False):
-        """Initialize the face detector with configuration."""
-        self.config = config or get_config()
+    def __init__(self, config_path: str = "config.json"):
+        """Initialize face detector with configuration."""
+        with open(config_path, "r") as f:
+            self.config = json.load(f)
+
+        self.detection_threshold = self.config["face_detection"]["detection_threshold"]
+        self.input_size = tuple(self.config["face_detection"]["input_size"])
+        self.model_name = self.config["face_detection"]["model_name"]
+
+        # Initialize InsightFace
         self.app = None
-        self.force_cpu_only = force_cpu_only
-        self._initialize_detector()
+        self.initialize_model()
 
-    def _initialize_detector(self):
-        """Initialize the InsightFace detection model."""
+    def initialize_model(self):
+        """Initialize the InsightFace model."""
         try:
-            # Configure providers based on hardware availability
-            providers = self._get_providers()
-
-            # ZeroGPU specific initialization (skip if force_cpu_only)
-            if not self.force_cpu_only:
-                try:
-                    import importlib.util
-                    if importlib.util.find_spec("spaces") is not None:
-                        # Ensure we're in a GPU context
-                        if torch.cuda.is_available():
-                            torch.cuda.init()
-                            torch.cuda.empty_cache()
-                            logger.info("ZeroGPU context initialized")
-                except ImportError:
-                    pass
-
             self.app = FaceAnalysis(
-                providers=providers,
-                allowed_modules=["detection", "recognition", "landmark_3d_68"],
-                use_onnx=True,
-                det_thresh=self.config.recognition.detection_threshold,
-                det_size=self.config.recognition.det_size,
+                name=self.model_name,
+                providers=[
+                    "CPUExecutionProvider"
+                ],  # Start with CPU, can upgrade to GPU later
             )
-
-            # Prepare the model with appropriate context
-            # Default to CPU context, then check for specific cases
-            ctx_id = -1  # Default to CPU
-
-            # On ZeroGPU, use CPU context for InsightFace models
-            try:
-                import importlib.util
-                if importlib.util.find_spec("spaces") is not None:
-                    ctx_id = -1  # Force CPU context on ZeroGPU
-                    logger.info("ZeroGPU: Using CPU context for InsightFace models")
-                else:
-                    # Regular GPU/CPU detection for non-ZeroGPU
-                    ctx_id = (
-                        0
-                        if torch.cuda.is_available() and self.config.recognition.use_gpu and not self.force_cpu_only
-                        else -1
-                    )
-            except ImportError:
-                # Regular GPU/CPU detection for non-ZeroGPU
-                ctx_id = (
-                    0
-                    if torch.cuda.is_available() and self.config.recognition.use_gpu and not self.force_cpu_only
-                    else -1
-                )
-
-            self.app.prepare(ctx_id=ctx_id, det_size=self.config.recognition.det_size)
-
-            # Verify GPU usage if expected
-            if torch.cuda.is_available() and self.config.recognition.use_gpu:
-                # Check if models are actually using GPU
-                actual_providers = []
-                for _model_name, model in self.app.models.items():
-                    if hasattr(model, 'session') and hasattr(model.session, 'get_providers'):
-                        actual_providers.extend(model.session.get_providers())
-
-                if 'CUDAExecutionProvider' in actual_providers:
-                    logger.info("✅ Models successfully initialized with GPU acceleration")
-                else:
-                    logger.warning("⚠️ Models falling back to CPU despite GPU availability")
-
-            logger.info(f"Face detector initialized with providers: {providers}")
-
+            self.app.prepare(ctx_id=0, det_size=self.input_size)
+            logger.info(f"Face detection model {self.model_name} loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize face detector: {e}")
-            raise RuntimeError(f"Face detector initialization failed: {e}")
+            logger.error(f"Failed to initialize face detection model: {e}")
+            raise
 
-    def _get_providers(self) -> list[str]:
-        """Get the appropriate ONNX providers based on hardware."""
-        providers = []
-
-        # Force CPU-only mode if requested
-        if self.force_cpu_only:
-            logger.info("Force CPU-only mode: Using CPU providers only")
-            providers.append("CPUExecutionProvider")
-            return providers
-
-        # Check if running on ZeroGPU first
-        try:
-            import importlib.util
-            if importlib.util.find_spec("spaces") is not None:
-                # ZeroGPU environment detected - use CPU for ONNX models
-                # but PyTorch operations will still use GPU via @spaces.GPU decorator
-                logger.info("ZeroGPU detected: Using CPU providers for ONNX models, GPU for PyTorch operations")
-                providers.append("CPUExecutionProvider")
-                return providers
-        except ImportError:
-            pass
-
-        # Standard GPU detection for non-ZeroGPU environments
-        if self.config.recognition.use_gpu:
-            if torch.cuda.is_available():
-                providers.append("CUDAExecutionProvider")
-                logger.info("CUDA GPU acceleration enabled")
-            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-                providers.append("CoreMLExecutionProvider")
-                logger.info("Apple Silicon GPU acceleration enabled")
-
-        providers.append("CPUExecutionProvider")
-        return providers
-
-    def detect_faces(self, image: np.ndarray) -> list:
+    def detect_faces(self, image: np.ndarray) -> List[dict]:
         """
         Detect faces in an image.
 
@@ -140,40 +51,34 @@ class FaceDetector:
             image: Input image as numpy array (BGR format)
 
         Returns:
-            List of detected face objects with embeddings and landmarks
+            List of face dictionaries with bbox, landmarks, and embedding
         """
-        if image is None or image.size == 0:
-            logger.warning("Empty or invalid image provided")
+        if self.app is None:
+            logger.error("Face detection model not initialized")
             return []
 
         try:
-            # Ensure image is in correct format
-            if len(image.shape) == 3 and image.shape[2] == 4:  # BGRA
-                image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
-            elif len(image.shape) == 3 and image.shape[2] == 3:  # Already BGR
-                pass  # No conversion needed
-            else:
-                logger.warning(f"Unexpected image format: {image.shape}")
-                return []
-
-            # Convert to RGB for InsightFace
-            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            # Apply image preprocessing for better detection
-            rgb_image = self._preprocess_image(rgb_image)
-
             # Detect faces
-            if self.app is None:
-                logger.error("Face detector not initialized")
-                return []
+            faces = self.app.get(image)
 
-            faces = self.app.get(rgb_image)
-
-            # Filter faces by detection confidence and size
-            filtered_faces = self._filter_faces(faces, image.shape)
+            # Filter by detection threshold
+            filtered_faces = []
+            for face in faces:
+                if face.det_score >= self.detection_threshold:
+                    face_dict = {
+                        "bbox": face.bbox.astype(int).tolist(),  # [x1, y1, x2, y2]
+                        "confidence": float(face.det_score),
+                        "landmarks": face.kps.astype(int).tolist()
+                        if hasattr(face, "kps")
+                        else None,
+                        "embedding": face.embedding
+                        if hasattr(face, "embedding")
+                        else None,
+                    }
+                    filtered_faces.append(face_dict)
 
             logger.debug(
-                f"Detected {len(filtered_faces)} faces from {len(faces)} initial detections"
+                f"Detected {len(filtered_faces)} faces (from {len(faces)} total)"
             )
             return filtered_faces
 
@@ -181,235 +86,191 @@ class FaceDetector:
             logger.error(f"Error detecting faces: {e}")
             return []
 
-    def _preprocess_image(self, image: np.ndarray) -> np.ndarray:
-        """Apply preprocessing to improve face detection."""
-        # Apply slight sharpening to improve detection
-        kernel = np.array([[-0.1, -0.1, -0.1], [-0.1, 1.8, -0.1], [-0.1, -0.1, -0.1]])
-        sharpened = cv2.filter2D(image, -1, kernel)
-
-        # Blend with original to avoid over-sharpening
-        return cv2.addWeighted(image, 0.7, sharpened, 0.3, 0)
-
-    def _filter_faces(self, faces: list, image_shape: tuple[int, ...]) -> list:
-        """Filter detected faces based on quality metrics."""
-        if not faces:
-            return []
-
-        filtered = []
-        image_area = image_shape[0] * image_shape[1]
-
-        for face in faces:
-            # Check face size (too small faces are likely false positives)
-            bbox = face.bbox
-            face_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-            face_ratio = face_area / image_area
-
-            # Skip faces that are too small (< 0.5% of image) or too large (> 80% of image)
-            if face_ratio < 0.005 or face_ratio > 0.8:
-                continue
-
-            # Check detection confidence if available
-            if (
-                hasattr(face, "det_score")
-                and face.det_score < self.config.recognition.detection_threshold
-            ):
-                continue
-
-            # Check face is within image bounds
-            if (
-                bbox[0] < 0
-                or bbox[1] < 0
-                or bbox[2] > image_shape[1]
-                or bbox[3] > image_shape[0]
-            ):
-                continue
-
-            filtered.append(face)
-
-            # Limit to maximum faces per frame
-            if len(filtered) >= self.config.recognition.max_faces_per_frame:
-                break
-
-        return filtered
-
-    def has_faces_quick(self, image: np.ndarray, min_confidence: float = 0.3) -> bool:
+    def extract_face_region(
+        self, image: np.ndarray, bbox: List[int], margin: float = 0.2
+    ) -> np.ndarray:
         """
-        Quickly check if image contains faces without full detection.
-        Uses lower confidence threshold for fast pre-filtering.
+        Extract face region from image with optional margin.
 
         Args:
-            image: Input image as numpy array (BGR format)
-            min_confidence: Minimum confidence for face detection
+            image: Input image
+            bbox: Face bounding box [x1, y1, x2, y2]
+            margin: Margin to add around face (as fraction of face size)
 
         Returns:
-            True if faces are likely present, False otherwise
+            Cropped face image
         """
-        if image is None or image.size == 0:
-            return False
+        h, w = image.shape[:2]
+        x1, y1, x2, y2 = bbox
 
-        try:
-            # Use smaller image for faster detection
-            height, width = image.shape[:2]
-            if height > 480 or width > 640:
-                # Resize to smaller resolution for quick check
-                scale = min(480/height, 640/width)
-                new_height = int(height * scale)
-                new_width = int(width * scale)
-                image = cv2.resize(image, (new_width, new_height))
+        # Calculate face dimensions
+        face_w = x2 - x1
+        face_h = y2 - y1
 
-            # Convert to RGB for InsightFace
-            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # Add margin
+        margin_w = int(face_w * margin)
+        margin_h = int(face_h * margin)
 
-            if self.app is None:
-                return False
+        # Calculate new coordinates with margin
+        new_x1 = max(0, x1 - margin_w)
+        new_y1 = max(0, y1 - margin_h)
+        new_x2 = min(w, x2 + margin_w)
+        new_y2 = min(h, y2 + margin_h)
 
-            # Use InsightFace with lower threshold for quick detection
-            faces = self.app.get(rgb_image, max_num=1)  # Only need to find one face
+        # Extract face region
+        face_region = image[new_y1:new_y2, new_x1:new_x2]
 
-            # Check if any face meets minimum confidence
-            for face in faces:
-                if hasattr(face, 'det_score') and face.det_score >= min_confidence:
-                    return True
-                elif not hasattr(face, 'det_score'):
-                    # If no confidence score available, assume it's valid
-                    return True
+        return face_region
 
-            return False
-
-        except Exception as e:
-            logger.debug(f"Error in quick face detection: {e}")
-            # If error occurs, assume faces might be present to avoid skipping
-            return True
-
-    def extract_face_embedding(
-        self, image: np.ndarray, normalize: bool = True
-    ) -> np.ndarray | None:
+    def get_face_embedding(
+        self, image: np.ndarray, bbox: List[int] = None
+    ) -> Optional[np.ndarray]:
         """
-        Extract face embedding from a single face image.
+        Get face embedding for a specific face or the whole image.
 
         Args:
-            image: Face image as numpy array
-            normalize: Whether to normalize the embedding
+            image: Input image
+            bbox: Optional face bounding box. If None, detect faces first.
 
         Returns:
-            Face embedding as numpy array, or None if no face detected
+            Face embedding as numpy array, or None if no face found
         """
-        faces = self.detect_faces(image)
-
-        if not faces:
-            logger.warning("No faces detected in image for embedding extraction")
+        if bbox is None:
+            # Detect faces first
+            faces = self.detect_faces(image)
+            if not faces:
+                return None
+            # Use the first face
+            face = faces[0]
+            return face["embedding"]
+        else:
+            # Use provided bounding box to extract face
+            face_region = self.extract_face_region(image, bbox)
+            faces = self.detect_faces(face_region)
+            if faces:
+                return faces[0]["embedding"]
             return None
 
-        if len(faces) > 1:
-            logger.warning(
-                f"Multiple faces detected ({len(faces)}), using the largest one"
+    def draw_face_annotations(
+        self,
+        image: np.ndarray,
+        faces: List[dict],
+        names: List[str] = None,
+        confidences: List[float] = None,
+    ) -> np.ndarray:
+        """
+        Draw face annotations on image.
+
+        Args:
+            image: Input image
+            faces: List of face dictionaries from detect_faces()
+            names: Optional list of names for each face
+            confidences: Optional list of recognition confidences
+
+        Returns:
+            Annotated image
+        """
+        annotated = image.copy()
+
+        for i, face in enumerate(faces):
+            bbox = face["bbox"]
+            x1, y1, x2, y2 = bbox
+
+            # Draw bounding box
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            # Draw detection confidence
+            det_conf = face["confidence"]
+            conf_text = f"Det: {det_conf:.2f}"
+            cv2.putText(
+                annotated,
+                conf_text,
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1,
             )
-            # Use the face with largest bounding box
-            faces = [
-                max(
-                    faces,
-                    key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+
+            # Draw name and recognition confidence if provided
+            if names and i < len(names):
+                name = names[i]
+                rec_conf = (
+                    confidences[i] if confidences and i < len(confidences) else 0.0
                 )
-            ]
 
-        face = faces[0]
-        embedding = face.normed_embedding if normalize else face.embedding
+                name_text = f"{name} ({rec_conf:.2f})"
+                text_size = cv2.getTextSize(
+                    name_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                )[0]
 
-        return embedding.flatten()
+                # Draw background for text
+                cv2.rectangle(
+                    annotated,
+                    (x1, y2),
+                    (x1 + text_size[0], y2 + text_size[1] + 10),
+                    (0, 255, 0),
+                    -1,
+                )
 
-    def is_face_masked(self, face) -> bool:
-        """
-        Check if a detected face appears to be wearing a mask.
+                # Draw text
+                cv2.putText(
+                    annotated,
+                    name_text,
+                    (x1, y2 + text_size[1] + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 0, 0),
+                    2,
+                )
 
-        Args:
-            face: Face object from InsightFace detection
+            # Draw landmarks if available
+            if face.get("landmarks"):
+                landmarks = np.array(face["landmarks"])
+                for point in landmarks:
+                    cv2.circle(annotated, tuple(point), 2, (255, 0, 0), -1)
 
-        Returns:
-            True if face appears to be masked
-        """
-        if not hasattr(face, "kps") or face.kps is None:
-            return False
+        return annotated
 
-        try:
-            # Check nose keypoint visibility (index 2 in 5-point landmarks)
-            if len(face.kps) > 2:
-                nose_point = face.kps[2]
-                # If nose keypoint confidence is low, face might be masked
-                if len(nose_point) > 2 and nose_point[2] < 0.5:
-                    return True
 
-            # Additional heuristics could be added here
-            # (e.g., checking mouth area visibility)
+def test_face_detector():
+    """Test the face detector with a sample image."""
+    import os
 
-        except Exception as e:
-            logger.debug(f"Error checking mask status: {e}")
+    # Setup logging
+    logging.basicConfig(level=logging.INFO)
 
-        return False
+    # Initialize detector
+    detector = FaceDetector()
 
-    def get_face_quality_score(self, face) -> float:
-        """
-        Calculate a quality score for a detected face.
+    # Test with a sample image from contestants
+    test_image_path = "source/photo/contestants/1/1-1.jpg"
 
-        Args:
-            face: Face object from InsightFace detection
+    if os.path.exists(test_image_path):
+        # Load image
+        image = cv2.imread(test_image_path)
 
-        Returns:
-            Quality score between 0.0 and 1.0
-        """
-        score = 0.0
+        if image is not None:
+            # Detect faces
+            faces = detector.detect_faces(image)
+            print(f"Detected {len(faces)} faces")
 
-        try:
-            # Base score from detection confidence
-            if hasattr(face, "det_score"):
-                score += face.det_score * 0.5
-            else:
-                score += 0.5  # Default if no detection score
+            for i, face in enumerate(faces):
+                print(
+                    f"Face {i + 1}: bbox={face['bbox']}, confidence={face['confidence']:.3f}"
+                )
+                if face["embedding"] is not None:
+                    print(f"  Embedding shape: {face['embedding'].shape}")
 
-            # Bonus for face size (larger faces usually better quality)
-            bbox = face.bbox
-            face_size = max(bbox[2] - bbox[0], bbox[3] - bbox[1])
-            size_score = (
-                min(face_size / 200.0, 1.0) * 0.3
-            )  # Normalize to 200px as good size
-            score += size_score
+            # Draw annotations and save result
+            annotated = detector.draw_face_annotations(image, faces)
+            cv2.imwrite("test_detection_result.jpg", annotated)
+            print("Test result saved as test_detection_result.jpg")
+        else:
+            print(f"Could not load image: {test_image_path}")
+    else:
+        print(f"Test image not found: {test_image_path}")
 
-            # Penalty for masked faces
-            if self.is_face_masked(face):
-                score -= 0.2
 
-            # Landmark quality bonus
-            if hasattr(face, "kps") and face.kps is not None:
-                score += 0.2
-
-        except Exception as e:
-            logger.debug(f"Error calculating face quality: {e}")
-
-        return max(0.0, min(1.0, score))
-
-    def batch_detect_faces(self, images: list[np.ndarray]) -> list[list]:
-        """
-        Detect faces in multiple images efficiently.
-
-        Args:
-            images: List of input images
-
-        Returns:
-            List of face detection results for each image
-        """
-        results = []
-
-        for image in images:
-            faces = self.detect_faces(image)
-            results.append(faces)
-
-        return results
-
-    def get_detector_info(self) -> dict:
-        """Get information about the current detector configuration."""
-        return {
-            "detection_threshold": self.config.recognition.detection_threshold,
-            "detection_size": self.config.recognition.det_size,
-            "max_faces_per_frame": self.config.recognition.max_faces_per_frame,
-            "gpu_enabled": self.config.recognition.use_gpu,
-            "providers": self._get_providers(),
-        }
+if __name__ == "__main__":
+    test_face_detector()
