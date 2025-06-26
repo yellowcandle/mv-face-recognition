@@ -1,0 +1,64 @@
+[project]
+name = "mv-face-recognition"
+version = "0.1.0"
+description = "Face recognition system for MV contestants using ChromaDB and InsightFace"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Core framework
+    "streamlit>=1.28.0",
+    
+    # Face recognition and computer vision
+    "insightface>=0.7.3",
+    "opencv-python>=4.8.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "onnxruntime>=1.16.0",
+    
+    # Data processing
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "pillow>=10.0.0",
+    
+    # Vector database for fast similarity search
+    "chromadb>=0.4.0",
+    
+    # Media processing
+    "ffmpeg-python>=0.2.0",
+    
+    # Utilities
+    "tqdm>=4.65.0",
+    
+    # GUI Framework
+    "PyQt6>=6.6.0",
+    "PyQt6-Qt6>=6.6.0",
+    "nicegui>=1.4.14",
+    "typing-extensions>=4.0.0",
+    "python-socketio>=5.0.0",
+    "python-engineio>=4.0.0",
+    "bidict>=0.22.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "orjson>=3.6.0",
+    "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.3",
+    "starlette>=0.14.0",
+    "python-multipart>=0.0.6",
+    "aiofiles>=23.2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+]

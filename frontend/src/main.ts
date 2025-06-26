@@ -9,8 +9,14 @@ import App from './App.vue'
 import 'vuetify/styles'
 import '@mdi/font/css/materialdesignicons.css'
 
+// Vuetify components (explicit import for better tree-shaking)
+import * as components from 'vuetify/components'
+import * as directives from 'vuetify/directives'
+
 // Create Vuetify instance
 const vuetify = createVuetify({
+  components,
+  directives,
   theme: {
     defaultTheme: 'light',
     themes: {

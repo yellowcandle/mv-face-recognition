@@ -8,6 +8,7 @@ from typing import List, Optional
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
+from src.core.hardware_acceleration import get_hardware_accelerator
 
 logger = logging.getLogger(__name__)
 
@@ -24,24 +25,53 @@ class FaceDetector:
         self.input_size = tuple(self.config["face_detection"]["input_size"])
         self.model_name = self.config["face_detection"]["model_name"]
 
+        # Initialize hardware acceleration
+        self.accelerator = get_hardware_accelerator()
+        self.accelerator.optimize_opencv_threads()
+
         # Initialize InsightFace
         self.app = None
         self.initialize_model()
 
     def initialize_model(self):
-        """Initialize the InsightFace model."""
+        """Initialize the InsightFace model with hardware acceleration."""
         try:
+            # Get optimal providers and context
+            providers = self.accelerator.get_insightface_providers()
+            ctx_id = self.accelerator.get_optimal_ctx_id()
+            
+            logger.info(f"Initializing {self.model_name} with providers: {providers}")
+            
             self.app = FaceAnalysis(
                 name=self.model_name,
-                providers=[
-                    "CPUExecutionProvider"
-                ],  # Start with CPU, can upgrade to GPU later
+                providers=providers
             )
-            self.app.prepare(ctx_id=0, det_size=self.input_size)
-            logger.info(f"Face detection model {self.model_name} loaded successfully")
+            
+            self.app.prepare(ctx_id=ctx_id, det_size=self.input_size)
+            
+            # Log hardware acceleration status
+            active_provider = providers[0] if providers else "Unknown"
+            if "CUDA" in active_provider:
+                logger.info(f"🚀 Face detection model loaded with CUDA acceleration")
+            elif "CoreML" in active_provider:
+                logger.info(f"🍎 Face detection model loaded with Apple Silicon acceleration")
+            else:
+                logger.info(f"💻 Face detection model loaded with CPU processing")
+                
         except Exception as e:
             logger.error(f"Failed to initialize face detection model: {e}")
-            raise
+            # Fallback to CPU only
+            try:
+                logger.warning("Falling back to CPU-only processing")
+                self.app = FaceAnalysis(
+                    name=self.model_name,
+                    providers=["CPUExecutionProvider"]
+                )
+                self.app.prepare(ctx_id=-1, det_size=self.input_size)
+                logger.info("✅ Face detection model loaded with CPU fallback")
+            except Exception as e2:
+                logger.error(f"CPU fallback also failed: {e2}")
+                raise
 
     def detect_faces(self, image: np.ndarray) -> List[dict]:
         """
@@ -232,6 +262,50 @@ class FaceDetector:
 
         return annotated
 
+    def detect_faces_batch(self, images: List[np.ndarray]) -> List[List[dict]]:
+        """
+        Detect faces in multiple images with optimized batching.
+
+        Args:
+            images: List of input images as numpy arrays
+
+        Returns:
+            List of face detection results for each image
+        """
+        if not images:
+            return []
+
+        batch_size = self.accelerator.get_optimal_batch_size()
+        results = []
+
+        # Process in optimal batches
+        for i in range(0, len(images), batch_size):
+            batch = images[i:i + batch_size]
+            batch_results = []
+
+            for image in batch:
+                faces = self.detect_faces(image)
+                batch_results.append(faces)
+
+            results.extend(batch_results)
+
+        return results
+
+    def get_hardware_info(self) -> dict:
+        """Get hardware acceleration information."""
+        return {
+            'providers': self.accelerator.get_insightface_providers(),
+            'batch_size': self.accelerator.get_optimal_batch_size(),
+            'ctx_id': self.accelerator.get_optimal_ctx_id(),
+            'system_info': self.accelerator.system_info,
+            'apple_silicon': self.accelerator._is_apple_silicon(),
+            'cuda_available': self.accelerator._is_cuda_available()
+        }
+
+    def print_hardware_info(self):
+        """Print hardware acceleration information."""
+        self.accelerator.print_hardware_info()
+
 
 def test_face_detector():
     """Test the face detector with a sample image."""
@@ -242,6 +316,9 @@ def test_face_detector():
 
     # Initialize detector
     detector = FaceDetector()
+    
+    # Print hardware info
+    detector.print_hardware_info()
 
     # Test with a sample image from contestants
     test_image_path = "source/photo/contestants/1/1-1.jpg"

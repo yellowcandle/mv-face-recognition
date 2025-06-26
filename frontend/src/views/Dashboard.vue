@@ -175,14 +175,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useMainStore } from '@/stores/main'
+import { useContestantsStore } from '@/stores/contestants'
+import { useVideoProcessingStore } from '@/modules/video-processing/stores/videoProcessing'
 
-// Reactive data
-const contestantCount = ref(96)
-const videoCount = ref(5)
-const processingJobs = ref(0)
-const resultsCount = ref(0)
-const recentActivity = ref([])
+const mainStore = useMainStore()
+const contestantsStore = useContestantsStore()
+const videoStore = useVideoProcessingStore()
+
+// Reactive data from stores
+const contestantCount = computed(() => mainStore.dashboardStats.contestants)
+const videoCount = computed(() => mainStore.dashboardStats.videos)
+const processingJobs = computed(() => mainStore.dashboardStats.processingJobs)
+const resultsCount = computed(() => {
+  // Count completed jobs with results
+  return videoStore.processingJobs.filter(job => job.status === 'completed').length
+})
+
+// Recent activity from processing jobs
+const recentActivity = computed(() => {
+  return videoStore.processingJobs
+    .slice(0, 5) // Latest 5 jobs
+    .map(job => ({
+      id: job.job_id,
+      videoName: `Video ${job.video_id}`,
+      status: job.status,
+      timestamp: job.created_at
+    }))
+})
+
+// Loading states
+const isLoading = computed(() => mainStore.isLoading)
+const systemStatus = computed(() => mainStore.systemStatus)
+const apiConnected = computed(() => mainStore.apiConnected)
+
+// Auto-refresh interval
+let refreshInterval: number | null = null
 
 // Methods
 const getStatusColor = (status: string) => {
@@ -207,8 +236,36 @@ const formatTime = (timestamp: string) => {
   return new Date(timestamp).toLocaleString()
 }
 
-onMounted(() => {
-  // Load dashboard data
-  // This will be replaced with actual API calls
+const refreshDashboard = async () => {
+  try {
+    await Promise.all([
+      mainStore.fetchSystemStatus(),
+      contestantsStore.loadContestants(),
+      videoStore.loadVideos(),
+      videoStore.getProcessingJobs()
+    ])
+  } catch (error) {
+    console.error('Failed to refresh dashboard:', error)
+  }
+}
+
+onMounted(async () => {
+  // Initialize app and load data
+  await mainStore.initializeApp()
+  await refreshDashboard()
+  
+  // Set up auto-refresh every 30 seconds
+  refreshInterval = setInterval(refreshDashboard, 30000)
+  
+  // Start health checks
+  const stopHealthChecks = mainStore.startHealthChecks()
+  
+  // Cleanup on unmount
+  onUnmounted(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval)
+    }
+    stopHealthChecks()
+  })
 })
 </script>
