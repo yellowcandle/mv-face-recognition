@@ -12,7 +12,7 @@
         "max_results": 5
     },
     "video_processing": {
-        "frame_skip": 5,
+        "frame_skip": 30,
         "output_fps": 24,
         "annotation_font_scale": 0.7,
         "annotation_thickness": 2

@@ -95,15 +95,21 @@ class FaceDetector:
             filtered_faces = []
             for face in faces:
                 if face.det_score >= self.detection_threshold:
+                    # Normalize embedding to unit vector for consistent similarity calculation
+                    embedding = face.embedding if hasattr(face, "embedding") else None
+                    if embedding is not None:
+                        # Normalize to unit vector (L2 normalization)
+                        embedding_norm = np.linalg.norm(embedding)
+                        if embedding_norm > 0:
+                            embedding = embedding / embedding_norm
+                    
                     face_dict = {
                         "bbox": face.bbox.astype(int).tolist(),  # [x1, y1, x2, y2]
                         "confidence": float(face.det_score),
                         "landmarks": face.kps.astype(int).tolist()
                         if hasattr(face, "kps")
                         else None,
-                        "embedding": face.embedding
-                        if hasattr(face, "embedding")
-                        else None,
+                        "embedding": embedding,
                     }
                     filtered_faces.append(face_dict)
 
