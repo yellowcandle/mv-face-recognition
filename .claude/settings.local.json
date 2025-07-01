@@ -56,7 +56,9 @@
       "Bash(ffprobe:*)",
       "Bash(ffplay:*)",
       "Bash(/dev/null)",
-      "Bash(ffmpeg:*)"
+      "Bash(ffmpeg:*)",
+      "Bash(git pull:*)",
+      "Bash(timeout 5 npm run dev 2 >& 1)"
     ]
   },
   "enableAllProjectMcpServers": true
