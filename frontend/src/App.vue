@@ -1,6 +1,8 @@
 <template>
   <v-app>
     <v-app-bar app color="primary" dark>
+      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      
       <v-app-bar-title>
         <v-icon class="mr-2">mdi-movie-open</v-icon>
         MV Face Recognition
