@@ -17,7 +17,10 @@ SIMILARITY_THRESHOLD=0.25
 FORCE_REPROCESS=false
 SINGLE_VIDEO=""
 DRY_RUN=false
+REFRESH_EMBEDDINGS=false
 CONFIG_FILE="config.json"
+GENERATE_DENSE_METADATA=true
+PARALLEL_PROCESSING=false
 
 # Function to print colored output
 print_status() {
@@ -46,13 +49,19 @@ show_usage() {
     echo "  -f, --force-reprocess        Force reprocessing of already processed videos"
     echo "  -v, --single-video           Process only a specific video file"
     echo "  -d, --dry-run                Show what would be processed without actually processing"
+    echo "  -r, --refresh-embeddings     Refresh embeddings and ChromaDB before processing"
+    echo "  --no-dense                   Skip dense metadata generation (faster but less smooth video player)"
+    echo "  --parallel                   Enable parallel processing for multiple videos"
     echo "  -c, --config                 Path to config file (default: config.json)"
     echo ""
     echo "Examples:"
-    echo "  $0                                          # Process all videos with default settings"
+    echo "  $0                                          # Process all videos with dense metadata (recommended)"
+    echo "  $0 --no-dense                              # Process without dense metadata (faster)"
+    echo "  $0 --parallel                              # Process with parallel optimization"
     echo "  $0 -f                                       # Force reprocess all videos"
     echo "  $0 -v \"video.mp4\"                          # Process specific video"
     echo "  $0 -s 0.3 -f                               # Reprocess with higher similarity threshold"
+    echo "  $0 -r                                       # Refresh embeddings and ChromaDB before processing"
     echo "  $0 -d                                       # Dry run to see what would be processed"
 }
 
@@ -79,9 +88,21 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=true
             shift
             ;;
+        -r|--refresh-embeddings)
+            REFRESH_EMBEDDINGS=true
+            shift
+            ;;
         -c|--config)
             CONFIG_FILE="$2"
             shift 2
+            ;;
+        --no-dense)
+            GENERATE_DENSE_METADATA=false
+            shift
+            ;;
+        --parallel)
+            PARALLEL_PROCESSING=true
+            shift
             ;;
         *)
             print_error "Unknown option: $1"
@@ -161,6 +182,46 @@ fi
 
 print_success "Found $EMBEDDING_COUNT contestant embeddings"
 
+# Function to refresh embeddings and ChromaDB
+refresh_embeddings() {
+    print_status "Refreshing embeddings and ChromaDB..."
+    
+    # Check if fix_embeddings.py exists
+    if [ ! -f "fix_embeddings.py" ]; then
+        print_error "fix_embeddings.py not found. Please run this script from the project root directory."
+        exit 1
+    fi
+    
+    # Check if Python environment has required packages for embeddings refresh
+    print_status "Checking Python environment for embeddings refresh..."
+    if ! python3 -c "
+import sys
+try:
+    import numpy as np
+    import chromadb
+    print('✓ Required packages found')
+except ImportError as e:
+    print(f'✗ Missing package: {e}')
+    sys.exit(1)
+"; then
+        print_error "Missing required Python packages. Please install requirements:"
+        echo "pip install -r requirements.txt"
+        exit 1
+    fi
+    
+    # Run the embeddings fix script
+    print_status "Running embeddings refresh (this may take a few minutes)..."
+    if python3 fix_embeddings.py --all --force; then
+        print_success "Embeddings and ChromaDB refreshed successfully!"
+    else
+        print_error "Failed to refresh embeddings and ChromaDB"
+        exit 1
+    fi
+    
+    print_success "Embeddings refresh completed!"
+    print_status "Face recognition database is now ready for processing."
+}
+
 # Build command arguments
 PYTHON_ARGS=(
     "scripts/batch_process_videos.py"
@@ -186,8 +247,17 @@ echo "  Config file: $CONFIG_FILE"
 echo "  Similarity threshold: $SIMILARITY_THRESHOLD"
 echo "  Force reprocess: $FORCE_REPROCESS"
 echo "  Single video: ${SINGLE_VIDEO:-"All videos"}"
+echo "  Refresh embeddings: $REFRESH_EMBEDDINGS"
+echo "  Generate dense metadata: $GENERATE_DENSE_METADATA"
+echo "  Parallel processing: $PARALLEL_PROCESSING"
 echo "  Dry run: $DRY_RUN"
 echo ""
+
+# Refresh embeddings if requested
+if [ "$REFRESH_EMBEDDINGS" = true ]; then
+    refresh_embeddings
+    echo ""
+fi
 
 if [ "$DRY_RUN" = false ]; then
     # Ask for confirmation unless processing single video
@@ -215,10 +285,46 @@ echo ""
 if python3 "${PYTHON_ARGS[@]}"; then
     if [ "$DRY_RUN" = false ]; then
         print_success "Local video processing completed successfully!"
+        
+        # Generate dense metadata for better video player experience
+        if [ "$GENERATE_DENSE_METADATA" = true ]; then
+            echo ""
+            print_status "🚀 Generating dense metadata for smooth video player synchronization..."
+            print_warning "This will provide 6x more timeline data for real-time face gallery sync"
+            
+            # Find processed videos
+            if [ -d "processed_videos" ]; then
+                video_count=0
+                for video in processed_videos/*_annotated.mp4; do
+                    if [ -f "$video" ]; then
+                        ((video_count++))
+                        print_status "Processing dense metadata for $(basename "$video")..."
+                        if python3 src/services/realtime_video_processor.py "$video"; then
+                            print_success "Dense metadata generated for $(basename "$video")"
+                        else
+                            print_warning "Failed to generate dense metadata for $(basename "$video")"
+                        fi
+                    fi
+                done
+                
+                if [ $video_count -gt 0 ]; then
+                    print_success "Dense metadata generation completed for $video_count videos!"
+                    print_status "Videos now have enhanced timeline data for smooth playback synchronization"
+                else
+                    print_warning "No processed videos found for dense metadata generation"
+                fi
+            else
+                print_warning "processed_videos directory not found, skipping dense metadata generation"
+            fi
+        fi
+        
         echo ""
         print_status "Output locations:"
         echo "  📹 Processed videos: processed_videos/"
-        echo "  📊 Metadata: metadata/"
+        echo "  📊 Sparse metadata: metadata/*_metadata.json"
+        if [ "$GENERATE_DENSE_METADATA" = true ]; then
+            echo "  🎯 Dense metadata: metadata/*_dense_metadata.json (6x more timeline data)"
+        fi
         echo "  🎬 Clips: clips/"
         echo "  📋 Processing report: batch_processing_report.json"
         echo ""
@@ -226,7 +332,8 @@ if python3 "${PYTHON_ARGS[@]}"; then
         echo "  1. Review the processing report for detailed statistics"
         echo "  2. Check the processed videos with annotations"
         echo "  3. Analyze the generated clips for specific contestants"
-        echo "  4. Start the backend and frontend to view results in the web interface"
+        echo "  4. Start the backend and frontend to view results with enhanced timeline sync"
+        echo "     ./scripts/start_app.sh"
     else
         print_success "Dry run completed successfully!"
     fi

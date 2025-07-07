@@ -17,6 +17,7 @@
 	// Menu items
 	const menuItems = [
 		{ title: 'Dashboard', icon: '🏠', href: '/' },
+		{ title: 'Video Player', icon: '🎬', href: '/video-player' },
 		{ title: 'Video Processing', icon: '🎥', href: '/video-processing' },
 		{ title: 'Face Recognition', icon: '👤', href: '/face-recognition' },
 		{ title: 'Analytics', icon: '📊', href: '/analytics' },

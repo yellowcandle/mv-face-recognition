@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-06-26T22:22:41.089263",
-  "processing_time_minutes": 77.6450222492218,
+  "timestamp": "2025-07-07T06:27:48.598909",
+  "processing_time_minutes": 38.022536027431485,
   "summary": {
     "total_videos": 5,
     "successful": 5,
@@ -9,84 +9,78 @@
   "detailed_results": {
     "1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u9996\u90e8\u66f2\uff1a\u9020\u661f\u306e\u99c5.mp4": {
       "video_name": "1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u9996\u90e8\u66f2\uff1a\u9020\u661f\u306e\u99c5.mp4",
-      "processing_time": 924.394329,
+      "processing_time": 536.057871,
       "annotated_video_path": "processed_videos/1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u9996\u90e8\u66f2\uff1a\u9020\u661f\u306e\u99c5_annotated.mp4",
       "metadata_file": "metadata/1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u9996\u90e8\u66f2\uff1a\u9020\u661f\u306e\u99c5_metadata.json",
       "clips_info": [],
       "stats": {
-        "total_frames_processed": 903,
-        "total_frames_skipped": 420,
-        "total_faces_detected": 3123,
-        "total_faces_recognized": 0,
-        "unique_contestants": 0,
+        "total_frames_processed": 151,
+        "total_frames_skipped": 70,
+        "total_faces_detected": 525,
+        "total_faces_recognized": 4,
+        "unique_contestants": 4,
         "similarity_threshold": 0.25
       }
     },
     "2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u6b21\u90e8\u66f2\uff1a\u59cb\u767a\u306e\u99c5.mp4": {
       "video_name": "2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u6b21\u90e8\u66f2\uff1a\u59cb\u767a\u306e\u99c5.mp4",
-      "processing_time": 918.216659,
+      "processing_time": 528.847822,
       "annotated_video_path": "processed_videos/2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u6b21\u90e8\u66f2\uff1a\u59cb\u767a\u306e\u99c5_annotated.mp4",
       "metadata_file": "metadata/2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u6b21\u90e8\u66f2\uff1a\u59cb\u767a\u306e\u99c5_metadata.json",
       "clips_info": [],
       "stats": {
-        "total_frames_processed": 1007,
-        "total_frames_skipped": 362,
-        "total_faces_detected": 2799,
-        "total_faces_recognized": 0,
-        "unique_contestants": 0,
+        "total_frames_processed": 167,
+        "total_frames_skipped": 62,
+        "total_faces_detected": 486,
+        "total_faces_recognized": 5,
+        "unique_contestants": 3,
         "similarity_threshold": 0.25
       }
     },
     "3-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u4e09\u90e8\u66f2\uff1a\u5973\u5718\u306e\u99c5.mp4": {
       "video_name": "3-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u4e09\u90e8\u66f2\uff1a\u5973\u5718\u306e\u99c5.mp4",
-      "processing_time": 1053.814388,
+      "processing_time": 543.819944,
       "annotated_video_path": "processed_videos/3-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u4e09\u90e8\u66f2\uff1a\u5973\u5718\u306e\u99c5_annotated.mp4",
       "metadata_file": "metadata/3-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c\u66f2 \u300a\u524d\u50b3\u300bMV 2021\u590f\u306e\u4e09\u90e8\u66f2\uff1a\u5973\u5718\u306e\u99c5_metadata.json",
       "clips_info": [],
       "stats": {
-        "total_frames_processed": 1026,
-        "total_frames_skipped": 263,
-        "total_faces_detected": 4094,
-        "total_faces_recognized": 0,
-        "unique_contestants": 0,
+        "total_frames_processed": 169,
+        "total_frames_skipped": 46,
+        "total_faces_detected": 671,
+        "total_faces_recognized": 14,
+        "unique_contestants": 7,
         "similarity_threshold": 0.25
       }
     },
     "4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650\u62cdMV.mp4": {
       "video_name": "4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650\u62cdMV.mp4",
-      "processing_time": 871.184741,
+      "processing_time": 331.756698,
       "annotated_video_path": "processed_videos/4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650\u62cdMV_annotated.mp4",
       "metadata_file": "metadata/4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650\u62cdMV_metadata.json",
       "clips_info": [],
       "stats": {
-        "total_frames_processed": 1513,
-        "total_frames_skipped": 227,
-        "total_faces_detected": 5136,
-        "total_faces_recognized": 0,
-        "unique_contestants": 0,
+        "total_frames_processed": 251,
+        "total_frames_skipped": 39,
+        "total_faces_detected": 874,
+        "total_faces_recognized": 5,
+        "unique_contestants": 4,
         "similarity_threshold": 0.25
       }
     },
     "5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d\u71b1\u8eab\uff01\u7387\u5148\u8868\u6f14\u300a\u524d\u50b3\u300b.mp4": {
       "video_name": "5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d\u71b1\u8eab\uff01\u7387\u5148\u8868\u6f14\u300a\u524d\u50b3\u300b.mp4",
-      "processing_time": 891.070168,
+      "processing_time": 324.643138,
       "annotated_video_path": "processed_videos/5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d\u71b1\u8eab\uff01\u7387\u5148\u8868\u6f14\u300a\u524d\u50b3\u300b_annotated.mp4",
       "metadata_file": "metadata/5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d\u71b1\u8eab\uff01\u7387\u5148\u8868\u6f14\u300a\u524d\u50b3\u300b_metadata.json",
       "clips_info": [],
       "stats": {
-        "total_frames_processed": 862,
-        "total_frames_skipped": 177,
-        "total_faces_detected": 6717,
+        "total_frames_processed": 142,
+        "total_frames_skipped": 32,
+        "total_faces_detected": 1119,
         "total_faces_recognized": 0,
         "unique_contestants": 0,
         "similarity_threshold": 0.25
       }
     }
-  },
-  "overall_stats": {
-    "total_faces_detected": 21869,
-    "total_faces_recognized": 0,
-    "total_clips_generated": 0,
-    "unique_contestants_found": 0
   }
 }

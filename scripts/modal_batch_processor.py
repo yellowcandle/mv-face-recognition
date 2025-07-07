@@ -74,20 +74,22 @@ import time
 import json
 from pathlib import Path
 
-from modal import Stub, Image, Volume, gpu, method
+from modal import App, Image, Volume, gpu, method
 
 # --- Modal Configuration ---
 
-# Define the Modal Stub (app name)
-stub = Stub("mv-face-recognition")
+# Define the Modal App (app name)
+app = App("mv-face-recognition")
 
 # Define the Docker image environment for the remote job
 # This installs all necessary Python libraries and system dependencies like ffmpeg
 modal_image = (
     Image.debian_slim(python_version="3.11")
-    .apt_install("git", "ffmpeg")
+    .apt_install("git", "ffmpeg", "sqlite3")
     .pip_install_from_requirements("requirements.txt")
-    .copy_local_dir("src", "/src")
+    .pip_install("pysqlite3-binary")  # Newer SQLite for ChromaDB
+    .pip_install("onnxruntime-gpu")  # Install ONNXRuntime with CUDA support
+    .add_local_dir("src", "/src")
 )
 
 # Define the persistent data volume
@@ -97,12 +99,12 @@ VOL_MOUNT_PATH = Path("/data")
 
 # --- Main Processing Logic ---
 
-@stub.cls(
+@app.cls(
     image=modal_image,
     volumes={str(VOL_MOUNT_PATH): volume},
-    gpu=gpu.T4(),  # Request a T4 GPU. Can be changed to A10G for more power.
+    gpu="T4",  # Request a T4 GPU. Can be changed to A10G for more power.
     timeout=7200,  # Set a 2-hour timeout for the job
-    container_idle_timeout=300, # Keep container warm for 5 mins
+    scaledown_window=300, # Keep container warm for 5 mins
 )
 class ModalProcessor:
     """
@@ -113,8 +115,19 @@ class ModalProcessor:
         Load models and initialize the processor when the container starts.
         This runs once per container, making subsequent calls faster.
         """
-        # Add src to path inside the container - handle different path scenarios
+        # Fix SQLite version for ChromaDB
         import os
+        import sys
+        
+        # Use pysqlite3 instead of sqlite3 if available
+        try:
+            import pysqlite3
+            sys.modules['sqlite3'] = pysqlite3
+            print("✅ Using pysqlite3 for ChromaDB compatibility")
+        except ImportError:
+            print("⚠️ pysqlite3 not available, using system sqlite3")
+        
+        # Add src to path inside the container - handle different path scenarios
         if os.path.exists('/src') and '/src' not in sys.path:
             sys.path.insert(0, '/src')
         # Also handle local development paths
@@ -138,19 +151,46 @@ class ModalProcessor:
             config = json.load(f)
 
         config["paths"]["videos_dir"] = str(VOL_MOUNT_PATH / "source/videos")
-        config["paths"]["contestants_photos_dir"] = str(VOL_MOUNT_PATH / "source/photo/contestants")
+        config["paths"]["contestants_dir"] = str(VOL_MOUNT_PATH / "source/photo/contestants")
+        config["paths"]["chroma_db_path"] = str(VOL_MOUNT_PATH / "data/chroma_db")
+        
+        # Ensure output directories are also on the volume
         config["paths"]["processed_videos_dir"] = str(VOL_MOUNT_PATH / "processed_videos")
         config["paths"]["metadata_dir"] = str(VOL_MOUNT_PATH / "metadata")
         config["paths"]["clips_dir"] = str(VOL_MOUNT_PATH / "clips")
-        config["paths"]["db_dir"] = str(VOL_MOUNT_PATH / ".chroma_db")
 
-        # Instantiate the processor with the modified config
-        self.processor = EnhancedVideoProcessor(config=config)
+        # Save the modified config to a temporary file
+        modified_config_path = str(VOL_MOUNT_PATH / "modified_config.json")
+        with open(modified_config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+
+        # Instantiate the processor with the modified config path
+        self.processor = EnhancedVideoProcessor(config_path=modified_config_path)
 
         # Verify hardware acceleration on the remote GPU
+        print("🔍 Checking GPU availability in Modal container...")
+        
+        # Check nvidia-smi
+        import subprocess
+        try:
+            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print("✅ nvidia-smi available:")
+                print(result.stdout)
+            else:
+                print(f"❌ nvidia-smi failed: {result.stderr}")
+        except Exception as e:
+            print(f"❌ nvidia-smi not available: {e}")
+        
         accelerator = HardwareAccelerator()
-        print(f"✅ Modal container running with: {accelerator.get_device_info()}")
+        print("✅ Modal container hardware info:")
+        accelerator.print_hardware_info()
+        
+        return self
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup when the container exits."""
+        pass
 
     @method()
     def run_batch_processing(
@@ -174,6 +214,10 @@ class ModalProcessor:
         start_time = time.time()
 
         try:
+            # Initialize the processor if not already done
+            if not hasattr(self, 'processor'):
+                self.__enter__()
+            
             self.processor.set_similarity_threshold(similarity_threshold)
             videos = self.processor.get_available_videos()
 
@@ -211,6 +255,14 @@ class ModalProcessor:
             # The report is saved to the persistent volume
             generate_processing_report(self.processor, results, total_time)
 
+            # Generate dense metadata for enhanced video player synchronization
+            print("\n" + "="*60)
+            print("🚀 GENERATING DENSE METADATA FOR ENHANCED VIDEO PLAYER")
+            print("="*60)
+            print("Generating 6x more timeline data for smooth real-time synchronization...")
+            
+            dense_metadata_results = self._generate_dense_metadata_for_processed_videos()
+            
             print("="*60)
             print("✅ MODAL BATCH PROCESSING COMPLETE")
             print("="*60)
@@ -220,10 +272,79 @@ class ModalProcessor:
             import traceback
             traceback.print_exc()
 
+    def _generate_dense_metadata_for_processed_videos(self):
+        """Generate dense metadata for all processed videos."""
+        from src.services.realtime_video_processor import create_dense_metadata_for_video
+        import os
+        
+        processed_videos_dir = VOL_MOUNT_PATH / "processed_videos"
+        dense_results = {}
+        
+        if not processed_videos_dir.exists():
+            print("⚠️ No processed videos directory found, skipping dense metadata generation")
+            return dense_results
+        
+        # Find all processed videos
+        processed_videos = list(processed_videos_dir.glob("*_annotated.mp4"))
+        
+        if not processed_videos:
+            print("⚠️ No processed videos found, skipping dense metadata generation")
+            return dense_results
+        
+        print(f"Found {len(processed_videos)} processed videos for dense metadata generation")
+        
+        for video_path in processed_videos:
+            video_name = video_path.name
+            print(f"\n🎯 Generating dense metadata for: {video_name}")
+            
+            try:
+                # Create dense metadata
+                result = create_dense_metadata_for_video(str(video_path))
+                
+                if result["success"]:
+                    dense_results[video_name] = {
+                        "success": True,
+                        "metadata_file": result["metadata_file"],
+                        "processing_stats": result["processing_stats"],
+                        "contestants_detected": result["contestants_detected"]
+                    }
+                    
+                    print(f"✅ Dense metadata generated successfully!")
+                    print(f"   📊 Processing stats: {result['processing_stats']}")
+                    print(f"   👥 Contestants detected: {len(result['contestants_detected'])}")
+                else:
+                    dense_results[video_name] = {
+                        "success": False,
+                        "error": result.get("error", "Unknown error")
+                    }
+                    print(f"❌ Failed to generate dense metadata: {result.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                dense_results[video_name] = {
+                    "success": False,
+                    "error": str(e)
+                }
+                print(f"❌ Exception generating dense metadata for {video_name}: {e}")
+        
+        # Summary
+        successful_dense = len([r for r in dense_results.values() if r.get("success", False)])
+        total_dense = len(dense_results)
+        
+        print(f"\n📈 Dense Metadata Generation Summary:")
+        print(f"   Total videos: {total_dense}")
+        print(f"   Successful: {successful_dense}")
+        print(f"   Failed: {total_dense - successful_dense}")
+        
+        if successful_dense > 0:
+            print(f"✅ Enhanced timeline data generated for {successful_dense} videos!")
+            print("   Videos now have 6x more timeline data for smooth video player synchronization")
+        
+        return dense_results
+
 
 # --- Local Entrypoint ---
 
-@stub.local_entrypoint()
+@app.local_entrypoint()
 def main(
     force_reprocess: bool = False,
     single_video: str = None,
