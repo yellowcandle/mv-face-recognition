@@ -58,7 +58,11 @@
       "Bash(/dev/null)",
       "Bash(ffmpeg:*)",
       "Bash(git pull:*)",
-      "Bash(timeout 5 npm run dev 2 >& 1)"
+      "Bash(timeout 5 npm run dev 2 >& 1)",
+      "Bash(bash:*)",
+      "Bash(scripts/process_videos_modal.sh:*)",
+      "Bash(modal volume get:*)",
+      "Bash(modal volume ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true

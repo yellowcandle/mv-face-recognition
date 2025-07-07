@@ -42,13 +42,19 @@ class HardwareAccelerator:
             import onnxruntime as ort
             all_providers = ort.get_available_providers()
             
+            logger.info(f"ONNXRuntime available providers: {all_providers}")
+            
             # Check for CUDA
             if 'CUDAExecutionProvider' in all_providers:
-                if self._is_cuda_available():
+                # In cloud containers (like Modal), trust ONNXRuntime's CUDA detection
+                # even if system-level CUDA tools aren't available
+                if self._is_cuda_available() or self._is_cloud_environment():
                     available_providers.insert(0, 'CUDAExecutionProvider')
                     logger.info("✅ CUDA acceleration available")
                 else:
                     logger.warning("⚠️ CUDA provider available but CUDA runtime not detected")
+            else:
+                logger.warning("❌ CUDAExecutionProvider not found in ONNXRuntime")
             
             # Check for Apple Silicon (Metal Performance Shaders)
             if 'CoreMLExecutionProvider' in all_providers:
@@ -123,6 +129,27 @@ class HardwareAccelerator:
                 logger.debug(f"CUDA libraries found at {path}")
                 return True
                 
+        return False
+
+    def _is_cloud_environment(self) -> bool:
+        """Check if running in a cloud container environment."""
+        # Check for common cloud environment indicators
+        cloud_indicators = [
+            # Modal container indicators
+            os.environ.get('MODAL_TASK_ID') is not None,
+            os.environ.get('MODAL_ENVIRONMENT') is not None,
+            # Docker indicators
+            os.path.exists('/.dockerenv'),
+            # Kubernetes indicators
+            os.environ.get('KUBERNETES_SERVICE_HOST') is not None,
+            # Generic cloud indicators
+            os.environ.get('CLOUD_PROVIDER') is not None,
+        ]
+        
+        if any(cloud_indicators):
+            logger.debug("Cloud environment detected, trusting ONNXRuntime CUDA detection")
+            return True
+            
         return False
 
     def _get_recommended_providers(self) -> List[str]:
@@ -222,6 +249,12 @@ class HardwareAccelerator:
         print(f"\nHardware Detection:")
         print(f"  Apple Silicon: {'✅ Yes' if self._is_apple_silicon() else '❌ No'}")
         print(f"  CUDA Available: {'✅ Yes' if self._is_cuda_available() else '❌ No'}")
+        print(f"  Cloud Environment: {'✅ Yes' if self._is_cloud_environment() else '❌ No'}")
+        
+        # Available vs Recommended providers
+        print(f"\nProvider Analysis:")
+        print(f"  Available providers: {self.available_providers}")
+        print(f"  Recommended providers: {self.recommended_providers}")
         
         # Providers
         print(f"\nExecution Providers:")

@@ -20,6 +20,7 @@ SINGLE_VIDEO=""
 SETUP_MODAL=false
 SYNC_DATA=false
 DOWNLOAD_RESULTS=false
+REFRESH_EMBEDDINGS=false
 VOLUME_NAME="mv-face-recognition-data"
 
 # Function to print colored output
@@ -55,6 +56,7 @@ show_usage() {
     echo "  --setup                       Set up Modal.com environment (first-time setup)"
     echo "  --sync-data                   Sync local data to Modal volume"
     echo "  --download-results            Download processed results from Modal volume"
+    echo "  --refresh-embeddings          Refresh embeddings and ChromaDB before processing"
     echo "  --volume-name                 Modal volume name (default: mv-face-recognition-data)"
     echo ""
     echo "Examples:"
@@ -64,13 +66,15 @@ show_usage() {
     echo "  $0 -f                                       # Force reprocess all videos"
     echo "  $0 -v \"video.mp4\"                          # Process specific video"
     echo "  $0 -s 0.3 -f                               # Reprocess with higher similarity threshold"
+    echo "  $0 --refresh-embeddings                     # Refresh embeddings and ChromaDB before processing"
     echo "  $0 --download-results                       # Download processed files"
     echo ""
     echo "Typical workflow:"
     echo "  1. $0 --setup                               # One-time setup"
     echo "  2. $0 --sync-data                           # Upload your data"
-    echo "  3. $0                                       # Process videos"
-    echo "  4. $0 --download-results                    # Download results"
+    echo "  3. $0 --refresh-embeddings                  # Refresh embeddings and ChromaDB"
+    echo "  4. $0                                       # Process videos"
+    echo "  5. $0 --download-results                    # Download results"
 }
 
 # Parse command line arguments
@@ -104,6 +108,10 @@ while [[ $# -gt 0 ]]; do
             DOWNLOAD_RESULTS=true
             shift
             ;;
+        --refresh-embeddings)
+            REFRESH_EMBEDDINGS=true
+            shift
+            ;;
         --volume-name)
             VOLUME_NAME="$2"
             shift 2
@@ -127,7 +135,8 @@ check_modal_installed() {
 
 # Function to check if modal is authenticated
 check_modal_auth() {
-    if ! modal auth current &> /dev/null; then
+    # Test authentication by trying to list volumes (simplest authenticated command)
+    if ! modal volume list &> /dev/null; then
         print_error "Modal is not authenticated. Please run 'modal setup' first."
         exit 1
     fi
@@ -179,7 +188,7 @@ sync_data() {
     
     # Sync source directory
     print_status "Uploading source directory to Modal volume..."
-    if modal volume put "$VOLUME_NAME" ./source /source; then
+    if modal volume put "$VOLUME_NAME" ./source /source --force; then
         print_success "Source directory uploaded successfully!"
     else
         print_error "Failed to upload source directory"
@@ -188,7 +197,7 @@ sync_data() {
     
     # Sync config file
     print_status "Uploading config.json to Modal volume..."
-    if modal volume put "$VOLUME_NAME" ./config.json /config.json; then
+    if modal volume put "$VOLUME_NAME" ./config.json /config.json --force; then
         print_success "Config file uploaded successfully!"
     else
         print_error "Failed to upload config file"
@@ -197,6 +206,46 @@ sync_data() {
     
     print_success "Data sync completed!"
     print_status "Your videos and configuration are now available on Modal's cloud storage."
+}
+
+# Function to refresh embeddings and ChromaDB
+refresh_embeddings() {
+    print_step "Refreshing embeddings and ChromaDB..."
+    
+    # Check if fix_embeddings.py exists
+    if [ ! -f "fix_embeddings.py" ]; then
+        print_error "fix_embeddings.py not found. Please run this script from the project root directory."
+        exit 1
+    fi
+    
+    # Check if Python environment has required packages
+    print_status "Checking Python environment..."
+    if ! python3 -c "
+import sys
+try:
+    import numpy as np
+    import chromadb
+    print('✓ Required packages found')
+except ImportError as e:
+    print(f'✗ Missing package: {e}')
+    sys.exit(1)
+"; then
+        print_error "Missing required Python packages. Please install requirements:"
+        echo "pip install -r requirements.txt"
+        exit 1
+    fi
+    
+    # Run the embeddings fix script
+    print_status "Running embeddings refresh (this may take a few minutes)..."
+    if python3 fix_embeddings.py --all --force; then
+        print_success "Embeddings and ChromaDB refreshed successfully!"
+    else
+        print_error "Failed to refresh embeddings and ChromaDB"
+        exit 1
+    fi
+    
+    print_success "Embeddings refresh completed!"
+    print_status "Face recognition database is now ready for processing."
 }
 
 # Function to download results from Modal volume
@@ -308,6 +357,8 @@ elif [ "$SYNC_DATA" = true ]; then
     sync_data
 elif [ "$DOWNLOAD_RESULTS" = true ]; then
     download_results
+elif [ "$REFRESH_EMBEDDINGS" = true ]; then
+    refresh_embeddings
 else
     # Validate similarity threshold
     if ! python3 -c "

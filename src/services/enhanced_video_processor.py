@@ -114,10 +114,10 @@ class EnhancedVideoProcessor:
         self.font_scale = self.config["video_processing"]["annotation_font_scale"]
         self.thickness = self.config["video_processing"]["annotation_thickness"]
 
-        # Output directories
-        self.processed_videos_dir = Path("processed_videos")
-        self.metadata_dir = Path("metadata")
-        self.clips_dir = Path("clips")
+        # Output directories - use config paths if available, otherwise default
+        self.processed_videos_dir = Path(self.config["paths"].get("processed_videos_dir", "processed_videos"))
+        self.metadata_dir = Path(self.config["paths"].get("metadata_dir", "metadata"))
+        self.clips_dir = Path(self.config["paths"].get("clips_dir", "clips"))
         
         # Create output directories
         self.processed_videos_dir.mkdir(exist_ok=True)

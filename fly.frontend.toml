@@ -1,0 +1,75 @@
+# Fly.io configuration for MV Face Recognition Frontend (Vue.js)
+app = "mv-face-recognition-frontend"
+primary_region = "sjc"  # San Jose (close to user)
+
+[build]
+  dockerfile = "Dockerfile.frontend"
+
+[env]
+  # API endpoint will be set via secrets
+  API_BASE_URL = "https://mv-face-recognition-backend.fly.dev"
+  NODE_ENV = "production"
+
+[experimental]
+  auto_rollback = true
+
+[[services]]
+  internal_port = 3000
+  processes = ["app"]
+  protocol = "tcp"
+  script_checks = []
+
+  # HTTP service configuration
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 500
+    soft_limit = 250
+
+  # Health checks
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["http", "tls"]
+
+  # HTTP checks for health monitoring
+  [[services.http_checks]]
+    interval = "30s"
+    grace_period = "5s"
+    method = "get"
+    path = "/"
+    protocol = "http"
+    timeout = "10s"
+    tls_skip_verify = false
+    
+    [services.http_checks.headers]
+      User-Agent = "fly-health-check"
+
+  # Readiness check
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "1s"
+
+# HTTP service configuration
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+# VM configuration (lighter than backend)
+[vm]
+  cpu_kind = "shared"  # Shared CPUs sufficient for static serving
+  cpus = 1
+  memory_mb = 512
+
+# Metrics
+[metrics]
+  port = 9091
+  path = "/metrics" 

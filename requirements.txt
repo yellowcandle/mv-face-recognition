@@ -7,15 +7,16 @@ huggingface_hub>=0.19.0
 # Face Recognition & Computer Vision
 insightface>=0.7.3
 opencv-python>=4.8.0
-torch>=2.0.0
-torchvision>=0.15.0
 
-# ONNX Runtime - Hardware Acceleration Support
-# Note: Install specific versions based on your hardware:
-# For CUDA GPU: pip install onnxruntime-gpu>=1.16.0
+# PyTorch with CUDA support (default for GPU acceleration)
+torch>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+torchvision>=0.15.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# ONNX Runtime - GPU acceleration by default
+# For GPU: onnxruntime-gpu (CUDA support)
 # For Apple Silicon: pip install onnxruntime>=1.16.0 (includes CoreML support)
 # For CPU only: pip install onnxruntime>=1.16.0
-onnxruntime>=1.16.0
+onnxruntime-gpu>=1.16.0
 
 # Vector Database & Data Processing  
 chromadb>=0.4.0

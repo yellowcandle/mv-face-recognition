@@ -47,6 +47,12 @@ app.add_middleware(
 )
 
 # Include API routes
+from app.api.routes import videos, health
+
+# Include API routes
+app.include_router(videos.router, prefix="/api")
+app.include_router(health.router)
+
 # Basic system status endpoint
 @app.get("/api/system/status/")
 async def get_system_status():
