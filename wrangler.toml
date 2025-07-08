@@ -1,0 +1,17 @@
+name = "mv-face-recognition"
+main = "worker/index.js"
+compatibility_date = "2024-11-08"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "VIDEOS_BUCKET"
+bucket_name = "mv-face-recognition-videos"
+preview_bucket_name = "mv-face-recognition-videos-preview"
+
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "890d77e11bfc4623ac4ef56db6b9a4ab"
+preview_id = "ba09879957074c0892d9a208f2fb1e5c"
+
+[build]
+command = "npm run build"

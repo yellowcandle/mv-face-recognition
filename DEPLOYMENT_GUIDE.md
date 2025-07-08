@@ -1,120 +1,165 @@
 # 🚀 Deployment Guide - MV Face Recognition
 
-This guide covers deploying the MV Face Recognition system to Hugging Face Spaces and other platforms.
+This guide covers deploying the MV Face Recognition system to Cloudflare Workers, Modal.com, and other platforms.
 
 ## 📋 Pre-Deployment Checklist
 
 ### 1. System Testing
 ```bash
-# Run the test suite
-python test_system.py
+# Test video processing locally
+python scripts/process_videos_local.sh
 
-# Test Gradio interface locally
-python gradio_app.py
+# Test frontend build
+cd frontend-svelte && npm run build
 
-# Verify batch processing works
-python batch_process_videos.py --dry-run
+# Verify configuration
+cat config.json  # Should have frame_skip: 5 for dense processing
 ```
 
-### 2. Data Preparation
+### 2. Video Processing with Modal.com
 ```bash
-# Pre-process videos for deployment
-python batch_process_videos.py
+# Setup Modal environment
+./scripts/process_videos_modal.sh --setup
 
-# Verify outputs
-ls processed_videos/  # Should contain annotated MP4s
-ls metadata/         # Should contain JSON files
-ls clips/           # Should contain highlight clips
+# Sync local data to Modal
+./scripts/process_videos_modal.sh --sync-data
+
+# Process videos on Modal's GPU infrastructure
+./scripts/process_videos_modal.sh
+
+# Download processed results
+./scripts/process_videos_modal.sh --download-results
 ```
 
-### 3. File Size Optimization
+### 3. Cloudflare Workers Preparation
 ```bash
-# Check total size
-du -sh processed_videos/ metadata/ clips/
+# Install Wrangler CLI
+npm install -g wrangler
 
-# Compress videos if needed (optional)
-ffmpeg -i input.mp4 -crf 28 -preset medium output.mp4
+# Authenticate with Cloudflare
+wrangler login
+
+# Verify configuration
+cat wrangler.toml
 ```
 
-## 🤗 Hugging Face Spaces Deployment
+## ☁️ Cloudflare Workers Deployment (Recommended)
 
-### Step 1: Create New Space
-
-1. Go to [Hugging Face Spaces](https://huggingface.co/spaces)
-2. Click "Create new Space"
-3. Fill in details:
-   - **Space name**: `mv-face-recognition`
-   - **License**: `MIT`
-   - **SDK**: `Gradio`
-   - **Hardware**: `CPU basic` (upgrade to GPU if needed)
-
-### Step 2: Repository Setup
+### Step 1: Build Frontend
 
 ```bash
-# Clone your new space
-git clone https://huggingface.co/spaces/your-username/mv-face-recognition
-cd mv-face-recognition
+# Navigate to frontend directory
+cd frontend-svelte
 
-# Copy files from your development directory
-cp /path/to/your/project/app.py .
-cp /path/to/your/project/gradio_app.py .
-cp /path/to/your/project/requirements.txt .
-cp /path/to/your/project/.gitattributes .
+# Install dependencies
+npm install
+
+# Build for static deployment
+npm run build
+
+# Copy build files to worker directory
+cd ..
+mkdir -p worker/public
+cp -r frontend-svelte/build/* worker/public/
 ```
 
-### Step 3: Add Core Files
+### Step 2: Deploy Worker
 
 ```bash
-# Copy source code
-cp -r /path/to/your/project/src/ .
+# Deploy to Cloudflare Workers
+wrangler deploy
 
-# Copy configuration
-cp /path/to/your/project/config.json .
-
-# Copy contestant embeddings
-mkdir -p source/photo/contestants
-cp /path/to/your/project/source/photo/contestants/*.npy source/photo/contestants/
+# Your app will be available at:
+# https://mv-face-recognition.your-subdomain.workers.dev
 ```
 
-### Step 4: Add Processed Data (Using Git LFS)
+### Step 3: Upload Videos to R2
 
 ```bash
-# Initialize Git LFS
-git lfs install
+# Upload processed videos to Cloudflare R2
+node scripts/upload-to-r2.js
 
-# Add processed videos (these will be large)
-mkdir -p processed_videos metadata clips
-cp /path/to/your/project/processed_videos/*.mp4 processed_videos/
-cp /path/to/your/project/metadata/*.json metadata/
-cp /path/to/your/project/clips/*.mp4 clips/
-
-# Add and commit
-git add .
-git commit -m "Initial deployment with pre-processed data"
-git push
+# Videos will be available at:
+# https://your-worker.com/videos/[filename]
 ```
 
-### Step 5: Configure Space Settings
+### Step 4: Upload Metadata to KV
 
-Create `README.md` in the space root:
-```markdown
----
-title: MV Face Recognition
-emoji: 🎬
-colorFrom: blue
-colorTo: purple
-sdk: gradio
-sdk_version: 4.0.0
-app_file: app.py
-pinned: false
-license: mit
----
+```bash
+# Upload contestant data and metadata
+node scripts/upload-metadata.js
 
-# MV Face Recognition
+# API endpoints will serve data from KV store
+```
 
-AI-powered contestant recognition in music videos with enhanced annotations.
+### Configuration
 
-[Full documentation and source code](https://github.com/your-username/mv-face-recognition)
+Your `wrangler.toml` should include:
+```toml
+name = "mv-face-recognition"
+main = "worker/index.js"
+compatibility_date = "2024-11-08"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "VIDEOS_BUCKET"
+bucket_name = "mv-face-recognition-videos"
+
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "your-kv-namespace-id"
+```
+
+## 🧠 Modal.com Video Processing
+
+### Step 1: Setup Modal Environment
+
+```bash
+# Install Modal CLI
+pip install modal
+
+# Setup authentication
+modal setup
+
+# Create volume for persistent storage
+modal volume create mv-face-recognition-data
+```
+
+### Step 2: Process Videos
+
+```bash
+# Sync local data to Modal
+./scripts/process_videos_modal.sh --sync-data
+
+# Process videos with GPU acceleration
+./scripts/process_videos_modal.sh
+
+# Download processed results
+./scripts/process_videos_modal.sh --download-results
+```
+
+### Configuration
+
+Modal processing supports:
+- **GPU Acceleration**: NVIDIA A100/V100 GPUs
+- **Batch Processing**: Multiple videos in parallel
+- **Persistent Storage**: Modal volumes for data persistence
+- **Cost Optimization**: Pay only for GPU time used
+
+### Processing Options
+
+```bash
+# Process with custom similarity threshold
+./scripts/process_videos_modal.sh -s 0.3
+
+# Force reprocess all videos
+./scripts/process_videos_modal.sh -f
+
+# Process single video
+./scripts/process_videos_modal.sh -v "video.mp4"
+
+# Refresh embeddings before processing
+./scripts/process_videos_modal.sh --refresh-embeddings
 ```
 
 ## 🖥️ Local Development Setup
@@ -377,15 +422,29 @@ demo.auth = authenticate
 
 ## ✅ Final Deployment Checklist
 
-- [ ] All tests pass (`python test_system.py`)
-- [ ] Videos are pre-processed and optimized
-- [ ] Git LFS is configured for large files
-- [ ] Requirements.txt includes all dependencies
-- [ ] app.py is the correct entry point
-- [ ] README.md has proper HF Spaces configuration
-- [ ] Performance is acceptable on target hardware
+### Cloudflare Workers Deployment
+- [ ] Frontend builds successfully (`npm run build`)
+- [ ] Worker deploys without errors (`wrangler deploy`)
+- [ ] R2 bucket is created and videos uploaded
+- [ ] KV namespace is configured with metadata
+- [ ] API endpoints respond correctly
+- [ ] Video streaming works with range requests
+- [ ] CORS is properly configured
+
+### Modal.com Processing
+- [ ] Modal CLI is authenticated (`modal setup`)
+- [ ] Video processing completes successfully
+- [ ] Processed videos are downloaded
+- [ ] Metadata files are generated correctly
+- [ ] Frame skip is set to 5 for dense processing
+- [ ] Embeddings are refreshed before processing
+
+### Configuration
+- [ ] `config.json` has `frame_skip: 5`
+- [ ] `wrangler.toml` includes R2 and KV bindings
+- [ ] Upload scripts are configured correctly
+- [ ] Worker handles missing R2 gracefully
 - [ ] Error handling is implemented
-- [ ] Monitoring/logging is configured
 - [ ] Security measures are in place
 
-🎉 **Ready to deploy!** Your MV Face Recognition system should now be ready for production use.
+🎉 **Ready to deploy!** Your MV Face Recognition system is now ready for serverless production deployment with Cloudflare Workers and Modal.com GPU processing.
