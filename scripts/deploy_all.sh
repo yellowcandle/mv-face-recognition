@@ -115,7 +115,7 @@ echo "3. Configure custom domains if needed"
 echo "4. Set up any additional environment variables"
 echo
 print_status "Useful commands:"
-echo "• View KV data: npx wrangler kv:key list --binding=METADATA_KV"
+echo "• View KV data: npx wrangler kv key list --binding=METADATA_KV --preview false"
 echo "• View R2 objects: npx wrangler r2 object list --bucket=mv-face-recognition-videos"
 echo "• View logs: npx wrangler tail"
 echo
