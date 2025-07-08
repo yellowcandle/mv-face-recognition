@@ -46,8 +46,8 @@ class ChromaDBManager:
         embeddings = {}
         contestants_path = Path(self.contestants_dir)
 
-        # Find all .npy files
-        npy_files = list(contestants_path.glob("*.npy"))
+        # Find all .npy files (only embedding files, not other npy files)
+        npy_files = list(contestants_path.glob("*_embedding.npy"))
 
         logger.info(f"Found {len(npy_files)} embedding files")
 

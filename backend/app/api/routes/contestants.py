@@ -1,142 +1,90 @@
 """
-Contestants management API routes.
+Contestant management API endpoints.
 """
 
-import logging
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from typing import List
+from fastapi import APIRouter, HTTPException, Depends
 
-logger = logging.getLogger(__name__)
+from app.models.schemas import Contestant, ErrorResponse
+from app.services.contestant_service import ContestantService
 
 router = APIRouter()
 
-class ContestantInfo(BaseModel):
-    """Contestant information model."""
-    name: str
-    has_embedding: bool
-    embedding_file: Optional[str] = None
 
-class DatabaseStats(BaseModel):
-    """Database statistics model."""
-    total_embeddings: int
-    similarity_threshold: float
-    max_results: int
-    cache_size: int
-    initialized: bool
-    error: Optional[str] = None
+def get_contestant_service():
+    """Dependency to get contestant service."""
+    return ContestantService()
 
-class ContestantListResponse(BaseModel):
-    """Response model for contestant list."""
-    contestants: List[ContestantInfo]
-    count: int
 
-@router.get("/", response_model=ContestantListResponse)
-async def get_contestants(request: Request):
+@router.get("/contestants/", response_model=List[Contestant])
+async def list_contestants(
+    contestant_service: ContestantService = Depends(get_contestant_service)
+):
     """Get list of all contestants."""
     try:
-        face_matcher = request.app.state.face_matcher
-        
-        # Get database stats to determine if initialized
-        stats = await face_matcher.get_database_stats_async()
-        
-        if not stats["initialized"]:
-            raise HTTPException(status_code=503, detail="Face matcher not initialized")
-        
-        # For now, return a placeholder response
-        # In a full implementation, this would scan the contestants directory
-        # and return actual contestant information
-        
-        return ContestantListResponse(
-            contestants=[],
-            count=0
-        )
-        
+        contestants = await contestant_service.get_all_contestants()
+        return contestants
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list contestants: {str(e)}")
+
+
+@router.get("/contestants/{contestant_id}/", response_model=Contestant)
+async def get_contestant(
+    contestant_id: str,
+    contestant_service: ContestantService = Depends(get_contestant_service)
+):
+    """Get detailed information about a specific contestant."""
+    try:
+        contestant = await contestant_service.get_contestant(contestant_id)
+        if not contestant:
+            raise HTTPException(status_code=404, detail="Contestant not found")
+        return contestant
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting contestants: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get contestant: {str(e)}")
 
-@router.get("/stats", response_model=DatabaseStats)
-async def get_database_stats(request: Request):
-    """Get database statistics."""
-    try:
-        face_matcher = request.app.state.face_matcher
-        stats = await face_matcher.get_database_stats_async()
-        
-        return DatabaseStats(**stats)
-        
-    except Exception as e:
-        logger.error(f"Error getting database stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/reload")
-async def reload_database(request: Request):
-    """Reload the contestant database."""
+@router.get("/contestants/{contestant_id}/photos/")
+async def get_contestant_photos(
+    contestant_id: str,
+    contestant_service: ContestantService = Depends(get_contestant_service)
+):
+    """Get contestant photo URLs."""
     try:
-        face_matcher = request.app.state.face_matcher
-        success = await face_matcher.reset_database_async()
-        
-        if success:
-            return {
-                "status": "success",
-                "message": "Database reloaded successfully"
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Failed to reload database")
-        
+        photos = await contestant_service.get_contestant_photos(contestant_id)
+        if photos is None:
+            raise HTTPException(status_code=404, detail="Contestant not found")
+        return {"contestant_id": contestant_id, "photos": photos}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error reloading database: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get photos: {str(e)}")
 
-@router.get("/{contestant_name}")
-async def get_contestant(contestant_name: str, request: Request):
-    """Get information about a specific contestant."""
-    try:
-        # This would retrieve specific contestant information
-        # For now, return a placeholder response
-        
-        return {
-            "name": contestant_name,
-            "status": "not_implemented",
-            "message": "Contestant retrieval not yet implemented"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting contestant {contestant_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{contestant_name}/add")
-async def add_contestant(contestant_name: str, request: Request):
-    """Add a new contestant to the database."""
+@router.post("/contestants/refresh-embeddings/")
+async def refresh_embeddings(
+    contestant_service: ContestantService = Depends(get_contestant_service)
+):
+    """Refresh face embeddings for all contestants."""
     try:
-        # This would add a new contestant embedding
-        # For now, return a placeholder response
-        
+        result = await contestant_service.refresh_embeddings()
         return {
-            "status": "not_implemented",
-            "message": "Adding contestants not yet implemented"
+            "message": "Embeddings refreshed successfully",
+            "processed_contestants": result["processed"],
+            "errors": result["errors"]
         }
-        
     except Exception as e:
-        logger.error(f"Error adding contestant {contestant_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to refresh embeddings: {str(e)}")
 
-@router.delete("/{contestant_name}")
-async def remove_contestant(contestant_name: str, request: Request):
-    """Remove a contestant from the database."""
+
+@router.get("/contestants/stats/")
+async def get_contestant_stats(
+    contestant_service: ContestantService = Depends(get_contestant_service)
+):
+    """Get overall contestant statistics."""
     try:
-        # This would remove a contestant from the database
-        # For now, return a placeholder response
-        
-        return {
-            "status": "not_implemented",
-            "message": "Removing contestants not yet implemented"
-        }
-        
+        stats = await contestant_service.get_stats()
+        return stats
     except Exception as e:
-        logger.error(f"Error removing contestant {contestant_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
