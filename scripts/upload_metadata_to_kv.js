@@ -29,14 +29,14 @@ async function uploadToKV() {
                 const tempFile = path.join(__dirname, 'temp_upload.txt');
                 fs.writeFileSync(tempFile, content);
                 
-                execSync(`npx wrangler kv:key put "${keyName}" --path="${tempFile}" --binding=${namespace}`, {
+                execSync(`npx wrangler kv key put "${keyName}" --path="${tempFile}" --binding=${namespace} --preview false`, {
                     stdio: 'inherit'
                 });
                 
                 fs.unlinkSync(tempFile);
             } else {
                 // For JSON files, upload directly
-                execSync(`npx wrangler kv:key put "${keyName}" --path="${filePath}" --binding=${namespace}`, {
+                execSync(`npx wrangler kv key put "${keyName}" --path="${filePath}" --binding=${namespace} --preview false`, {
                     stdio: 'inherit'
                 });
             }
@@ -83,7 +83,7 @@ async function uploadVideoMetadata() {
     try {
         const videoMetadataFile = path.join(__dirname, 'temp_video_metadata.json');
         fs.writeFileSync(videoMetadataFile, JSON.stringify(videoMetadata, null, 2));
-        execSync(`npx wrangler kv:key put "video_metadata_collection" --path="${videoMetadataFile}" --binding=${namespace}`, {
+        execSync(`npx wrangler kv key put "video_metadata_collection" --path="${videoMetadataFile}" --binding=${namespace} --preview false`, {
             stdio: 'inherit'
         });
         fs.unlinkSync(videoMetadataFile);
@@ -91,7 +91,7 @@ async function uploadVideoMetadata() {
         
         const annotatedMetadataFile = path.join(__dirname, 'temp_annotated_metadata.json');
         fs.writeFileSync(annotatedMetadataFile, JSON.stringify(annotatedMetadata, null, 2));
-        execSync(`npx wrangler kv:key put "annotated_metadata_collection" --path="${annotatedMetadataFile}" --binding=${namespace}`, {
+        execSync(`npx wrangler kv key put "annotated_metadata_collection" --path="${annotatedMetadataFile}" --binding=${namespace} --preview false`, {
             stdio: 'inherit'
         });
         fs.unlinkSync(annotatedMetadataFile);
@@ -129,7 +129,7 @@ async function uploadContestantInfo() {
         const contestantsFile = path.join(__dirname, 'temp_contestants.json');
         fs.writeFileSync(contestantsFile, JSON.stringify(contestants, null, 2));
         
-        execSync(`npx wrangler kv:key put "contestants_structured" --path="${contestantsFile}" --binding=${namespace}`, {
+        execSync(`npx wrangler kv key put "contestants_structured" --path="${contestantsFile}" --binding=${namespace} --preview false`, {
             stdio: 'inherit'
         });
         

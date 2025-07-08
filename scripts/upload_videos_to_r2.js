@@ -44,7 +44,7 @@ async function uploadToR2() {
             const startTime = Date.now();
             
             // Upload using wrangler r2 object put
-            execSync(`npx wrangler r2 object put "${objectKey}" --file="${filePath}" --bucket=${bucketName}`, {
+            execSync(`npx wrangler r2 object put "${bucketName}/${objectKey}" --file="${filePath}"`, {
                 stdio: 'inherit'
             });
             
@@ -88,12 +88,12 @@ async function createVideoManifest() {
         fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
         
         // Upload manifest to R2
-        execSync(`npx wrangler r2 object put "manifest/processed_videos_manifest.json" --file="${manifestFile}" --bucket=${bucketName}`, {
+        execSync(`npx wrangler r2 object put "${bucketName}/manifest/processed_videos_manifest.json" --file="${manifestFile}"`, {
             stdio: 'inherit'
         });
         
         // Also upload to KV for easy access
-        execSync(`npx wrangler kv:key put "processed_videos_manifest" --path="${manifestFile}" --binding=METADATA_KV`, {
+        execSync(`npx wrangler kv key put "processed_videos_manifest" --path="${manifestFile}" --binding=METADATA_KV --preview false`, {
             stdio: 'inherit'
         });
         
@@ -125,7 +125,7 @@ async function generateAccessInfo() {
         const accessFile = path.join(__dirname, 'temp_access_info.json');
         fs.writeFileSync(accessFile, JSON.stringify(accessInfo, null, 2));
         
-        execSync(`npx wrangler kv:key put "r2_access_info" --path="${accessFile}" --binding=METADATA_KV`, {
+        execSync(`npx wrangler kv key put "r2_access_info" --path="${accessFile}" --binding=METADATA_KV --preview false`, {
             stdio: 'inherit'
         });
         

@@ -1,0 +1,13 @@
+# FastAPI Backend Requirements for Cloudflare Workers
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+pydantic>=2.4.0
+pydantic-settings>=2.0.3
+
+# File handling
+aiofiles>=23.2.1
+
+# Basic data processing (without heavy ML dependencies)
+# Note: OpenCV, torch, chromadb, etc. are not compatible with Workers
+# This deployment provides basic API functionality only 
