@@ -20,8 +20,8 @@ insightface>=0.7.3
 chromadb>=0.4.0
 
 # PyTorch with CUDA support
-torch>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
-torchvision>=0.15.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+torch>=2.0.0
+torchvision>=0.15.0
 
 # ONNX Runtime with GPU support
 onnxruntime-gpu>=1.16.0
