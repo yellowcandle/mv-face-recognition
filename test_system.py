@@ -1,278 +1,255 @@
 #!/usr/bin/env python3
 """
-Test script to verify the FastAPI + Svelte system components work correctly.
+Test script to verify the MV Face Recognition system functionality.
 """
 
-import asyncio
-import subprocess
-import time
 import sys
-import requests
-import websockets
-import json
+import logging
 from pathlib import Path
+import json
 
-# Change to the project directory
-PROJECT_DIR = Path(__file__).parent
-BACKEND_DIR = PROJECT_DIR / "backend"
-FRONTEND_DIR = PROJECT_DIR / "frontend"
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class SystemTester:
-    def __init__(self):
-        self.backend_process = None
-        self.frontend_process = None
-        
-    async def test_backend_health(self):
-        """Test if backend is running and healthy."""
-        try:
-            response = requests.get("http://127.0.0.1:8000/health", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                print(f"✅ Backend health check passed: {data}")
-                return True
-            else:
-                print(f"❌ Backend health check failed: {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Backend health check failed: {e}")
-            return False
+def test_dependencies():
+    """Test if all required dependencies are available."""
+    logger.info("Testing dependencies...")
     
-    async def test_video_api(self):
-        """Test video API endpoints."""
-        try:
-            # Test video list endpoint
-            response = requests.get("http://127.0.0.1:8000/api/videos/", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                print(f"✅ Video API works: Found {data['count']} videos")
-                
-                # Test video info if videos exist
-                if data['videos']:
-                    video_name = data['videos'][0]
-                    response = requests.get(f"http://127.0.0.1:8000/api/videos/{video_name}", timeout=5)
-                    if response.status_code == 200:
-                        video_info = response.json()
-                        print(f"✅ Video info API works: {video_info['filename']}")
-                        return True
-                    else:
-                        print(f"❌ Video info API failed: {response.status_code}")
-                        return False
-                else:
-                    print("⚠️ No videos found in source/videos directory")
-                    return True
-            else:
-                print(f"❌ Video API failed: {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Video API test failed: {e}")
-            return False
+    try:
+        import gradio as gr
+        logger.info(f"✓ Gradio {gr.__version__} available")
+    except ImportError:
+        logger.error("✗ Gradio not available")
+        return False
     
-    async def test_websocket(self):
-        """Test WebSocket connection."""
-        try:
-            async with websockets.connect("ws://127.0.0.1:8000/ws/realtime-processing") as websocket:
-                print("✅ WebSocket connection established")
-                
-                # Send a test message
-                test_message = {
-                    "type": "parameter_update",
-                    "parameter": "detection_threshold",
-                    "value": 0.6
-                }
-                await websocket.send(json.dumps(test_message))
-                
-                # Try to receive a response (with timeout)
-                try:
-                    response = await asyncio.wait_for(websocket.recv(), timeout=2.0)
-                    print(f"✅ WebSocket response received: {response[:100]}...")
-                    return True
-                except asyncio.TimeoutError:
-                    print("⚠️ WebSocket connected but no response received (this is OK)")
-                    return True
-                    
-        except Exception as e:
-            print(f"❌ WebSocket test failed: {e}")
-            return False
+    try:
+        import cv2
+        logger.info(f"✓ OpenCV {cv2.__version__} available")
+    except ImportError:
+        logger.error("✗ OpenCV not available")
+        return False
     
-    async def test_contestants_api(self):
-        """Test contestants API."""
-        try:
-            response = requests.get("http://127.0.0.1:8000/api/contestants/stats", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                print(f"✅ Contestants API works: {data['total_embeddings']} embeddings loaded")
-                return True
-            else:
-                print(f"❌ Contestants API failed: {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Contestants API test failed: {e}")
-            return False
+    try:
+        import numpy as np
+        logger.info(f"✓ NumPy {np.__version__} available")
+    except ImportError:
+        logger.error("✗ NumPy not available")
+        return False
     
-    def start_backend(self):
-        """Start the FastAPI backend."""
-        print("🚀 Starting FastAPI backend...")
-        try:
-            self.backend_process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"],
-                cwd=BACKEND_DIR,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # Wait for backend to start
-            for i in range(30):  # Wait up to 30 seconds
-                try:
-                    response = requests.get("http://127.0.0.1:8000/health", timeout=1)
-                    if response.status_code == 200:
-                        print("✅ Backend started successfully")
-                        return True
-                except:
-                    time.sleep(1)
-                    print(f"⏳ Waiting for backend... ({i+1}/30)")
-            
-            print("❌ Backend failed to start within 30 seconds")
-            return False
-            
-        except Exception as e:
-            print(f"❌ Failed to start backend: {e}")
-            return False
+    try:
+        import pandas as pd
+        logger.info(f"✓ Pandas {pd.__version__} available")
+    except ImportError:
+        logger.error("✗ Pandas not available")
+        return False
     
-    def start_frontend(self):
-        """Start the Svelte frontend."""
-        print("🚀 Starting Svelte frontend...")
-        try:
-            self.frontend_process = subprocess.Popen(
-                ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"],
-                cwd=FRONTEND_DIR,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # Wait for frontend to start
-            for i in range(20):  # Wait up to 20 seconds
-                try:
-                    response = requests.get("http://127.0.0.1:5173", timeout=1)
-                    if response.status_code == 200:
-                        print("✅ Frontend started successfully")
-                        return True
-                except:
-                    time.sleep(1)
-                    print(f"⏳ Waiting for frontend... ({i+1}/20)")
-            
-            print("❌ Frontend failed to start within 20 seconds")
-            return False
-            
-        except Exception as e:
-            print(f"❌ Failed to start frontend: {e}")
-            return False
+    # Test optional dependencies
+    try:
+        import insightface
+        logger.info("✓ InsightFace available")
+    except ImportError:
+        logger.warning("⚠ InsightFace not available (face recognition will be limited)")
     
-    def stop_processes(self):
-        """Stop both processes."""
-        print("🛑 Stopping processes...")
-        if self.backend_process:
-            self.backend_process.terminate()
-            try:
-                self.backend_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.backend_process.kill()
-        
-        if self.frontend_process:
-            self.frontend_process.terminate()
-            try:
-                self.frontend_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.frontend_process.kill()
+    try:
+        import chromadb
+        logger.info("✓ ChromaDB available")
+    except ImportError:
+        logger.warning("⚠ ChromaDB not available (similarity search will be limited)")
     
-    async def run_tests(self):
-        """Run all system tests."""
-        print("🧪 Starting MV Face Recognition System Tests\n")
-        
-        # Check if source videos directory exists
-        videos_dir = PROJECT_DIR / "source" / "videos"
-        if not videos_dir.exists():
-            print(f"⚠️ Videos directory not found: {videos_dir}")
-            print("   Creating empty directory for testing...")
-            videos_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Start backend
-        if not self.start_backend():
-            return False
-        
-        try:
-            # Test backend components
-            print("\n📡 Testing Backend Components:")
-            
-            health_ok = await self.test_backend_health()
-            video_api_ok = await self.test_video_api()
-            contestants_ok = await self.test_contestants_api()
-            websocket_ok = await self.test_websocket()
-            
-            backend_tests_passed = health_ok and video_api_ok and contestants_ok and websocket_ok
-            
-            if backend_tests_passed:
-                print("\n✅ All backend tests passed!")
-            else:
-                print("\n❌ Some backend tests failed")
-            
-            # Test frontend build
-            print("\n🎨 Testing Frontend Build:")
-            try:
-                result = subprocess.run(
-                    ["npm", "run", "build"],
-                    cwd=FRONTEND_DIR,
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
-                if result.returncode == 0:
-                    print("✅ Frontend builds successfully")
-                    frontend_build_ok = True
-                else:
-                    print(f"❌ Frontend build failed: {result.stderr}")
-                    frontend_build_ok = False
-            except Exception as e:
-                print(f"❌ Frontend build test failed: {e}")
-                frontend_build_ok = False
-            
-            # Start frontend for integration test
-            print("\n🔗 Testing Frontend-Backend Integration:")
-            if self.start_frontend():
-                print("✅ Frontend started and accessible")
-                integration_ok = True
-            else:
-                print("❌ Frontend integration test failed")
-                integration_ok = False
-            
-            # Summary
-            print("\n📋 Test Summary:")
-            print(f"Backend Health: {'✅' if health_ok else '❌'}")
-            print(f"Video API: {'✅' if video_api_ok else '❌'}")
-            print(f"Contestants API: {'✅' if contestants_ok else '❌'}")
-            print(f"WebSocket: {'✅' if websocket_ok else '❌'}")
-            print(f"Frontend Build: {'✅' if frontend_build_ok else '❌'}")
-            print(f"Integration: {'✅' if integration_ok else '❌'}")
-            
-            all_passed = (backend_tests_passed and frontend_build_ok and integration_ok)
-            
-            if all_passed:
-                print("\n🎉 All tests passed! The system is ready to use.")
-                print("\n🚀 Quick Start:")
-                print("1. Backend: cd backend && python -m uvicorn main:app --reload")
-                print("2. Frontend: cd frontend && npm run dev")
-                print("3. Open: http://localhost:5173")
-            else:
-                print("\n⚠️ Some tests failed. Please check the issues above.")
-            
-            return all_passed
-            
-        finally:
-            self.stop_processes()
+    return True
 
-async def main():
-    tester = SystemTester()
-    success = await tester.run_tests()
-    sys.exit(0 if success else 1)
+def test_file_structure():
+    """Test if required files and directories exist."""
+    logger.info("Testing file structure...")
+    
+    required_files = [
+        "gradio_app.py",
+        "app.py", 
+        "batch_process_videos.py",
+        "requirements.txt",
+        "config.json"
+    ]
+    
+    required_dirs = [
+        "src/core",
+        "src/services", 
+        "src/database",
+        "source/videos",
+        "source/photo/contestants"
+    ]
+    
+    # Check files
+    for file_path in required_files:
+        if Path(file_path).exists():
+            logger.info(f"✓ {file_path} exists")
+        else:
+            logger.error(f"✗ {file_path} missing")
+            return False
+    
+    # Check directories
+    for dir_path in required_dirs:
+        if Path(dir_path).exists():
+            logger.info(f"✓ {dir_path}/ exists")
+        else:
+            logger.error(f"✗ {dir_path}/ missing")
+            return False
+    
+    return True
+
+def test_config():
+    """Test configuration file."""
+    logger.info("Testing configuration...")
+    
+    try:
+        with open("config.json") as f:
+            config = json.load(f)
+        
+        required_sections = [
+            "face_detection",
+            "face_matching", 
+            "video_processing",
+            "paths"
+        ]
+        
+        for section in required_sections:
+            if section in config:
+                logger.info(f"✓ Config section '{section}' present")
+            else:
+                logger.error(f"✗ Config section '{section}' missing")
+                return False
+                
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Error reading config.json: {e}")
+        return False
+
+def test_data_availability():
+    """Test if required data is available."""
+    logger.info("Testing data availability...")
+    
+    # Check for videos
+    videos_dir = Path("source/videos")
+    video_files = list(videos_dir.glob("*.mp4"))
+    
+    if video_files:
+        logger.info(f"✓ Found {len(video_files)} video files")
+        for video in video_files[:3]:  # Show first 3
+            logger.info(f"  - {video.name}")
+    else:
+        logger.warning("⚠ No video files found in source/videos/")
+    
+    # Check for contestant embeddings
+    contestants_dir = Path("source/photo/contestants")
+    embedding_files = list(contestants_dir.glob("*_embedding.npy"))
+    
+    if embedding_files:
+        logger.info(f"✓ Found {len(embedding_files)} contestant embeddings")
+    else:
+        logger.warning("⚠ No contestant embeddings found")
+    
+    return True
+
+def test_gradio_app():
+    """Test if Gradio app can be imported and initialized."""
+    logger.info("Testing Gradio app...")
+    
+    try:
+        # Add src to path
+        sys.path.append('src')
+        
+        # Try to import the main app
+        from gradio_app import GradioMVFaceRecognition
+        
+        # Try to initialize (without launching)
+        app = GradioMVFaceRecognition()
+        logger.info("✓ Gradio app can be initialized")
+        
+        # Test interface creation
+        demo = app.create_interface()
+        logger.info("✓ Gradio interface can be created")
+        
+        return True
+        
+    except ImportError as e:
+        logger.error(f"✗ Cannot import Gradio app: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"✗ Error initializing Gradio app: {e}")
+        return False
+
+def test_processing_script():
+    """Test if processing script can be imported."""
+    logger.info("Testing processing script...")
+    
+    try:
+        # Check if enhanced video processor can be imported
+        sys.path.append('src')
+        from src.services.enhanced_video_processor import EnhancedVideoProcessor
+        
+        processor = EnhancedVideoProcessor()
+        logger.info("✓ Enhanced video processor can be initialized")
+        
+        # Test getting available videos
+        videos = processor.get_available_videos()
+        logger.info(f"✓ Can scan for videos: {len(videos)} found")
+        
+        return True
+        
+    except ImportError as e:
+        logger.error(f"✗ Cannot import video processor: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"✗ Error with video processor: {e}")
+        return False
+
+def main():
+    """Run all tests."""
+    logger.info("="*60)
+    logger.info("MV FACE RECOGNITION SYSTEM TEST")
+    logger.info("="*60)
+    
+    tests = [
+        ("Dependencies", test_dependencies),
+        ("File Structure", test_file_structure),
+        ("Configuration", test_config),
+        ("Data Availability", test_data_availability),
+        ("Gradio App", test_gradio_app),
+        ("Processing Script", test_processing_script)
+    ]
+    
+    results = {}
+    
+    for test_name, test_func in tests:
+        logger.info(f"\n--- Testing {test_name} ---")
+        try:
+            results[test_name] = test_func()
+        except Exception as e:
+            logger.error(f"✗ {test_name} test failed with exception: {e}")
+            results[test_name] = False
+    
+    # Summary
+    logger.info("\n" + "="*60)
+    logger.info("TEST SUMMARY")
+    logger.info("="*60)
+    
+    total_tests = len(results)
+    passed_tests = sum(results.values())
+    
+    for test_name, passed in results.items():
+        status = "✓ PASS" if passed else "✗ FAIL"
+        logger.info(f"{test_name}: {status}")
+    
+    logger.info(f"\nResult: {passed_tests}/{total_tests} tests passed")
+    
+    if passed_tests == total_tests:
+        logger.info("🎉 All tests passed! System is ready.")
+        return 0
+    else:
+        logger.error("❌ Some tests failed. Please check the issues above.")
+        return 1
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    exit_code = main()
+    sys.exit(exit_code)
