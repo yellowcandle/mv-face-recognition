@@ -21,6 +21,13 @@
 		return new Date(timestamp * 1000).toLocaleDateString();
 	}
 
+	// Format duration for display
+	function formatDuration(seconds: number): string {
+		const mins = Math.floor(seconds / 60);
+		const secs = Math.floor(seconds % 60);
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	}
+
 	// Handle video selection
 	function onVideoSelect(event: Event) {
 		const target = event.target as HTMLSelectElement;
@@ -90,15 +97,47 @@
 							<span class="detail-icon">📁</span>
 							{formatFileSize($currentVideo.size)}
 						</span>
+						{#if $currentVideo.duration_seconds}
+							<span class="detail-item">
+								<span class="detail-icon">⏱️</span>
+								{formatDuration($currentVideo.duration_seconds)}
+							</span>
+						{/if}
+						{#if $currentVideo.fps && $currentVideo.width && $currentVideo.height}
+							<span class="detail-item">
+								<span class="detail-icon">🎬</span>
+								{$currentVideo.width}×{$currentVideo.height} @ {$currentVideo.fps}fps
+							</span>
+						{/if}
 						<span class="detail-item">
 							<span class="detail-icon">📅</span>
 							{formatDate($currentVideo.created_at)}
 						</span>
-						<span class="detail-item">
-							<span class="detail-icon">{$currentVideo.has_metadata ? '✅' : '❌'}</span>
-							{$currentVideo.has_metadata ? 'Face data available' : 'No face data'}
-						</span>
 					</div>
+					
+					<!-- Face Recognition Stats -->
+					{#if $currentVideo.face_count !== undefined || $currentVideo.unique_contestants !== undefined}
+						<div class="face-stats">
+							{#if $currentVideo.face_count !== undefined}
+								<span class="stat-item">
+									<span class="stat-icon">👤</span>
+									<span class="stat-value">{$currentVideo.face_count}</span>
+									<span class="stat-label">faces detected</span>
+								</span>
+							{/if}
+							{#if $currentVideo.unique_contestants !== undefined}
+								<span class="stat-item">
+									<span class="stat-icon">🎭</span>
+									<span class="stat-value">{$currentVideo.unique_contestants}</span>
+									<span class="stat-label">contestants</span>
+								</span>
+							{/if}
+							<span class="stat-item">
+								<span class="stat-icon">{$currentVideo.has_metadata ? '✅' : '❌'}</span>
+								<span class="stat-label">{$currentVideo.has_metadata ? 'Face data available' : 'No face data'}</span>
+							</span>
+						</div>
+					{/if}
 				</div>
 				
 				<div class="video-actions">
@@ -265,6 +304,39 @@
 
 	.detail-icon {
 		font-size: 1rem;
+	}
+
+	.face-stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 16px;
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid rgba(var(--text-primary), 0.1);
+	}
+
+	.stat-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		background-color: rgba(var(--primary-color), 0.1);
+		padding: 6px 10px;
+		border-radius: 6px;
+	}
+
+	.stat-icon {
+		font-size: 1rem;
+	}
+
+	.stat-value {
+		font-weight: 600;
+		color: var(--primary-color);
+	}
+
+	.stat-label {
+		color: var(--text-secondary);
 	}
 
 	.video-actions {
