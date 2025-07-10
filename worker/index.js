@@ -72,7 +72,9 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       });
 
     case '/contestants':
+    case '/contestants/':
     case '/videos/contestants':
+    case '/videos/contestants/':
       // Complete 96 contestants from CSV data
       const allContestants = [
         {"id": "1", "number": 1, "name": "蘇雅琳", "nickname": "Ivy So", "age": 20, "has_photos": true, "has_embedding": true},
@@ -179,6 +181,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       });
 
     case '/videos':
+    case '/videos/':
       const allVideos = [
         {
           "id": "1",
@@ -253,6 +256,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       });
 
     case '/videos/processed/list':
+    case '/videos/processed/list/':
       // Return processed videos in the format expected by the VideoPlayer frontend
       const processedVideos = [
         {
@@ -309,6 +313,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       });
 
     case '/settings':
+    case '/settings/':
       if (request.method === 'GET') {
         const settings = await env.METADATA_KV.get('app_settings');
         return new Response(settings || JSON.stringify({
