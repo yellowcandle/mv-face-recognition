@@ -4,7 +4,8 @@
 		dashboardStats, 
 		fetchSystemStatus, 
 		isLoading, 
-		isSystemHealthy 
+		isSystemHealthy,
+		offlineMode 
 	} from '$lib/stores/main';
 	import { contestantsStore } from '$lib/stores/contestants';
 	import { videoProcessingStore } from '$lib/stores/videoProcessing';
@@ -46,6 +47,11 @@
 	}
 	
 	async function refreshDashboard() {
+		// Skip refresh if in offline mode
+		if ($offlineMode) {
+			return;
+		}
+		
 		try {
 			await Promise.all([
 				fetchSystemStatus(),
@@ -80,7 +86,15 @@
 <div class="dashboard">
 	<div class="dashboard-header">
 		<h1>Dashboard</h1>
-	</div>
+		{#if $offlineMode}
+			<div class="offline-notice">
+				<div class="offline-icon">🔌</div>
+				<div class="offline-text">
+					<strong>Offline Mode</strong> - Showing demo data. Backend API is not available.
+				</div>
+			</div>
+		{/if}
+	</div></div>
 
 	<!-- System Status Cards -->
 	<div class="stats-grid">
@@ -415,6 +429,27 @@
 	.action-icon {
 		font-size: 2rem;
 		margin-bottom: 8px;
+	}
+
+	.offline-notice {
+		display: flex;
+		align-items: center;
+		background-color: rgba(255, 170, 0, 0.1);
+		border: 1px solid rgba(255, 170, 0, 0.3);
+		border-radius: 8px;
+		padding: 12px 16px;
+		margin-top: 16px;
+	}
+
+	.offline-icon {
+		font-size: 1.5rem;
+		margin-right: 12px;
+		color: #ffaa00;
+	}
+
+	.offline-text {
+		color: var(--text-primary);
+		font-size: 0.9rem;
 	}
 
 	@media (max-width: 768px) {

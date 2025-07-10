@@ -19,19 +19,6 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['svelte'],
-          video: ['video.js'],
-          audio: ['wavesurfer.js'],
-          graphics: ['three'],
-          data: ['@msgpack/msgpack', 'chart.js']
-        }
-      }
-    }
-  },
-  optimizeDeps: {
-    include: ['video.js', 'wavesurfer.js', 'three', '@msgpack/msgpack']
+    outDir: 'build'
   }
 })

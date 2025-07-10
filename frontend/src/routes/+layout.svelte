@@ -7,7 +7,8 @@
 		startHealthChecks, 
 		isLoading, 
 		error, 
-		clearError 
+		clearError,
+		offlineMode 
 	} from '$lib/stores/main';
 	
 	// Theme management
@@ -85,6 +86,11 @@
 			</div>
 			
 			<div class="app-bar-actions">
+				{#if $offlineMode}
+					<div class="offline-indicator" title="Running in offline mode">
+						🔌
+					</div>
+				{/if}
 				<button class="theme-toggle" on:click={toggleTheme} aria-label="Toggle theme">
 					{isDarkTheme ? '☀️' : '🌙'}
 				</button>
@@ -236,6 +242,15 @@
 	}
 
 	.theme-toggle:hover {
+		background-color: rgba(255, 255, 255, 0.1);
+	}
+
+	.offline-indicator {
+		color: #ffaa00;
+		font-size: 20px;
+		margin-right: 8px;
+		padding: 4px;
+		border-radius: 4px;
 		background-color: rgba(255, 255, 255, 0.1);
 	}
 

@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
-import { decode as unpack } from '@msgpack/msgpack';
+// Note: MessagePack functionality disabled for demo mode
+// import { decode as unpack } from '@msgpack/msgpack';
 
 // WebSocket connection state
 export const websocketStore = writable({
@@ -68,14 +69,11 @@ class WebSocketManager {
       try {
         let data;
         
-        // Handle both MessagePack and JSON data
-        if (event.data instanceof ArrayBuffer) {
-          // MessagePack binary data
-          data = unpack(new Uint8Array(event.data));
-        } else if (event.data instanceof Blob) {
-          // Handle Blob data
-          const arrayBuffer = await event.data.arrayBuffer();
-          data = unpack(new Uint8Array(arrayBuffer));
+        // Handle JSON data (MessagePack disabled for demo mode)
+        if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
+          // Skip binary data in demo mode
+          console.log('Binary data received but skipped in demo mode');
+          return;
         } else {
           // JSON text data
           data = JSON.parse(event.data);
