@@ -53,7 +53,6 @@ class WebSocketManager {
 
   setupEventListeners() {
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
       this.isConnecting = false;
       this.reconnectAttempts = 0;
       
@@ -72,7 +71,6 @@ class WebSocketManager {
         // Handle JSON data (MessagePack disabled for demo mode)
         if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
           // Skip binary data in demo mode
-          console.log('Binary data received but skipped in demo mode');
           return;
         } else {
           // JSON text data
@@ -88,7 +86,6 @@ class WebSocketManager {
     };
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
       this.isConnecting = false;
       
       websocketStore.update(state => ({
@@ -127,7 +124,6 @@ class WebSocketManager {
         break;
 
       case 'parameter_updated':
-        console.log(`Parameter ${data.parameter} updated to ${data.value}`);
         break;
 
       case 'error':
@@ -143,8 +139,6 @@ class WebSocketManager {
   scheduleReconnect() {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
     
     setTimeout(() => {
       if (this.reconnectAttempts <= this.maxReconnectAttempts) {

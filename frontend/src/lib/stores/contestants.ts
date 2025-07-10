@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { offlineMode } from './main';
 import { apiFetch } from '$lib/utils/api';
 
@@ -24,7 +24,7 @@ export const searchQuery = writable('');
 export const selectedContestant = writable<Contestant | null>(null);
 
 // Derived stores
-export const contestantCount = derived(contestants, ($contestants) => $contestants.length);
+export const contestantCount = derived(contestants, ($contestants) => $contestants ? $contestants.length : 0);
 
 export const contestantsWithEmbeddings = derived(
 	contestants, 
@@ -72,6 +72,9 @@ export const contestantsStore = {
 	set: contestants.set,
 	update: contestants.update,
 	
+	// Expose contestants as property for component compatibility
+	contestants,
+	
 	async loadContestants() {
 		loading.set(true);
 		error.set(null);
@@ -84,7 +87,7 @@ export const contestantsStore = {
 			console.warn('Failed to load from API, checking offline mode:', err);
 			
 			// Check if in offline mode
-			if (offlineMode.get()) {
+			if (get(offlineMode)) {
 				// Return mock contestants data as fallback
 				const mockContestants: Contestant[] = [
 					{

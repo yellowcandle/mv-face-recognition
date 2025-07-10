@@ -35,7 +35,7 @@
 
 		Object.entries(metadata.contestant_timeline).forEach(([name, timeline]: [string, any]) => {
 			const appearances = timeline.frame_appearances || timeline.detailed_timeline || [];
-			const relevantAppearances = appearances.filter(
+			const relevantAppearances = (appearances || []).filter(
 				(appearance: any) => Math.abs(appearance.timestamp - currentTime) <= tolerance
 			);
 
@@ -45,7 +45,7 @@
 				);
 
 				const contestant = $allContestants.find(c => c.nickname === name);
-				const timestamps = appearances.map((a: any) => a.timestamp).slice(0, 5);
+				const timestamps = (appearances || []).map((a: any) => a.timestamp).slice(0, 5);
 
 				details.push({
 					contestant: name,

@@ -37,6 +37,14 @@
 		isVideoLoaded = true;
 		videoPlayerActions.updateDuration(videoElement.duration);
 	}
+	
+	function onLoadStart() {
+		isBuffering = true;
+	}
+	
+	function onCanPlay() {
+		isBuffering = false;
+	}
 
 	function onTimeUpdate() {
 		if (videoElement && !isNaN(videoElement.currentTime)) {
@@ -54,10 +62,6 @@
 
 	function onWaiting() {
 		isBuffering = true;
-	}
-
-	function onCanPlay() {
-		isBuffering = false;
 	}
 
 	function onVolumeChange() {

@@ -209,7 +209,7 @@ export const videoPlayerActions = {
 		// Load metadata for the selected video
 		if (video.has_metadata) {
 			try {
-				const metadata = await apiFetch(`/api/videos/${video.id}/metadata`);
+				const metadata = await apiFetch(`/api/videos/metadata/${video.id}`);
 				currentMetadata.set(metadata);
 				
 				// Update duration from metadata if available
@@ -267,11 +267,11 @@ export const videoPlayerActions = {
 		error.set(null);
 	},
 
-	async loadFaceData(videoId: string, timestamp?: number) {
+			async loadFaceData(videoId: string, timestamp?: number) {
 		try {
 			const url = timestamp !== undefined 
-				? `/api/videos/${videoId}/faces?timestamp=${timestamp}`
-				: `/api/videos/${videoId}/faces`;
+				? `/api/videos/metadata/dense/${videoId}?timestamp=${timestamp}`
+				: `/api/videos/metadata/dense/${videoId}`;
 			
 			const faceData = await apiFetch(url);
 			return faceData;
@@ -283,8 +283,10 @@ export const videoPlayerActions = {
 
 	async getContestantTimeline(videoId: string, contestantName: string) {
 		try {
-			const timeline = await apiFetch(`/api/videos/${videoId}/contestants/${encodeURIComponent(contestantName)}/timeline`);
-			return timeline;
+			const timeline = await apiFetch(`/api/videos/metadata/${videoId}`);
+			// Extract the specific contestant's timeline from the metadata
+			const metadata = timeline;
+			return metadata?.contestant_timeline?.[contestantName] || null;
 		} catch (err) {
 			console.error('Failed to load contestant timeline:', err);
 			throw err;

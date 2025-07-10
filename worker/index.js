@@ -24,6 +24,12 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
+    // Handle WebSocket upgrade requests
+    if (pathname.startsWith('/ws/')) {
+      console.log(`WebSocket upgrade request: ${pathname}`);
+      return await handleWebSocketRequest(pathname, request, env);
+    }
+
     try {
       // API routes
       if (pathname.startsWith('/api/')) {
@@ -50,6 +56,123 @@ export default {
     }
   }
 };
+
+/**
+ * Handle WebSocket requests
+ */
+async function handleWebSocketRequest(pathname, request, env) {
+  const path = pathname.replace('/ws', '');
+
+  // Check if this is a WebSocket upgrade request
+  const upgradeHeader = request.headers.get('Upgrade');
+  if (upgradeHeader !== 'websocket') {
+    return new Response('Expected Upgrade: websocket', { status: 426 });
+  }
+
+  switch (path) {
+    case '/realtime-processing':
+      // Create WebSocket pair
+      const webSocketPair = new WebSocketPair();
+      const [client, server] = Object.values(webSocketPair);
+
+      // Accept the WebSocket connection
+      server.accept();
+
+      // Handle WebSocket events
+      server.addEventListener('message', async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
+
+          // Handle different message types
+          switch (data.type) {
+            case 'start_processing':
+              // Simulate processing start
+              server.send(JSON.stringify({
+                type: 'processing_started',
+                message: 'Video processing started',
+                video_name: data.video_name
+              }));
+
+              // Send periodic updates
+              let frameCount = 0;
+              const interval = setInterval(() => {
+                frameCount += 5;
+                if (frameCount > 100) {
+                  clearInterval(interval);
+                  server.send(JSON.stringify({
+                    type: 'processing_complete',
+                    message: 'Processing completed',
+                    video_name: data.video_name
+                  }));
+                  return;
+                }
+
+                server.send(JSON.stringify({
+                  type: 'frame_update',
+                  data: {
+                    frame_number: frameCount,
+                    timestamp: frameCount * 0.033,
+                    faces: [
+                      {
+                        contestant: 'Ivy So',
+                        confidence: 0.85 + Math.random() * 0.15,
+                        bbox: [100 + Math.random() * 50, 100 + Math.random() * 50, 200, 250]
+                      }
+                    ],
+                    stats: {
+                      fps: 30,
+                      total_faces: frameCount,
+                      recognized: Math.floor(frameCount * 0.8)
+                    }
+                  }
+                }));
+              }, 100);
+
+              break;
+
+            case 'parameter_update':
+              server.send(JSON.stringify({
+                type: 'parameter_updated',
+                parameter: data.parameter,
+                value: data.value
+              }));
+              break;
+
+            default:
+              server.send(JSON.stringify({
+                type: 'error',
+                message: `Unknown message type: ${data.type}`
+              }));
+          }
+        } catch (error) {
+          console.error('WebSocket message processing error:', error);
+          server.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to process message'
+          }));
+        }
+      });
+
+      server.addEventListener('close', () => {
+        console.log('WebSocket connection closed');
+      });
+
+      // Send initial connection confirmation
+      server.send(JSON.stringify({
+        type: 'connected',
+        message: 'WebSocket connection established'
+      }));
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
+
+    default:
+      return new Response('WebSocket endpoint not found', { status: 404 });
+  }
+}
 
 /**
  * Handle API requests
@@ -251,7 +374,10 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       ];
       
       const videos = await env.METADATA_KV.get('videos_list');
-      return new Response(videos || JSON.stringify(allVideos), {
+      const videosData = videos || JSON.stringify(allVideos);
+      // Wrap in an object with 'videos' key as expected by frontend
+      const response = { videos: JSON.parse(videosData) };
+      return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
 
@@ -336,14 +462,190 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       }
       break;
 
+    case '/recognition/results':
+    case '/recognition/results/':
+      // Handle recognition results with optional filtering
+      const url = new URL(request.url);
+      const videoIdFilter = url.searchParams.get('video_id');
+      const contestantIdFilter = url.searchParams.get('contestant_id');
+      
+      // Mock recognition results data
+      let allRecognitionResults = [
+        {
+          confidence: 0.89,
+          video_id: "1",
+          contestant_id: "1",
+          timestamp: 12.5,
+          bounding_box: { x: 120, y: 80, width: 180, height: 240 }
+        },
+        {
+          confidence: 0.92,
+          video_id: "1", 
+          contestant_id: "2",
+          timestamp: 18.3,
+          bounding_box: { x: 350, y: 120, width: 170, height: 220 }
+        },
+        {
+          confidence: 0.85,
+          video_id: "1",
+          contestant_id: "3",
+          timestamp: 24.7,
+          bounding_box: { x: 200, y: 150, width: 160, height: 210 }
+        },
+        {
+          confidence: 0.91,
+          video_id: "1",
+          contestant_id: "1",
+          timestamp: 45.2,
+          bounding_box: { x: 100, y: 50, width: 150, height: 200 }
+        },
+        {
+          confidence: 0.87,
+          video_id: "1",
+          contestant_id: "4",
+          timestamp: 52.8,
+          bounding_box: { x: 380, y: 90, width: 165, height: 215 }
+        },
+        {
+          confidence: 0.93,
+          video_id: "1",
+          contestant_id: "2",
+          timestamp: 67.4,
+          bounding_box: { x: 300, y: 75, width: 140, height: 180 }
+        },
+        {
+          confidence: 0.88,
+          video_id: "2",
+          contestant_id: "1",
+          timestamp: 15.6,
+          bounding_box: { x: 150, y: 100, width: 175, height: 230 }
+        },
+        {
+          confidence: 0.84,
+          video_id: "2",
+          contestant_id: "5",
+          timestamp: 28.9,
+          bounding_box: { x: 250, y: 110, width: 155, height: 195 }
+        },
+        {
+          confidence: 0.90,
+          video_id: "2",
+          contestant_id: "3",
+          timestamp: 41.3,
+          bounding_box: { x: 180, y: 85, width: 170, height: 225 }
+        },
+        {
+          confidence: 0.86,
+          video_id: "3",
+          contestant_id: "2",
+          timestamp: 8.7,
+          bounding_box: { x: 320, y: 60, width: 145, height: 185 }
+        },
+        {
+          confidence: 0.94,
+          video_id: "3",
+          contestant_id: "6",
+          timestamp: 33.1,
+          bounding_box: { x: 110, y: 140, width: 180, height: 240 }
+        },
+        {
+          confidence: 0.82,
+          video_id: "3",
+          contestant_id: "1",
+          timestamp: 48.5,
+          bounding_box: { x: 270, y: 95, width: 160, height: 205 }
+        },
+        {
+          confidence: 0.95,
+          video_id: "4",
+          contestant_id: "7",
+          timestamp: 22.4,
+          bounding_box: { x: 140, y: 70, width: 175, height: 235 }
+        },
+        {
+          confidence: 0.83,
+          video_id: "4",
+          contestant_id: "2",
+          timestamp: 56.8,
+          bounding_box: { x: 360, y: 130, width: 150, height: 190 }
+        },
+        {
+          confidence: 0.88,
+          video_id: "5",
+          contestant_id: "8",
+          timestamp: 11.2,
+          bounding_box: { x: 190, y: 55, width: 165, height: 220 }
+        },
+        {
+          confidence: 0.91,
+          video_id: "5",
+          contestant_id: "3",
+          timestamp: 39.6,
+          bounding_box: { x: 310, y: 105, width: 155, height: 200 }
+        }
+      ];
+      
+      // Apply filters if provided
+      let filteredResults = allRecognitionResults;
+      
+      if (videoIdFilter) {
+        filteredResults = filteredResults.filter(result => result.video_id === videoIdFilter);
+      }
+      
+      if (contestantIdFilter) {
+        filteredResults = filteredResults.filter(result => result.contestant_id === contestantIdFilter);
+      }
+      
+      // Try to get from KV storage first, fallback to filtered mock data
+      const storageKey = `recognition_results${videoIdFilter ? `_video_${videoIdFilter}` : ''}${contestantIdFilter ? `_contestant_${contestantIdFilter}` : ''}`;
+      const storedResults = await env.METADATA_KV?.get(storageKey);
+      
+      const results = storedResults ? JSON.parse(storedResults) : filteredResults;
+      
+      return new Response(JSON.stringify({
+        results: results,
+        total: results.length,
+        filters: {
+          video_id: videoIdFilter,
+          contestant_id: contestantIdFilter
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+
     default:
       // Handle /videos/metadata/dense/{video_id}
       if (path.startsWith('/videos/metadata/dense/')) {
-        const videoId = path.replace('/videos/metadata/dense/', '');
+        let videoId = path.replace('/videos/metadata/dense/', '');
         
-        // Mock dense metadata structure
+        // Handle URL decoding for video IDs with special characters
+        try {
+          videoId = decodeURIComponent(videoId);
+        } catch (e) {
+          // If decoding fails, use as-is
+        }
+        
+        // Try to extract numeric ID from video name (e.g., "1-video-name" -> "1")
+        let metadataKey = videoId;
+        const numericMatch = videoId.match(/^(\d+)-/);
+        if (numericMatch) {
+          metadataKey = numericMatch[1];
+        }
+        
+        console.log(`Looking for dense metadata with key: metadata_dense_${metadataKey} (from videoId: ${videoId})`);
+        
+        // Try to get from KV storage first using the correct key
+        const storedDenseMetadata = await env.METADATA_KV?.get(`metadata_dense_${metadataKey}`);
+        
+        if (storedDenseMetadata) {
+          return new Response(storedDenseMetadata, {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Mock dense metadata structure as fallback
         const denseMetadata = {
-          "video_id": videoId,
+          "video_id": metadataKey,
           "video_info": {
             "filename": `${videoId}_annotated.mp4`,
             "fps": 25.0,
@@ -388,13 +690,38 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       
       // Handle /videos/metadata/{video_id}
       if (path.startsWith('/videos/metadata/') && !path.includes('/dense/')) {
-        const videoId = path.replace('/videos/metadata/', '');
+        let videoId = path.replace('/videos/metadata/', '');
         
-        // Mock regular metadata structure
+        // Handle URL decoding for video IDs with special characters
+        try {
+          videoId = decodeURIComponent(videoId);
+        } catch (e) {
+          // If decoding fails, use as-is
+        }
+        
+        // Try to extract numeric ID from video name (e.g., "1-video-name" -> "1")
+        let metadataKey = videoId;
+        const numericMatch = videoId.match(/^(\d+)-/);
+        if (numericMatch) {
+          metadataKey = numericMatch[1];
+        }
+        
+        console.log(`Looking for metadata with key: metadata_${metadataKey} (from videoId: ${videoId})`);
+        
+        // Try to get from KV storage first using the correct key
+        const storedVideoMetadata = await env.METADATA_KV?.get(`metadata_${metadataKey}`);
+        
+        if (storedVideoMetadata) {
+          return new Response(storedVideoMetadata, {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Mock regular metadata structure as fallback
         const metadata = {
-          "video_id": videoId,
+          "video_id": metadataKey,
           "video_info": {
-            "filename": `${videoId}.mp4`,
+            "filename": `${metadataKey}.mp4`,
             "fps": 25.0,
             "duration_seconds": 180.0,
             "frame_count": 4500
@@ -407,9 +734,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           "contestant_timeline": {}
         };
         
-        // Try to get from KV storage first, fallback to mock data
-        const storedMetadata = await env.METADATA_KV?.get(`video_metadata_${videoId}`);
-        return new Response(storedMetadata || JSON.stringify(metadata), {
+        return new Response(JSON.stringify(metadata), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }

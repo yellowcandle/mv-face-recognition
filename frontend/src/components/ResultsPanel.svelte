@@ -16,13 +16,13 @@
   });
 
   function getTopContestants(limit = 5) {
-    return Object.entries(contestantAppearances)
+    return Object.entries(contestantAppearances || {})
       .sort(([,a], [,b]) => b.totalAppearances - a.totalAppearances)
       .slice(0, limit);
   }
 
   function getRecentResults(limit = 10) {
-    return allResults.slice(-limit).reverse();
+    return (allResults || []).slice(-limit).reverse();
   }
 
   function formatConfidence(confidence) {

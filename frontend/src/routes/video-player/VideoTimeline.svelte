@@ -97,7 +97,7 @@
 
 			Object.entries(metadata.contestant_timeline).forEach(([name, timeline]: [string, any]) => {
 				const appearances = timeline.frame_appearances || timeline.detailed_timeline || [];
-				const relevantAppearances = appearances.filter(
+				const relevantAppearances = (appearances || []).filter(
 					(appearance: any) => Math.abs(appearance.timestamp - time) <= tolerance
 				);
 
@@ -140,7 +140,7 @@
 			}> = [];
 
 			// Group continuous appearances into segments
-			appearances.sort((a: any, b: any) => a.timestamp - b.timestamp);
+			(appearances || []).sort((a: any, b: any) => a.timestamp - b.timestamp);
 
 			let currentSegment: any = null;
 			const segmentGap = 5; // seconds

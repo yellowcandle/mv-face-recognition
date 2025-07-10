@@ -11,7 +11,6 @@
 
   onMount(() => {
     // Simple demo video player
-    console.log('Video player initialized in demo mode');
   });
 
   onDestroy(() => {
