@@ -78,10 +78,7 @@ export const contestantsStore = {
 		
 		try {
 			// Try to load from live API first
-			const response = await apiFetch('/api/contestants');
-			if (!response.ok) throw new Error('Failed to load contestants from API');
-			
-			const data = await response.json();
+			const data = await apiFetch('/api/contestants');
 			contestants.set(data);
 		} catch (err) {
 			console.warn('Failed to load from API, checking offline mode:', err);

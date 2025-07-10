@@ -116,10 +116,7 @@ export async function initializeApp() {
 
 export async function fetchSystemStatus() {
 	try {
-		const response = await apiFetch('/api/system/status');
-		if (!response.ok) throw new Error('Failed to fetch system status');
-		
-		const data = await response.json();
+		const data = await apiFetch('/api/system/status');
 		
 		// Update system status
 		systemStatus.set({
@@ -182,10 +179,7 @@ export function clearError() {
 // Settings functions
 export async function loadSettings() {
 	try {
-		const response = await apiFetch('/api/settings');
-		if (!response.ok) throw new Error('Failed to load settings');
-		
-		const data = await response.json();
+		const data = await apiFetch('/api/settings');
 		settings.set(data);
 	} catch (err) {
 		console.error('Failed to load settings:', err);
@@ -204,7 +198,7 @@ export async function loadSettings() {
 
 export async function updateSettings(newSettings: AppSettings) {
 	try {
-		const response = await apiFetch('/api/settings', {
+		const data = await apiFetch('/api/settings', {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json',
@@ -212,9 +206,6 @@ export async function updateSettings(newSettings: AppSettings) {
 			body: JSON.stringify(newSettings),
 		});
 		
-		if (!response.ok) throw new Error('Failed to update settings');
-		
-		const data = await response.json();
 		settings.set(data);
 	} catch (err) {
 		console.error('Failed to update settings:', err);
