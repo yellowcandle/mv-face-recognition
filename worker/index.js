@@ -2,7 +2,7 @@
  * Cloudflare Worker for MV Face Recognition
  * Serves static frontend and provides API for metadata/videos
  */
-import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
+import { EMBEDDED_ASSETS } from './embedded-assets.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -492,97 +492,49 @@ async function handleVideoRequest(pathname, request, env, corsHeaders) {
 async function handleStaticRequest(pathname, request, env, corsHeaders) {
   console.log(`Static request for: ${pathname}`);
   
-  try {
-    // Handle SPA routing - serve index.html for routes that don't have file extensions
-    if (!pathname.includes('.') && pathname !== '/') {
-      console.log(`SPA route detected, serving index.html for: ${pathname}`);
-      const options = {
-        mapRequestToAsset: req => new Request(`${new URL(req.url).origin}/index.html`, req),
-      };
-      const asset = await getAssetFromKV({ request, waitUntil() {} }, { ...options, ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
-      
-      console.log(`Successfully served index.html for SPA route: ${pathname}`);
-      return new Response(asset.body, {
-        ...asset,
-        headers: {
-          ...corsHeaders,
-          ...asset.headers,
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
+  // Handle root path
+  if (pathname === '/') {
+    pathname = 'index.html';
+  }
+  
+  // Remove leading slash for asset lookup
+  const assetKey = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+  
+  // Check if we have the asset in our embedded assets
+  if (EMBEDDED_ASSETS[assetKey]) {
+    console.log(`Successfully serving embedded asset: ${assetKey}`);
     
-    // For regular files (CSS, JS, etc.)
-    console.log(`Attempting to serve asset: ${pathname}`);
-    const asset = await getAssetFromKV({ request, waitUntil() {} }, { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
+    const contentType = getContentType(pathname);
+    const cacheControl = pathname.includes('assets/') ? 'public, max-age=31536000' : 'public, max-age=3600';
     
-    console.log(`Successfully served asset: ${pathname}, Content-Type: ${getContentType(pathname)}`);
-    return new Response(asset.body, {
-      ...asset,
+    return new Response(EMBEDDED_ASSETS[assetKey], {
       headers: {
         ...corsHeaders,
-        ...asset.headers,
-        'Content-Type': getContentType(pathname),
-        'Cache-Control': pathname.includes('assets/') ? 'public, max-age=31536000' : 'public, max-age=3600'
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl
       }
     });
-    
-  } catch (e) {
-    console.error(`Asset not found: ${pathname}, error:`, e.message);
-    
-    // If asset not found, serve index.html for SPA routing
-    try {
-      console.log(`Fallback: serving index.html for failed asset: ${pathname}`);
-      const options = {
-        mapRequestToAsset: req => new Request(`${new URL(req.url).origin}/index.html`, req),
-      };
-      const asset = await getAssetFromKV({ request, waitUntil() {} }, { ...options, ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
-      
-      console.log(`Fallback successful for: ${pathname}`);
-      return new Response(asset.body, {
-        ...asset,
-        headers: {
-          ...corsHeaders,
-          ...asset.headers,
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    } catch (indexError) {
-      console.error(`Index.html fallback failed for: ${pathname}, error:`, indexError.message);
-      
-      // Last resort fallback
-      console.log(`Using last resort fallback HTML for: ${pathname}`);
-      return new Response(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>MV Face Recognition</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
-    .container { max-width: 800px; margin: 0 auto; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>🎥 MV Face Recognition</h1>
-    <p>Application is loading...</p>
-    <p>If this persists, there may be an issue with the deployment.</p>
-    <p><small>Debug: Asset not found - ${pathname}</small></p>
-  </div>
-</body>
-</html>`, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
   }
+  
+  // For SPA routing, serve index.html for unknown routes
+  if (!pathname.includes('.')) {
+    console.log(`SPA route detected, serving index.html for: ${pathname}`);
+    return new Response(EMBEDDED_ASSETS['index.html'], {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    });
+  }
+  
+  console.log(`Asset not found in embedded assets: ${assetKey}`);
+  
+  // Asset not found - return 404
+  return new Response('File not found', {
+    status: 404,
+    headers: corsHeaders
+  });
 }
 
 /**
