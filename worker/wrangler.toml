@@ -17,5 +17,5 @@ bucket_name = "mv-face-recognition-videos"
 preview_bucket_name = "mv-face-recognition-videos-preview"
 
 [vars]
-ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,http://localhost:5173"
+ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,https://d7308ddf.mv-face-recognition.pages.dev,http://localhost:5173"
 ENVIRONMENT = "production"
