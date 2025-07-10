@@ -2,6 +2,13 @@ name = "mv-face-recognition-api"
 main = "index.js"
 compatibility_date = "2024-11-08"
 
+[site]
+bucket = "./public"
+
+# Enable Workers Logs
+[observability]
+enabled = true
+
 [[kv_namespaces]]
 binding = "METADATA_KV"
 id = "890d77e11bfc4623ac4ef56db6b9a4ab"
@@ -13,5 +20,5 @@ bucket_name = "mv-face-recognition-videos"
 preview_bucket_name = "mv-face-recognition-videos-preview"
 
 [vars]
-ALLOWED_ORIGINS = "https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,http://localhost:5173"
+ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,http://localhost:5173"
 ENVIRONMENT = "production"
