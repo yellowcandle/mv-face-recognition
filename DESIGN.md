@@ -10,9 +10,40 @@
 
 This document describes the architecture and design decisions for the MV Face Recognition system. The system has evolved from real-time processing to a **pre-processing and annotation system** with **dense metadata generation** for optimal video player synchronization.
 
-## Recent Updates (July 7, 2025)
+## Recent Updates (July 10, 2025)
 
-### ✅ COMPLETED: Dense Metadata Generation System
+### ✅ COMPLETED: Frontend API Configuration Fix
+Fixed the "Unexpected token '<'" JSON parsing error that occurred when the frontend received HTML instead of JSON from API calls:
+
+**Root Cause:**
+- Frontend stores were hardcoded to call production Worker API at `https://mv-face-recognition-api.herballemon.workers.dev`
+- This bypassed the Vite development proxy configuration
+- In development, the frontend should call the local backend at `127.0.0.1:8000`
+
+**Solution Implemented:**
+- Created environment-aware API utility (`/frontend/src/lib/utils/api.ts`)
+- Updated all stores to use relative URLs in development mode
+- Production builds continue to use absolute Worker API URLs
+- Enhanced error handling to detect HTML responses and provide better error messages
+
+**Technical Details:**
+```typescript
+// New API utility automatically detects environment
+import { apiFetch } from '$lib/utils/api';
+
+// Development: Uses relative URLs → Vite proxy → http://127.0.0.1:8000
+// Production: Uses absolute URLs → https://mv-face-recognition-api.herballemon.workers.dev
+const response = await apiFetch('/api/videos/processed/list');
+```
+
+**Files Updated:**
+- `frontend/src/lib/utils/api.ts` (new utility)
+- `frontend/src/lib/stores/main.ts`
+- `frontend/src/lib/stores/videoProcessing.ts`
+- `frontend/src/lib/stores/videoPlayer.ts` (critical for video dropdown)
+- `frontend/src/lib/stores/contestants.ts`
+
+### ✅ COMPLETED: Dense Metadata Generation System (July 7, 2025)
 Implemented a revolutionary dense processing system that dramatically improves video player performance:
 
 **Key Achievements:**
