@@ -2,11 +2,14 @@
  * Cloudflare Worker for MV Face Recognition
  * Serves static frontend and provides API for metadata/videos
  */
+import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const { pathname } = url;
+
+    console.log(`[${new Date().toISOString()}] ${request.method} ${pathname} - User-Agent: ${request.headers.get('User-Agent')?.substring(0, 50)}...`);
 
     // CORS headers for all responses
     const corsHeaders = {
@@ -17,21 +20,25 @@ export default {
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
+      console.log(`CORS preflight for ${pathname}`);
       return new Response(null, { headers: corsHeaders });
     }
 
     try {
       // API routes
       if (pathname.startsWith('/api/')) {
+        console.log(`Routing to API handler: ${pathname}`);
         return await handleApiRequest(pathname, request, env, corsHeaders);
       }
 
       // Video files from R2
       if (pathname.startsWith('/videos/')) {
+        console.log(`Routing to video handler: ${pathname}`);
         return await handleVideoRequest(pathname, request, env, corsHeaders);
       }
 
       // Static frontend files
+      console.log(`Routing to static handler: ${pathname}`);
       return await handleStaticRequest(pathname, request, env, corsHeaders);
       
     } catch (error) {
@@ -483,70 +490,99 @@ async function handleVideoRequest(pathname, request, env, corsHeaders) {
  * Handle static frontend files
  */
 async function handleStaticRequest(pathname, request, env, corsHeaders) {
-  // For now, return a simple message indicating the frontend will be served
-  // In production, you'd upload the built files to KV store or use Workers Sites
+  console.log(`Static request for: ${pathname}`);
   
-  if (pathname === '/' || pathname === '/index.html') {
-    return new Response(`
+  try {
+    // Handle SPA routing - serve index.html for routes that don't have file extensions
+    if (!pathname.includes('.') && pathname !== '/') {
+      console.log(`SPA route detected, serving index.html for: ${pathname}`);
+      const options = {
+        mapRequestToAsset: req => new Request(`${new URL(req.url).origin}/index.html`, req),
+      };
+      const asset = await getAssetFromKV({ request, waitUntil() {} }, { ...options, ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
+      
+      console.log(`Successfully served index.html for SPA route: ${pathname}`);
+      return new Response(asset.body, {
+        ...asset,
+        headers: {
+          ...corsHeaders,
+          ...asset.headers,
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
+    
+    // For regular files (CSS, JS, etc.)
+    console.log(`Attempting to serve asset: ${pathname}`);
+    const asset = await getAssetFromKV({ request, waitUntil() {} }, { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
+    
+    console.log(`Successfully served asset: ${pathname}, Content-Type: ${getContentType(pathname)}`);
+    return new Response(asset.body, {
+      ...asset,
+      headers: {
+        ...corsHeaders,
+        ...asset.headers,
+        'Content-Type': getContentType(pathname),
+        'Cache-Control': pathname.includes('assets/') ? 'public, max-age=31536000' : 'public, max-age=3600'
+      }
+    });
+    
+  } catch (e) {
+    console.error(`Asset not found: ${pathname}, error:`, e.message);
+    
+    // If asset not found, serve index.html for SPA routing
+    try {
+      console.log(`Fallback: serving index.html for failed asset: ${pathname}`);
+      const options = {
+        mapRequestToAsset: req => new Request(`${new URL(req.url).origin}/index.html`, req),
+      };
+      const asset = await getAssetFromKV({ request, waitUntil() {} }, { ...options, ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: env.__STATIC_CONTENT_MANIFEST });
+      
+      console.log(`Fallback successful for: ${pathname}`);
+      return new Response(asset.body, {
+        ...asset,
+        headers: {
+          ...corsHeaders,
+          ...asset.headers,
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    } catch (indexError) {
+      console.error(`Index.html fallback failed for: ${pathname}, error:`, indexError.message);
+      
+      // Last resort fallback
+      console.log(`Using last resort fallback HTML for: ${pathname}`);
+      return new Response(`
 <!DOCTYPE html>
 <html>
 <head>
   <title>MV Face Recognition</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; margin: 40px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .status { padding: 20px; border-radius: 8px; margin: 20px 0; }
-    .info { background: #e7f3ff; border: 1px solid #b3d9ff; }
-    .success { background: #d4edda; border: 1px solid #c3e6cb; }
-    .warning { background: #fff3cd; border: 1px solid #ffeaa7; }
-    .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+    body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
+    .container { max-width: 800px; margin: 0 auto; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎥 MV Face Recognition</h1>
-    <div class="status success">
-      <h3>✅ Worker Deployed Successfully!</h3>
-      <p>Your Cloudflare Worker is now running.</p>
-    </div>
-    
-    <div class="status info">
-      <h3>📊 System Status</h3>
-      <p>API endpoints are available at:</p>
-      <ul>
-        <li><a href="/api/system/status">/api/system/status</a></li>
-        <li><a href="/api/contestants">/api/contestants</a></li>
-        <li><a href="/api/videos">/api/videos</a></li>
-        <li><a href="/api/settings">/api/settings</a></li>
-      </ul>
-    </div>
-    
-    <div class="status warning">
-      <h3>⚠️ Next Steps</h3>
-      <p>To complete setup:</p>
-      <ol>
-        <li>Enable R2 in your Cloudflare dashboard</li>
-        <li>Upload your processed videos using the upload scripts</li>
-        <li>Upload metadata to KV store</li>
-        <li>The full SvelteKit frontend will be available</li>
-      </ol>
-    </div>
+    <p>Application is loading...</p>
+    <p>If this persists, there may be an issue with the deployment.</p>
+    <p><small>Debug: Asset not found - ${pathname}</small></p>
   </div>
 </body>
-</html>
-    `, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600'
-      }
-    });
+</html>`, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
   }
-
-  return new Response('File not found', { 
-    status: 404,
-    headers: corsHeaders 
-  });
 }
 
 /**
