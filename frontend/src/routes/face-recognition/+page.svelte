@@ -26,14 +26,14 @@
 	}
 	
 	// Filter results based on confidence threshold
-	$: filteredResults = recognitionResults.filter(result => 
+	$: filteredResults = (recognitionResults || []).filter(result => 
 		result.confidence >= filterConfidence &&
 		(!selectedVideoId || result.video_id === selectedVideoId) &&
 		(!selectedContestantId || result.contestant_id === selectedContestantId)
 	);
 	
 	// Group results by video
-	$: resultsByVideo = filteredResults.reduce((acc, result) => {
+	$: resultsByVideo = (filteredResults || []).reduce((acc, result) => {
 		if (!acc[result.video_id]) {
 			acc[result.video_id] = [];
 		}
@@ -42,7 +42,7 @@
 	}, {} as Record<string, RecognitionResult[]>);
 	
 	// Group results by contestant
-	$: resultsByContestant = filteredResults.reduce((acc, result) => {
+	$: resultsByContestant = (filteredResults || []).reduce((acc, result) => {
 		if (!acc[result.contestant_id]) {
 			acc[result.contestant_id] = [];
 		}
@@ -51,7 +51,7 @@
 	}, {} as Record<string, RecognitionResult[]>);
 	
 	function getContestantName(contestantId: string): string {
-		const contestant = $contestantsStore.contestants.find(c => c.id === contestantId);
+		const contestant = ($contestantsStore.contestants || []).find(c => c.id === contestantId);
 		return contestant?.name || `Contestant ${contestantId}`;
 	}
 	
@@ -118,7 +118,7 @@
 					<label for="video-filter">Video:</label>
 					<select bind:value={selectedVideoId} id="video-filter" on:change={loadResults}>
 						<option value={null}>All Videos</option>
-						{#each processingJobs.filter(job => job.status === 'completed') as job}
+						{#each (processingJobs || []).filter(job => job.status === 'completed') as job}
 							<option value={job.video_id}>Video {job.video_id}</option>
 						{/each}
 					</select>
@@ -128,7 +128,7 @@
 					<label for="contestant-filter">Contestant:</label>
 					<select bind:value={selectedContestantId} id="contestant-filter" on:change={loadResults}>
 						<option value={null}>All Contestants</option>
-						{#each contestants as contestant}
+						{#each (contestants || []) as contestant}
 							<option value={contestant.id}>{contestant.name}</option>
 						{/each}
 					</select>
@@ -251,7 +251,7 @@
 					<div class="empty-icon">🔍</div>
 					<p>No recognition results found</p>
 					<p class="empty-hint">
-						{filteredResults.length === 0 && recognitionResults.length > 0 
+						{(filteredResults || []).length === 0 && (recognitionResults || []).length > 0 
 							? 'Try adjusting your filters' 
 							: 'Process some videos to see results here'
 						}

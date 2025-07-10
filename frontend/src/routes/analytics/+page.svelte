@@ -11,18 +11,18 @@
 	$: stats = $dashboardStats;
 	
 	// Computed analytics
-	$: totalJobs = processingJobs.length;
-	$: completedJobs = processingJobs.filter(job => job.status === 'completed').length;
-	$: failedJobs = processingJobs.filter(job => job.status === 'failed').length;
+	$: totalJobs = (processingJobs || []).length;
+	$: completedJobs = (processingJobs || []).filter(job => job.status === 'completed').length;
+	$: failedJobs = (processingJobs || []).filter(job => job.status === 'failed').length;
 	$: successRate = totalJobs > 0 ? (completedJobs / totalJobs * 100).toFixed(1) : '0';
 	
-	$: jobsByStatus = processingJobs.reduce((acc, job) => {
+	$: jobsByStatus = (processingJobs || []).reduce((acc, job) => {
 		acc[job.status] = (acc[job.status] || 0) + 1;
 		return acc;
 	}, {} as Record<string, number>);
 	
-	$: averageConfidence = recognitionResults.length > 0 
-		? (recognitionResults.reduce((sum, r) => sum + r.confidence, 0) / recognitionResults.length * 100).toFixed(1)
+	$: averageConfidence = (recognitionResults || []).length > 0 
+		? ((recognitionResults || []).reduce((sum, r) => sum + r.confidence, 0) / (recognitionResults || []).length * 100).toFixed(1)
 		: '0';
 	
 	onMount(async () => {
@@ -142,7 +142,7 @@
 		<div class="card-content">
 			{#if processingJobs.length > 0}
 				<div class="activity-timeline">
-					{#each processingJobs.slice(0, 10) as job}
+					{#each (processingJobs || []).slice(0, 10) as job}
 						<div class="timeline-item">
 							<div class="timeline-marker {job.status}"></div>
 							<div class="timeline-content">

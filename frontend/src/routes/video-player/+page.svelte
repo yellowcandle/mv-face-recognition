@@ -128,6 +128,19 @@
 		grid-template-columns: 1fr 450px;
 		gap: 32px;
 		align-items: start;
+		transition: grid-template-columns 0.3s ease;
+		position: relative;
+	}
+
+	.main-content::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: calc(100% - 450px - 16px);
+		width: 1px;
+		height: 100%;
+		background: linear-gradient(to bottom, transparent, rgba(var(--text-primary), 0.1), transparent);
+		pointer-events: none;
 	}
 
 	.video-section {
@@ -264,6 +277,10 @@
 		.main-content {
 			grid-template-columns: 1fr 420px;
 		}
+
+		.main-content::before {
+			left: calc(100% - 420px - 16px);
+		}
 	}
 
 	@media (max-width: 1200px) {
@@ -271,15 +288,48 @@
 			grid-template-columns: 1fr 380px;
 		}
 
+		.main-content::before {
+			left: calc(100% - 380px - 16px);
+		}
+
 		.sidebar-section {
 			gap: 16px;
 		}
 	}
 
-	@media (max-width: 1024px) {
+	/* Tablet landscape optimization */
+	@media (max-width: 1024px) and (min-width: 769px) {
+		.main-content {
+			grid-template-columns: 1.2fr 360px;
+			gap: 24px;
+		}
+
+		.main-content::before {
+			left: calc(100% - 360px - 12px);
+		}
+
+		.sidebar-section {
+			max-height: calc(100vh - 100px);
+		}
+
+		.video-section {
+			gap: 12px;
+		}
+
+		.timeline-section {
+			padding: 12px;
+		}
+	}
+
+	/* Mobile and small tablet optimization */
+	@media (max-width: 768px) {
 		.main-content {
 			grid-template-columns: 1fr;
-			gap: 24px;
+			gap: 20px;
+		}
+
+		.main-content::before {
+			display: none;
 		}
 
 		.sidebar-section {
@@ -288,17 +338,32 @@
 			order: -1;
 			flex-direction: row;
 			overflow-x: auto;
-			gap: 20px;
+			gap: 16px;
+			padding: 0 4px 16px 4px;
+			margin: 0 -4px;
 		}
 
 		.gallery-container,
 		.details-container {
-			min-width: 350px;
+			min-width: 320px;
 			flex-shrink: 0;
+			max-height: 400px;
+			overflow-y: auto;
+		}
+
+		/* Snap scrolling for better mobile experience */
+		.sidebar-section {
+			scroll-snap-type: x mandatory;
+		}
+
+		.gallery-container,
+		.details-container {
+			scroll-snap-align: start;
 		}
 	}
 
-	@media (max-width: 768px) {
+	/* Small mobile devices */
+	@media (max-width: 600px) {
 		.video-player-page {
 			padding: 16px;
 		}
@@ -319,11 +384,16 @@
 			flex-direction: column;
 			overflow-x: visible;
 			gap: 16px;
+			padding: 0;
+			margin: 0;
+			scroll-snap-type: none;
 		}
 
 		.gallery-container,
 		.details-container {
 			min-width: auto;
+			max-height: none;
+			scroll-snap-align: none;
 		}
 
 		.error-banner {

@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { apiFetch } from '$lib/utils/api';
 
 // Types
@@ -63,7 +63,7 @@ export const isSystemHealthy = derived(
 );
 
 // Health check interval
-let healthCheckInterval: number | null = null;
+let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 // Mock data for offline mode
 const mockSystemStatus = {
@@ -87,28 +87,60 @@ export async function initializeApp() {
 		await fetchSystemStatus();
 		apiConnected.set(true);
 		offlineMode.set(false);
+		console.log('✅ API connected successfully - application running in online mode');
 	} catch (err) {
-		console.warn('API not available, switching to offline mode:', err);
-		// Set offline mode with mock data as fallback
-		offlineMode.set(true);
-		apiConnected.set(false);
+		console.warn('API connection failed, details:', err);
 		
-		// Load mock data
-		systemStatus.set({
-			chromadb_connected: mockSystemStatus.chromadb_connected,
-			model_loaded: mockSystemStatus.model_loaded,
-			services_running: mockSystemStatus.services_running
-		});
-		
-		dashboardStats.set({
-			contestants: mockSystemStatus.contestant_count,
-			videos: mockSystemStatus.video_count,
-			processingJobs: mockSystemStatus.processing_jobs,
-			results: 2
-		});
-		
-		// Show warning but don't break the app
-		error.set('Using offline mode - backend API unavailable');
+		// For Cloudflare Workers deployment, the API should be available
+		// Let's try a more aggressive approach to ensure connectivity
+		try {
+			// Try direct test of the API
+			const testResponse = await fetch('/api/system/status');
+			if (testResponse.ok) {
+				console.log('✅ Direct API test successful - forcing online mode');
+				apiConnected.set(true);
+				offlineMode.set(false);
+				
+				// Parse the response and update stores
+				const data = await testResponse.json();
+				systemStatus.set({
+					chromadb_connected: data.chromadb_connected,
+					model_loaded: data.model_loaded,
+					services_running: data.services_running
+				});
+				
+				dashboardStats.set({
+					contestants: data.contestant_count || 0,
+					videos: data.video_count || 0,
+					processingJobs: data.processing_jobs || 0,
+					results: 0
+				});
+			} else {
+				throw new Error(`API test failed with status: ${testResponse.status}`);
+			}
+		} catch (secondErr) {
+			console.error('Both API connection attempts failed:', secondErr);
+			// Set offline mode with mock data as fallback
+			offlineMode.set(true);
+			apiConnected.set(false);
+			
+			// Load mock data
+			systemStatus.set({
+				chromadb_connected: mockSystemStatus.chromadb_connected,
+				model_loaded: mockSystemStatus.model_loaded,
+				services_running: mockSystemStatus.services_running
+			});
+			
+			dashboardStats.set({
+				contestants: mockSystemStatus.contestant_count,
+				videos: mockSystemStatus.video_count,
+				processingJobs: mockSystemStatus.processing_jobs,
+				results: 2
+			});
+			
+			// Show warning but don't break the app
+			error.set('Using offline mode - backend API unavailable');
+		}
 	} finally {
 		isLoading.set(false);
 	}
@@ -150,7 +182,7 @@ export function startHealthChecks(): () => void {
 	// Start health checks every 30 seconds, but only if not in offline mode
 	healthCheckInterval = setInterval(async () => {
 		// Skip health checks if in offline mode
-		if (offlineMode.get()) {
+		if (get(offlineMode)) {
 			return;
 		}
 		

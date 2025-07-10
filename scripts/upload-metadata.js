@@ -30,7 +30,10 @@ async function main() {
     });
 
     // Upload contestants data
-    execSync(`wrangler kv:key put --binding=METADATA_KV "contestants" '${JSON.stringify(contestants)}'`, { stdio: 'inherit' });
+    const contestantsFile = path.join(__dirname, 'temp_contestants.json');
+    fs.writeFileSync(contestantsFile, JSON.stringify(contestants, null, 2));
+    execSync(`wrangler kv key put "contestants" --path="${contestantsFile}" --binding=METADATA_KV --preview false`, { stdio: 'inherit' });
+    fs.unlinkSync(contestantsFile);
 
     // 2. Upload video metadata files
     console.log('🎬 Uploading video metadata...');
@@ -43,7 +46,10 @@ async function main() {
       const videoId = file.replace('_metadata.json', '');
       
       // Upload individual video metadata
-      execSync(`wrangler kv:key put --binding=METADATA_KV "video_metadata_${videoId}" '${JSON.stringify(metadata)}'`, { stdio: 'inherit' });
+      const metadataFile = path.join(__dirname, `temp_metadata_${videoId}.json`);
+      fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+      execSync(`wrangler kv key put "video_metadata_${videoId}" --path="${metadataFile}" --binding=METADATA_KV --preview false`, { stdio: 'inherit' });
+      fs.unlinkSync(metadataFile);
       
       // Add to videos list
       videosList.push({
@@ -58,13 +64,15 @@ async function main() {
     }
 
     // Upload videos list
-    execSync(`wrangler kv:key put --binding=METADATA_KV "videos_list" '${JSON.stringify(videosList)}'`, { stdio: 'inherit' });
+    const videosListFile = path.join(__dirname, 'temp_videos_list.json');
+    fs.writeFileSync(videosListFile, JSON.stringify(videosList, null, 2));
+    execSync(`wrangler kv key put "videos_list" --path="${videosListFile}" --binding=METADATA_KV --preview false`, { stdio: 'inherit' });
+    fs.unlinkSync(videosListFile);
 
     // 3. Upload processing report if it exists
     if (fs.existsSync('batch_processing_report.json')) {
       console.log('📋 Uploading processing report...');
-      const report = fs.readFileSync('batch_processing_report.json', 'utf8');
-      execSync(`wrangler kv:key put --binding=METADATA_KV "processing_report" '${report}'`, { stdio: 'inherit' });
+      execSync(`wrangler kv key put "processing_report" --path="batch_processing_report.json" --binding=METADATA_KV --preview false`, { stdio: 'inherit' });
     }
 
     // 4. Upload default settings
@@ -78,7 +86,10 @@ async function main() {
       videoQuality: 'medium',
       faceDetectionThreshold: 0.8
     };
-    execSync(`wrangler kv:key put --binding=METADATA_KV "app_settings" '${JSON.stringify(defaultSettings)}'`, { stdio: 'inherit' });
+    const settingsFile = path.join(__dirname, 'temp_settings.json');
+    fs.writeFileSync(settingsFile, JSON.stringify(defaultSettings, null, 2));
+    execSync(`wrangler kv key put "app_settings" --path="${settingsFile}" --binding=METADATA_KV --preview false`, { stdio: 'inherit' });
+    fs.unlinkSync(settingsFile);
 
     console.log('✅ Metadata upload completed!');
     console.log(`   📊 Uploaded ${contestants.length} contestants`);

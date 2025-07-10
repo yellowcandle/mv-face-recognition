@@ -8,15 +8,15 @@
 		offlineMode 
 	} from '$lib/stores/main';
 	import { contestantsStore } from '$lib/stores/contestants';
-	import { videoProcessingStore } from '$lib/stores/videoProcessing';
+	import { videoProcessingStore, processingJobs } from '$lib/stores/videoProcessing';
 	
 	// Auto-refresh interval
-	let refreshInterval: number | null = null;
+	let refreshInterval: ReturnType<typeof setInterval> | null = null;
 	
 	// Reactive statements for computed values
-	$: recentActivity = $videoProcessingStore.processingJobs
+	$: recentActivity = ($processingJobs || [])
 		.slice(0, 5) // Latest 5 jobs
-		.map(job => ({
+		.map((job: any) => ({
 			id: job.job_id,
 			videoName: `Video ${job.video_id}`,
 			status: job.status,
@@ -94,7 +94,7 @@
 				</div>
 			</div>
 		{/if}
-	</div></div>
+	</div>
 
 	<!-- System Status Cards -->
 	<div class="stats-grid">
@@ -134,7 +134,7 @@
 				<div class="stat-info">
 					<div class="stat-label">Results</div>
 					<div class="stat-value">
-						{$videoProcessingStore.processingJobs.filter(job => job.status === 'completed').length}
+						{($processingJobs || []).filter(job => job.status === 'completed').length}
 					</div>
 				</div>
 			</div>

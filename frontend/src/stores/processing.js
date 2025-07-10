@@ -68,7 +68,6 @@ class ProcessingManager {
     }));
 
     this.processingActive = true;
-    console.log(`Processing started for ${videoName}`);
   }
 
   stopProcessing() {
@@ -78,7 +77,6 @@ class ProcessingManager {
     }));
 
     this.processingActive = false;
-    console.log('Processing stopped');
   }
 
   updateParameters(parameters) {
@@ -234,7 +232,7 @@ class ProcessingManager {
     ];
 
     const rows = results.allResults.map(frame => {
-      const recognizedFaces = frame.faces.filter(face => face.m || face.matched);
+      const recognizedFaces = (frame.faces || []).filter(face => face.m || face.matched);
       const names = recognizedFaces.map(face => face.n || face.contestant_name).join(';');
       const avgConfidence = recognizedFaces.length > 0 
         ? recognizedFaces.reduce((sum, face) => sum + (face.r || face.recognition_confidence || 0), 0) / recognizedFaces.length

@@ -8,9 +8,22 @@ export default defineConfig({
 		host: true,
 		proxy: {
 			'/api': {
-				target: 'http://localhost:8000',
+				target: 'https://mv-face-recognition-api.herballemon.workers.dev',
 				changeOrigin: true,
-				secure: false
+				secure: true,
+				rewrite: (path) => path
+			},
+			'/ws': {
+				target: 'wss://mv-face-recognition-api.herballemon.workers.dev',
+				ws: true,
+				changeOrigin: true,
+				secure: true
+			},
+			'/videos': {
+				target: 'https://mv-face-recognition-api.herballemon.workers.dev',
+				changeOrigin: true,
+				secure: true,
+				rewrite: (path) => path
 			}
 		}
 	},
