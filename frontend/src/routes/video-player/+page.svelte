@@ -5,6 +5,7 @@
 	import VideoSelector from './VideoSelector.svelte';
 	import FaceGallery from './FaceGallery.svelte';
 	import VideoTimeline from './VideoTimeline.svelte';
+	import FaceDetailsPanel from './FaceDetailsPanel.svelte';
 
 	// Initialize video player on mount
 	onMount(() => {
@@ -48,9 +49,17 @@
 				</div>
 			</div>
 
-			<!-- Face Gallery Section -->
-			<div class="gallery-section">
-				<FaceGallery />
+			<!-- Sidebar Section -->
+			<div class="sidebar-section">
+				<!-- Face Gallery -->
+				<div class="gallery-container">
+					<FaceGallery />
+				</div>
+
+				<!-- Face Details Panel -->
+				<div class="details-container">
+					<FaceDetailsPanel />
+				</div>
 			</div>
 		</div>
 	{:else}
@@ -116,7 +125,7 @@
 
 	.main-content {
 		display: grid;
-		grid-template-columns: 1fr 400px;
+		grid-template-columns: 1fr 450px;
 		gap: 32px;
 		align-items: start;
 	}
@@ -134,11 +143,22 @@
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 	}
 
-	.gallery-section {
+	.sidebar-section {
 		position: sticky;
 		top: 24px;
 		max-height: calc(100vh - 120px);
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
 		overflow-y: auto;
+	}
+
+	.gallery-container {
+		flex-shrink: 0;
+	}
+
+	.details-container {
+		flex-shrink: 0;
 	}
 
 	.empty-state {
@@ -239,17 +259,42 @@
 		background-color: rgba(255, 255, 255, 0.1);
 	}
 
-	/* Mobile Responsive */
+	/* Enhanced Responsive Design */
+	@media (max-width: 1400px) {
+		.main-content {
+			grid-template-columns: 1fr 420px;
+		}
+	}
+
+	@media (max-width: 1200px) {
+		.main-content {
+			grid-template-columns: 1fr 380px;
+		}
+
+		.sidebar-section {
+			gap: 16px;
+		}
+	}
+
 	@media (max-width: 1024px) {
 		.main-content {
 			grid-template-columns: 1fr;
 			gap: 24px;
 		}
 
-		.gallery-section {
+		.sidebar-section {
 			position: static;
 			max-height: none;
 			order: -1;
+			flex-direction: row;
+			overflow-x: auto;
+			gap: 20px;
+		}
+
+		.gallery-container,
+		.details-container {
+			min-width: 350px;
+			flex-shrink: 0;
 		}
 	}
 
@@ -270,11 +315,84 @@
 			gap: 16px;
 		}
 
+		.sidebar-section {
+			flex-direction: column;
+			overflow-x: visible;
+			gap: 16px;
+		}
+
+		.gallery-container,
+		.details-container {
+			min-width: auto;
+		}
+
 		.error-banner {
 			left: 16px;
 			right: 16px;
 			transform: none;
 			max-width: none;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.video-player-page {
+			padding: 12px;
+		}
+
+		.page-header {
+			margin-bottom: 20px;
+		}
+
+		.page-header h1 {
+			font-size: 1.75rem;
+		}
+
+		.page-description {
+			font-size: 0.95rem;
+		}
+
+		.video-selection {
+			margin-bottom: 20px;
+		}
+
+		.main-content {
+			gap: 12px;
+		}
+
+		.sidebar-section {
+			gap: 12px;
+		}
+
+		.timeline-section {
+			padding: 12px;
+		}
+	}
+
+	/* Landscape mobile optimization */
+	@media (max-width: 768px) and (orientation: landscape) {
+		.sidebar-section {
+			flex-direction: row;
+			overflow-x: auto;
+			gap: 16px;
+			max-height: 60vh;
+		}
+
+		.gallery-container,
+		.details-container {
+			min-width: 300px;
+			max-height: 50vh;
+			overflow-y: auto;
+		}
+	}
+
+	/* Ultra-wide screen optimization */
+	@media (min-width: 1600px) {
+		.main-content {
+			grid-template-columns: 1fr 500px;
+		}
+
+		.video-player-page {
+			max-width: 1600px;
 		}
 	}
 </style>

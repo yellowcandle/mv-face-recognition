@@ -86,6 +86,18 @@
 		return timeline || null;
 	}
 
+	// Get total appearances for sorting
+	function getTotalAppearances(contestant: ContestantInfo): number {
+		const timeline = getTimelineInfo(contestant);
+		return timeline?.total_appearances || 0;
+	}
+
+	// Get max confidence for sorting
+	function getMaxConfidence(contestant: ContestantInfo): number {
+		const timeline = getTimelineInfo(contestant);
+		return timeline?.max_confidence || 0;
+	}
+
 	// Format confidence percentage
 	function formatConfidence(confidence: number): string {
 		return `${(confidence * 100).toFixed(1)}%`;
@@ -96,6 +108,13 @@
 		const mins = Math.floor(seconds / 60);
 		const secs = Math.floor(seconds % 60);
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	}
+
+	// Get confidence color
+	function getConfidenceColor(confidence: number): string {
+		if (confidence >= 0.8) return '#4CAF50'; // Green
+		if (confidence >= 0.6) return '#FF9800'; // Orange
+		return '#F44336'; // Red
 	}
 </script>
 
@@ -111,6 +130,16 @@
 				<span class="stat">
 					{$currentMetadata.recognition_summary.unique_contestants} detected
 				</span>
+				{#if $currentMetadata.recognition_summary.faces_detected}
+					<span class="stat">
+						{$currentMetadata.recognition_summary.faces_detected} faces
+					</span>
+				{/if}
+				{#if $currentMetadata.recognition_summary.recognition_rate}
+					<span class="stat">
+						{Math.round($currentMetadata.recognition_summary.recognition_rate * 100)}% recognized
+					</span>
+				{/if}
 			{/if}
 			<span class="stat">
 				{filteredContestants.length} shown
@@ -147,20 +176,104 @@
 		</div>
 	</div>
 
-	<!-- Active Contestants Banner -->
+	<!-- Enhanced Active Contestants Display -->
 	{#if $activeContestants.length > 0}
-		<div class="active-banner">
-			<div class="active-header">
-				<span class="active-icon">👁️</span>
-				<span class="active-text">Currently Visible ({$activeContestants.length})</span>
+		<div class="active-faces-panel">
+			<div class="active-faces-header">
+				<div class="header-left">
+					<div class="detection-indicator">
+						<div class="pulse-ring"></div>
+						<div class="pulse-dot"></div>
+					</div>
+					<div class="header-text">
+						<h3>Live Detection</h3>
+						<p>{$activeContestants.length} face{$activeContestants.length !== 1 ? 's' : ''} recognized</p>
+					</div>
+				</div>
+				<div class="timestamp">
+					{formatTime($currentTime)}
+				</div>
 			</div>
-			<div class="active-list">
+
+			<div class="active-faces-grid">
 				{#each $activeContestants as active}
-					<span class="active-contestant">
-						{active.contestant} ({formatConfidence(active.confidence)})
-					</span>
+					{@const contestant = $allContestants.find(c => c.nickname === active.contestant)}
+					{@const confidenceColor = getConfidenceColor(active.confidence)}
+					<div 
+						class="active-face-card"
+						on:click={() => contestant && selectContestant(contestant)}
+						on:keydown={(e) => e.key === 'Enter' && contestant && selectContestant(contestant)}
+						role="button"
+						tabindex="0"
+						style="border-color: {confidenceColor};"
+					>
+						<div class="face-photo-container">
+							{#if contestant?.photo_url}
+								<img 
+									src={contestant.photo_url} 
+									alt={contestant.name}
+									class="active-face-photo"
+								/>
+							{:else}
+								<div class="active-face-placeholder">
+									<span class="placeholder-icon">👤</span>
+								</div>
+							{/if}
+							
+							<!-- Confidence ring -->
+							<div class="confidence-ring">
+								<svg class="confidence-circle" width="80" height="80">
+									<circle
+										cx="40"
+										cy="40"
+										r="35"
+										stroke="rgba(255,255,255,0.2)"
+										stroke-width="3"
+										fill="none"
+									/>
+									<circle
+										cx="40"
+										cy="40"
+										r="35"
+										stroke={confidenceColor}
+										stroke-width="3"
+										fill="none"
+										stroke-dasharray={2 * Math.PI * 35}
+										stroke-dashoffset={2 * Math.PI * 35 * (1 - active.confidence)}
+										class="confidence-progress"
+									/>
+								</svg>
+								<div class="confidence-percentage" style="color: {confidenceColor};">
+									{formatConfidence(active.confidence)}
+								</div>
+							</div>
+						</div>
+
+						<div class="active-face-info">
+							<h4 class="active-face-name">{contestant?.nickname || active.contestant}</h4>
+							<p class="active-face-fullname">{contestant?.name || ''}</p>
+							<div class="confidence-bar-horizontal">
+								<div class="confidence-track">
+									<div 
+										class="confidence-fill-horizontal"
+										style="width: {active.confidence * 100}%; background-color: {confidenceColor};"
+									></div>
+								</div>
+								<span class="confidence-text" style="color: {confidenceColor};">
+									{formatConfidence(active.confidence)}
+								</span>
+							</div>
+						</div>
+					</div>
 				{/each}
 			</div>
+		</div>
+	{:else}
+		<!-- No Active Faces State -->
+		<div class="no-active-faces">
+			<div class="no-faces-icon">👤</div>
+			<h4>No Faces Detected</h4>
+			<p>No contestants are currently visible at this timestamp</p>
 		</div>
 	{/if}
 
@@ -383,40 +496,269 @@
 		font-size: 0.85rem;
 	}
 
-	.active-banner {
-		background: linear-gradient(135deg, rgba(var(--primary-color), 0.1) 0%, rgba(var(--primary-color), 0.05) 100%);
-		border: 1px solid rgba(var(--primary-color), 0.2);
-		border-radius: 8px;
-		padding: 12px;
-		margin-bottom: 20px;
+	.active-faces-panel {
+		background: linear-gradient(135deg, rgba(var(--primary-color), 0.15) 0%, rgba(var(--primary-color), 0.05) 100%);
+		border: 2px solid rgba(var(--primary-color), 0.3);
+		border-radius: 12px;
+		padding: 20px;
+		margin-bottom: 24px;
+		box-shadow: 0 4px 16px rgba(var(--primary-color), 0.1);
 	}
 
-	.active-header {
+	.active-faces-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16px;
+	}
+
+	.header-left {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		margin-bottom: 8px;
-		font-weight: 500;
+		gap: 12px;
+	}
+
+	.detection-indicator {
+		position: relative;
+		width: 24px;
+		height: 24px;
+	}
+
+	.pulse-ring {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 24px;
+		height: 24px;
+		border: 2px solid var(--primary-color);
+		border-radius: 50%;
+		animation: pulse-ring 1.5s infinite;
+	}
+
+	.pulse-dot {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		width: 12px;
+		height: 12px;
+		background-color: var(--primary-color);
+		border-radius: 50%;
+		animation: pulse-dot 1.5s infinite;
+	}
+
+	@keyframes pulse-ring {
+		0% {
+			transform: scale(0.8);
+			opacity: 1;
+		}
+		100% {
+			transform: scale(1.5);
+			opacity: 0;
+		}
+	}
+
+	@keyframes pulse-dot {
+		0%, 100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.5;
+		}
+	}
+
+	.header-text h3 {
+		margin: 0;
+		font-size: 1.1rem;
+		font-weight: 600;
 		color: var(--text-primary);
 	}
 
-	.active-icon {
-		font-size: 1rem;
+	.header-text p {
+		margin: 2px 0 0 0;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
 	}
 
-	.active-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-
-	.active-contestant {
-		background-color: var(--primary-color);
-		color: white;
+	.timestamp {
+		font-family: 'Courier New', monospace;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--primary-color);
+		background: rgba(var(--primary-color), 0.1);
 		padding: 4px 8px;
+		border-radius: 6px;
+	}
+
+	.active-faces-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 16px;
+	}
+
+	.active-face-card {
+		background: rgba(255, 255, 255, 0.9);
+		border: 2px solid;
 		border-radius: 12px;
+		padding: 16px;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.active-face-card:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+	}
+
+	.active-face-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+		animation: shimmer 2s infinite;
+	}
+
+	@keyframes shimmer {
+		0% { transform: translateX(-100%); }
+		100% { transform: translateX(100%); }
+	}
+
+	.face-photo-container {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.active-face-photo {
+		width: 80px;
+		height: 80px;
+		border-radius: 50%;
+		object-fit: cover;
+		border: 3px solid white;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+
+	.active-face-placeholder {
+		width: 80px;
+		height: 80px;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #f0f0f0, #e0e0e0);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 3px solid white;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+
+	.active-face-placeholder .placeholder-icon {
+		font-size: 2rem;
+		color: #999;
+	}
+
+	.confidence-ring {
+		position: absolute;
+		top: 0;
+		left: 0;
+	}
+
+	.confidence-circle {
+		transform: rotate(-90deg);
+	}
+
+	.confidence-progress {
+		transition: stroke-dashoffset 0.5s ease;
+	}
+
+	.confidence-percentage {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+	}
+
+	.active-face-info {
+		text-align: center;
+		width: 100%;
+	}
+
+	.active-face-name {
+		margin: 0 0 4px 0;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.active-face-fullname {
+		margin: 0 0 8px 0;
 		font-size: 0.8rem;
-		font-weight: 500;
+		color: var(--text-secondary);
+	}
+
+	.confidence-bar-horizontal {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+	}
+
+	.confidence-track {
+		flex: 1;
+		height: 6px;
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.confidence-fill-horizontal {
+		height: 100%;
+		transition: width 0.5s ease;
+		border-radius: 3px;
+	}
+
+	.confidence-text {
+		font-size: 0.75rem;
+		font-weight: 600;
+		min-width: 35px;
+		text-align: right;
+	}
+
+	.no-active-faces {
+		background: rgba(var(--text-primary), 0.05);
+		border: 2px dashed rgba(var(--text-primary), 0.2);
+		border-radius: 12px;
+		padding: 32px 20px;
+		text-align: center;
+		margin-bottom: 24px;
+		color: var(--text-secondary);
+	}
+
+	.no-faces-icon {
+		font-size: 3rem;
+		margin-bottom: 12px;
+		opacity: 0.5;
+	}
+
+	.no-active-faces h4 {
+		margin: 0 0 8px 0;
+		font-size: 1.1rem;
+		color: var(--text-primary);
+	}
+
+	.no-active-faces p {
+		margin: 0;
+		font-size: 0.9rem;
 	}
 
 	.contestants-grid {

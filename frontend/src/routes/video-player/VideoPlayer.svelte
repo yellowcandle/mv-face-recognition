@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, afterUpdate } from 'svelte';
 	import { 
 		currentVideo, 
 		currentTime, 
@@ -9,12 +9,16 @@
 		isMuted,
 		videoPlayerActions 
 	} from '$lib/stores/videoPlayer';
+	import FaceOverlay from './FaceOverlay.svelte';
 
 	let videoElement: HTMLVideoElement;
+	let videoContainer: HTMLDivElement;
 	let isVideoLoaded = false;
 	let isBuffering = false;
 	let showControls = true;
-	let controlsTimeout: number;
+	let controlsTimeout: ReturnType<typeof setTimeout>;
+	let containerWidth = 0;
+	let containerHeight = 0;
 
 	// Format time for display (MM:SS or HH:MM:SS)
 	function formatTime(seconds: number): string {
@@ -182,16 +186,43 @@
 		}
 	}
 
+	// Track container dimensions for overlay positioning
+	let resizeObserver: ResizeObserver;
+
+	function setupResizeObserver() {
+		// Check if videoContainer exists and observer hasn't been set up yet
+		if (typeof videoContainer !== 'undefined' && videoContainer && !resizeObserver) {
+			resizeObserver = new ResizeObserver(entries => {
+				for (const entry of entries) {
+					containerWidth = entry.contentRect.width;
+					containerHeight = entry.contentRect.height;
+				}
+			});
+			resizeObserver.observe(videoContainer);
+		}
+	}
+
+	afterUpdate(() => {
+		setupResizeObserver();
+	});
+
 	onMount(() => {
 		document.addEventListener('keydown', handleKeydown);
+
 		return () => {
 			document.removeEventListener('keydown', handleKeydown);
 			clearTimeout(controlsTimeout);
+			if (resizeObserver) {
+				resizeObserver.disconnect();
+			}
 		};
 	});
 
 	onDestroy(() => {
 		clearTimeout(controlsTimeout);
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+		}
 	});
 </script>
 
@@ -202,7 +233,7 @@
 	 tabindex="0"
 >
 	{#if $currentVideo}
-		<div class="video-container">
+		<div class="video-container" bind:this={videoContainer}>
 			<!-- Video Element -->
 			<video
 				bind:this={videoElement}
@@ -220,6 +251,13 @@
 				<track kind="captions" />
 				Your browser does not support the video tag.
 			</video>
+
+			<!-- Face Detection Overlay -->
+			<FaceOverlay 
+				{videoElement}
+				{containerWidth}
+				{containerHeight}
+			/>
 
 			<!-- Loading/Buffering Overlay -->
 			{#if isBuffering || !isVideoLoaded}
