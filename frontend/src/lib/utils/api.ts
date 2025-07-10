@@ -1,51 +1,59 @@
-// API Configuration utility for environment-aware base URL handling
+/**
+ * API utility for environment-aware URL generation
+ * Handles development vs production API endpoint routing
+ */
+
+const PRODUCTION_API_BASE = 'https://mv-face-recognition-api.herballemon.workers.dev';
 
 /**
- * Get the appropriate API base URL based on the current environment
- * In development: Use relative URLs to leverage Vite proxy
- * In production: Use the full Worker API URL
+ * Get the appropriate API URL based on environment
+ * @param endpoint - The API endpoint path (e.g., '/api/videos/processed/list')
+ * @returns Complete URL for the API call
  */
-export function getApiBaseUrl(): string {
-	// Check if we're in development mode
-	const isDevelopment = import.meta.env.DEV;
-	
-	if (isDevelopment) {
-		// Use relative URLs in development to leverage Vite proxy
-		// This will proxy to http://127.0.0.1:8000 as configured in vite.config.js
-		return '';
-	} else {
-		// Use full Worker API URL in production
-		return 'https://mv-face-recognition-api.herballemon.workers.dev';
-	}
+export function getApiUrl(endpoint: string): string {
+  // In development, use relative URLs so Vite proxy can handle routing
+  if (import.meta.env.DEV) {
+    return endpoint;
+  }
+  
+  // In production, use absolute URLs to the Worker API
+  return `${PRODUCTION_API_BASE}${endpoint}`;
 }
 
 /**
- * Create a full API URL for the given endpoint
+ * Enhanced fetch wrapper with better error handling for HTML responses
+ * @param endpoint - The API endpoint path
+ * @param options - Fetch options
+ * @returns Promise with parsed JSON response
  */
-export function apiUrl(endpoint: string): string {
-	const baseUrl = getApiBaseUrl();
-	const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-	return `${baseUrl}${cleanEndpoint}`;
-}
+export async function apiFetch(endpoint: string, options?: RequestInit): Promise<any> {
+  const url = getApiUrl(endpoint);
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+    });
 
-/**
- * Enhanced fetch with error handling and fallback logic
- */
-export async function apiFetch(endpoint: string, options?: RequestInit): Promise<Response> {
-	const url = apiUrl(endpoint);
-	
-	try {
-		const response = await fetch(url, options);
-		
-		// Check if we got HTML instead of JSON (common error case)
-		const contentType = response.headers.get('content-type');
-		if (contentType && contentType.includes('text/html') && response.status === 200) {
-			throw new Error('Received HTML instead of JSON - API endpoint may be incorrect');
-		}
-		
-		return response;
-	} catch (error) {
-		console.error(`API call failed for ${url}:`, error);
-		throw error;
-	}
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      if (text.includes('<!DOCTYPE')) {
+        throw new Error(`API returned HTML instead of JSON. This usually means the API endpoint is not available or there's a routing issue. URL: ${url}`);
+      }
+      throw new Error(`API returned non-JSON response: ${contentType}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`API call failed for ${url}:`, error);
+    throw error;
+  }
 }

@@ -66,10 +66,7 @@ export const videoProcessingStore = {
 		
 		try {
 			// Try to load from live API first
-			const response = await apiFetch('/api/videos');
-			if (!response.ok) throw new Error('Failed to load videos from API');
-			
-			const data = await response.json();
+			const data = await apiFetch('/api/videos');
 			// If API returns wrapped data with videos property, extract it
 			const videoList = data.videos || data;
 			videos.set(videoList);

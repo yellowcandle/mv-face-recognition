@@ -148,10 +148,7 @@ export const videoPlayerActions = {
 		error.set(null);
 		
 		try {
-			const response = await apiFetch('/api/videos/processed/list');
-			if (!response.ok) throw new Error('Failed to load videos');
-			
-			const videos = await response.json();
+			const videos = await apiFetch('/api/videos/processed/list');
 			availableVideos.set(videos);
 		} catch (err) {
 			error.set(err instanceof Error ? err.message : 'Failed to load videos');
@@ -165,10 +162,7 @@ export const videoPlayerActions = {
 		error.set(null);
 		
 		try {
-			const response = await apiFetch('/api/videos/contestants');
-			if (!response.ok) throw new Error('Failed to load contestants');
-			
-			const contestants = await response.json();
+			const contestants = await apiFetch('/api/videos/contestants');
 			allContestants.set(contestants);
 		} catch (err) {
 			error.set(err instanceof Error ? err.message : 'Failed to load contestants');
@@ -188,18 +182,18 @@ export const videoPlayerActions = {
 		if (video.has_metadata) {
 			try {
 				// Try to load dense metadata first
-				let response = await apiFetch(`/api/videos/metadata/dense/${video.id}`);
-				if (response.ok) {
-					const metadata = await response.json();
+				try {
+					const metadata = await apiFetch(`/api/videos/metadata/dense/${video.id}`);
 					currentMetadata.set(metadata);
 					duration.set(metadata.video_info.duration_seconds);
-				} else {
+				} catch (err) {
 					// Fallback to regular metadata
-					response = await apiFetch(`/api/videos/metadata/${video.id}`);
-					if (response.ok) {
-						const metadata = await response.json();
+					try {
+						const metadata = await apiFetch(`/api/videos/metadata/${video.id}`);
 						currentMetadata.set(metadata);
 						duration.set(metadata.video_info.duration_seconds);
+					} catch (fallbackErr) {
+						console.error('Failed to load any video metadata:', fallbackErr);
 					}
 				}
 			} catch (err) {
@@ -257,15 +251,10 @@ export const videoPlayerActions = {
 		error.set(null);
 		
 		try {
-			const response = await apiFetch(`/api/videos/metadata/dense/${videoId}/generate`, {
+			const result = await apiFetch(`/api/videos/metadata/dense/${videoId}/generate`, {
 				method: 'POST'
 			});
 			
-			if (!response.ok) {
-				throw new Error('Failed to generate dense metadata');
-			}
-			
-			const result = await response.json();
 			console.log('Dense metadata generated:', result);
 			
 			// Reload the video to get the new dense metadata
