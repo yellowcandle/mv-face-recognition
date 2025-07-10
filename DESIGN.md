@@ -5,12 +5,63 @@
 - [x] Streamline the frontend to use SvelteKit - COMPLETED
 - [x] Fix API proxy configuration in frontend deployment - COMPLETED
 - [x] Migrate to Cloudflare Workers deployment - COMPLETED
+- [ ] Fix the API proxy configuration in frontend deployment
+- [ ] Fix the API proxy configuration in backend deployment 
+- [x] Redesign the Web UI to display the video and the faces being recognized - COMPLETED
 
 ## Overview
 
 This document describes the architecture and design decisions for the MV Face Recognition system. The system has evolved from real-time processing to a **pre-processing and annotation system** with **dense metadata generation** for optimal video player synchronization.
 
 ## Recent Updates (July 10, 2025)
+
+### ✅ COMPLETED: Enhanced Web UI for Face Recognition Display (July 10, 2025)
+Completed a comprehensive redesign of the Web UI to better showcase real-time face recognition capabilities:
+
+**New Features Implemented:**
+1. **Real-time Face Detection Overlay**: 
+   - Bounding boxes directly overlaid on video with contestant names and confidence scores
+   - Color-coded confidence levels (green/orange/red) with smooth animations
+   - Corner markers and confidence bars for enhanced visual feedback
+   - Proper aspect ratio scaling for all video dimensions
+
+2. **Enhanced Active Faces Display**:
+   - Large, prominent cards showing currently detected contestants
+   - Circular confidence indicators with animated progress rings
+   - Live detection status with pulsing indicators
+   - Enlarged contestant photos with real-time confidence badges
+
+3. **Face Details Panel**:
+   - Detailed analysis panel for each detected face
+   - Navigation between multiple detected faces
+   - Comprehensive statistics (appearances, confidence levels, timeline)
+   - Quick access to contestant timeline and appearance history
+   - Action buttons for gallery selection and timeline navigation
+
+4. **Enhanced Timeline Visualization**:
+   - Color-coded contestant tracks showing appearance segments
+   - Confidence heat map with visual intensity indicators
+   - Individual contestant lanes with segment-based confidence visualization
+   - Interactive hover effects and detailed tooltips
+
+5. **Responsive Layout Optimization**:
+   - Multi-breakpoint responsive design for all screen sizes
+   - Optimized layouts for mobile, tablet, landscape, and ultra-wide displays
+   - Horizontal scrolling sidebar for medium screens
+   - Enhanced touch interaction support
+
+**Technical Achievements:**
+- Real-time video overlay positioning with proper aspect ratio calculations
+- Performance-optimized animations and transitions
+- Comprehensive state management for face detection data
+- Enhanced accessibility with proper ARIA labels and keyboard navigation
+- Mobile-first responsive design with orientation-specific optimizations
+
+**Components Created:**
+- `FaceOverlay.svelte`: Real-time video overlay with bounding boxes
+- `FaceDetailsPanel.svelte`: Detailed face analysis and navigation
+- Enhanced `FaceGallery.svelte`: Improved active contestant display
+- Enhanced `VideoTimeline.svelte`: Color-coded tracks and confidence heat map
 
 ### ✅ COMPLETED: Frontend API Configuration Fix
 Fixed the "Unexpected token '<'" JSON parsing error that occurred when the frontend received HTML instead of JSON from API calls:

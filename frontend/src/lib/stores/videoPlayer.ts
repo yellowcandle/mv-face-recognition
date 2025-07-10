@@ -12,6 +12,12 @@ export interface VideoInfo {
 	created_at: number;
 	has_metadata: boolean;
 	stream_url: string;
+	duration_seconds?: number;
+	fps?: number;
+	width?: number;
+	height?: number;
+	face_count?: number;
+	unique_contestants?: number;
 }
 
 export interface ContestantInfo {
@@ -27,23 +33,30 @@ export interface ContestantInfo {
 
 export interface VideoMetadata {
 	video_id: string;
-	video_info: {
-		filename: string;
-		fps: number;
-		duration_seconds: number;
-		frame_count: number;
-	};
-	processing_info?: {
-		frame_interval: number;
-		interpolation_enabled: boolean;
-		similarity_threshold: number;
-	};
+	processing_timestamp?: string;
+	total_frames?: number;
+	frames_with_faces?: number;
+	total_face_detections?: number;
+	unique_contestants?: number;
 	recognition_summary: {
 		unique_contestants: number;
-		total_faces_detected: number;
-		total_faces_recognized: number;
+		faces_detected: number;
+		faces_recognized: number;
+		recognition_rate: number;
+		processing_time_seconds?: number;
+		frames_processed?: number;
 	};
 	contestant_timeline: Record<string, ContestantAppearance>;
+	frame_data?: Array<{
+		timestamp: number;
+		frame_number: number;
+		faces: Array<{
+			contestant: string;
+			confidence: number;
+			bbox: [number, number, number, number];
+			landmarks?: number[][];
+		}>;
+	}>;
 }
 
 export interface ContestantAppearance {
@@ -52,7 +65,13 @@ export interface ContestantAppearance {
 	max_confidence: number;
 	first_appearance_time: number;
 	last_appearance_time: number;
-	detailed_timeline: Array<{
+	frame_appearances?: Array<{
+		timestamp: number;
+		confidence: number;
+		bbox: [number, number, number, number];
+		landmarks?: number[][];
+	}>;
+	detailed_timeline?: Array<{
 		frame: number;
 		timestamp: number;
 		confidence: number;
@@ -91,7 +110,9 @@ export const activeContestants = derived(
 		
 		// Check which contestants are visible at current time (with 1 second tolerance)
 		Object.entries($metadata.contestant_timeline).forEach(([name, timeline]) => {
-			const relevantAppearances = timeline.detailed_timeline.filter(
+			// Use frame_appearances if available, otherwise fall back to detailed_timeline
+			const appearances = timeline.frame_appearances || timeline.detailed_timeline || [];
+			const relevantAppearances = appearances.filter(
 				appearance => Math.abs(appearance.timestamp - $currentTime) <= 1.0
 			);
 			
@@ -120,7 +141,9 @@ export const timelineMarkers = derived(
 		const timeMap = new Map<number, string[]>();
 		
 		Object.entries($metadata.contestant_timeline).forEach(([name, timeline]) => {
-			timeline.detailed_timeline.forEach(appearance => {
+			// Use frame_appearances if available, otherwise fall back to detailed_timeline
+			const appearances = timeline.frame_appearances || timeline.detailed_timeline || [];
+			appearances.forEach(appearance => {
 				const time = Math.round(appearance.timestamp);
 				if (!timeMap.has(time)) {
 					timeMap.set(time, []);
@@ -162,8 +185,13 @@ export const videoPlayerActions = {
 		error.set(null);
 		
 		try {
-			const contestants = await apiFetch('/api/videos/contestants');
-			allContestants.set(contestants);
+			const contestants = await apiFetch('/api/contestants/');
+			// Add photo URLs if available
+			const contestantsWithPhotos = contestants.map((contestant: ContestantInfo) => ({
+				...contestant,
+				photo_url: contestant.has_photos ? `/photos/${contestant.number}-1.jpg` : null
+			}));
+			allContestants.set(contestantsWithPhotos);
 		} catch (err) {
 			error.set(err instanceof Error ? err.message : 'Failed to load contestants');
 		} finally {
@@ -175,29 +203,22 @@ export const videoPlayerActions = {
 		currentVideo.set(video);
 		currentMetadata.set(null);
 		currentTime.set(0);
-		duration.set(0);
+		duration.set(video.duration_seconds || 0);
 		isPlaying.set(false);
 		
 		// Load metadata for the selected video
 		if (video.has_metadata) {
 			try {
-				// Try to load dense metadata first
-				try {
-					const metadata = await apiFetch(`/api/videos/metadata/dense/${video.id}`);
-					currentMetadata.set(metadata);
-					duration.set(metadata.video_info.duration_seconds);
-				} catch (err) {
-					// Fallback to regular metadata
-					try {
-						const metadata = await apiFetch(`/api/videos/metadata/${video.id}`);
-						currentMetadata.set(metadata);
-						duration.set(metadata.video_info.duration_seconds);
-					} catch (fallbackErr) {
-						console.error('Failed to load any video metadata:', fallbackErr);
-					}
+				const metadata = await apiFetch(`/api/videos/${video.id}/metadata`);
+				currentMetadata.set(metadata);
+				
+				// Update duration from metadata if available
+				if (metadata && video.duration_seconds) {
+					duration.set(video.duration_seconds);
 				}
 			} catch (err) {
 				console.error('Failed to load video metadata:', err);
+				error.set('Failed to load face recognition data');
 			}
 		}
 	},
@@ -246,30 +267,27 @@ export const videoPlayerActions = {
 		error.set(null);
 	},
 
-	async generateDenseMetadata(videoId: string) {
-		isLoading.set(true);
-		error.set(null);
-		
+	async loadFaceData(videoId: string, timestamp?: number) {
 		try {
-			const result = await apiFetch(`/api/videos/metadata/dense/${videoId}/generate`, {
-				method: 'POST'
-			});
+			const url = timestamp !== undefined 
+				? `/api/videos/${videoId}/faces?timestamp=${timestamp}`
+				: `/api/videos/${videoId}/faces`;
 			
-			console.log('Dense metadata generated:', result);
-			
-			// Reload the video to get the new dense metadata
-			const video = get(currentVideo);
-			if (video && video.id === videoId) {
-				await this.selectVideo(video);
-			}
-			
-			return result;
-			
+			const faceData = await apiFetch(url);
+			return faceData;
 		} catch (err) {
-			error.set(err instanceof Error ? err.message : 'Failed to generate dense metadata');
+			console.error('Failed to load face data:', err);
 			throw err;
-		} finally {
-			isLoading.set(false);
+		}
+	},
+
+	async getContestantTimeline(videoId: string, contestantName: string) {
+		try {
+			const timeline = await apiFetch(`/api/videos/${videoId}/contestants/${encodeURIComponent(contestantName)}/timeline`);
+			return timeline;
+		} catch (err) {
+			console.error('Failed to load contestant timeline:', err);
+			throw err;
 		}
 	}
 };
