@@ -1,17 +1,19 @@
-name = "mv-face-recognition"
-compatibility_date = "2024-11-08"
-
-# Pages configuration
-pages_build_output_dir = "frontend/build"
+name = "mv-face-recognition-api"
+main = "worker/index.js"
+compatibility_date = "2024-07-25"
 
 [[r2_buckets]]
 binding = "VIDEOS_BUCKET"
 bucket_name = "mv-face-recognition-videos"
-preview_bucket_name = "mv-face-recognition-videos-preview"
 
 [[kv_namespaces]]
 binding = "METADATA_KV"
 id = "890d77e11bfc4623ac4ef56db6b9a4ab"
-preview_id = "ba09879957074c0892d9a208f2fb1e5c"
 
-# Build command not needed for Pages deployment
+[vars]
+ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv.herballemon.dev"
+ENVIRONMENT = "production"
+
+routes = [
+  { pattern = "mv.herballemon.dev", custom_domain = true }
+]
