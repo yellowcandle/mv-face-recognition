@@ -305,6 +305,46 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
 
     case '/videos':
     case '/videos/':
+      // Try to get optimized video list from KV storage first (without detailed contestant timelines)
+      const optimizedVideosList = await env.METADATA_KV?.get('videos_list_optimized');
+      
+      if (optimizedVideosList) {
+        console.log('Using optimized video list from KV storage');
+        return new Response(optimizedVideosList, {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Fallback: Try to get full metadata collection and extract basic info only
+      const videoMetadataCollection = await env.METADATA_KV?.get('video_metadata_collection');
+      
+      if (videoMetadataCollection) {
+        console.log('Creating optimized response from full metadata collection');
+        const parsedData = JSON.parse(videoMetadataCollection);
+        
+        // Extract only basic info, exclude detailed contestant timelines
+        const optimizedVideos = {};
+        for (const [videoId, videoData] of Object.entries(parsedData)) {
+          optimizedVideos[videoId] = {
+            video_info: videoData.video_info,
+            processing_date: videoData.processing_date,
+            recognition_summary: videoData.recognition_summary,
+            has_detailed_metadata: true,
+            metadata_endpoints: {
+              basic: `/api/videos/metadata/${videoId.match(/^\d+/) ? videoId.match(/^\d+/)[0] : videoId}`,
+              detailed: `/api/videos/metadata/dense/${videoId.match(/^\d+/) ? videoId.match(/^\d+/)[0] : videoId}`
+            }
+            // Exclude contestant_timeline to reduce response size
+          };
+        }
+        
+        const response = { videos: optimizedVideos };
+        return new Response(JSON.stringify(response), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Fallback to hardcoded data if KV storage is empty
       const allVideos = [
         {
           "id": "1",
@@ -373,10 +413,8 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
         }
       ];
       
-      const videos = await env.METADATA_KV.get('videos_list');
-      const videosData = videos || JSON.stringify(allVideos);
-      // Wrap in an object with 'videos' key as expected by frontend
-      const response = { videos: JSON.parse(videosData) };
+      console.log('Using fallback video data');
+      const response = { videos: allVideos };
       return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -846,8 +884,21 @@ async function handleStaticRequest(pathname, request, env, corsHeaders) {
     });
   }
   
-  // For SPA routing, serve index.html for unknown routes
-  if (!pathname.includes('.')) {
+  // For SPA routing, serve the corresponding HTML file or fall back to index.html
+  // Handle SPA routing by checking for extensionless paths
+  if (!/\.[^/]+$/.test(pathname)) {
+    const pageKey = `${assetKey}.html`;
+    if (EMBEDDED_ASSETS[pageKey]) {
+      console.log(`SPA route, serving specific page: ${pageKey}`);
+      return new Response(EMBEDDED_ASSETS[pageKey], {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
+    
     console.log(`SPA route detected, serving index.html for: ${pathname}`);
     return new Response(EMBEDDED_ASSETS['index.html'], {
       headers: {
