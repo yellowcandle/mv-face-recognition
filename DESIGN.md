@@ -380,85 +380,495 @@ SMOOTHING_WINDOW=5
 - **FFmpeg**: Audio/video encoding
 - **Wrangler CLI**: Cloudflare deployment
 
-## Usage Instructions
+## 📚 User Guide: Video Processing & Deployment
 
-### Local Development
+### 🚀 Quick Start
+
+**One-Command Setup & Processing:**
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-cd frontend && npm install
-
-# Setup ChromaDB
-python src/database/chroma_setup.py
-
-# Start development server
-cd frontend && npm run dev
+# Complete setup and video processing pipeline
+git clone https://github.com/yellowcandle/mv-face-recognition.git
+cd mv-face-recognition
+node scripts/setup-environment.js && node scripts/run-full-pipeline.js
 ```
 
-### Automated Pipeline Deployment
+This will automatically:
+- ✅ Verify system prerequisites
+- ✅ Install all dependencies 
+- ✅ Process videos in `source/videos/`
+- ✅ Deploy to Cloudflare Workers
+- ✅ Generate face recognition overlays
 
-**Comprehensive Integration Scripts:**
+### 📋 Prerequisites
+
+**Required Software:**
 ```bash
-# Environment setup and verification
-node scripts/setup-environment.js
+# System dependencies
+python --version    # 3.8+ required
+node --version      # 18+ required
+git lfs --version   # For large file handling
 
-# Full pipeline execution
+# Install system packages (Ubuntu/Debian)
+sudo apt-get install -y ffmpeg libgl1-mesa-glx libglib2.0-0
+
+# Install system packages (macOS)
+brew install ffmpeg
+```
+
+**Cloudflare Account Setup:**
+```bash
+# Install Wrangler CLI
+npm install -g wrangler
+
+# Login to Cloudflare
+wrangler login
+
+# Verify authentication
+wrangler whoami
+```
+
+### 🎬 Video Processing Workflow
+
+#### Step 1: Prepare Your Videos
+
+**Video Requirements:**
+- **Format**: MP4, AVI, MOV (auto-converted to MP4)
+- **Resolution**: Any (auto-scaled to 720p for processing)
+- **Duration**: No limit (longer videos take proportionally more time)
+- **Audio**: Preserved in final output
+
+**Directory Structure:**
+```
+source/videos/
+├── video1.mp4          # Your raw video files
+├── video2.mov          # Multiple formats supported
+└── video3.avi          # Will be converted to MP4
+```
+
+**Prepare Videos:**
+```bash
+# Create source directory
+mkdir -p source/videos
+
+# Copy your videos
+cp /path/to/your/videos/* source/videos/
+
+# Verify video files
+ls -la source/videos/
+```
+
+#### Step 2: Run Video Processing
+
+**Option A: Full Automated Processing (Recommended)**
+```bash
+# Process all videos and deploy
 node scripts/run-full-pipeline.js
 
-# Process-only mode (development)
+# Process videos only (skip deployment)
 node scripts/run-full-pipeline.js --process-only
+```
 
-# Deploy-only mode (updates)
+**Option B: Individual Video Processing**
+```bash
+# Process single video
+cd mvp-processor
+python src/process_video.py --input ../source/videos/video1.mp4
+
+# Process with custom settings
+python src/process_video.py \
+  --input ../source/videos/video1.mp4 \
+  --confidence-threshold 0.8 \
+  --output-name "custom-video" \
+  --no-upload
+```
+
+**Option C: Batch Processing**
+```bash
+# Process all videos in source/videos/
+cd mvp-processor
+python scripts/process_all_videos.py
+
+# Or use shell script
+chmod +x scripts/process_videos_local.sh
+./scripts/process_videos_local.sh
+```
+
+#### Step 3: Monitor Processing
+
+**Processing Output:**
+```bash
+# Watch processing progress
+tail -f mvp-processor/processing.log
+
+# Check processing status
+python mvp-processor/src/check_processing_status.py
+```
+
+**Expected Output Files:**
+```
+processed_videos/
+├── video1_720p.mp4           # Processed video with face overlays
+├── video2_720p.mp4           # Audio preserved from original
+└── video3_720p.mp4           # Converted and processed
+
+metadata/
+├── video1_metadata.json      # Dense frame-by-frame face data
+├── video2_metadata.json      # Recognition confidence scores
+└── video3_metadata.json      # Bounding box coordinates
+
+thumbnails/
+├── video1_thumb.jpg          # Auto-generated thumbnails
+├── video2_thumb.jpg          # For video gallery display
+└── video3_thumb.jpg          # Optimized for web
+```
+
+### 🌐 Deployment Workflow
+
+#### Step 1: Environment Setup
+
+**Initial Configuration:**
+```bash
+# Run environment setup (first time only)
+node scripts/setup-environment.js
+```
+
+This script:
+- ✅ Verifies Node.js, Python, Wrangler, FFmpeg installations
+- ✅ Configures Cloudflare credentials
+- ✅ Installs project dependencies
+- ✅ Sets up ChromaDB with contestant embeddings
+- ✅ Creates necessary directories
+
+**Manual Environment Setup (if needed):**
+```bash
+# Python dependencies
+cd mvp-processor
+pip install -r requirements.txt
+
+# Frontend dependencies  
+cd ../frontend
+npm install
+
+# Scripts dependencies
+cd ../scripts
+npm install
+
+# Worker dependencies
+cd ../worker
+npm install
+```
+
+#### Step 2: Build Frontend
+
+**SvelteKit Build Process:**
+```bash
+# Build production frontend
+cd frontend
+npm run build
+
+# Verify build output
+ls -la build/_app/        # Should contain 30+ assets
+du -sh build/             # Should be ~2-5MB total
+```
+
+**Build Verification:**
+```bash
+# Check build quality
+npm run preview           # Local preview server
+curl http://localhost:4173 | grep -q "MV Face Recognition"
+```
+
+#### Step 3: Deploy to Cloudflare
+
+**Automated Deployment (Recommended):**
+```bash
+# Deploy everything automatically
 node scripts/run-full-pipeline.js --skip-processing
+
+# Or deploy step-by-step
+node scripts/upload-to-r2.js        # Upload videos
+node scripts/upload-metadata.js     # Upload metadata
+node scripts/update-worker-assets.js # Embed frontend assets
+cd worker && wrangler deploy         # Deploy worker
 ```
 
-**Pipeline Components:**
-1. **Environment Setup** (`setup-environment.js`):
-   - Prerequisites verification (Python, Node.js, Wrangler)
-   - Cloudflare credentials configuration
-   - Project directory initialization
-   - Dependency installation
+**Manual Deployment Steps:**
 
-2. **Full Pipeline Runner** (`run-full-pipeline.js`):
-   - Video processing orchestration
-   - SvelteKit frontend building
-   - Cloudflare R2 upload automation
-   - KV metadata deployment
-   - Worker asset embedding and deployment
-
-**Integration Architecture:**
-```javascript
-scripts/
-├── setup-environment.js      # Environment configuration
-├── run-full-pipeline.js      # Complete automation
-├── upload-to-r2.js          # Video/metadata upload
-├── upload-metadata.js        # KV store deployment
-└── update-worker-assets.js   # Asset embedding
-```
-
-### Video Processing
+1. **Upload Videos to R2:**
 ```bash
-# Process single video with dense metadata
-python src/services/realtime_video_processor.py input_video.mp4
-
-# Process all videos in directory
-python scripts/process_videos_local.sh
-
-# Cloud processing via Modal.com
-./scripts/process_videos_modal.sh
+# Upload processed videos
+node scripts/upload-to-r2.js
+# Expected: 10+ videos uploaded to R2 bucket
 ```
 
-### Production Deployment
+2. **Upload Metadata to KV:**
 ```bash
-# Build SvelteKit frontend
-cd frontend && npm run build
+# Upload face recognition metadata
+node scripts/upload-metadata.js
+# Expected: JSON metadata uploaded to KV store
+```
 
-# Update worker assets (36 SvelteKit files)
-cd .. && node scripts/update-worker-assets.js
+3. **Embed Frontend Assets:**
+```bash
+# Embed SvelteKit build into worker
+node scripts/update-worker-assets.js
+# Expected: 36+ assets embedded in worker/index.js
+```
 
+4. **Deploy Worker:**
+```bash
 # Deploy to Cloudflare Workers
-cd worker && wrangler deploy
+cd worker
+wrangler deploy
+# Expected: Deployment URL provided
 ```
+
+#### Step 4: Verify Deployment
+
+**Deployment Verification:**
+```bash
+# Check deployment health
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/system/status" | jq
+
+# Test video streaming
+curl -I "https://mv-face-recognition-api.herballemon.workers.dev/videos/"
+
+# Verify frontend routes
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/" | grep -q "DOCTYPE html"
+```
+
+**Expected Responses:**
+```json
+{
+  "status": "healthy",
+  "features": {
+    "video_streaming": true,
+    "face_recognition": true,
+    "metadata_storage": true
+  },
+  "stats": {
+    "total_videos": 10,
+    "total_contestants": 95,
+    "api_endpoints": 21
+  }
+}
+```
+
+### 🔄 Development Workflow
+
+#### Local Development Setup
+
+**Development Server:**
+```bash
+# Start local development
+cd frontend
+npm run dev
+
+# Development server available at:
+# http://localhost:5173/
+```
+
+**Local Testing:**
+```bash
+# Run all tests
+npm run test:all
+
+# Frontend tests
+cd frontend && npm run test:coverage
+
+# Python tests  
+cd mvp-processor && pytest tests/unit/ -v
+
+# Integration tests
+node scripts/test-integration.js
+```
+
+#### Iterative Development
+
+**Development Cycle:**
+```bash
+# 1. Make code changes
+# 2. Test locally
+npm run test
+
+# 3. Process sample video
+python mvp-processor/src/process_video.py --input source/videos/sample.mp4
+
+# 4. Build and test frontend
+cd frontend && npm run build && npm run preview
+
+# 5. Deploy to staging (optional)
+node scripts/run-full-pipeline.js --staging
+```
+
+### 🔧 Advanced Configuration
+
+#### Processing Settings
+
+**Configuration File:** `mvp-processor/config.yaml`
+```yaml
+processing:
+  confidence_threshold: 0.7          # Recognition confidence (0.0-1.0)
+  processing_interval: 5             # Process every Nth frame
+  enable_interpolation: true         # Smooth between frames
+  hardware_acceleration: true        # Use GPU if available
+
+output:
+  video_quality: "720p"              # Output resolution
+  preserve_audio: true               # Keep original audio
+  overlay_style: "modern"            # Overlay design theme
+  
+deployment:
+  cloudflare_account_id: "your-id"   # Cloudflare configuration
+  r2_bucket: "mv-face-recognition-videos"
+  kv_namespace: "mv-metadata"
+```
+
+#### Custom Processing
+
+**Advanced Processing Options:**
+```bash
+# Custom confidence threshold
+python src/process_video.py --input video.mp4 --confidence-threshold 0.9
+
+# Skip certain processing steps
+python src/process_video.py --input video.mp4 --skip-interpolation
+
+# Output different format
+python src/process_video.py --input video.mp4 --output-format 1080p
+
+# Process with custom contestant database
+python src/process_video.py --input video.mp4 --contestants custom_contestants.csv
+```
+
+#### Cloud Processing
+
+**Modal.com GPU Processing:**
+```bash
+# Setup Modal (for heavy processing)
+pip install modal-client
+modal token new
+
+# Deploy processing function to cloud
+modal deploy mvp-processor/modal_app.py
+
+# Process videos in cloud with GPU
+modal run mvp-processor/modal_app.py::process_video_batch
+```
+
+### 🚨 Troubleshooting
+
+#### Common Issues
+
+**1. Video Processing Fails:**
+```bash
+# Check video format
+ffprobe source/videos/your-video.mp4
+
+# Check Python dependencies
+pip check
+
+# Check disk space
+df -h
+
+# Check processing logs
+tail -f mvp-processor/processing.log
+```
+
+**2. Deployment Fails:**
+```bash
+# Check Cloudflare authentication
+wrangler whoami
+
+# Check R2 bucket permissions
+wrangler r2 bucket list
+
+# Check build output
+ls -la frontend/build/_app/
+
+# Verify worker syntax
+cd worker && wrangler dev
+```
+
+**3. Face Recognition Issues:**
+```bash
+# Check contestant database
+python mvp-processor/src/validate_contestants.py
+
+# Check embeddings
+python mvp-processor/src/check_embeddings.py
+
+# Test recognition with sample image
+python mvp-processor/src/test_recognition.py --image test.jpg
+```
+
+#### Performance Optimization
+
+**Processing Speed:**
+```bash
+# Check hardware acceleration
+python -c "import cv2; print(cv2.getBuildInformation())"
+
+# Monitor GPU usage (if available)
+nvidia-smi  # For NVIDIA GPUs
+# or
+system_profiler SPDisplaysDataType  # For Apple Silicon
+
+# Optimize batch size for your hardware
+export BATCH_SIZE=4  # Adjust based on available RAM
+```
+
+**Deployment Optimization:**
+```bash
+# Optimize frontend bundle size
+cd frontend
+npm run build -- --analyze
+
+# Check worker size limits
+cd worker
+wrangler dev --local
+
+# Monitor R2 usage
+wrangler r2 bucket list
+```
+
+### 📊 Monitoring & Analytics
+
+#### System Monitoring
+
+**Real-time Status:**
+```bash
+# Check system health
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/system/status" | jq
+
+# Monitor processing queue
+python mvp-processor/src/check_queue_status.py
+
+# View analytics dashboard
+open "https://mv-face-recognition-api.herballemon.workers.dev/analytics"
+```
+
+**Performance Metrics:**
+- **Processing Speed**: ~5.3 FPS average
+- **Recognition Accuracy**: 95 validated contestants
+- **Global Response Time**: <100ms worldwide
+- **Uptime**: 99.9%+ via Cloudflare edge network
+
+#### Usage Analytics
+
+**Video Analytics:**
+```bash
+# Check video view counts
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/analytics/videos" | jq
+
+# Recognition statistics
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/analytics/recognition" | jq
+
+# Performance metrics
+curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/analytics/performance" | jq
+```
+
+This comprehensive user guide provides everything needed to process videos and deploy the MV Face Recognition system. The workflow is designed to be both beginner-friendly with automated scripts and flexible for advanced users who need custom configurations.
 
 ## System Status & Live URLs
 
