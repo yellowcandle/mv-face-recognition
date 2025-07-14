@@ -109,7 +109,26 @@
       "Bash(grep -n -B5 -A15 \"API endpoint not found\" /Users/yellowcandle/dev/mv-face-recognition/worker/index.js)",
       "Bash(curl -I \"https://mv-face-recognition-api.herballemon.workers.dev/videos/processed_videos/1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_annotated.mp4\")",
       "Bash(curl -s \"https://mv-face-recognition-api.herballemon.workers.dev/_app/immutable/assets/app-B_xKW_I-.css\")",
-      "Bash(curl -I \"https://mv-face-recognition-api.herballemon.workers.dev/favicon.png\")"
+      "Bash(curl -I \"https://mv-face-recognition-api.herballemon.workers.dev/favicon.png\")",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(npx wrangler kv namespace list:*)",
+      "Bash(npx wrangler kv key list:*)",
+      "Bash(npx wrangler r2 object list:*)",
+      "Bash(npx wrangler r2 bucket list:*)",
+      "Bash(npx wrangler kv key get:*)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(ln:*)",
+      "mcp__toolbase__sequential_thinking_sequentialthinking",
+      "Bash(wrangler pages deploy:*)",
+      "Bash(wrangler tail:*)",
+      "Bash(wrangler r2 bucket list:*)",
+      "Bash(wrangler r2 object list:*)",
+      "Bash(npx wrangler r2 object put:*)",
+      "Bash(for:*)",
+      "Bash(do npx wrangler r2 object put:*)",
+      "Bash(done:*)",
+      "Bash(source:*)"
     ]
   },
   "enableAllProjectMcpServers": true

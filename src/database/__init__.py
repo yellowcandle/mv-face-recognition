@@ -1,1 +1,0 @@
-# ChromaDB setup and management
