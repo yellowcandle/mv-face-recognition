@@ -1,9 +1,11 @@
 ---
 id: task-002
 title: Implement Missing API Endpoints in Worker
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2025-07-15'
+updated_date: '2025-07-15'
 labels: []
 dependencies: []
 ---
