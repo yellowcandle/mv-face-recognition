@@ -1,6 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
 import { apiFetch } from '$lib/utils/api';
-import { offlineMode } from './main.js';
+import { offlineMode } from './main.ts';
 import { loadVideoList, loadVideoMetadata, isMetadataAvailable, loadContestantInfo } from '$lib/services/metadataService';
 
 // Store states

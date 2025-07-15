@@ -124,7 +124,7 @@ async def get_contestants():
     ]
 
 # Serve static files (for video downloads, etc.)
-app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def root():

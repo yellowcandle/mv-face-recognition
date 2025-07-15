@@ -61,4 +61,5 @@ dev-dependencies = [
     "isort",
     "flake8",
     "mypy",
+    "psutil>=7.0.0",
 ]
