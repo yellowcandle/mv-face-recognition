@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Ruff Format & Check",
+  "description": "Automatically runs ruff format, ruff check, and ruff check --fix on Python files when saved to maintain code quality and formatting standards",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.py"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run the following commands on the saved Python file:\n1. ruff format {filepath}\n2. ruff check {filepath}\n3. ruff check --fix {filepath}\n\nExecute these commands in sequence and report any issues or fixes applied."
+  }
+}

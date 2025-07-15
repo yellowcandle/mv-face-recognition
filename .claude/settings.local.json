@@ -128,7 +128,10 @@
       "Bash(for:*)",
       "Bash(do npx wrangler r2 object put:*)",
       "Bash(done:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(backlog task list:*)",
+      "Bash(backlog task:*)",
+      "Bash(wrangler whoami:*)"
     ]
   },
   "enableAllProjectMcpServers": true

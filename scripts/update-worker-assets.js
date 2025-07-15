@@ -7,8 +7,12 @@
  * into the Cloudflare Worker for edge deployment.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const FRONTEND_BUILD_DIR = path.join(__dirname, '..', 'frontend', 'build');
@@ -68,16 +72,11 @@ function generateAssetsObject(assets) {
   const entries = [];
   
   for (const [path, asset] of Object.entries(assets)) {
-    // Escape the content for JavaScript string
-    const escapedContent = asset.content
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
+    // Use JSON.stringify to properly escape the content
+    const escapedContent = JSON.stringify(asset.content);
     
     entries.push(`  '${path}': {
-    content: '${escapedContent}',
+    content: ${escapedContent},
     size: ${asset.size}
   }`);
   }
@@ -116,27 +115,41 @@ try {
   
   // Read worker file
   console.log('\n🔧 Updating worker file...');
-  let workerContent = fs.readFileSync(WORKER_FILE, 'utf8');
+  const workerLines = fs.readFileSync(WORKER_FILE, 'utf8').split('\n');
   
-  // Generate assets object
-  const assetsObjectString = generateAssetsObject(assets);
+  // Find the STATIC_ASSETS object boundaries
+  let startLine = -1;
+  let endLine = -1;
   
-  // Replace the STATIC_ASSETS object in the worker
-  const assetsRegex = /const STATIC_ASSETS = \{[^}]*\};/s;
-  const newAssetsDeclaration = `const STATIC_ASSETS = ${assetsObjectString};`;
+  for (let i = 0; i < workerLines.length; i++) {
+    // Look for the exact STATIC_ASSETS constant declaration
+    if (workerLines[i].trim() === 'const STATIC_ASSETS = {};') {
+      startLine = i;
+      endLine = i; // Single line object, we'll replace this entire line
+      break;
+    }
+  }
   
-  if (assetsRegex.test(workerContent)) {
-    workerContent = workerContent.replace(assetsRegex, newAssetsDeclaration);
-    console.log('✅ Updated existing STATIC_ASSETS object');
-  } else {
-    console.error('❌ Could not find STATIC_ASSETS object in worker file');
-    console.error('   Make sure the worker file contains: const STATIC_ASSETS = {};');
+  if (startLine === -1 || endLine === -1) {
+    console.error('❌ Could not find STATIC_ASSETS object boundaries in worker file');
     process.exit(1);
   }
   
-  // Write updated worker file
-  fs.writeFileSync(WORKER_FILE, workerContent);
+  // Generate assets object
+  const assetsObjectString = generateAssetsObject(assets);
+  const newAssetsLine = `const STATIC_ASSETS = ${assetsObjectString};`;
   
+  // Replace only the STATIC_ASSETS line
+  const newWorkerLines = [
+    ...workerLines.slice(0, startLine),
+    newAssetsLine,
+    ...workerLines.slice(endLine + 1)
+  ];
+  
+  // Write updated worker file
+  fs.writeFileSync(WORKER_FILE, newWorkerLines.join('\n'));
+  
+  console.log('✅ Updated existing STATIC_ASSETS object');
   console.log('\n🎉 Asset embedding completed successfully!');
   console.log(`📦 Embedded ${Object.keys(assets).length} assets (${(totalSize / 1024).toFixed(1)}KB total)`);
   console.log('🚀 Worker is ready for deployment with "wrangler deploy"');

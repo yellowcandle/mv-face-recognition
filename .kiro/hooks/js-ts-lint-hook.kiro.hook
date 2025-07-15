@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "JS/TS Lint on Save",
+  "description": "Automatically runs linting for JavaScript and TypeScript files whenever they are saved to maintain code quality and catch potential issues",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.js",
+      "**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run linting on the JavaScript and TypeScript files that were just saved. Check for code quality issues, syntax errors, and style violations. Report any linting errors or warnings found."
+  }
+}

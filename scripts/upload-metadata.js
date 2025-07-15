@@ -7,9 +7,13 @@
  * Cloudflare KV for fast edge access.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const METADATA_DIR = path.join(__dirname, '..', 'metadata');
@@ -41,7 +45,7 @@ function uploadToKV(key, value) {
     const tempFile = path.join(__dirname, 'temp_kv_value.json');
     fs.writeFileSync(tempFile, value);
     
-    const command = `wrangler kv:key put "${key}" --path="${tempFile}" --binding=${KV_NAMESPACE}`;
+    const command = `wrangler kv key put "${key}" --path="${tempFile}" --binding=${KV_NAMESPACE}`;
     console.log(`📤 Uploading KV: ${key}`);
     execSync(command, { stdio: 'pipe' });
     

@@ -65,7 +65,7 @@ export async function getVideos() {
  * Get video metadata
  */
 export async function getVideoMetadata(videoId: string) {
-	return apiRequest(`/videos/${videoId}/metadata`);
+	return apiRequest(`/videos/metadata/dense/${videoId}`);
 }
 
 /**

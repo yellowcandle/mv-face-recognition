@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { parseMetadata, type DetectedFace, type ParsedMetadata } from '$lib/utils/metadata.js';
+  import { createVideoSynchronizer, type VideoTimestampSynchronizer, type TimestampSyncResult } from '$lib/utils/synchronization.js';
   
   let videos: any[] = [];
   let selectedVideo: any = null;
@@ -12,14 +14,44 @@
   let loading = true;
   let showOverlay = true;
   let showSidebar = true;
-  let currentFaces: any[] = [];
-  let selectedFace: any = null;
+  let currentFaces: DetectedFace[] = [];
+  let selectedFace: DetectedFace | null = null;
   let metadata: any = null;
+  let parsedMetadata: ParsedMetadata | null = null;
+  let synchronizer: VideoTimestampSynchronizer | null = null;
   let animationId: number;
+  let resizeObserver: ResizeObserver;
+  let hoveredFace: DetectedFace | null = null;
+  let mousePosition = { x: 0, y: 0 };
+  let syncStats = {
+    averageLatency: 0,
+    frameDrops: 0,
+    cacheHitRate: 0,
+    confidence: 0
+  };
+  let performanceMonitoring = true;
   
   onMount(async () => {
     await loadVideos();
     loading = false;
+    
+    // Setup resize observer for canvas scaling
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (videoElement && canvas) {
+          updateCanvasSize();
+        }
+      });
+    }
+    
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
   });
   
   async function loadVideos() {
@@ -42,6 +74,12 @@
     currentFaces = [];
     selectedFace = null;
     
+    // Stop existing synchronizer
+    if (synchronizer) {
+      synchronizer.stop();
+      synchronizer = null;
+    }
+    
     if (videoElement) {
       videoElement.currentTime = 0;
       currentTime = 0;
@@ -62,8 +100,50 @@
           duration: video.duration,
           fps: 30
         },
+        processing_info: {
+          processing_interval: 5,
+          interpolation_enabled: true,
+          total_processed_frames: Math.floor(video.duration * 30 / 5),
+          total_interpolated_frames: Math.floor(video.duration * 30 * 0.8)
+        },
         timeline: generateMockTimeline(video.duration)
       };
+    }
+    
+    // Parse metadata and initialize synchronizer
+    if (metadata) {
+      parsedMetadata = parseMetadata(metadata);
+      
+      if (parsedMetadata.isValid) {
+        // Create advanced synchronizer with performance optimizations
+        synchronizer = createVideoSynchronizer({
+          toleranceSeconds: 0.5,
+          interpolationEnabled: true,
+          preloadBufferSeconds: performanceMonitoring ? 15 : 10,
+          maxCacheSize: performanceMonitoring ? 300 : 200
+        });
+        
+        // Initialize synchronizer with parsed metadata
+        const initialized = synchronizer.initialize(parsedMetadata);
+        if (initialized) {
+          console.log('Advanced synchronizer initialized successfully');
+          
+          // Setup synchronization callback for face updates
+          synchronizer.onSync((result: TimestampSyncResult) => {
+            currentFaces = result.faces;
+            syncStats.confidence = result.confidence;
+            
+            // Update performance stats if monitoring is enabled
+            if (performanceMonitoring) {
+              updatePerformanceStats(result);
+            }
+          });
+        } else {
+          console.error('Failed to initialize synchronizer');
+        }
+      } else {
+        console.error('Invalid metadata:', parsedMetadata.errors);
+      }
     }
   }
   
@@ -109,42 +189,139 @@
   
   function initCanvas() {
     if (canvas && videoElement) {
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
+      updateCanvasSize();
       ctx = canvas.getContext('2d');
+      
+      // Start observing video element for size changes
+      if (resizeObserver) {
+        resizeObserver.observe(videoElement);
+      }
+      
       startAnimation();
     }
   }
   
+  function updateCanvasSize() {
+    if (!canvas || !videoElement) return;
+    
+    // Get the displayed size of the video element
+    const rect = videoElement.getBoundingClientRect();
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+    
+    // Get device pixel ratio for crisp rendering
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    
+    // Set canvas size to match displayed video size
+    canvas.style.width = displayWidth + 'px';
+    canvas.style.height = displayHeight + 'px';
+    
+    // Scale canvas for device pixel ratio
+    canvas.width = displayWidth * devicePixelRatio;
+    canvas.height = displayHeight * devicePixelRatio;
+    
+    // Scale the drawing context to match device pixel ratio
+    if (ctx) {
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+    }
+  }
+  
+  function getVideoScaleFactors() {
+    if (!videoElement || !canvas) return { scaleX: 1, scaleY: 1 };
+    
+    // Get video's natural dimensions
+    const videoWidth = videoElement.videoWidth || 1920;
+    const videoHeight = videoElement.videoHeight || 1080;
+    
+    // Get displayed dimensions
+    const rect = videoElement.getBoundingClientRect();
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+    
+    // Calculate how the video is actually displayed (considering object-fit: contain)
+    const videoAspect = videoWidth / videoHeight;
+    const displayAspect = displayWidth / displayHeight;
+    
+    let actualVideoWidth, actualVideoHeight;
+    let offsetX = 0, offsetY = 0;
+    
+    if (videoAspect > displayAspect) {
+      // Video is wider - letterboxed top/bottom
+      actualVideoWidth = displayWidth;
+      actualVideoHeight = displayWidth / videoAspect;
+      offsetY = (displayHeight - actualVideoHeight) / 2;
+    } else {
+      // Video is taller - letterboxed left/right
+      actualVideoHeight = displayHeight;
+      actualVideoWidth = displayHeight * videoAspect;
+      offsetX = (displayWidth - actualVideoWidth) / 2;
+    }
+    
+    return {
+      scaleX: actualVideoWidth / videoWidth,
+      scaleY: actualVideoHeight / videoHeight,
+      offsetX,
+      offsetY,
+      actualVideoWidth,
+      actualVideoHeight
+    };
+  }
+  
   function startAnimation() {
-    function animate() {
-      if (showOverlay && ctx && videoElement && metadata) {
-        updateFaceOverlay();
+    let lastFrameTime = 0;
+    const targetFPS = 60;
+    const frameInterval = 1000 / targetFPS;
+    
+    function animate(currentTime: number) {
+      // Throttle to 60fps for smooth performance
+      if (currentTime - lastFrameTime >= frameInterval) {
+        if (showOverlay && ctx && videoElement && metadata) {
+          updateFaceOverlay();
+        }
+        lastFrameTime = currentTime;
       }
       animationId = requestAnimationFrame(animate);
     }
-    animate();
+    animationId = requestAnimationFrame(animate);
   }
   
   function updateFaceOverlay() {
-    if (!ctx || !canvas || !metadata) return;
+    if (!ctx || !canvas) return;
     
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas using display dimensions (since context is scaled)
+    const rect = videoElement?.getBoundingClientRect();
+    if (rect) {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+    }
     
-    // Find faces for current timestamp
-    const currentTimestamp = videoElement.currentTime;
-    const currentFrame = metadata.timeline.find((frame: any) => 
-      Math.abs(frame.timestamp - currentTimestamp) < 0.5
-    );
-    
-    if (currentFrame && currentFrame.contestants) {
-      currentFaces = currentFrame.contestants;
+    // Use advanced synchronizer if available, fallback to basic lookup
+    if (synchronizer && videoElement) {
+      const currentTimestamp = videoElement.currentTime;
       
-      currentFrame.contestants.forEach((face: any) => {
+      // Sync to current timestamp - this will trigger the callback
+      // which updates currentFaces automatically
+      synchronizer.syncToTimestamp(currentTimestamp);
+      
+      // Draw all current faces
+      currentFaces.forEach((face: DetectedFace) => {
         drawFaceBoundingBox(face);
       });
-    } else {
-      currentFaces = [];
+    } else if (metadata) {
+      // Fallback to basic synchronization for compatibility
+      const currentTimestamp = videoElement.currentTime;
+      const currentFrame = metadata.timeline.find((frame: any) => 
+        Math.abs(frame.timestamp - currentTimestamp) < 0.5
+      );
+      
+      if (currentFrame && currentFrame.contestants) {
+        currentFaces = currentFrame.contestants;
+        
+        currentFrame.contestants.forEach((face: any) => {
+          drawFaceBoundingBox(face);
+        });
+      } else {
+        currentFaces = [];
+      }
     }
   }
   
@@ -154,52 +331,118 @@
     const { x, y, width, height } = face.bounding_box;
     const confidence = face.confidence;
     
-    // Scale coordinates to canvas size
-    const scaleX = canvas.width / 1920; // Assuming 1080p base resolution
-    const scaleY = canvas.height / 1080;
+    // Get proper scaling factors based on video display
+    const scaleFactors = getVideoScaleFactors();
     
-    const scaledX = x * scaleX;
-    const scaledY = y * scaleY;
-    const scaledWidth = width * scaleX;
-    const scaledHeight = height * scaleY;
+    const scaledX = x * scaleFactors.scaleX + scaleFactors.offsetX;
+    const scaledY = y * scaleFactors.scaleY + scaleFactors.offsetY;
+    const scaledWidth = width * scaleFactors.scaleX;
+    const scaledHeight = height * scaleFactors.scaleY;
     
-    // Set color based on confidence
-    let color = '#ef4444'; // Red for low confidence
-    if (confidence >= 0.8) color = '#10b981'; // Green for high confidence
-    else if (confidence >= 0.6) color = '#f59e0b'; // Orange for medium confidence
+    // Check if this face is hovered or selected
+    const isHovered = hoveredFace?.id === face.id;
+    const isSelected = selectedFace?.id === face.id;
     
-    // Draw bounding box
+    // Enhanced confidence-based colors with alpha for better visibility
+    let color = '#ef4444'; // Red for low confidence (< 0.5)
+    let alpha = 0.8;
+    let lineWidth = 3;
+    
+    if (confidence >= 0.8) {
+      color = '#10b981'; // Green for high confidence
+      alpha = 0.9;
+    } else if (confidence >= 0.7) {
+      color = '#10b981'; // Green for good confidence  
+      alpha = 0.8;
+    } else if (confidence >= 0.5) {
+      color = '#f59e0b'; // Orange for medium confidence
+      alpha = 0.8;
+    } else {
+      color = '#ef4444'; // Red for low confidence
+      alpha = 0.7;
+    }
+    
+    // Enhance visual feedback for hover and selection states
+    if (isSelected) {
+      alpha = 1.0;
+      lineWidth = 4;
+      color = '#2563eb'; // Blue for selected
+    } else if (isHovered) {
+      alpha = 0.95;
+      lineWidth = 4;
+      // Keep original color but make it brighter
+    }
+    
+    // Save context state
+    ctx.save();
+    
+    // Set global alpha for the entire face overlay
+    ctx.globalAlpha = alpha;
+    
+    // Draw main bounding box with rounded corners effect
     ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
     
-    // Draw corner markers
-    const cornerSize = 20;
+    // Draw enhanced corner markers
+    const cornerSize = Math.min(25, Math.min(scaledWidth, scaledHeight) * 0.15);
+    const cornerThickness = 4;
+    
     ctx.fillStyle = color;
+    ctx.globalAlpha = 1.0; // Full opacity for corners
     
     // Top-left corner
-    ctx.fillRect(scaledX - 2, scaledY - 2, cornerSize, 4);
-    ctx.fillRect(scaledX - 2, scaledY - 2, 4, cornerSize);
+    ctx.fillRect(scaledX - cornerThickness/2, scaledY - cornerThickness/2, cornerSize, cornerThickness);
+    ctx.fillRect(scaledX - cornerThickness/2, scaledY - cornerThickness/2, cornerThickness, cornerSize);
     
     // Top-right corner
-    ctx.fillRect(scaledX + scaledWidth - cornerSize + 2, scaledY - 2, cornerSize, 4);
-    ctx.fillRect(scaledX + scaledWidth - 2, scaledY - 2, 4, cornerSize);
+    ctx.fillRect(scaledX + scaledWidth - cornerSize + cornerThickness/2, scaledY - cornerThickness/2, cornerSize, cornerThickness);
+    ctx.fillRect(scaledX + scaledWidth - cornerThickness/2, scaledY - cornerThickness/2, cornerThickness, cornerSize);
     
     // Bottom-left corner
-    ctx.fillRect(scaledX - 2, scaledY + scaledHeight - 2, cornerSize, 4);
-    ctx.fillRect(scaledX - 2, scaledY + scaledHeight - cornerSize + 2, 4, cornerSize);
+    ctx.fillRect(scaledX - cornerThickness/2, scaledY + scaledHeight - cornerThickness/2, cornerSize, cornerThickness);
+    ctx.fillRect(scaledX - cornerThickness/2, scaledY + scaledHeight - cornerSize + cornerThickness/2, cornerThickness, cornerSize);
     
     // Bottom-right corner
-    ctx.fillRect(scaledX + scaledWidth - cornerSize + 2, scaledY + scaledHeight - 2, cornerSize, 4);
-    ctx.fillRect(scaledX + scaledWidth - 2, scaledY + scaledHeight - cornerSize + 2, 4, cornerSize);
+    ctx.fillRect(scaledX + scaledWidth - cornerSize + cornerThickness/2, scaledY + scaledHeight - cornerThickness/2, cornerSize, cornerThickness);
+    ctx.fillRect(scaledX + scaledWidth - cornerThickness/2, scaledY + scaledHeight - cornerSize + cornerThickness/2, cornerThickness, cornerSize);
     
-    // Draw label
-    const label = `${face.contestant_name} (${Math.round(confidence * 100)}%)`;
-    ctx.fillStyle = color;
-    ctx.font = '14px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillRect(scaledX, scaledY - 25, ctx.measureText(label).width + 10, 20);
-    ctx.fillStyle = 'white';
-    ctx.fillText(label, scaledX + 5, scaledY - 10);
+    // Draw enhanced label with better styling
+    if (confidence >= 0.7) { // Only show labels for confident detections
+      const label = `${face.contestant_name} (${Math.round(confidence * 100)}%)`;
+      ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      
+      const textMetrics = ctx.measureText(label);
+      const labelWidth = textMetrics.width + 16;
+      const labelHeight = 24;
+      const labelX = Math.max(scaledX, Math.min(scaledX, scaleFactors.actualVideoWidth - labelWidth));
+      const labelY = scaledY > labelHeight + 5 ? scaledY - 5 : scaledY + scaledHeight + labelHeight;
+      
+      // Draw label background with rounded corners
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(labelX, labelY - labelHeight, labelWidth, labelHeight);
+      
+      // Add subtle shadow effect
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(labelX + 2, labelY - labelHeight + 2, labelWidth, labelHeight);
+      
+      // Draw label background again on top
+      ctx.fillStyle = color;
+      ctx.fillRect(labelX, labelY - labelHeight, labelWidth, labelHeight);
+      
+      // Draw label text
+      ctx.fillStyle = 'white';
+      ctx.globalAlpha = 1.0;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, labelX + 8, labelY - labelHeight/2);
+    }
+    
+    // Restore context state
+    ctx.restore();
   }
   
   function handleTimeUpdate() {
@@ -235,8 +478,9 @@
   
   function toggleOverlay() {
     showOverlay = !showOverlay;
-    if (!showOverlay && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!showOverlay && ctx && videoElement) {
+      const rect = videoElement.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
     }
   }
   
@@ -258,6 +502,195 @@
     if (confidence >= 0.8) return '#10b981';
     if (confidence >= 0.6) return '#f59e0b';
     return '#ef4444';
+  }
+  
+  // Interactive canvas functions
+  function handleCanvasMouseMove(event: MouseEvent) {
+    if (!canvas || !currentFaces.length) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    mousePosition.x = event.clientX - rect.left;
+    mousePosition.y = event.clientY - rect.top;
+    
+    // Check if mouse is over any face bounding box
+    const previousHoveredFace = hoveredFace;
+    hoveredFace = null;
+    
+    for (const face of currentFaces) {
+      if (isPointInFaceBoundingBox(mousePosition, face)) {
+        hoveredFace = face;
+        break;
+      }
+    }
+    
+    // Update cursor style
+    if (hoveredFace) {
+      canvas.style.cursor = 'pointer';
+    } else {
+      canvas.style.cursor = 'default';
+    }
+    
+    // Trigger redraw if hover state changed
+    if (hoveredFace?.id !== previousHoveredFace?.id) {
+      // Force a redraw on next animation frame
+    }
+  }
+  
+  function handleCanvasClick(event: MouseEvent) {
+    if (!canvas || !currentFaces.length) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const clickPosition = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
+    
+    // Check if click is on any face bounding box
+    for (const face of currentFaces) {
+      if (isPointInFaceBoundingBox(clickPosition, face)) {
+        selectFace(face);
+        break;
+      }
+    }
+  }
+  
+  function handleCanvasMouseLeave() {
+    hoveredFace = null;
+    if (canvas) {
+      canvas.style.cursor = 'default';
+    }
+  }
+  
+  function isPointInFaceBoundingBox(point: {x: number, y: number}, face: any): boolean {
+    const scaleFactors = getVideoScaleFactors();
+    const { x, y, width, height } = face.bounding_box;
+    
+    const scaledX = x * scaleFactors.scaleX + scaleFactors.offsetX;
+    const scaledY = y * scaleFactors.scaleY + scaleFactors.offsetY;
+    const scaledWidth = width * scaleFactors.scaleX;
+    const scaledHeight = height * scaleFactors.scaleY;
+    
+    return point.x >= scaledX && 
+           point.x <= scaledX + scaledWidth && 
+           point.y >= scaledY && 
+           point.y <= scaledY + scaledHeight;
+  }
+
+  // Performance monitoring functions
+  let performanceStats = {
+    frameCount: 0,
+    lastFrameTime: 0,
+    frameDrops: 0,
+    averageLatency: 0,
+    latencyMeasurements: [] as number[]
+  };
+
+  function updatePerformanceStats(result: TimestampSyncResult) {
+    if (!performanceMonitoring) return;
+    
+    const now = performance.now();
+    const targetTimestamp = result.timestamp * 1000; // Convert to milliseconds
+    const latency = Math.abs(now - targetTimestamp);
+    
+    // Track latency measurements
+    performanceStats.latencyMeasurements.push(latency);
+    if (performanceStats.latencyMeasurements.length > 100) {
+      performanceStats.latencyMeasurements.shift(); // Keep only last 100 measurements
+    }
+    
+    // Calculate average latency
+    const sum = performanceStats.latencyMeasurements.reduce((a, b) => a + b, 0);
+    performanceStats.averageLatency = sum / performanceStats.latencyMeasurements.length;
+    
+    // Track frame drops (if time between frames is too long)
+    if (performanceStats.lastFrameTime > 0) {
+      const timeDelta = now - performanceStats.lastFrameTime;
+      const expectedFrameTime = 1000 / 60; // 60fps target
+      
+      if (timeDelta > expectedFrameTime * 1.5) {
+        performanceStats.frameDrops++;
+      }
+    }
+    
+    performanceStats.frameCount++;
+    performanceStats.lastFrameTime = now;
+    
+    // Update sync stats for UI display
+    syncStats.averageLatency = performanceStats.averageLatency;
+    syncStats.frameDrops = performanceStats.frameDrops;
+    syncStats.confidence = result.confidence;
+    
+    // Get cache hit rate from synchronizer if available
+    if (synchronizer) {
+      const stats = synchronizer.getStats();
+      syncStats.cacheHitRate = stats.cacheHitRate;
+    }
+  }
+
+  function resetPerformanceStats() {
+    performanceStats = {
+      frameCount: 0,
+      lastFrameTime: 0,
+      frameDrops: 0,
+      averageLatency: 0,
+      latencyMeasurements: []
+    };
+    
+    syncStats = {
+      averageLatency: 0,
+      frameDrops: 0,
+      cacheHitRate: 0,
+      confidence: 0
+    };
+  }
+
+  function togglePerformanceMonitoring() {
+    performanceMonitoring = !performanceMonitoring;
+    
+    if (performanceMonitoring) {
+      resetPerformanceStats();
+    }
+    
+    // Update synchronizer options if available
+    if (synchronizer) {
+      synchronizer.updateOptions({
+        preloadBufferSeconds: performanceMonitoring ? 15 : 10,
+        maxCacheSize: performanceMonitoring ? 300 : 200
+      });
+    }
+  }
+
+  // Enhanced video player lifecycle management
+  function handleVideoPlay() {
+    playing = true;
+    
+    // Start synchronizer if available
+    if (synchronizer && videoElement) {
+      synchronizer.start(videoElement);
+      console.log('Advanced synchronizer started');
+    }
+  }
+
+  function handleVideoPause() {
+    playing = false;
+    
+    // Stop synchronizer to save resources
+    if (synchronizer) {
+      synchronizer.stop();
+      console.log('Advanced synchronizer stopped');
+    }
+  }
+
+  function handleVideoSeeked() {
+    // Clear cache and preload around new position
+    if (synchronizer && videoElement) {
+      const currentTime = videoElement.currentTime;
+      synchronizer.clearCache();
+      synchronizer.preloadTimeRange(
+        Math.max(0, currentTime - 5),
+        Math.min(duration, currentTime + 15)
+      );
+    }
   }
 </script>
 
@@ -313,6 +746,9 @@
               <span class="detection-count">{currentFaces.length}</span>
               <span>faces detected</span>
             </div>
+            <button class="control-btn" on:click={togglePerformanceMonitoring} class:active={performanceMonitoring}>
+              📊 Performance
+            </button>
           </div>
           
           <!-- Video Container -->
@@ -323,8 +759,9 @@
                 src="/videos/{selectedVideo.filename}"
                 on:timeupdate={handleTimeUpdate}
                 on:canplay={handleCanPlay}
-                on:play={() => playing = true}
-                on:pause={() => playing = false}
+                on:play={handleVideoPlay}
+                on:pause={handleVideoPause}
+                on:seeked={handleVideoSeeked}
                 preload="metadata"
                 crossorigin="anonymous"
               >
@@ -335,6 +772,9 @@
                 <canvas
                   bind:this={canvas}
                   class="face-overlay"
+                  on:mousemove={handleCanvasMouseMove}
+                  on:click={handleCanvasClick}
+                  on:mouseleave={handleCanvasMouseLeave}
                 ></canvas>
               {/if}
             {/if}
@@ -435,6 +875,66 @@
                       {Math.round(selectedFace.bounding_box.width)}×{Math.round(selectedFace.bounding_box.height)}
                     </span>
                   </div>
+                  {#if selectedFace.interpolated}
+                    <div class="detail-item">
+                      <label>Type:</label>
+                      <span class="interpolated-badge">Interpolated</span>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+            
+            <!-- Performance Monitoring Panel -->
+            {#if performanceMonitoring}
+              <div class="performance-panel">
+                <h4>Synchronization Performance</h4>
+                <div class="performance-stats">
+                  <div class="stat-item">
+                    <label>Avg Latency:</label>
+                    <span class="stat-value" class:good={syncStats.averageLatency < 16} class:warning={syncStats.averageLatency >= 16 && syncStats.averageLatency < 33} class:bad={syncStats.averageLatency >= 33}>
+                      {syncStats.averageLatency.toFixed(1)}ms
+                    </span>
+                  </div>
+                  <div class="stat-item">
+                    <label>Frame Drops:</label>
+                    <span class="stat-value" class:good={syncStats.frameDrops === 0} class:warning={syncStats.frameDrops < 5} class:bad={syncStats.frameDrops >= 5}>
+                      {syncStats.frameDrops}
+                    </span>
+                  </div>
+                  <div class="stat-item">
+                    <label>Cache Hit Rate:</label>
+                    <span class="stat-value" class:good={syncStats.cacheHitRate > 0.8} class:warning={syncStats.cacheHitRate > 0.6} class:bad={syncStats.cacheHitRate <= 0.6}>
+                      {Math.round(syncStats.cacheHitRate * 100)}%
+                    </span>
+                  </div>
+                  <div class="stat-item">
+                    <label>Sync Confidence:</label>
+                    <span class="stat-value" class:good={syncStats.confidence > 0.8} class:warning={syncStats.confidence > 0.6} class:bad={syncStats.confidence <= 0.6}>
+                      {Math.round(syncStats.confidence * 100)}%
+                    </span>
+                  </div>
+                  {#if synchronizer}
+                    <div class="stat-item">
+                      <label>Synchronizer:</label>
+                      <span class="stat-value good">Advanced</span>
+                    </div>
+                  {:else}
+                    <div class="stat-item">
+                      <label>Synchronizer:</label>
+                      <span class="stat-value warning">Basic</span>
+                    </div>
+                  {/if}
+                </div>
+                <div class="performance-actions">
+                  <button class="small-btn" on:click={resetPerformanceStats}>
+                    Reset Stats
+                  </button>
+                  {#if synchronizer}
+                    <button class="small-btn" on:click={() => synchronizer?.clearCache()}>
+                      Clear Cache
+                    </button>
+                  {/if}
                 </div>
               </div>
             {/if}
@@ -613,7 +1113,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 10;
   }
   
@@ -835,6 +1335,94 @@
     font-size: 0.85rem;
     color: var(--text-color);
     font-weight: 600;
+  }
+
+  .interpolated-badge {
+    background: #f59e0b;
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Performance Monitoring Panel */
+  .performance-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .performance-panel h4 {
+    margin: 0 0 1rem 0;
+    color: #60a5fa;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .performance-stats {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+  }
+
+  .stat-item label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+  }
+
+  .stat-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-value.good {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+  }
+
+  .stat-value.warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+  }
+
+  .stat-value.bad {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+  }
+
+  .performance-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .small-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .small-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
   }
   
   /* Mobile Responsiveness */

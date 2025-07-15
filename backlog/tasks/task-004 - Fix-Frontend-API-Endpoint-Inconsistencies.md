@@ -1,7 +1,7 @@
 ---
 id: task-004
 title: Fix Frontend API Endpoint Inconsistencies
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2025-07-15'

@@ -1,0 +1,75 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": [
+        "fetch"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "resolve-library-id",
+        "get-library-docs",
+        "get-library-docs"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    },
+    "exa": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.exa.ai/mcp?exaApiKey=1963415b-0d89-445d-a448-f3001b24dd31"
+      ]
+    },
+    "cloudflare-bindings": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://bindings.mcp.cloudflare.com/sse"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    },
+    "cloudflare-builds": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "https://builds.mcp.cloudflare.com/sse"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    },
+    "cloudflare-logs": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://logs.mcp.cloudflare.com/sse"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  }
+}
