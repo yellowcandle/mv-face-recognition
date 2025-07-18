@@ -110,6 +110,7 @@
       "Bash(curl -I \"https://mv-face-recognition-api.herballemon.workers.dev/videos/processed_videos/1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_annotated.mp4\")",
       "Bash(curl -s \"https://mv-face-recognition-api.herballemon.workers.dev/_app/immutable/assets/app-B_xKW_I-.css\")",
       "Bash(curl -I \"https://mv-face-recognition-api.herballemon.workers.dev/favicon.png\")",
+<<<<<<< HEAD
       "Bash(npm test:*)",
       "Bash(npm run:*)",
       "Bash(npx wrangler kv namespace list:*)",
@@ -133,6 +134,10 @@
       "Bash(backlog task:*)",
       "Bash(wrangler whoami:*)",
       "Bash(git merge:*)"
+=======
+      "Bash(cd /Users/yellowcandle/dev/mv-face-recognition/frontend)",
+      "Bash(npx tsc --noEmit --skipLibCheck)"
+>>>>>>> 70223a2a6950665cf66c70f0d3619b83e29fe118
     ]
   },
   "enableAllProjectMcpServers": true
