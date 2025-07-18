@@ -1,0 +1,7854 @@
+{
+  "video_info": {
+    "filename": "temp_test_video.mp4",
+    "path": "temp_test_video.mp4",
+    "fps": 25,
+    "frame_count": 750,
+    "width": 3840,
+    "height": 1600,
+    "duration_seconds": 30
+  },
+  "processing_info": {
+    "processing_date": "2025-07-07T12:01:12.247789",
+    "processing_time_seconds": 28.118494272232056,
+    "frames_processed": 150,
+    "frame_interval": 5,
+    "interpolation_enabled": true,
+    "similarity_threshold": 0.25
+  },
+  "recognition_summary": {
+    "total_frames_processed": 150,
+    "total_faces_detected": 212,
+    "total_faces_recognized": 3,
+    "recognition_rate": 0.014150943396226415,
+    "unique_contestants": 1,
+    "processing_fps": 5.334567297514575
+  },
+  "contestant_timeline": {
+    "子涓": {
+      "total_appearances": 3,
+      "max_confidence": 0.3094166439857464,
+      "first_appearance_time": 29.2,
+      "last_appearance_time": 29.8,
+      "detailed_timeline": [
+        {
+          "frame": 730,
+          "timestamp": 29.2,
+          "confidence": 0.265147964885052,
+          "bbox": [
+            1267,
+            432,
+            1407,
+            644
+          ],
+          "interpolated": false
+        },
+        {
+          "frame": 731,
+          "timestamp": 29.24,
+          "bbox": [
+            1261,
+            432,
+            1402,
+            643
+          ],
+          "confidence": 0.2518905666407994,
+          "interpolated": true
+        },
+        {
+          "frame": 732,
+          "timestamp": 29.28,
+          "bbox": [
+            1256,
+            432,
+            1397,
+            642
+          ],
+          "confidence": 0.23929603830875942,
+          "interpolated": true
+        },
+        {
+          "frame": 733,
+          "timestamp": 29.32,
+          "bbox": [
+            1251,
+            432,
+            1392,
+            642
+          ],
+          "confidence": 0.22733123639332142,
+          "interpolated": true
+        },
+        {
+          "frame": 734,
+          "timestamp": 29.36,
+          "bbox": [
+            1245,
+            432,
+            1387,
+            641
+          ],
+          "confidence": 0.21596467457365534,
+          "interpolated": true
+        },
+        {
+          "frame": 735,
+          "timestamp": 29.4,
+          "bbox": [
+            1240,
+            432,
+            1382,
+            641
+          ],
+          "confidence": 0.20516644084497254,
+          "interpolated": true
+        },
+        {
+          "frame": 736,
+          "timestamp": 29.44,
+          "bbox": [
+            1235,
+            432,
+            1377,
+            640
+          ],
+          "confidence": 0.19490811880272393,
+          "interpolated": true
+        },
+        {
+          "frame": 737,
+          "timestamp": 29.48,
+          "bbox": [
+            1229,
+            432,
+            1372,
+            639
+          ],
+          "confidence": 0.1851627128625877,
+          "interpolated": true
+        },
+        {
+          "frame": 738,
+          "timestamp": 29.52,
+          "bbox": [
+            1224,
+            432,
+            1367,
+            639
+          ],
+          "confidence": 0.17590457721945832,
+          "interpolated": true
+        },
+        {
+          "frame": 739,
+          "timestamp": 29.56,
+          "bbox": [
+            1219,
+            432,
+            1362,
+            638
+          ],
+          "confidence": 0.1671093483584854,
+          "interpolated": true
+        },
+        {
+          "frame": 740,
+          "timestamp": 29.6,
+          "confidence": 0.26847211345217725,
+          "bbox": [
+            1214,
+            432,
+            1357,
+            638
+          ],
+          "interpolated": false
+        },
+        {
+          "frame": 741,
+          "timestamp": 29.64,
+          "bbox": [
+            1209,
+            433,
+            1353,
+            639
+          ],
+          "confidence": 0.2550485077795684,
+          "interpolated": true
+        },
+        {
+          "frame": 742,
+          "timestamp": 29.68,
+          "bbox": [
+            1204,
+            434,
+            1349,
+            640
+          ],
+          "confidence": 0.24229608239058997,
+          "interpolated": true
+        },
+        {
+          "frame": 743,
+          "timestamp": 29.72,
+          "bbox": [
+            1199,
+            435,
+            1345,
+            641
+          ],
+          "confidence": 0.23018127827106044,
+          "interpolated": true
+        },
+        {
+          "frame": 744,
+          "timestamp": 29.76,
+          "bbox": [
+            1194,
+            436,
+            1341,
+            642
+          ],
+          "confidence": 0.21867221435750742,
+          "interpolated": true
+        },
+        {
+          "frame": 745,
+          "timestamp": 29.8,
+          "confidence": 0.3094166439857464,
+          "bbox": [
+            1189,
+            437,
+            1338,
+            643
+          ],
+          "interpolated": false
+        }
+      ],
+      "avg_confidence": 0.28101224077432524
+    }
+  },
+  "frame_results": [
+    {
+      "frame_number": 330,
+      "timestamp": 13.2,
+      "faces": [
+        {
+          "bbox": [
+            2835,
+            415,
+            2966,
+            582
+          ],
+          "detection_confidence": 0.8810836672782898,
+          "landmarks": [
+            [
+              2866,
+              483
+            ],
+            [
+              2933,
+              481
+            ],
+            [
+              2901,
+              521
+            ],
+            [
+              2871,
+              542
+            ],
+            [
+              2930,
+              541
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1716,
+            343,
+            1838,
+            495
+          ],
+          "detection_confidence": 0.8593608140945435,
+          "landmarks": [
+            [
+              1732,
+              408
+            ],
+            [
+              1781,
+              403
+            ],
+            [
+              1750,
+              438
+            ],
+            [
+              1746,
+              461
+            ],
+            [
+              1786,
+              457
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            839,
+            470,
+            958,
+            609
+          ],
+          "detection_confidence": 0.8219767808914185,
+          "landmarks": [
+            [
+              854,
+              525
+            ],
+            [
+              901,
+              518
+            ],
+            [
+              871,
+              554
+            ],
+            [
+              872,
+              580
+            ],
+            [
+              905,
+              575
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 335,
+      "timestamp": 13.4,
+      "faces": [
+        {
+          "bbox": [
+            2850,
+            475,
+            2982,
+            652
+          ],
+          "detection_confidence": 0.8993047475814819,
+          "landmarks": [
+            [
+              2880,
+              544
+            ],
+            [
+              2943,
+              544
+            ],
+            [
+              2909,
+              580
+            ],
+            [
+              2881,
+              597
+            ],
+            [
+              2945,
+              596
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1654,
+            337,
+            1781,
+            501
+          ],
+          "detection_confidence": 0.8804259300231934,
+          "landmarks": [
+            [
+              1669,
+              408
+            ],
+            [
+              1720,
+              403
+            ],
+            [
+              1686,
+              438
+            ],
+            [
+              1681,
+              464
+            ],
+            [
+              1723,
+              459
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            790,
+            464,
+            913,
+            607
+          ],
+          "detection_confidence": 0.868933379650116,
+          "landmarks": [
+            [
+              806,
+              520
+            ],
+            [
+              853,
+              516
+            ],
+            [
+              821,
+              550
+            ],
+            [
+              818,
+              576
+            ],
+            [
+              855,
+              572
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 340,
+      "timestamp": 13.6,
+      "faces": [
+        {
+          "bbox": [
+            2825,
+            484,
+            2955,
+            656
+          ],
+          "detection_confidence": 0.8944598436355591,
+          "landmarks": [
+            [
+              2854,
+              548
+            ],
+            [
+              2916,
+              547
+            ],
+            [
+              2882,
+              582
+            ],
+            [
+              2856,
+              602
+            ],
+            [
+              2917,
+              601
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1584,
+            329,
+            1710,
+            496
+          ],
+          "detection_confidence": 0.8731554746627808,
+          "landmarks": [
+            [
+              1600,
+              401
+            ],
+            [
+              1651,
+              399
+            ],
+            [
+              1617,
+              433
+            ],
+            [
+              1611,
+              457
+            ],
+            [
+              1654,
+              454
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            730,
+            463,
+            855,
+            610
+          ],
+          "detection_confidence": 0.871062695980072,
+          "landmarks": [
+            [
+              746,
+              517
+            ],
+            [
+              797,
+              517
+            ],
+            [
+              762,
+              550
+            ],
+            [
+              756,
+              576
+            ],
+            [
+              794,
+              575
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 345,
+      "timestamp": 13.8,
+      "faces": [
+        {
+          "bbox": [
+            2790,
+            466,
+            2914,
+            636
+          ],
+          "detection_confidence": 0.8959271907806396,
+          "landmarks": [
+            [
+              2819,
+              530
+            ],
+            [
+              2879,
+              528
+            ],
+            [
+              2849,
+              566
+            ],
+            [
+              2824,
+              587
+            ],
+            [
+              2880,
+              586
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1543,
+            329,
+            1671,
+            491
+          ],
+          "detection_confidence": 0.8880160450935364,
+          "landmarks": [
+            [
+              1561,
+              399
+            ],
+            [
+              1611,
+              395
+            ],
+            [
+              1579,
+              432
+            ],
+            [
+              1576,
+              454
+            ],
+            [
+              1619,
+              450
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            714,
+            533,
+            840,
+            679
+          ],
+          "detection_confidence": 0.8615763783454895,
+          "landmarks": [
+            [
+              728,
+              593
+            ],
+            [
+              778,
+              590
+            ],
+            [
+              744,
+              622
+            ],
+            [
+              742,
+              648
+            ],
+            [
+              779,
+              645
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 350,
+      "timestamp": 14,
+      "faces": [
+        {
+          "bbox": [
+            2782,
+            442,
+            2909,
+            606
+          ],
+          "detection_confidence": 0.890541672706604,
+          "landmarks": [
+            [
+              2816,
+              506
+            ],
+            [
+              2874,
+              502
+            ],
+            [
+              2847,
+              537
+            ],
+            [
+              2822,
+              559
+            ],
+            [
+              2877,
+              556
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1510,
+            287,
+            1650,
+            461
+          ],
+          "detection_confidence": 0.8796107769012451,
+          "landmarks": [
+            [
+              1531,
+              368
+            ],
+            [
+              1576,
+              355
+            ],
+            [
+              1550,
+              397
+            ],
+            [
+              1558,
+              423
+            ],
+            [
+              1595,
+              412
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            688,
+            530,
+            809,
+            668
+          ],
+          "detection_confidence": 0.8309845924377441,
+          "landmarks": [
+            [
+              701,
+              579
+            ],
+            [
+              746,
+              576
+            ],
+            [
+              713,
+              608
+            ],
+            [
+              712,
+              635
+            ],
+            [
+              748,
+              632
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 355,
+      "timestamp": 14.2,
+      "faces": [
+        {
+          "bbox": [
+            1461,
+            320,
+            1599,
+            497
+          ],
+          "detection_confidence": 0.8898091316223145,
+          "landmarks": [
+            [
+              1480,
+              403
+            ],
+            [
+              1529,
+              393
+            ],
+            [
+              1498,
+              432
+            ],
+            [
+              1501,
+              459
+            ],
+            [
+              1541,
+              451
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2775,
+            488,
+            2902,
+            645
+          ],
+          "detection_confidence": 0.8806119561195374,
+          "landmarks": [
+            [
+              2814,
+              551
+            ],
+            [
+              2873,
+              546
+            ],
+            [
+              2848,
+              581
+            ],
+            [
+              2819,
+              602
+            ],
+            [
+              2874,
+              597
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            609,
+            503,
+            733,
+            642
+          ],
+          "detection_confidence": 0.8459427356719971,
+          "landmarks": [
+            [
+              624,
+              555
+            ],
+            [
+              666,
+              549
+            ],
+            [
+              635,
+              586
+            ],
+            [
+              642,
+              610
+            ],
+            [
+              673,
+              605
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 360,
+      "timestamp": 14.4,
+      "faces": [
+        {
+          "bbox": [
+            1417,
+            333,
+            1542,
+            508
+          ],
+          "detection_confidence": 0.8706954717636108,
+          "landmarks": [
+            [
+              1431,
+              412
+            ],
+            [
+              1468,
+              400
+            ],
+            [
+              1440,
+              440
+            ],
+            [
+              1453,
+              471
+            ],
+            [
+              1484,
+              461
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2795,
+            502,
+            2919,
+            652
+          ],
+          "detection_confidence": 0.854786217212677,
+          "landmarks": [
+            [
+              2832,
+              570
+            ],
+            [
+              2890,
+              564
+            ],
+            [
+              2867,
+              599
+            ],
+            [
+              2843,
+              621
+            ],
+            [
+              2889,
+              617
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            563,
+            516,
+            678,
+            651
+          ],
+          "detection_confidence": 0.8237127661705017,
+          "landmarks": [
+            [
+              575,
+              571
+            ],
+            [
+              609,
+              568
+            ],
+            [
+              579,
+              605
+            ],
+            [
+              595,
+              626
+            ],
+            [
+              615,
+              623
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 365,
+      "timestamp": 14.6,
+      "faces": [
+        {
+          "bbox": [
+            2764,
+            478,
+            2891,
+            634
+          ],
+          "detection_confidence": 0.8946149349212646,
+          "landmarks": [
+            [
+              2799,
+              537
+            ],
+            [
+              2857,
+              535
+            ],
+            [
+              2829,
+              569
+            ],
+            [
+              2801,
+              587
+            ],
+            [
+              2858,
+              586
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1287,
+            301,
+            1425,
+            483
+          ],
+          "detection_confidence": 0.8942506909370422,
+          "landmarks": [
+            [
+              1306,
+              381
+            ],
+            [
+              1356,
+              372
+            ],
+            [
+              1325,
+              415
+            ],
+            [
+              1329,
+              443
+            ],
+            [
+              1369,
+              435
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            418,
+            490,
+            543,
+            631
+          ],
+          "detection_confidence": 0.8255746960639954,
+          "landmarks": [
+            [
+              432,
+              544
+            ],
+            [
+              478,
+              539
+            ],
+            [
+              446,
+              575
+            ],
+            [
+              449,
+              599
+            ],
+            [
+              483,
+              595
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3715,
+            457,
+            3917,
+            693
+          ],
+          "detection_confidence": 0.8028987646102905,
+          "landmarks": [
+            [
+              3760,
+              548
+            ],
+            [
+              3858,
+              548
+            ],
+            [
+              3803,
+              606
+            ],
+            [
+              3768,
+              636
+            ],
+            [
+              3849,
+              637
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 425,
+      "timestamp": 17,
+      "faces": [
+        {
+          "bbox": [
+            2553,
+            190,
+            2936,
+            689
+          ],
+          "detection_confidence": 0.760231614112854,
+          "landmarks": [
+            [
+              2767,
+              376
+            ],
+            [
+              2868,
+              357
+            ],
+            [
+              2917,
+              446
+            ],
+            [
+              2842,
+              569
+            ],
+            [
+              2910,
+              553
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 430,
+      "timestamp": 17.2,
+      "faces": [
+        {
+          "bbox": [
+            2498,
+            144,
+            2889,
+            663
+          ],
+          "detection_confidence": 0.8210887908935547,
+          "landmarks": [
+            [
+              2735,
+              332
+            ],
+            [
+              2825,
+              317
+            ],
+            [
+              2882,
+              414
+            ],
+            [
+              2794,
+              536
+            ],
+            [
+              2855,
+              524
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 435,
+      "timestamp": 17.4,
+      "faces": [
+        {
+          "bbox": [
+            2478,
+            123,
+            2861,
+            650
+          ],
+          "detection_confidence": 0.834553599357605,
+          "landmarks": [
+            [
+              2712,
+              323
+            ],
+            [
+              2804,
+              319
+            ],
+            [
+              2847,
+              416
+            ],
+            [
+              2749,
+              525
+            ],
+            [
+              2811,
+              523
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 440,
+      "timestamp": 17.6,
+      "faces": [
+        {
+          "bbox": [
+            2526,
+            240,
+            2892,
+            765
+          ],
+          "detection_confidence": 0.7878713607788086,
+          "landmarks": [
+            [
+              2780,
+              428
+            ],
+            [
+              2845,
+              437
+            ],
+            [
+              2891,
+              546
+            ],
+            [
+              2782,
+              632
+            ],
+            [
+              2826,
+              641
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 445,
+      "timestamp": 17.8,
+      "faces": [
+        {
+          "bbox": [
+            2636,
+            413,
+            2980,
+            904
+          ],
+          "detection_confidence": 0.6596184968948364,
+          "landmarks": [
+            [
+              2881,
+              569
+            ],
+            [
+              2930,
+              566
+            ],
+            [
+              2966,
+              673
+            ],
+            [
+              2881,
+              767
+            ],
+            [
+              2912,
+              767
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1036,
+            -245,
+            1860,
+            941
+          ],
+          "detection_confidence": 0.5547621846199036,
+          "landmarks": [
+            [
+              1343,
+              157
+            ],
+            [
+              1717,
+              174
+            ],
+            [
+              1565,
+              442
+            ],
+            [
+              1365,
+              656
+            ],
+            [
+              1612,
+              666
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 450,
+      "timestamp": 18,
+      "faces": [
+        {
+          "bbox": [
+            1206,
+            -295,
+            2065,
+            1034
+          ],
+          "detection_confidence": 0.6596845388412476,
+          "landmarks": [
+            [
+              1520,
+              253
+            ],
+            [
+              1935,
+              260
+            ],
+            [
+              1766,
+              560
+            ],
+            [
+              1539,
+              759
+            ],
+            [
+              1828,
+              766
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 455,
+      "timestamp": 18.2,
+      "faces": [
+        {
+          "bbox": [
+            1392,
+            -195,
+            2298,
+            1136
+          ],
+          "detection_confidence": 0.7062854766845703,
+          "landmarks": [
+            [
+              1749,
+              379
+            ],
+            [
+              2165,
+              384
+            ],
+            [
+              2016,
+              683
+            ],
+            [
+              1767,
+              877
+            ],
+            [
+              2038,
+              883
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 460,
+      "timestamp": 18.4,
+      "faces": [
+        {
+          "bbox": [
+            1535,
+            -143,
+            2450,
+            1268
+          ],
+          "detection_confidence": 0.8045557737350464,
+          "landmarks": [
+            [
+              1893,
+              478
+            ],
+            [
+              2311,
+              481
+            ],
+            [
+              2151,
+              792
+            ],
+            [
+              1904,
+              982
+            ],
+            [
+              2202,
+              986
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 465,
+      "timestamp": 18.6,
+      "faces": [
+        {
+          "bbox": [
+            1605,
+            -120,
+            2521,
+            1279
+          ],
+          "detection_confidence": 0.7932672500610352,
+          "landmarks": [
+            [
+              1973,
+              487
+            ],
+            [
+              2389,
+              497
+            ],
+            [
+              2233,
+              814
+            ],
+            [
+              1981,
+              991
+            ],
+            [
+              2276,
+              999
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 470,
+      "timestamp": 18.8,
+      "faces": [
+        {
+          "bbox": [
+            1710,
+            -130,
+            2617,
+            1268
+          ],
+          "detection_confidence": 0.7950005531311035,
+          "landmarks": [
+            [
+              2064,
+              480
+            ],
+            [
+              2476,
+              486
+            ],
+            [
+              2316,
+              804
+            ],
+            [
+              2068,
+              983
+            ],
+            [
+              2363,
+              988
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 475,
+      "timestamp": 19,
+      "faces": [
+        {
+          "bbox": [
+            1728,
+            419,
+            2089,
+            840
+          ],
+          "detection_confidence": 0.8539711236953735,
+          "landmarks": [
+            [
+              1789,
+              625
+            ],
+            [
+              1933,
+              612
+            ],
+            [
+              1855,
+              729
+            ],
+            [
+              1863,
+              770
+            ],
+            [
+              1960,
+              757
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3475,
+            565,
+            3847,
+            933
+          ],
+          "detection_confidence": 0.7829881906509399,
+          "landmarks": [
+            [
+              3557,
+              732
+            ],
+            [
+              3724,
+              723
+            ],
+            [
+              3644,
+              839
+            ],
+            [
+              3605,
+              847
+            ],
+            [
+              3746,
+              837
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 480,
+      "timestamp": 19.2,
+      "faces": [
+        {
+          "bbox": [
+            1868,
+            234,
+            2223,
+            683
+          ],
+          "detection_confidence": 0.83214271068573,
+          "landmarks": [
+            [
+              1918,
+              465
+            ],
+            [
+              2065,
+              450
+            ],
+            [
+              1983,
+              565
+            ],
+            [
+              1989,
+              619
+            ],
+            [
+              2087,
+              605
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 485,
+      "timestamp": 19.4,
+      "faces": [
+        {
+          "bbox": [
+            1946,
+            35,
+            2316,
+            455
+          ],
+          "detection_confidence": 0.8341683149337769,
+          "landmarks": [
+            [
+              2008,
+              243
+            ],
+            [
+              2162,
+              222
+            ],
+            [
+              2080,
+              337
+            ],
+            [
+              2081,
+              389
+            ],
+            [
+              2185,
+              371
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 490,
+      "timestamp": 19.6,
+      "faces": [
+        {
+          "bbox": [
+            1967,
+            -147,
+            2340,
+            292
+          ],
+          "detection_confidence": 0.7839717864990234,
+          "landmarks": [
+            [
+              2025,
+              92
+            ],
+            [
+              2201,
+              79
+            ],
+            [
+              2113,
+              196
+            ],
+            [
+              2110,
+              232
+            ],
+            [
+              2223,
+              220
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 495,
+      "timestamp": 19.8,
+      "faces": [
+        {
+          "bbox": [
+            2022,
+            -157,
+            2354,
+            201
+          ],
+          "detection_confidence": 0.5504110455513,
+          "landmarks": [
+            [
+              2088,
+              -4
+            ],
+            [
+              2211,
+              -5
+            ],
+            [
+              2143,
+              91
+            ],
+            [
+              2139,
+              128
+            ],
+            [
+              2236,
+              125
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 520,
+      "timestamp": 20.8,
+      "faces": [
+        {
+          "bbox": [
+            565,
+            652,
+            682,
+            812
+          ],
+          "detection_confidence": 0.847264289855957,
+          "landmarks": [
+            [
+              620,
+              727
+            ],
+            [
+              666,
+              725
+            ],
+            [
+              654,
+              753
+            ],
+            [
+              626,
+              779
+            ],
+            [
+              660,
+              778
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2446,
+            463,
+            2516,
+            550
+          ],
+          "detection_confidence": 0.7611489295959473,
+          "landmarks": [
+            [
+              2464,
+              495
+            ],
+            [
+              2496,
+              498
+            ],
+            [
+              2478,
+              514
+            ],
+            [
+              2466,
+              527
+            ],
+            [
+              2490,
+              529
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1869,
+            392,
+            1937,
+            481
+          ],
+          "detection_confidence": 0.6816941499710083,
+          "landmarks": [
+            [
+              1906,
+              429
+            ],
+            [
+              1927,
+              428
+            ],
+            [
+              1925,
+              447
+            ],
+            [
+              1907,
+              462
+            ],
+            [
+              1922,
+              462
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3009,
+            715,
+            3088,
+            791
+          ],
+          "detection_confidence": 0.5859934091567993,
+          "landmarks": [
+            [
+              3039,
+              741
+            ],
+            [
+              3070,
+              750
+            ],
+            [
+              3049,
+              761
+            ],
+            [
+              3029,
+              768
+            ],
+            [
+              3053,
+              775
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2807,
+            152,
+            2900,
+            277
+          ],
+          "detection_confidence": 0.505263090133667,
+          "landmarks": [
+            [
+              2821,
+              194
+            ],
+            [
+              2840,
+              196
+            ],
+            [
+              2814,
+              220
+            ],
+            [
+              2826,
+              244
+            ],
+            [
+              2839,
+              245
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 525,
+      "timestamp": 21,
+      "faces": [
+        {
+          "bbox": [
+            546,
+            633,
+            674,
+            781
+          ],
+          "detection_confidence": 0.8534502983093262,
+          "landmarks": [
+            [
+              590,
+              713
+            ],
+            [
+              638,
+              687
+            ],
+            [
+              635,
+              721
+            ],
+            [
+              622,
+              757
+            ],
+            [
+              658,
+              737
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            871,
+            793,
+            950,
+            895
+          ],
+          "detection_confidence": 0.5333006381988525,
+          "landmarks": [
+            [
+              913,
+              842
+            ],
+            [
+              934,
+              839
+            ],
+            [
+              933,
+              859
+            ],
+            [
+              916,
+              876
+            ],
+            [
+              931,
+              875
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 530,
+      "timestamp": 21.2,
+      "faces": [
+        {
+          "bbox": [
+            576,
+            625,
+            709,
+            768
+          ],
+          "detection_confidence": 0.8467051982879639,
+          "landmarks": [
+            [
+              632,
+              694
+            ],
+            [
+              669,
+              675
+            ],
+            [
+              682,
+              696
+            ],
+            [
+              670,
+              737
+            ],
+            [
+              698,
+              722
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1837,
+            393,
+            1902,
+            479
+          ],
+          "detection_confidence": 0.7760235667228699,
+          "landmarks": [
+            [
+              1869,
+              428
+            ],
+            [
+              1892,
+              427
+            ],
+            [
+              1887,
+              445
+            ],
+            [
+              1871,
+              460
+            ],
+            [
+              1888,
+              459
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            871,
+            781,
+            945,
+            885
+          ],
+          "detection_confidence": 0.7487825155258179,
+          "landmarks": [
+            [
+              918,
+              827
+            ],
+            [
+              934,
+              825
+            ],
+            [
+              938,
+              846
+            ],
+            [
+              918,
+              863
+            ],
+            [
+              929,
+              862
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1283,
+            236,
+            1435,
+            461
+          ],
+          "detection_confidence": 0.5598524212837219,
+          "landmarks": [
+            [
+              1357,
+              342
+            ],
+            [
+              1407,
+              322
+            ],
+            [
+              1411,
+              373
+            ],
+            [
+              1384,
+              425
+            ],
+            [
+              1420,
+              410
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2919,
+            333,
+            3009,
+            438
+          ],
+          "detection_confidence": 0.5474538803100586,
+          "landmarks": [
+            [
+              2954,
+              380
+            ],
+            [
+              2993,
+              376
+            ],
+            [
+              2982,
+              397
+            ],
+            [
+              2964,
+              417
+            ],
+            [
+              2991,
+              415
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 535,
+      "timestamp": 21.4,
+      "faces": [
+        {
+          "bbox": [
+            605,
+            620,
+            716,
+            755
+          ],
+          "detection_confidence": 0.8241264820098877,
+          "landmarks": [
+            [
+              662,
+              680
+            ],
+            [
+              682,
+              665
+            ],
+            [
+              700,
+              683
+            ],
+            [
+              691,
+              721
+            ],
+            [
+              707,
+              710
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            859,
+            751,
+            944,
+            868
+          ],
+          "detection_confidence": 0.8178122043609619,
+          "landmarks": [
+            [
+              910,
+              803
+            ],
+            [
+              930,
+              798
+            ],
+            [
+              938,
+              822
+            ],
+            [
+              920,
+              845
+            ],
+            [
+              932,
+              842
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2380,
+            439,
+            2446,
+            524
+          ],
+          "detection_confidence": 0.7865384817123413,
+          "landmarks": [
+            [
+              2403,
+              472
+            ],
+            [
+              2432,
+              472
+            ],
+            [
+              2421,
+              489
+            ],
+            [
+              2407,
+              504
+            ],
+            [
+              2429,
+              504
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1828,
+            383,
+            1893,
+            473
+          ],
+          "detection_confidence": 0.7471365928649902,
+          "landmarks": [
+            [
+              1859,
+              422
+            ],
+            [
+              1883,
+              421
+            ],
+            [
+              1877,
+              439
+            ],
+            [
+              1861,
+              453
+            ],
+            [
+              1878,
+              453
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 540,
+      "timestamp": 21.6,
+      "faces": [
+        {
+          "bbox": [
+            2363,
+            440,
+            2432,
+            527
+          ],
+          "detection_confidence": 0.7129936218261719,
+          "landmarks": [
+            [
+              2383,
+              471
+            ],
+            [
+              2414,
+              470
+            ],
+            [
+              2400,
+              488
+            ],
+            [
+              2388,
+              504
+            ],
+            [
+              2412,
+              504
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            595,
+            625,
+            703,
+            772
+          ],
+          "detection_confidence": 0.6311233043670654,
+          "landmarks": [
+            [
+              660,
+              683
+            ],
+            [
+              677,
+              675
+            ],
+            [
+              697,
+              697
+            ],
+            [
+              678,
+              734
+            ],
+            [
+              690,
+              729
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1794,
+            122,
+            1900,
+            269
+          ],
+          "detection_confidence": 0.5063502788543701,
+          "landmarks": [
+            [
+              1814,
+              174
+            ],
+            [
+              1849,
+              172
+            ],
+            [
+              1822,
+              205
+            ],
+            [
+              1819,
+              232
+            ],
+            [
+              1845,
+              230
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 545,
+      "timestamp": 21.8,
+      "faces": [
+        {
+          "bbox": [
+            588,
+            621,
+            694,
+            777
+          ],
+          "detection_confidence": 0.7142217755317688,
+          "landmarks": [
+            [
+              652,
+              685
+            ],
+            [
+              664,
+              678
+            ],
+            [
+              685,
+              699
+            ],
+            [
+              670,
+              737
+            ],
+            [
+              681,
+              733
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            842,
+            746,
+            922,
+            854
+          ],
+          "detection_confidence": 0.7130641937255859,
+          "landmarks": [
+            [
+              897,
+              781
+            ],
+            [
+              907,
+              778
+            ],
+            [
+              919,
+              799
+            ],
+            [
+              900,
+              824
+            ],
+            [
+              908,
+              822
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2759,
+            655,
+            2823,
+            733
+          ],
+          "detection_confidence": 0.7120708227157593,
+          "landmarks": [
+            [
+              2789,
+              683
+            ],
+            [
+              2814,
+              683
+            ],
+            [
+              2807,
+              698
+            ],
+            [
+              2792,
+              713
+            ],
+            [
+              2810,
+              713
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2346,
+            435,
+            2414,
+            522
+          ],
+          "detection_confidence": 0.7054265141487122,
+          "landmarks": [
+            [
+              2367,
+              473
+            ],
+            [
+              2397,
+              470
+            ],
+            [
+              2385,
+              487
+            ],
+            [
+              2373,
+              503
+            ],
+            [
+              2397,
+              501
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1660,
+            215,
+            1737,
+            319
+          ],
+          "detection_confidence": 0.617293655872345,
+          "landmarks": [
+            [
+              1672,
+              255
+            ],
+            [
+              1681,
+              255
+            ],
+            [
+              1666,
+              277
+            ],
+            [
+              1683,
+              296
+            ],
+            [
+              1689,
+              295
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1935,
+            415,
+            2002,
+            505
+          ],
+          "detection_confidence": 0.5958508253097534,
+          "landmarks": [
+            [
+              1968,
+              449
+            ],
+            [
+              1988,
+              446
+            ],
+            [
+              1988,
+              464
+            ],
+            [
+              1976,
+              482
+            ],
+            [
+              1991,
+              480
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 550,
+      "timestamp": 22,
+      "faces": [
+        {
+          "bbox": [
+            2332,
+            439,
+            2404,
+            530
+          ],
+          "detection_confidence": 0.7702345848083496,
+          "landmarks": [
+            [
+              2355,
+              477
+            ],
+            [
+              2387,
+              475
+            ],
+            [
+              2374,
+              494
+            ],
+            [
+              2360,
+              510
+            ],
+            [
+              2385,
+              508
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2741,
+            653,
+            2812,
+            737
+          ],
+          "detection_confidence": 0.7412803173065186,
+          "landmarks": [
+            [
+              2777,
+              681
+            ],
+            [
+              2802,
+              681
+            ],
+            [
+              2798,
+              698
+            ],
+            [
+              2779,
+              714
+            ],
+            [
+              2798,
+              715
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            574,
+            646,
+            674,
+            790
+          ],
+          "detection_confidence": 0.7280071973800659,
+          "landmarks": [
+            [
+              636,
+              706
+            ],
+            [
+              646,
+              697
+            ],
+            [
+              667,
+              719
+            ],
+            [
+              651,
+              753
+            ],
+            [
+              659,
+              747
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1807,
+            389,
+            1872,
+            480
+          ],
+          "detection_confidence": 0.6487178802490234,
+          "landmarks": [
+            [
+              1836,
+              429
+            ],
+            [
+              1861,
+              427
+            ],
+            [
+              1854,
+              445
+            ],
+            [
+              1839,
+              461
+            ],
+            [
+              1858,
+              460
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1540,
+            274,
+            1613,
+            369
+          ],
+          "detection_confidence": 0.5950968861579895,
+          "landmarks": [
+            [
+              1553,
+              315
+            ],
+            [
+              1572,
+              315
+            ],
+            [
+              1557,
+              338
+            ],
+            [
+              1564,
+              352
+            ],
+            [
+              1577,
+              350
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            897,
+            483,
+            1003,
+            646
+          ],
+          "detection_confidence": 0.5082403421401978,
+          "landmarks": [
+            [
+              915,
+              552
+            ],
+            [
+              950,
+              551
+            ],
+            [
+              926,
+              586
+            ],
+            [
+              927,
+              611
+            ],
+            [
+              951,
+              610
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 555,
+      "timestamp": 22.2,
+      "faces": [
+        {
+          "bbox": [
+            2323,
+            442,
+            2390,
+            528
+          ],
+          "detection_confidence": 0.7941287755966187,
+          "landmarks": [
+            [
+              2342,
+              477
+            ],
+            [
+              2373,
+              475
+            ],
+            [
+              2359,
+              492
+            ],
+            [
+              2348,
+              508
+            ],
+            [
+              2372,
+              506
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            830,
+            728,
+            908,
+            838
+          ],
+          "detection_confidence": 0.7484395503997803,
+          "landmarks": [
+            [
+              878,
+              776
+            ],
+            [
+              889,
+              768
+            ],
+            [
+              904,
+              785
+            ],
+            [
+              891,
+              812
+            ],
+            [
+              898,
+              807
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1798,
+            375,
+            1860,
+            462
+          ],
+          "detection_confidence": 0.7286795973777771,
+          "landmarks": [
+            [
+              1836,
+              410
+            ],
+            [
+              1851,
+              410
+            ],
+            [
+              1853,
+              426
+            ],
+            [
+              1836,
+              442
+            ],
+            [
+              1848,
+              443
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2729,
+            656,
+            2799,
+            737
+          ],
+          "detection_confidence": 0.7185572981834412,
+          "landmarks": [
+            [
+              2761,
+              685
+            ],
+            [
+              2788,
+              684
+            ],
+            [
+              2784,
+              699
+            ],
+            [
+              2767,
+              716
+            ],
+            [
+              2788,
+              715
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1413,
+            369,
+            1488,
+            475
+          ],
+          "detection_confidence": 0.6333909630775452,
+          "landmarks": [
+            [
+              1428,
+              410
+            ],
+            [
+              1427,
+              412
+            ],
+            [
+              1415,
+              434
+            ],
+            [
+              1438,
+              451
+            ],
+            [
+              1437,
+              451
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            569,
+            674,
+            655,
+            794
+          ],
+          "detection_confidence": 0.5794508457183838,
+          "landmarks": [
+            [
+              624,
+              716
+            ],
+            [
+              633,
+              711
+            ],
+            [
+              648,
+              730
+            ],
+            [
+              634,
+              761
+            ],
+            [
+              640,
+              758
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 560,
+      "timestamp": 22.4,
+      "faces": [
+        {
+          "bbox": [
+            1555,
+            297,
+            1971,
+            821
+          ],
+          "detection_confidence": 0.8937863111495972,
+          "landmarks": [
+            [
+              1602,
+              516
+            ],
+            [
+              1764,
+              450
+            ],
+            [
+              1660,
+              570
+            ],
+            [
+              1654,
+              688
+            ],
+            [
+              1811,
+              633
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3559,
+            160,
+            3944,
+            683
+          ],
+          "detection_confidence": 0.6662651300430298,
+          "landmarks": [
+            [
+              3756,
+              350
+            ],
+            [
+              3815,
+              330
+            ],
+            [
+              3866,
+              409
+            ],
+            [
+              3839,
+              528
+            ],
+            [
+              3879,
+              513
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 565,
+      "timestamp": 22.6,
+      "faces": [
+        {
+          "bbox": [
+            1540,
+            212,
+            1939,
+            733
+          ],
+          "detection_confidence": 0.8799034357070923,
+          "landmarks": [
+            [
+              1583,
+              423
+            ],
+            [
+              1748,
+              370
+            ],
+            [
+              1637,
+              480
+            ],
+            [
+              1632,
+              599
+            ],
+            [
+              1778,
+              556
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3578,
+            221,
+            3933,
+            707
+          ],
+          "detection_confidence": 0.5589833855628967,
+          "landmarks": [
+            [
+              3793,
+              403
+            ],
+            [
+              3832,
+              382
+            ],
+            [
+              3886,
+              451
+            ],
+            [
+              3859,
+              566
+            ],
+            [
+              3888,
+              547
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 570,
+      "timestamp": 22.8,
+      "faces": [
+        {
+          "bbox": [
+            1537,
+            84,
+            1928,
+            653
+          ],
+          "detection_confidence": 0.8645145297050476,
+          "landmarks": [
+            [
+              1575,
+              324
+            ],
+            [
+              1744,
+              281
+            ],
+            [
+              1624,
+              392
+            ],
+            [
+              1617,
+              507
+            ],
+            [
+              1765,
+              472
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 575,
+      "timestamp": 23,
+      "faces": [
+        {
+          "bbox": [
+            207,
+            69,
+            710,
+            826
+          ],
+          "detection_confidence": 0.7127334475517273,
+          "landmarks": [
+            [
+              553,
+              349
+            ],
+            [
+              617,
+              365
+            ],
+            [
+              700,
+              497
+            ],
+            [
+              537,
+              622
+            ],
+            [
+              594,
+              640
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3070,
+            -8,
+            3478,
+            755
+          ],
+          "detection_confidence": 0.679587185382843,
+          "landmarks": [
+            [
+              3120,
+              281
+            ],
+            [
+              3138,
+              263
+            ],
+            [
+              3051,
+              410
+            ],
+            [
+              3175,
+              540
+            ],
+            [
+              3202,
+              521
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 580,
+      "timestamp": 23.2,
+      "faces": [
+        {
+          "bbox": [
+            255,
+            49,
+            741,
+            794
+          ],
+          "detection_confidence": 0.7155300974845886,
+          "landmarks": [
+            [
+              588,
+              337
+            ],
+            [
+              629,
+              344
+            ],
+            [
+              723,
+              475
+            ],
+            [
+              592,
+              608
+            ],
+            [
+              625,
+              619
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3112,
+            -6,
+            3511,
+            735
+          ],
+          "detection_confidence": 0.5783278942108154,
+          "landmarks": [
+            [
+              3177,
+              279
+            ],
+            [
+              3180,
+              274
+            ],
+            [
+              3094,
+              414
+            ],
+            [
+              3226,
+              532
+            ],
+            [
+              3242,
+              523
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 585,
+      "timestamp": 23.4,
+      "faces": [
+        {
+          "bbox": [
+            289,
+            7,
+            787,
+            781
+          ],
+          "detection_confidence": 0.6872633099555969,
+          "landmarks": [
+            [
+              632,
+              307
+            ],
+            [
+              683,
+              311
+            ],
+            [
+              772,
+              451
+            ],
+            [
+              637,
+              589
+            ],
+            [
+              676,
+              597
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3141,
+            60,
+            3552,
+            715
+          ],
+          "detection_confidence": 0.6229064464569092,
+          "landmarks": [
+            [
+              3206,
+              299
+            ],
+            [
+              3237,
+              292
+            ],
+            [
+              3136,
+              422
+            ],
+            [
+              3247,
+              550
+            ],
+            [
+              3273,
+              540
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 590,
+      "timestamp": 23.6,
+      "faces": [
+        {
+          "bbox": [
+            2355,
+            438,
+            2790,
+            966
+          ],
+          "detection_confidence": 0.8515322208404541,
+          "landmarks": [
+            [
+              2410,
+              662
+            ],
+            [
+              2551,
+              576
+            ],
+            [
+              2462,
+              720
+            ],
+            [
+              2498,
+              825
+            ],
+            [
+              2631,
+              751
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1936,
+            292,
+            2206,
+            781
+          ],
+          "detection_confidence": 0.7496659755706787,
+          "landmarks": [
+            [
+              2002,
+              449
+            ],
+            [
+              1997,
+              454
+            ],
+            [
+              1945,
+              556
+            ],
+            [
+              2030,
+              642
+            ],
+            [
+              2026,
+              641
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 595,
+      "timestamp": 23.8,
+      "faces": [
+        {
+          "bbox": [
+            2357,
+            275,
+            2787,
+            814
+          ],
+          "detection_confidence": 0.8401170969009399,
+          "landmarks": [
+            [
+              2398,
+              497
+            ],
+            [
+              2539,
+              419
+            ],
+            [
+              2439,
+              554
+            ],
+            [
+              2476,
+              675
+            ],
+            [
+              2605,
+              610
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1807,
+            201,
+            2079,
+            652
+          ],
+          "detection_confidence": 0.7763180732727051,
+          "landmarks": [
+            [
+              1861,
+              337
+            ],
+            [
+              1865,
+              339
+            ],
+            [
+              1811,
+              438
+            ],
+            [
+              1889,
+              513
+            ],
+            [
+              1894,
+              511
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 600,
+      "timestamp": 24,
+      "faces": [
+        {
+          "bbox": [
+            1971,
+            265,
+            2423,
+            896
+          ],
+          "detection_confidence": 0.7782305479049683,
+          "landmarks": [
+            [
+              2028,
+              536
+            ],
+            [
+              2204,
+              545
+            ],
+            [
+              2062,
+              677
+            ],
+            [
+              2065,
+              766
+            ],
+            [
+              2193,
+              769
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 605,
+      "timestamp": 24.2,
+      "faces": [
+        {
+          "bbox": [
+            1940,
+            301,
+            2423,
+            920
+          ],
+          "detection_confidence": 0.7677903771400452,
+          "landmarks": [
+            [
+              2005,
+              570
+            ],
+            [
+              2201,
+              578
+            ],
+            [
+              2061,
+              718
+            ],
+            [
+              2058,
+              792
+            ],
+            [
+              2199,
+              795
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 610,
+      "timestamp": 24.4,
+      "faces": [
+        {
+          "bbox": [
+            1902,
+            310,
+            2385,
+            943
+          ],
+          "detection_confidence": 0.7523878812789917,
+          "landmarks": [
+            [
+              1972,
+              591
+            ],
+            [
+              2159,
+              589
+            ],
+            [
+              2037,
+              745
+            ],
+            [
+              2045,
+              820
+            ],
+            [
+              2172,
+              817
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            492,
+            334,
+            943,
+            991
+          ],
+          "detection_confidence": 0.5402741432189941,
+          "landmarks": [
+            [
+              786,
+              516
+            ],
+            [
+              807,
+              495
+            ],
+            [
+              919,
+              562
+            ],
+            [
+              877,
+              748
+            ],
+            [
+              898,
+              733
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 615,
+      "timestamp": 24.6,
+      "faces": [
+        {
+          "bbox": [
+            2493,
+            606,
+            2627,
+            761
+          ],
+          "detection_confidence": 0.8800159692764282,
+          "landmarks": [
+            [
+              2533,
+              662
+            ],
+            [
+              2590,
+              682
+            ],
+            [
+              2550,
+              707
+            ],
+            [
+              2518,
+              717
+            ],
+            [
+              2562,
+              733
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            575,
+            621,
+            759,
+            825
+          ],
+          "detection_confidence": 0.8404045701026917,
+          "landmarks": [
+            [
+              621,
+              734
+            ],
+            [
+              700,
+              700
+            ],
+            [
+              672,
+              767
+            ],
+            [
+              656,
+              796
+            ],
+            [
+              715,
+              770
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1946,
+            464,
+            2035,
+            569
+          ],
+          "detection_confidence": 0.8336865305900574,
+          "landmarks": [
+            [
+              1968,
+              502
+            ],
+            [
+              2008,
+              506
+            ],
+            [
+              1985,
+              528
+            ],
+            [
+              1969,
+              543
+            ],
+            [
+              2000,
+              546
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            648,
+            427,
+            772,
+            581
+          ],
+          "detection_confidence": 0.8328075408935547,
+          "landmarks": [
+            [
+              681,
+              498
+            ],
+            [
+              735,
+              496
+            ],
+            [
+              709,
+              528
+            ],
+            [
+              692,
+              551
+            ],
+            [
+              732,
+              549
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2699,
+            456,
+            2771,
+            550
+          ],
+          "detection_confidence": 0.8248895406723022,
+          "landmarks": [
+            [
+              2743,
+              491
+            ],
+            [
+              2762,
+              490
+            ],
+            [
+              2764,
+              508
+            ],
+            [
+              2745,
+              527
+            ],
+            [
+              2758,
+              527
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1642,
+            445,
+            1704,
+            512
+          ],
+          "detection_confidence": 0.7122881412506104,
+          "landmarks": [
+            [
+              1656,
+              471
+            ],
+            [
+              1681,
+              467
+            ],
+            [
+              1669,
+              483
+            ],
+            [
+              1663,
+              496
+            ],
+            [
+              1682,
+              493
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3508,
+            628,
+            3629,
+            722
+          ],
+          "detection_confidence": 0.5104928016662598,
+          "landmarks": [
+            [
+              3575,
+              676
+            ],
+            [
+              3594,
+              681
+            ],
+            [
+              3583,
+              706
+            ],
+            [
+              3556,
+              706
+            ],
+            [
+              3565,
+              711
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 620,
+      "timestamp": 24.8,
+      "faces": [
+        {
+          "bbox": [
+            2498,
+            597,
+            2630,
+            748
+          ],
+          "detection_confidence": 0.8766541481018066,
+          "landmarks": [
+            [
+              2541,
+              654
+            ],
+            [
+              2596,
+              672
+            ],
+            [
+              2561,
+              698
+            ],
+            [
+              2527,
+              706
+            ],
+            [
+              2569,
+              720
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            616,
+            623,
+            795,
+            821
+          ],
+          "detection_confidence": 0.8459340333938599,
+          "landmarks": [
+            [
+              664,
+              731
+            ],
+            [
+              741,
+              698
+            ],
+            [
+              715,
+              763
+            ],
+            [
+              699,
+              792
+            ],
+            [
+              757,
+              767
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1936,
+            461,
+            2027,
+            556
+          ],
+          "detection_confidence": 0.8192524909973145,
+          "landmarks": [
+            [
+              1956,
+              495
+            ],
+            [
+              1996,
+              499
+            ],
+            [
+              1972,
+              520
+            ],
+            [
+              1958,
+              533
+            ],
+            [
+              1988,
+              536
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            656,
+            444,
+            779,
+            589
+          ],
+          "detection_confidence": 0.7943065166473389,
+          "landmarks": [
+            [
+              685,
+              507
+            ],
+            [
+              741,
+              505
+            ],
+            [
+              712,
+              535
+            ],
+            [
+              695,
+              559
+            ],
+            [
+              733,
+              558
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1615,
+            439,
+            1679,
+            509
+          ],
+          "detection_confidence": 0.7851012945175171,
+          "landmarks": [
+            [
+              1633,
+              465
+            ],
+            [
+              1661,
+              463
+            ],
+            [
+              1649,
+              478
+            ],
+            [
+              1639,
+              491
+            ],
+            [
+              1661,
+              489
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2686,
+            460,
+            2755,
+            552
+          ],
+          "detection_confidence": 0.6892738938331604,
+          "landmarks": [
+            [
+              2730,
+              493
+            ],
+            [
+              2746,
+              491
+            ],
+            [
+              2750,
+              512
+            ],
+            [
+              2731,
+              530
+            ],
+            [
+              2741,
+              529
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 625,
+      "timestamp": 25,
+      "faces": [
+        {
+          "bbox": [
+            2499,
+            590,
+            2629,
+            738
+          ],
+          "detection_confidence": 0.8473563194274902,
+          "landmarks": [
+            [
+              2542,
+              645
+            ],
+            [
+              2597,
+              661
+            ],
+            [
+              2563,
+              688
+            ],
+            [
+              2528,
+              696
+            ],
+            [
+              2570,
+              709
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            658,
+            614,
+            830,
+            812
+          ],
+          "detection_confidence": 0.8313018083572388,
+          "landmarks": [
+            [
+              706,
+              722
+            ],
+            [
+              781,
+              693
+            ],
+            [
+              758,
+              755
+            ],
+            [
+              740,
+              784
+            ],
+            [
+              795,
+              761
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1928,
+            456,
+            2016,
+            563
+          ],
+          "detection_confidence": 0.8119758367538452,
+          "landmarks": [
+            [
+              1949,
+              497
+            ],
+            [
+              1990,
+              501
+            ],
+            [
+              1966,
+              524
+            ],
+            [
+              1950,
+              538
+            ],
+            [
+              1982,
+              541
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2652,
+            446,
+            2720,
+            540
+          ],
+          "detection_confidence": 0.7732524871826172,
+          "landmarks": [
+            [
+              2694,
+              480
+            ],
+            [
+              2711,
+              478
+            ],
+            [
+              2715,
+              498
+            ],
+            [
+              2698,
+              518
+            ],
+            [
+              2709,
+              517
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1590,
+            434,
+            1651,
+            505
+          ],
+          "detection_confidence": 0.7366735339164734,
+          "landmarks": [
+            [
+              1610,
+              462
+            ],
+            [
+              1635,
+              458
+            ],
+            [
+              1627,
+              474
+            ],
+            [
+              1618,
+              487
+            ],
+            [
+              1637,
+              485
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            658,
+            460,
+            772,
+            584
+          ],
+          "detection_confidence": 0.6427105665206909,
+          "landmarks": [
+            [
+              690,
+              504
+            ],
+            [
+              741,
+              504
+            ],
+            [
+              716,
+              528
+            ],
+            [
+              699,
+              552
+            ],
+            [
+              735,
+              552
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 630,
+      "timestamp": 25.2,
+      "faces": [
+        {
+          "bbox": [
+            705,
+            604,
+            862,
+            805
+          ],
+          "detection_confidence": 0.8376679420471191,
+          "landmarks": [
+            [
+              748,
+              712
+            ],
+            [
+              819,
+              685
+            ],
+            [
+              797,
+              742
+            ],
+            [
+              775,
+              771
+            ],
+            [
+              832,
+              751
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2502,
+            588,
+            2623,
+            721
+          ],
+          "detection_confidence": 0.7549906969070435,
+          "landmarks": [
+            [
+              2537,
+              640
+            ],
+            [
+              2593,
+              647
+            ],
+            [
+              2561,
+              679
+            ],
+            [
+              2534,
+              692
+            ],
+            [
+              2574,
+              697
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1920,
+            447,
+            2006,
+            545
+          ],
+          "detection_confidence": 0.6640104055404663,
+          "landmarks": [
+            [
+              1943,
+              481
+            ],
+            [
+              1983,
+              483
+            ],
+            [
+              1962,
+              505
+            ],
+            [
+              1945,
+              519
+            ],
+            [
+              1977,
+              521
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 635,
+      "timestamp": 25.4,
+      "faces": [
+        {
+          "bbox": [
+            2492,
+            577,
+            2619,
+            719
+          ],
+          "detection_confidence": 0.8490506410598755,
+          "landmarks": [
+            [
+              2536,
+              632
+            ],
+            [
+              2588,
+              646
+            ],
+            [
+              2556,
+              671
+            ],
+            [
+              2524,
+              682
+            ],
+            [
+              2563,
+              692
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            739,
+            610,
+            896,
+            795
+          ],
+          "detection_confidence": 0.84195876121521,
+          "landmarks": [
+            [
+              785,
+              713
+            ],
+            [
+              856,
+              685
+            ],
+            [
+              833,
+              744
+            ],
+            [
+              813,
+              771
+            ],
+            [
+              865,
+              750
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1901,
+            454,
+            1987,
+            552
+          ],
+          "detection_confidence": 0.82349693775177,
+          "landmarks": [
+            [
+              1924,
+              491
+            ],
+            [
+              1962,
+              496
+            ],
+            [
+              1940,
+              517
+            ],
+            [
+              1925,
+              529
+            ],
+            [
+              1953,
+              532
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            647,
+            469,
+            761,
+            604
+          ],
+          "detection_confidence": 0.7631407976150513,
+          "landmarks": [
+            [
+              677,
+              532
+            ],
+            [
+              724,
+              526
+            ],
+            [
+              701,
+              555
+            ],
+            [
+              689,
+              578
+            ],
+            [
+              723,
+              573
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1545,
+            437,
+            1598,
+            503
+          ],
+          "detection_confidence": 0.6624938249588013,
+          "landmarks": [
+            [
+              1571,
+              461
+            ],
+            [
+              1588,
+              458
+            ],
+            [
+              1587,
+              473
+            ],
+            [
+              1575,
+              486
+            ],
+            [
+              1588,
+              485
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2585,
+            451,
+            2664,
+            559
+          ],
+          "detection_confidence": 0.5818858742713928,
+          "landmarks": [
+            [
+              2622,
+              495
+            ],
+            [
+              2653,
+              495
+            ],
+            [
+              2645,
+              517
+            ],
+            [
+              2624,
+              535
+            ],
+            [
+              2646,
+              535
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3349,
+            592,
+            3454,
+            685
+          ],
+          "detection_confidence": 0.5285161137580872,
+          "landmarks": [
+            [
+              3412,
+              636
+            ],
+            [
+              3425,
+              643
+            ],
+            [
+              3417,
+              666
+            ],
+            [
+              3388,
+              668
+            ],
+            [
+              3394,
+              674
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 640,
+      "timestamp": 25.6,
+      "faces": [
+        {
+          "bbox": [
+            2490,
+            566,
+            2613,
+            709
+          ],
+          "detection_confidence": 0.8374691009521484,
+          "landmarks": [
+            [
+              2529,
+              618
+            ],
+            [
+              2582,
+              630
+            ],
+            [
+              2550,
+              658
+            ],
+            [
+              2520,
+              671
+            ],
+            [
+              2562,
+              681
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1889,
+            446,
+            1978,
+            551
+          ],
+          "detection_confidence": 0.8063334822654724,
+          "landmarks": [
+            [
+              1913,
+              485
+            ],
+            [
+              1954,
+              486
+            ],
+            [
+              1932,
+              511
+            ],
+            [
+              1916,
+              525
+            ],
+            [
+              1948,
+              526
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            764,
+            601,
+            924,
+            795
+          ],
+          "detection_confidence": 0.7902292609214783,
+          "landmarks": [
+            [
+              809,
+              706
+            ],
+            [
+              880,
+              680
+            ],
+            [
+              857,
+              737
+            ],
+            [
+              842,
+              770
+            ],
+            [
+              890,
+              749
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            645,
+            483,
+            766,
+            629
+          ],
+          "detection_confidence": 0.7747867107391357,
+          "landmarks": [
+            [
+              679,
+              550
+            ],
+            [
+              728,
+              544
+            ],
+            [
+              705,
+              578
+            ],
+            [
+              691,
+              599
+            ],
+            [
+              725,
+              594
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1526,
+            436,
+            1580,
+            501
+          ],
+          "detection_confidence": 0.6939820051193237,
+          "landmarks": [
+            [
+              1551,
+              458
+            ],
+            [
+              1570,
+              457
+            ],
+            [
+              1565,
+              472
+            ],
+            [
+              1553,
+              484
+            ],
+            [
+              1568,
+              484
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3310,
+            577,
+            3421,
+            660
+          ],
+          "detection_confidence": 0.5436170101165771,
+          "landmarks": [
+            [
+              3373,
+              621
+            ],
+            [
+              3388,
+              628
+            ],
+            [
+              3376,
+              651
+            ],
+            [
+              3347,
+              647
+            ],
+            [
+              3354,
+              653
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 645,
+      "timestamp": 25.8,
+      "faces": [
+        {
+          "bbox": [
+            1888,
+            439,
+            1974,
+            535
+          ],
+          "detection_confidence": 0.8336079120635986,
+          "landmarks": [
+            [
+              1912,
+              478
+            ],
+            [
+              1950,
+              479
+            ],
+            [
+              1930,
+              501
+            ],
+            [
+              1914,
+              513
+            ],
+            [
+              1944,
+              514
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2498,
+            556,
+            2623,
+            699
+          ],
+          "detection_confidence": 0.8286291360855103,
+          "landmarks": [
+            [
+              2535,
+              614
+            ],
+            [
+              2588,
+              627
+            ],
+            [
+              2554,
+              654
+            ],
+            [
+              2525,
+              665
+            ],
+            [
+              2565,
+              675
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            803,
+            599,
+            960,
+            798
+          ],
+          "detection_confidence": 0.798708975315094,
+          "landmarks": [
+            [
+              847,
+              701
+            ],
+            [
+              920,
+              675
+            ],
+            [
+              898,
+              735
+            ],
+            [
+              875,
+              765
+            ],
+            [
+              932,
+              745
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            653,
+            478,
+            781,
+            643
+          ],
+          "detection_confidence": 0.7859972715377808,
+          "landmarks": [
+            [
+              690,
+              549
+            ],
+            [
+              746,
+              549
+            ],
+            [
+              720,
+              585
+            ],
+            [
+              700,
+              609
+            ],
+            [
+              740,
+              608
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1519,
+            440,
+            1572,
+            506
+          ],
+          "detection_confidence": 0.7122564911842346,
+          "landmarks": [
+            [
+              1548,
+              463
+            ],
+            [
+              1564,
+              462
+            ],
+            [
+              1563,
+              478
+            ],
+            [
+              1549,
+              490
+            ],
+            [
+              1561,
+              490
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 650,
+      "timestamp": 26,
+      "faces": [
+        {
+          "bbox": [
+            2514,
+            553,
+            2636,
+            697
+          ],
+          "detection_confidence": 0.8567127585411072,
+          "landmarks": [
+            [
+              2552,
+              605
+            ],
+            [
+              2605,
+              619
+            ],
+            [
+              2574,
+              647
+            ],
+            [
+              2542,
+              658
+            ],
+            [
+              2585,
+              669
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            673,
+            475,
+            803,
+            640
+          ],
+          "detection_confidence": 0.8526538610458374,
+          "landmarks": [
+            [
+              710,
+              543
+            ],
+            [
+              770,
+              545
+            ],
+            [
+              740,
+              581
+            ],
+            [
+              714,
+              601
+            ],
+            [
+              761,
+              604
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1895,
+            430,
+            1980,
+            533
+          ],
+          "detection_confidence": 0.817762017250061,
+          "landmarks": [
+            [
+              1919,
+              477
+            ],
+            [
+              1957,
+              474
+            ],
+            [
+              1941,
+              498
+            ],
+            [
+              1927,
+              512
+            ],
+            [
+              1956,
+              511
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            856,
+            594,
+            1013,
+            793
+          ],
+          "detection_confidence": 0.8155994415283203,
+          "landmarks": [
+            [
+              901,
+              702
+            ],
+            [
+              971,
+              676
+            ],
+            [
+              948,
+              733
+            ],
+            [
+              933,
+              766
+            ],
+            [
+              981,
+              746
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1522,
+            438,
+            1574,
+            504
+          ],
+          "detection_confidence": 0.6460003852844238,
+          "landmarks": [
+            [
+              1551,
+              461
+            ],
+            [
+              1566,
+              461
+            ],
+            [
+              1565,
+              476
+            ],
+            [
+              1552,
+              488
+            ],
+            [
+              1562,
+              488
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2554,
+            424,
+            2617,
+            512
+          ],
+          "detection_confidence": 0.6272978782653809,
+          "landmarks": [
+            [
+              2594,
+              460
+            ],
+            [
+              2606,
+              459
+            ],
+            [
+              2609,
+              478
+            ],
+            [
+              2592,
+              493
+            ],
+            [
+              2600,
+              493
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3280,
+            552,
+            3375,
+            647
+          ],
+          "detection_confidence": 0.6227185726165771,
+          "landmarks": [
+            [
+              3342,
+              600
+            ],
+            [
+              3354,
+              605
+            ],
+            [
+              3350,
+              627
+            ],
+            [
+              3320,
+              631
+            ],
+            [
+              3326,
+              636
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 655,
+      "timestamp": 26.2,
+      "faces": [
+        {
+          "bbox": [
+            1922,
+            28,
+            2496,
+            740
+          ],
+          "detection_confidence": 0.7845284938812256,
+          "landmarks": [
+            [
+              2190,
+              279
+            ],
+            [
+              2396,
+              379
+            ],
+            [
+              2291,
+              471
+            ],
+            [
+              2114,
+              547
+            ],
+            [
+              2267,
+              629
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 660,
+      "timestamp": 26.4,
+      "faces": [
+        {
+          "bbox": [
+            2023,
+            87,
+            2580,
+            767
+          ],
+          "detection_confidence": 0.7838032245635986,
+          "landmarks": [
+            [
+              2273,
+              312
+            ],
+            [
+              2484,
+              397
+            ],
+            [
+              2372,
+              507
+            ],
+            [
+              2208,
+              586
+            ],
+            [
+              2353,
+              657
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 665,
+      "timestamp": 26.6,
+      "faces": [
+        {
+          "bbox": [
+            2206,
+            188,
+            2801,
+            897
+          ],
+          "detection_confidence": 0.7755228281021118,
+          "landmarks": [
+            [
+              2482,
+              428
+            ],
+            [
+              2698,
+              510
+            ],
+            [
+              2594,
+              642
+            ],
+            [
+              2414,
+              715
+            ],
+            [
+              2561,
+              782
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 670,
+      "timestamp": 26.8,
+      "faces": [
+        {
+          "bbox": [
+            2304,
+            269,
+            2913,
+            969
+          ],
+          "detection_confidence": 0.7868725657463074,
+          "landmarks": [
+            [
+              2585,
+              512
+            ],
+            [
+              2805,
+              597
+            ],
+            [
+              2695,
+              716
+            ],
+            [
+              2526,
+              792
+            ],
+            [
+              2670,
+              862
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 675,
+      "timestamp": 27,
+      "faces": [
+        {
+          "bbox": [
+            2304,
+            300,
+            2921,
+            1000
+          ],
+          "detection_confidence": 0.7575759291648865,
+          "landmarks": [
+            [
+              2593,
+              553
+            ],
+            [
+              2809,
+              635
+            ],
+            [
+              2706,
+              758
+            ],
+            [
+              2533,
+              823
+            ],
+            [
+              2680,
+              890
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 680,
+      "timestamp": 27.2,
+      "faces": [
+        {
+          "bbox": [
+            3064,
+            494,
+            3364,
+            883
+          ],
+          "detection_confidence": 0.835175096988678,
+          "landmarks": [
+            [
+              3224,
+              647
+            ],
+            [
+              3330,
+              655
+            ],
+            [
+              3311,
+              733
+            ],
+            [
+              3227,
+              800
+            ],
+            [
+              3301,
+              807
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            880,
+            209,
+            1412,
+            1013
+          ],
+          "detection_confidence": 0.7623860239982605,
+          "landmarks": [
+            [
+              1172,
+              565
+            ],
+            [
+              1290,
+              515
+            ],
+            [
+              1385,
+              657
+            ],
+            [
+              1295,
+              847
+            ],
+            [
+              1369,
+              811
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 685,
+      "timestamp": 27.4,
+      "faces": [
+        {
+          "bbox": [
+            3062,
+            484,
+            3360,
+            877
+          ],
+          "detection_confidence": 0.8370481729507446,
+          "landmarks": [
+            [
+              3223,
+              643
+            ],
+            [
+              3327,
+              653
+            ],
+            [
+              3308,
+              728
+            ],
+            [
+              3224,
+              794
+            ],
+            [
+              3297,
+              802
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            879,
+            212,
+            1410,
+            1011
+          ],
+          "detection_confidence": 0.7564810514450073,
+          "landmarks": [
+            [
+              1173,
+              563
+            ],
+            [
+              1292,
+              515
+            ],
+            [
+              1386,
+              661
+            ],
+            [
+              1297,
+              851
+            ],
+            [
+              1370,
+              816
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 690,
+      "timestamp": 27.6,
+      "faces": [
+        {
+          "bbox": [
+            2479,
+            91,
+            2896,
+            623
+          ],
+          "detection_confidence": 0.8465793132781982,
+          "landmarks": [
+            [
+              2717,
+              328
+            ],
+            [
+              2854,
+              302
+            ],
+            [
+              2843,
+              443
+            ],
+            [
+              2728,
+              528
+            ],
+            [
+              2812,
+              509
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            168,
+            -108,
+            807,
+            747
+          ],
+          "detection_confidence": 0.7996011972427368,
+          "landmarks": [
+            [
+              365,
+              184
+            ],
+            [
+              681,
+              170
+            ],
+            [
+              553,
+              380
+            ],
+            [
+              416,
+              552
+            ],
+            [
+              632,
+              539
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 695,
+      "timestamp": 27.8,
+      "faces": [
+        {
+          "bbox": [
+            1912,
+            567,
+            2088,
+            792
+          ],
+          "detection_confidence": 0.8259414434432983,
+          "landmarks": [
+            [
+              2027,
+              645
+            ],
+            [
+              2062,
+              642
+            ],
+            [
+              2085,
+              689
+            ],
+            [
+              2039,
+              738
+            ],
+            [
+              2060,
+              737
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2243,
+            402,
+            2503,
+            726
+          ],
+          "detection_confidence": 0.8164465427398682,
+          "landmarks": [
+            [
+              2355,
+              550
+            ],
+            [
+              2440,
+              508
+            ],
+            [
+              2454,
+              573
+            ],
+            [
+              2418,
+              657
+            ],
+            [
+              2480,
+              624
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3434,
+            578,
+            3607,
+            806
+          ],
+          "detection_confidence": 0.8134185075759888,
+          "landmarks": [
+            [
+              3545,
+              647
+            ],
+            [
+              3586,
+              650
+            ],
+            [
+              3598,
+              695
+            ],
+            [
+              3548,
+              741
+            ],
+            [
+              3578,
+              744
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            320,
+            -248,
+            1031,
+            676
+          ],
+          "detection_confidence": 0.758105456829071,
+          "landmarks": [
+            [
+              595,
+              143
+            ],
+            [
+              900,
+              84
+            ],
+            [
+              835,
+              308
+            ],
+            [
+              712,
+              501
+            ],
+            [
+              932,
+              449
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 700,
+      "timestamp": 28,
+      "faces": [
+        {
+          "bbox": [
+            2522,
+            243,
+            3251,
+            1051
+          ],
+          "detection_confidence": 0.806114673614502,
+          "landmarks": [
+            [
+              2885,
+              522
+            ],
+            [
+              3132,
+              608
+            ],
+            [
+              3041,
+              745
+            ],
+            [
+              2813,
+              826
+            ],
+            [
+              2989,
+              899
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            353,
+            -220,
+            1079,
+            745
+          ],
+          "detection_confidence": 0.7110945582389832,
+          "landmarks": [
+            [
+              632,
+              209
+            ],
+            [
+              944,
+              142
+            ],
+            [
+              883,
+              370
+            ],
+            [
+              754,
+              565
+            ],
+            [
+              981,
+              509
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 705,
+      "timestamp": 28.2,
+      "faces": [
+        {
+          "bbox": [
+            2614,
+            250,
+            3332,
+            1072
+          ],
+          "detection_confidence": 0.7815654277801514,
+          "landmarks": [
+            [
+              2979,
+              557
+            ],
+            [
+              3209,
+              635
+            ],
+            [
+              3124,
+              775
+            ],
+            [
+              2901,
+              860
+            ],
+            [
+              3055,
+              924
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            395,
+            -168,
+            1125,
+            783
+          ],
+          "detection_confidence": 0.7600704431533813,
+          "landmarks": [
+            [
+              680,
+              251
+            ],
+            [
+              992,
+              188
+            ],
+            [
+              930,
+              421
+            ],
+            [
+              797,
+              622
+            ],
+            [
+              1018,
+              566
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 710,
+      "timestamp": 28.4,
+      "faces": [
+        {
+          "bbox": [
+            434,
+            -127,
+            1158,
+            833
+          ],
+          "detection_confidence": 0.7687087059020996,
+          "landmarks": [
+            [
+              716,
+              302
+            ],
+            [
+              1028,
+              241
+            ],
+            [
+              960,
+              470
+            ],
+            [
+              821,
+              661
+            ],
+            [
+              1052,
+              609
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2707,
+            240,
+            3428,
+            1058
+          ],
+          "detection_confidence": 0.7682396173477173,
+          "landmarks": [
+            [
+              3071,
+              532
+            ],
+            [
+              3307,
+              619
+            ],
+            [
+              3219,
+              762
+            ],
+            [
+              2995,
+              839
+            ],
+            [
+              3157,
+              911
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 715,
+      "timestamp": 28.6,
+      "faces": [
+        {
+          "bbox": [
+            1188,
+            363,
+            1332,
+            543
+          ],
+          "detection_confidence": 0.8893542289733887,
+          "landmarks": [
+            [
+              1251,
+              426
+            ],
+            [
+              1312,
+              426
+            ],
+            [
+              1303,
+              445
+            ],
+            [
+              1270,
+              493
+            ],
+            [
+              1316,
+              493
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            736,
+            377,
+            860,
+            527
+          ],
+          "detection_confidence": 0.8771246671676636,
+          "landmarks": [
+            [
+              787,
+              437
+            ],
+            [
+              837,
+              444
+            ],
+            [
+              814,
+              473
+            ],
+            [
+              782,
+              491
+            ],
+            [
+              819,
+              497
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2541,
+            461,
+            2647,
+            582
+          ],
+          "detection_confidence": 0.8408335447311401,
+          "landmarks": [
+            [
+              2584,
+              513
+            ],
+            [
+              2628,
+              516
+            ],
+            [
+              2609,
+              544
+            ],
+            [
+              2582,
+              558
+            ],
+            [
+              2613,
+              561
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1827,
+            360,
+            1905,
+            468
+          ],
+          "detection_confidence": 0.8336183428764343,
+          "landmarks": [
+            [
+              1856,
+              403
+            ],
+            [
+              1889,
+              401
+            ],
+            [
+              1879,
+              422
+            ],
+            [
+              1863,
+              442
+            ],
+            [
+              1889,
+              441
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1425,
+            379,
+            1483,
+            445
+          ],
+          "detection_confidence": 0.70148104429245,
+          "landmarks": [
+            [
+              1444,
+              401
+            ],
+            [
+              1470,
+              400
+            ],
+            [
+              1460,
+              414
+            ],
+            [
+              1448,
+              428
+            ],
+            [
+              1468,
+              427
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2410,
+            375,
+            2464,
+            450
+          ],
+          "detection_confidence": 0.6863235831260681,
+          "landmarks": [
+            [
+              2449,
+              404
+            ],
+            [
+              2457,
+              403
+            ],
+            [
+              2463,
+              420
+            ],
+            [
+              2447,
+              433
+            ],
+            [
+              2452,
+              433
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3055,
+            436,
+            3124,
+            514
+          ],
+          "detection_confidence": 0.6537675857543945,
+          "landmarks": [
+            [
+              3103,
+              472
+            ],
+            [
+              3113,
+              474
+            ],
+            [
+              3113,
+              492
+            ],
+            [
+              3092,
+              498
+            ],
+            [
+              3098,
+              501
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 720,
+      "timestamp": 28.8,
+      "faces": [
+        {
+          "bbox": [
+            737,
+            371,
+            861,
+            515
+          ],
+          "detection_confidence": 0.8576536178588867,
+          "landmarks": [
+            [
+              790,
+              429
+            ],
+            [
+              840,
+              434
+            ],
+            [
+              819,
+              463
+            ],
+            [
+              788,
+              482
+            ],
+            [
+              825,
+              486
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1216,
+            368,
+            1356,
+            555
+          ],
+          "detection_confidence": 0.8435615301132202,
+          "landmarks": [
+            [
+              1274,
+              436
+            ],
+            [
+              1337,
+              429
+            ],
+            [
+              1328,
+              459
+            ],
+            [
+              1295,
+              509
+            ],
+            [
+              1341,
+              504
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2543,
+            461,
+            2640,
+            569
+          ],
+          "detection_confidence": 0.7644799947738647,
+          "landmarks": [
+            [
+              2582,
+              497
+            ],
+            [
+              2622,
+              498
+            ],
+            [
+              2605,
+              526
+            ],
+            [
+              2583,
+              543
+            ],
+            [
+              2611,
+              545
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1830,
+            360,
+            1911,
+            463
+          ],
+          "detection_confidence": 0.7346174716949463,
+          "landmarks": [
+            [
+              1855,
+              393
+            ],
+            [
+              1893,
+              394
+            ],
+            [
+              1877,
+              417
+            ],
+            [
+              1859,
+              436
+            ],
+            [
+              1889,
+              437
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 725,
+      "timestamp": 29,
+      "faces": [
+        {
+          "bbox": [
+            1248,
+            395,
+            1392,
+            601
+          ],
+          "detection_confidence": 0.8768877387046814,
+          "landmarks": [
+            [
+              1309,
+              474
+            ],
+            [
+              1372,
+              465
+            ],
+            [
+              1362,
+              504
+            ],
+            [
+              1326,
+              550
+            ],
+            [
+              1375,
+              543
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            740,
+            366,
+            865,
+            515
+          ],
+          "detection_confidence": 0.8725326657295227,
+          "landmarks": [
+            [
+              794,
+              426
+            ],
+            [
+              843,
+              432
+            ],
+            [
+              822,
+              461
+            ],
+            [
+              789,
+              479
+            ],
+            [
+              828,
+              484
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2531,
+            435,
+            2632,
+            559
+          ],
+          "detection_confidence": 0.8528403043746948,
+          "landmarks": [
+            [
+              2577,
+              492
+            ],
+            [
+              2616,
+              493
+            ],
+            [
+              2601,
+              521
+            ],
+            [
+              2575,
+              535
+            ],
+            [
+              2602,
+              537
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1829,
+            354,
+            1903,
+            450
+          ],
+          "detection_confidence": 0.8077989816665649,
+          "landmarks": [
+            [
+              1859,
+              387
+            ],
+            [
+              1889,
+              387
+            ],
+            [
+              1879,
+              407
+            ],
+            [
+              1862,
+              425
+            ],
+            [
+              1885,
+              425
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1416,
+            372,
+            1470,
+            438
+          ],
+          "detection_confidence": 0.7085026502609253,
+          "landmarks": [
+            [
+              1442,
+              397
+            ],
+            [
+              1461,
+              397
+            ],
+            [
+              1456,
+              410
+            ],
+            [
+              1444,
+              423
+            ],
+            [
+              1458,
+              423
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2392,
+            364,
+            2449,
+            440
+          ],
+          "detection_confidence": 0.6930502653121948,
+          "landmarks": [
+            [
+              2429,
+              394
+            ],
+            [
+              2441,
+              393
+            ],
+            [
+              2444,
+              410
+            ],
+            [
+              2429,
+              423
+            ],
+            [
+              2437,
+              423
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3029,
+            414,
+            3104,
+            496
+          ],
+          "detection_confidence": 0.6632582545280457,
+          "landmarks": [
+            [
+              3078,
+              450
+            ],
+            [
+              3090,
+              452
+            ],
+            [
+              3087,
+              473
+            ],
+            [
+              3062,
+              479
+            ],
+            [
+              3070,
+              482
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 730,
+      "timestamp": 29.2,
+      "faces": [
+        {
+          "bbox": [
+            1267,
+            432,
+            1407,
+            644
+          ],
+          "detection_confidence": 0.8619741797447205,
+          "landmarks": [
+            [
+              1320,
+              518
+            ],
+            [
+              1386,
+              510
+            ],
+            [
+              1370,
+              555
+            ],
+            [
+              1341,
+              601
+            ],
+            [
+              1386,
+              595
+            ]
+          ],
+          "matched": true,
+          "contestant_name": "子涓",
+          "recognition_confidence": 0.265147964885052
+        },
+        {
+          "bbox": [
+            741,
+            367,
+            866,
+            521
+          ],
+          "detection_confidence": 0.8613784909248352,
+          "landmarks": [
+            [
+              795,
+              430
+            ],
+            [
+              845,
+              434
+            ],
+            [
+              823,
+              466
+            ],
+            [
+              791,
+              484
+            ],
+            [
+              831,
+              488
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2519,
+            423,
+            2621,
+            550
+          ],
+          "detection_confidence": 0.8399031758308411,
+          "landmarks": [
+            [
+              2568,
+              479
+            ],
+            [
+              2607,
+              481
+            ],
+            [
+              2594,
+              509
+            ],
+            [
+              2566,
+              524
+            ],
+            [
+              2594,
+              526
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1833,
+            354,
+            1906,
+            448
+          ],
+          "detection_confidence": 0.7834779024124146,
+          "landmarks": [
+            [
+              1864,
+              387
+            ],
+            [
+              1893,
+              388
+            ],
+            [
+              1883,
+              407
+            ],
+            [
+              1864,
+              423
+            ],
+            [
+              1886,
+              425
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2381,
+            364,
+            2437,
+            438
+          ],
+          "detection_confidence": 0.713384211063385,
+          "landmarks": [
+            [
+              2416,
+              393
+            ],
+            [
+              2430,
+              391
+            ],
+            [
+              2431,
+              408
+            ],
+            [
+              2416,
+              421
+            ],
+            [
+              2426,
+              421
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1416,
+            371,
+            1469,
+            437
+          ],
+          "detection_confidence": 0.6472753882408142,
+          "landmarks": [
+            [
+              1445,
+              396
+            ],
+            [
+              1460,
+              395
+            ],
+            [
+              1460,
+              409
+            ],
+            [
+              1449,
+              422
+            ],
+            [
+              1459,
+              421
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3019,
+            411,
+            3092,
+            492
+          ],
+          "detection_confidence": 0.5980188250541687,
+          "landmarks": [
+            [
+              3067,
+              447
+            ],
+            [
+              3080,
+              449
+            ],
+            [
+              3077,
+              468
+            ],
+            [
+              3054,
+              475
+            ],
+            [
+              3064,
+              478
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 735,
+      "timestamp": 29.4,
+      "faces": [
+        {
+          "bbox": [
+            1255,
+            426,
+            1395,
+            645
+          ],
+          "detection_confidence": 0.8696171045303345,
+          "landmarks": [
+            [
+              1308,
+              514
+            ],
+            [
+              1375,
+              503
+            ],
+            [
+              1360,
+              554
+            ],
+            [
+              1325,
+              597
+            ],
+            [
+              1376,
+              589
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            743,
+            375,
+            861,
+            523
+          ],
+          "detection_confidence": 0.8485465049743652,
+          "landmarks": [
+            [
+              791,
+              435
+            ],
+            [
+              841,
+              435
+            ],
+            [
+              821,
+              470
+            ],
+            [
+              792,
+              489
+            ],
+            [
+              832,
+              489
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2500,
+            415,
+            2597,
+            539
+          ],
+          "detection_confidence": 0.8439751863479614,
+          "landmarks": [
+            [
+              2549,
+              466
+            ],
+            [
+              2584,
+              465
+            ],
+            [
+              2576,
+              493
+            ],
+            [
+              2549,
+              512
+            ],
+            [
+              2575,
+              512
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1835,
+            351,
+            1907,
+            447
+          ],
+          "detection_confidence": 0.7656078338623047,
+          "landmarks": [
+            [
+              1873,
+              386
+            ],
+            [
+              1897,
+              388
+            ],
+            [
+              1891,
+              407
+            ],
+            [
+              1870,
+              423
+            ],
+            [
+              1888,
+              425
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2369,
+            363,
+            2427,
+            441
+          ],
+          "detection_confidence": 0.7588708400726318,
+          "landmarks": [
+            [
+              2407,
+              392
+            ],
+            [
+              2419,
+              391
+            ],
+            [
+              2422,
+              407
+            ],
+            [
+              2405,
+              422
+            ],
+            [
+              2414,
+              421
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            3006,
+            410,
+            3082,
+            491
+          ],
+          "detection_confidence": 0.6958203911781311,
+          "landmarks": [
+            [
+              3056,
+              448
+            ],
+            [
+              3068,
+              451
+            ],
+            [
+              3064,
+              471
+            ],
+            [
+              3040,
+              476
+            ],
+            [
+              3048,
+              479
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1410,
+            377,
+            1458,
+            438
+          ],
+          "detection_confidence": 0.578568160533905,
+          "landmarks": [
+            [
+              1433,
+              400
+            ],
+            [
+              1450,
+              399
+            ],
+            [
+              1446,
+              411
+            ],
+            [
+              1436,
+              423
+            ],
+            [
+              1449,
+              423
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 740,
+      "timestamp": 29.6,
+      "faces": [
+        {
+          "bbox": [
+            734,
+            381,
+            852,
+            532
+          ],
+          "detection_confidence": 0.8752624988555908,
+          "landmarks": [
+            [
+              778,
+              444
+            ],
+            [
+              831,
+              443
+            ],
+            [
+              808,
+              479
+            ],
+            [
+              781,
+              497
+            ],
+            [
+              824,
+              496
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1214,
+            432,
+            1357,
+            638
+          ],
+          "detection_confidence": 0.8713842630386353,
+          "landmarks": [
+            [
+              1261,
+              512
+            ],
+            [
+              1331,
+              502
+            ],
+            [
+              1311,
+              551
+            ],
+            [
+              1281,
+              594
+            ],
+            [
+              1333,
+              586
+            ]
+          ],
+          "matched": true,
+          "contestant_name": "子涓",
+          "recognition_confidence": 0.26847211345217725
+        },
+        {
+          "bbox": [
+            2474,
+            419,
+            2567,
+            539
+          ],
+          "detection_confidence": 0.8609174489974976,
+          "landmarks": [
+            [
+              2526,
+              468
+            ],
+            [
+              2557,
+              469
+            ],
+            [
+              2551,
+              494
+            ],
+            [
+              2524,
+              511
+            ],
+            [
+              2547,
+              512
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1827,
+            362,
+            1900,
+            452
+          ],
+          "detection_confidence": 0.7900111675262451,
+          "landmarks": [
+            [
+              1863,
+              395
+            ],
+            [
+              1889,
+              398
+            ],
+            [
+              1880,
+              416
+            ],
+            [
+              1860,
+              429
+            ],
+            [
+              1879,
+              432
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1397,
+            385,
+            1451,
+            450
+          ],
+          "detection_confidence": 0.6429582834243774,
+          "landmarks": [
+            [
+              1421,
+              409
+            ],
+            [
+              1442,
+              407
+            ],
+            [
+              1438,
+              421
+            ],
+            [
+              1427,
+              434
+            ],
+            [
+              1443,
+              433
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2356,
+            381,
+            2410,
+            448
+          ],
+          "detection_confidence": 0.6028030514717102,
+          "landmarks": [
+            [
+              2392,
+              405
+            ],
+            [
+              2403,
+              404
+            ],
+            [
+              2407,
+              420
+            ],
+            [
+              2391,
+              432
+            ],
+            [
+              2400,
+              432
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2988,
+            414,
+            3056,
+            491
+          ],
+          "detection_confidence": 0.5703124403953552,
+          "landmarks": [
+            [
+              3035,
+              447
+            ],
+            [
+              3042,
+              450
+            ],
+            [
+              3041,
+              470
+            ],
+            [
+              3019,
+              475
+            ],
+            [
+              3023,
+              479
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    },
+    {
+      "frame_number": 745,
+      "timestamp": 29.8,
+      "faces": [
+        {
+          "bbox": [
+            1189,
+            437,
+            1338,
+            643
+          ],
+          "detection_confidence": 0.8867384195327759,
+          "landmarks": [
+            [
+              1237,
+              526
+            ],
+            [
+              1306,
+              506
+            ],
+            [
+              1291,
+              556
+            ],
+            [
+              1269,
+              604
+            ],
+            [
+              1317,
+              588
+            ]
+          ],
+          "matched": true,
+          "contestant_name": "子涓",
+          "recognition_confidence": 0.3094166439857464
+        },
+        {
+          "bbox": [
+            726,
+            396,
+            841,
+            542
+          ],
+          "detection_confidence": 0.8541469573974609,
+          "landmarks": [
+            [
+              764,
+              461
+            ],
+            [
+              814,
+              455
+            ],
+            [
+              793,
+              491
+            ],
+            [
+              773,
+              511
+            ],
+            [
+              813,
+              506
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2450,
+            431,
+            2535,
+            548
+          ],
+          "detection_confidence": 0.8367137908935547,
+          "landmarks": [
+            [
+              2497,
+              479
+            ],
+            [
+              2525,
+              476
+            ],
+            [
+              2523,
+              502
+            ],
+            [
+              2500,
+              521
+            ],
+            [
+              2520,
+              520
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1810,
+            382,
+            1879,
+            465
+          ],
+          "detection_confidence": 0.7680432200431824,
+          "landmarks": [
+            [
+              1848,
+              410
+            ],
+            [
+              1870,
+              412
+            ],
+            [
+              1864,
+              430
+            ],
+            [
+              1844,
+              443
+            ],
+            [
+              1859,
+              446
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2342,
+            390,
+            2394,
+            462
+          ],
+          "detection_confidence": 0.6658516526222229,
+          "landmarks": [
+            [
+              2381,
+              418
+            ],
+            [
+              2388,
+              417
+            ],
+            [
+              2393,
+              435
+            ],
+            [
+              2377,
+              446
+            ],
+            [
+              2382,
+              446
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            1389,
+            397,
+            1445,
+            465
+          ],
+          "detection_confidence": 0.5780948996543884,
+          "landmarks": [
+            [
+              1412,
+              422
+            ],
+            [
+              1435,
+              421
+            ],
+            [
+              1429,
+              434
+            ],
+            [
+              1417,
+              448
+            ],
+            [
+              1435,
+              448
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        },
+        {
+          "bbox": [
+            2970,
+            417,
+            3038,
+            502
+          ],
+          "detection_confidence": 0.5768434405326843,
+          "landmarks": [
+            [
+              3015,
+              452
+            ],
+            [
+              3027,
+              455
+            ],
+            [
+              3024,
+              474
+            ],
+            [
+              3003,
+              483
+            ],
+            [
+              3011,
+              486
+            ]
+          ],
+          "matched": false,
+          "contestant_name": null,
+          "recognition_confidence": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "theme": "auto",
+  "notifications": true,
+  "autoRefresh": true,
+  "refreshInterval": 30,
+  "maxConcurrentJobs": 3,
+  "videoQuality": "medium",
+  "faceDetectionThreshold": 0.8
+}
