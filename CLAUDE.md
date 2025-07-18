@@ -18,16 +18,28 @@
   - **VIDEO PLAYER AND FACE RECOGNITION DEPEND ON THIS FILE**
 
 # CRITICAL DEPLOYMENT CONFIGURATION - DO NOT BREAK
+## ⚠️ FRONTEND RESTRUCTURING COMPLETE (January 2025) ⚠️
+
+**MAJOR RESTRUCTURING COMPLETED:**
+The frontend has been consolidated from multiple directories into mvp-processor as the single frontend.
+
+### ✅ NEW STRUCTURE (Current Working State):
+- **Primary Frontend**: mvp-processor/ directory contains both Python processing AND SvelteKit frontend
+- **Face Recognition Dashboard**: Complete implementation based on face_recognition_mockup.html
+- **Routes**: /, /video-player, /processing, /analytics with dark theme UI
+- **Legacy Frontend**: frontend/ moved to frontend-legacy-backup/ (do not restore)
+- **Build Process**: `cd mvp-processor && npm run build` for complete system
+
 ## ⚠️ SVELTEKIT vs LEGACY APP CONFLICTS - RESOLVED ⚠️
 
 **CRITICAL ISSUE RESOLVED (July 10, 2025):**
 The deployment was serving the WRONG APPLICATION due to build configuration conflicts.
 
 ### ✅ CORRECT CONFIGURATION (Current Working State):
-- **Frontend Framework**: SvelteKit 2.x with TypeScript
-- **Build Command**: `npm run build` (uses SvelteKit via `vite build --mode production`)
-- **Entry Point**: `src/app.html` + SvelteKit routes (NOT `src/main.js`)
-- **Asset Structure**: `build/_app/` directory with 36 embedded assets
+- **Frontend Framework**: SvelteKit 2.x with TypeScript in mvp-processor/ directory
+- **Build Command**: `cd mvp-processor && npm run build` (uses SvelteKit via `vite build --mode production`)
+- **Entry Point**: `mvp-processor/src/app.html` + SvelteKit routes (NOT `src/main.js`)
+- **Asset Structure**: `mvp-processor/build/_app/` directory with embedded assets
 - **Worker Deployment**: Uses `scripts/update-worker-assets.js` for SvelteKit structure
 
 ### ❌ LEGACY CONFIGURATION (Backed Up, Do Not Restore):
@@ -48,9 +60,9 @@ The deployment was serving the WRONG APPLICATION due to build configuration conf
    - Asset embedding script MUST handle `_app/` directory, not just `assets/`
 
 3. **DEPLOYMENT VERIFICATION**:
-   - Cloudflare Workers should serve 36 assets (SvelteKit), not 3 (legacy Vite)
-   - Root URL should serve functional video player, not demo placeholder
-   - All routes (/, /video-player, /settings, etc.) should work
+   - Cloudflare Workers should serve embedded assets from mvp-processor/build/
+   - Root URL should serve functional face recognition dashboard, not demo placeholder
+   - All routes (/, /video-player, /processing, /analytics) should work
 
 4. **IF DEPLOYMENT BREAKS**:
    - Check that SvelteKit is being built (not legacy Vite app)
@@ -59,18 +71,18 @@ The deployment was serving the WRONG APPLICATION due to build configuration conf
    - Test that video player shows actual videos, not "[object Object]"
 
 ### 📋 WORKING DEPLOYMENT CHECKLIST:
-- ✅ `vite.config.js` uses `sveltekit()` plugin
-- ✅ `frontend/build/` contains `_app/` directory with 30+ files
-- ✅ `scripts/update-worker-assets.js` embeds 36+ assets
-- ✅ Video player route shows functional interface, not placeholder
-- ✅ Video dropdown shows video names, not "[object Object]"
+- ✅ `mvp-processor/vite.config.js` uses `sveltekit()` plugin
+- ✅ `mvp-processor/build/` contains `_app/` directory with embedded assets
+- ✅ `scripts/update-worker-assets.js` embeds assets from mvp-processor
+- ✅ Dashboard route shows functional face recognition interface
+- ✅ All routes work: /, /video-player, /processing, /analytics
 - ✅ All API endpoints return proper JSON responses
-- ✅ WebSocket connections work for real-time features
+- ✅ Face recognition mockup dashboard is the primary interface
 
 ### 🔧 RECOVERY COMMANDS (If Deployment Breaks):
 ```bash
 # 1. Ensure correct SvelteKit build
-cd frontend && npm run build
+cd mvp-processor && npm run build
 
 # 2. Verify _app directory exists
 ls -la build/_app/
@@ -87,11 +99,13 @@ curl -s "https://mv-face-recognition-api.herballemon.workers.dev/" | head -10
 
 ## ⚠️ WARNING TO FUTURE AI ASSISTANTS ⚠️
 - **NEVER DELETE metadata/contestant_info.csv**
+- **NEVER RESTORE frontend-legacy-backup/ directory as frontend/**
 - **NEVER RESTORE src/main.js.backup or src/App.svelte.backup**
+- **FRONTEND IS NOW IN mvp-processor/ DIRECTORY - DO NOT REVERT**
 - **ALWAYS CHECK CLAUDE.md BEFORE MAKING BUILD CONFIGURATION CHANGES**
 - **VERIFY SVELTEKIT DEPLOYMENT AFTER ANY FRONTEND CHANGES**
-- **THIS DEPLOYMENT WAS BROKEN ONCE - DO NOT REPEAT CONFIGURATION MISTAKES**
-- **THE USER EXPECTS A WORKING VIDEO PLAYER, NOT DEMO PLACEHOLDERS**
+- **THE USER EXPECTS FACE RECOGNITION DASHBOARD, NOT SIMPLE VIDEO PLAYER**
+- **mvp-processor/ IS THE SINGLE SOURCE OF TRUTH FOR FRONTEND**
 
 # 🧪 COMPREHENSIVE TEST SUITE - PRODUCTION READY
 ## ✅ TESTING INFRASTRUCTURE COMPLETE (January 2025)

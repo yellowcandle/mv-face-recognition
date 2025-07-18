@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration
-const FRONTEND_BUILD_DIR = path.join(__dirname, '..', 'frontend', 'build');
+const FRONTEND_BUILD_DIR = path.join(__dirname, '..', 'mvp-processor', 'build');
 const WORKER_FILE = path.join(__dirname, '..', 'worker', 'index.js');
 const BACKUP_FILE = path.join(__dirname, '..', 'worker', 'index.js.backup');
 
@@ -24,7 +24,7 @@ console.log('🚀 Starting SvelteKit asset embedding for Cloudflare Workers...')
 // Check if build directory exists
 if (!fs.existsSync(FRONTEND_BUILD_DIR)) {
   console.error('❌ Frontend build directory not found:', FRONTEND_BUILD_DIR);
-  console.error('   Run "cd frontend && npm run build" first');
+  console.error('   Run "cd mvp-processor && npm run build" first');
   process.exit(1);
 }
 

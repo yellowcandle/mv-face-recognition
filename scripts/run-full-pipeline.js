@@ -16,7 +16,7 @@ const { execSync, spawn } = require('child_process');
 
 // Configuration
 const PROCESSOR_DIR = path.join(__dirname, '..', 'mvp-processor');
-const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
+const FRONTEND_DIR = path.join(__dirname, '..', 'mvp-processor');
 const WORKER_DIR = path.join(__dirname, '..', 'worker');
 const SOURCE_VIDEOS_DIR = path.join(__dirname, '..', 'source', 'videos');
 
