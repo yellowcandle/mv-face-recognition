@@ -1,7 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { parseMetadata, type DetectedFace, type ParsedMetadata } from '$lib/utils/metadata.js';
-  import { createVideoSynchronizer, type VideoTimestampSynchronizer, type TimestampSyncResult } from '$lib/utils/synchronization.js';
   
   let videos: any[] = [];
   let selectedVideo: any = null;
@@ -14,137 +12,85 @@
   let loading = true;
   let showOverlay = true;
   let showSidebar = true;
-  let currentFaces: DetectedFace[] = [];
-  let selectedFace: DetectedFace | null = null;
+  let currentFaces: any[] = [];
+  let selectedFace: any = null;
   let metadata: any = null;
-  let parsedMetadata: ParsedMetadata | null = null;
-  let synchronizer: VideoTimestampSynchronizer | null = null;
-  let animationId: number;
-  let resizeObserver: ResizeObserver;
-  let hoveredFace: DetectedFace | null = null;
+  let hoveredFace: any = null;
   let mousePosition = { x: 0, y: 0 };
-  let syncStats = {
-    averageLatency: 0,
-    frameDrops: 0,
-    cacheHitRate: 0,
-    confidence: 0
-  };
-  let performanceMonitoring = true;
+  let confidenceFilter = 0.5;
+  let contestantSearch = '';
+  let showMobileMenu = false;
+  let videoError = false;
+  let errorMessage = '';
+  let showExportDialog = false;
+  let exportStartTime = 0;
+  let exportEndTime = 0;
+  let exportProgress = 0;
+  let isExporting = false;
+  let highlightedFace: any = null;
   
   onMount(async () => {
     await loadVideos();
     loading = false;
-    
-    // Setup resize observer for canvas scaling
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
-        if (videoElement && canvas) {
-          updateCanvasSize();
-        }
-      });
-    }
-    
-    return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-    };
   });
   
   async function loadVideos() {
     try {
-      const response = await fetch('/api/videos/processed/list');
-      if (response.ok) {
-        const data = await response.json();
-        videos = data.videos || [];
-        if (videos.length > 0) {
-          await selectVideo(videos[0]);
+      // Mock video data for testing
+      videos = [
+        {
+          id: 'test-video',
+          filename: 'test-video_720p.mp4',
+          name: '《全民造星IV》主題曲',
+          duration: 180
+        },
+        {
+          id: 'video-1',
+          filename: 'video-1_720p.mp4',
+          name: '女團の駅 Performance',
+          duration: 240
         }
+      ];
+      
+      if (videos.length > 0) {
+        await selectVideo(videos[0]);
       }
     } catch (err) {
       console.error('Failed to load videos:', err);
     }
   }
   
-  async function selectVideo(video: any) {
+  async function selectVideo(videoOrName: any) {
+    let video;
+    if (typeof videoOrName === 'string') {
+      video = videos.find(v => v.name === videoOrName);
+    } else {
+      video = videoOrName;
+    }
+    
+    if (!video) return;
+    
     selectedVideo = video;
     currentFaces = [];
     selectedFace = null;
-    
-    // Stop existing synchronizer
-    if (synchronizer) {
-      synchronizer.stop();
-      synchronizer = null;
-    }
+    videoError = false;
+    errorMessage = '';
     
     if (videoElement) {
       videoElement.currentTime = 0;
       currentTime = 0;
     }
     
-    // Load metadata
-    try {
-      const metadataResponse = await fetch(`/api/videos/metadata/dense/${video.id}`);
-      if (metadataResponse.ok) {
-        metadata = await metadataResponse.json();
-      }
-    } catch (err) {
-      console.error('Failed to load metadata:', err);
-      // Mock metadata for demonstration
-      metadata = {
-        video_info: {
-          filename: video.filename,
-          duration: video.duration,
-          fps: 30
-        },
-        processing_info: {
-          processing_interval: 5,
-          interpolation_enabled: true,
-          total_processed_frames: Math.floor(video.duration * 30 / 5),
-          total_interpolated_frames: Math.floor(video.duration * 30 * 0.8)
-        },
-        timeline: generateMockTimeline(video.duration)
-      };
-    }
-    
-    // Parse metadata and initialize synchronizer
-    if (metadata) {
-      parsedMetadata = parseMetadata(metadata);
-      
-      if (parsedMetadata.isValid) {
-        // Create advanced synchronizer with performance optimizations
-        synchronizer = createVideoSynchronizer({
-          toleranceSeconds: 0.5,
-          interpolationEnabled: true,
-          preloadBufferSeconds: performanceMonitoring ? 15 : 10,
-          maxCacheSize: performanceMonitoring ? 300 : 200
-        });
-        
-        // Initialize synchronizer with parsed metadata
-        const initialized = synchronizer.initialize(parsedMetadata);
-        if (initialized) {
-          console.log('Advanced synchronizer initialized successfully');
-          
-          // Setup synchronization callback for face updates
-          synchronizer.onSync((result: TimestampSyncResult) => {
-            currentFaces = result.faces;
-            syncStats.confidence = result.confidence;
-            
-            // Update performance stats if monitoring is enabled
-            if (performanceMonitoring) {
-              updatePerformanceStats(result);
-            }
-          });
-        } else {
-          console.error('Failed to initialize synchronizer');
-        }
-      } else {
-        console.error('Invalid metadata:', parsedMetadata.errors);
-      }
-    }
+    // Mock metadata for demonstration
+    metadata = {
+      video_info: {
+        filename: video.filename,
+        duration: video.duration,
+        fps: 30,
+        title: video.name
+      },
+      timeline: generateMockTimeline(video.duration)
+    };
   }
   
   function generateMockTimeline(duration: number) {
@@ -152,11 +98,10 @@
     const fps = 30;
     const totalFrames = Math.floor(duration * fps);
     
-    for (let frame = 0; frame < totalFrames; frame += 30) { // Every second
+    for (let frame = 0; frame < totalFrames; frame += 30) {
       const timestamp = frame / fps;
       const contestants = [];
       
-      // Randomly add contestants with varying confidence
       if (Math.random() > 0.7) {
         const numFaces = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < numFaces; i++) {
@@ -168,7 +113,7 @@
             confidence: 0.6 + Math.random() * 0.4,
             bounding_box: {
               x: Math.random() * 300 + 50,
-              y: Math.random() * 200 + 50, 
+              y: Math.random() * 200 + 50,
               width: 120 + Math.random() * 80,
               height: 150 + Math.random() * 100
             },
@@ -191,67 +136,58 @@
     if (canvas && videoElement) {
       updateCanvasSize();
       ctx = canvas.getContext('2d');
-      
-      // Start observing video element for size changes
-      if (resizeObserver) {
-        resizeObserver.observe(videoElement);
-      }
-      
-      startAnimation();
     }
   }
   
   function updateCanvasSize() {
     if (!canvas || !videoElement) return;
     
-    // Get the displayed size of the video element
     const rect = videoElement.getBoundingClientRect();
     const displayWidth = rect.width;
     const displayHeight = rect.height;
     
-    // Get device pixel ratio for crisp rendering
-    const devicePixelRatio = window.devicePixelRatio || 1;
-    
-    // Set canvas size to match displayed video size
     canvas.style.width = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
     
-    // Scale canvas for device pixel ratio
+    const devicePixelRatio = window.devicePixelRatio || 1;
     canvas.width = displayWidth * devicePixelRatio;
     canvas.height = displayHeight * devicePixelRatio;
     
-    // Scale the drawing context to match device pixel ratio
     if (ctx) {
       ctx.scale(devicePixelRatio, devicePixelRatio);
     }
   }
   
   function getVideoScaleFactors() {
-    if (!videoElement || !canvas) return { scaleX: 1, scaleY: 1 };
+    if (!videoElement || !canvas) return { 
+      scaleX: 1, 
+      scaleY: 1, 
+      offsetX: 0, 
+      offsetY: 0, 
+      actualVideoWidth: 0, 
+      actualVideoHeight: 0 
+    };
     
-    // Get video's natural dimensions
     const videoWidth = videoElement.videoWidth || 1920;
     const videoHeight = videoElement.videoHeight || 1080;
     
-    // Get displayed dimensions
     const rect = videoElement.getBoundingClientRect();
     const displayWidth = rect.width;
     const displayHeight = rect.height;
     
-    // Calculate how the video is actually displayed (considering object-fit: contain)
     const videoAspect = videoWidth / videoHeight;
     const displayAspect = displayWidth / displayHeight;
     
-    let actualVideoWidth, actualVideoHeight;
-    let offsetX = 0, offsetY = 0;
+    let actualVideoWidth = displayWidth;
+    let actualVideoHeight = displayHeight;
+    let offsetX = 0;
+    let offsetY = 0;
     
     if (videoAspect > displayAspect) {
-      // Video is wider - letterboxed top/bottom
       actualVideoWidth = displayWidth;
       actualVideoHeight = displayWidth / videoAspect;
       offsetY = (displayHeight - actualVideoHeight) / 2;
     } else {
-      // Video is taller - letterboxed left/right
       actualVideoHeight = displayHeight;
       actualVideoWidth = displayHeight * videoAspect;
       offsetX = (displayWidth - actualVideoWidth) / 2;
@@ -267,47 +203,15 @@
     };
   }
   
-  function startAnimation() {
-    let lastFrameTime = 0;
-    const targetFPS = 60;
-    const frameInterval = 1000 / targetFPS;
-    
-    function animate(currentTime: number) {
-      // Throttle to 60fps for smooth performance
-      if (currentTime - lastFrameTime >= frameInterval) {
-        if (showOverlay && ctx && videoElement && metadata) {
-          updateFaceOverlay();
-        }
-        lastFrameTime = currentTime;
-      }
-      animationId = requestAnimationFrame(animate);
-    }
-    animationId = requestAnimationFrame(animate);
-  }
-  
   function updateFaceOverlay() {
     if (!ctx || !canvas) return;
     
-    // Clear canvas using display dimensions (since context is scaled)
     const rect = videoElement?.getBoundingClientRect();
     if (rect) {
       ctx.clearRect(0, 0, rect.width, rect.height);
     }
     
-    // Use advanced synchronizer if available, fallback to basic lookup
-    if (synchronizer && videoElement) {
-      const currentTimestamp = videoElement.currentTime;
-      
-      // Sync to current timestamp - this will trigger the callback
-      // which updates currentFaces automatically
-      synchronizer.syncToTimestamp(currentTimestamp);
-      
-      // Draw all current faces
-      currentFaces.forEach((face: DetectedFace) => {
-        drawFaceBoundingBox(face);
-      });
-    } else if (metadata) {
-      // Fallback to basic synchronization for compatibility
+    if (metadata) {
       const currentTimestamp = videoElement.currentTime;
       const currentFrame = metadata.timeline.find((frame: any) => 
         Math.abs(frame.timestamp - currentTimestamp) < 0.5
@@ -331,7 +235,6 @@
     const { x, y, width, height } = face.bounding_box;
     const confidence = face.confidence;
     
-    // Get proper scaling factors based on video display
     const scaleFactors = getVideoScaleFactors();
     
     const scaledX = x * scaleFactors.scaleX + scaleFactors.offsetX;
@@ -339,78 +242,69 @@
     const scaledWidth = width * scaleFactors.scaleX;
     const scaledHeight = height * scaleFactors.scaleY;
     
-    // Check if this face is hovered or selected
     const isHovered = hoveredFace?.id === face.id;
     const isSelected = selectedFace?.id === face.id;
+    const isHighlighted = highlightedFace?.id === face.id;
     
-    // Enhanced confidence-based colors with alpha for better visibility
-    let color = '#ef4444'; // Red for low confidence (< 0.5)
+    let color = '#ef4444';
     let alpha = 0.8;
     let lineWidth = 3;
     
     if (confidence >= 0.8) {
-      color = '#10b981'; // Green for high confidence
+      color = '#10b981';
       alpha = 0.9;
     } else if (confidence >= 0.7) {
-      color = '#10b981'; // Green for good confidence  
+      color = '#10b981';
       alpha = 0.8;
     } else if (confidence >= 0.5) {
-      color = '#f59e0b'; // Orange for medium confidence
+      color = '#f59e0b';
       alpha = 0.8;
     } else {
-      color = '#ef4444'; // Red for low confidence
+      color = '#ef4444';
       alpha = 0.7;
     }
     
-    // Enhance visual feedback for hover and selection states
     if (isSelected) {
       alpha = 1.0;
       lineWidth = 4;
-      color = '#2563eb'; // Blue for selected
+      color = '#2563eb';
+    } else if (isHighlighted) {
+      alpha = 1.0;
+      lineWidth = 4;
+      color = '#f59e0b';
     } else if (isHovered) {
       alpha = 0.95;
       lineWidth = 4;
-      // Keep original color but make it brighter
     }
     
-    // Save context state
     ctx.save();
-    
-    // Set global alpha for the entire face overlay
     ctx.globalAlpha = alpha;
     
-    // Draw main bounding box with rounded corners effect
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
     
-    // Draw enhanced corner markers
     const cornerSize = Math.min(25, Math.min(scaledWidth, scaledHeight) * 0.15);
     const cornerThickness = 4;
     
     ctx.fillStyle = color;
-    ctx.globalAlpha = 1.0; // Full opacity for corners
+    ctx.globalAlpha = 1.0;
     
-    // Top-left corner
     ctx.fillRect(scaledX - cornerThickness/2, scaledY - cornerThickness/2, cornerSize, cornerThickness);
     ctx.fillRect(scaledX - cornerThickness/2, scaledY - cornerThickness/2, cornerThickness, cornerSize);
     
-    // Top-right corner
     ctx.fillRect(scaledX + scaledWidth - cornerSize + cornerThickness/2, scaledY - cornerThickness/2, cornerSize, cornerThickness);
     ctx.fillRect(scaledX + scaledWidth - cornerThickness/2, scaledY - cornerThickness/2, cornerThickness, cornerSize);
     
-    // Bottom-left corner
     ctx.fillRect(scaledX - cornerThickness/2, scaledY + scaledHeight - cornerThickness/2, cornerSize, cornerThickness);
     ctx.fillRect(scaledX - cornerThickness/2, scaledY + scaledHeight - cornerSize + cornerThickness/2, cornerThickness, cornerSize);
     
-    // Bottom-right corner
     ctx.fillRect(scaledX + scaledWidth - cornerSize + cornerThickness/2, scaledY + scaledHeight - cornerThickness/2, cornerSize, cornerThickness);
     ctx.fillRect(scaledX + scaledWidth - cornerThickness/2, scaledY + scaledHeight - cornerSize + cornerThickness/2, cornerThickness, cornerSize);
     
-    // Draw enhanced label with better styling
-    if (confidence >= 0.7) { // Only show labels for confident detections
+    if (confidence >= 0.7) {
       const label = `${face.contestant_name} (${Math.round(confidence * 100)}%)`;
       ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       
@@ -420,20 +314,16 @@
       const labelX = Math.max(scaledX, Math.min(scaledX, scaleFactors.actualVideoWidth - labelWidth));
       const labelY = scaledY > labelHeight + 5 ? scaledY - 5 : scaledY + scaledHeight + labelHeight;
       
-      // Draw label background with rounded corners
       ctx.fillStyle = color;
       ctx.globalAlpha = 0.9;
       ctx.fillRect(labelX, labelY - labelHeight, labelWidth, labelHeight);
       
-      // Add subtle shadow effect
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fillRect(labelX + 2, labelY - labelHeight + 2, labelWidth, labelHeight);
       
-      // Draw label background again on top
       ctx.fillStyle = color;
       ctx.fillRect(labelX, labelY - labelHeight, labelWidth, labelHeight);
       
-      // Draw label text
       ctx.fillStyle = 'white';
       ctx.globalAlpha = 1.0;
       ctx.textAlign = 'left';
@@ -441,7 +331,6 @@
       ctx.fillText(label, labelX + 8, labelY - labelHeight/2);
     }
     
-    // Restore context state
     ctx.restore();
   }
   
@@ -449,11 +338,13 @@
     if (videoElement) {
       currentTime = videoElement.currentTime;
       duration = videoElement.duration || 0;
+      updateFaceOverlay();
     }
   }
   
   function handleCanPlay() {
     initCanvas();
+    updateFaceOverlay();
   }
   
   function togglePlay() {
@@ -504,7 +395,6 @@
     return '#ef4444';
   }
   
-  // Interactive canvas functions
   function handleCanvasMouseMove(event: MouseEvent) {
     if (!canvas || !currentFaces.length) return;
     
@@ -512,7 +402,6 @@
     mousePosition.x = event.clientX - rect.left;
     mousePosition.y = event.clientY - rect.top;
     
-    // Check if mouse is over any face bounding box
     const previousHoveredFace = hoveredFace;
     hoveredFace = null;
     
@@ -523,16 +412,14 @@
       }
     }
     
-    // Update cursor style
     if (hoveredFace) {
       canvas.style.cursor = 'pointer';
     } else {
       canvas.style.cursor = 'default';
     }
     
-    // Trigger redraw if hover state changed
     if (hoveredFace?.id !== previousHoveredFace?.id) {
-      // Force a redraw on next animation frame
+      // Force redraw
     }
   }
   
@@ -545,7 +432,6 @@
       y: event.clientY - rect.top
     };
     
-    // Check if click is on any face bounding box
     for (const face of currentFaces) {
       if (isPointInFaceBoundingBox(clickPosition, face)) {
         selectFace(face);
@@ -570,141 +456,107 @@
     const scaledWidth = width * scaleFactors.scaleX;
     const scaledHeight = height * scaleFactors.scaleY;
     
-    return point.x >= scaledX && 
-           point.x <= scaledX + scaledWidth && 
-           point.y >= scaledY && 
-           point.y <= scaledY + scaledHeight;
+    return point.x >= scaledX && point.x <= scaledX + scaledWidth &&
+           point.y >= scaledY && point.y <= scaledY + scaledHeight;
+  }
+  
+  function handleVideoError() {
+    videoError = true;
+    errorMessage = 'Failed to load video. Please try again.';
+  }
+  
+  function handleExport() {
+    showExportDialog = true;
+  }
+  
+  function closeExportDialog() {
+    showExportDialog = false;
+  }
+  
+  function startExport() {
+    // Mock export functionality with progress
+    isExporting = true;
+    exportProgress = 0;
+    
+    const progressInterval = setInterval(() => {
+      exportProgress += 10;
+      if (exportProgress >= 100) {
+        clearInterval(progressInterval);
+        isExporting = false;
+        showExportDialog = false;
+        exportProgress = 0;
+      }
+    }, 200);
+    
+    console.log('Exporting video from', exportStartTime, 'to', exportEndTime);
   }
 
-  // Performance monitoring functions
-  let performanceStats = {
-    frameCount: 0,
-    lastFrameTime: 0,
-    frameDrops: 0,
-    averageLatency: 0,
-    latencyMeasurements: [] as number[]
-  };
-
-  function updatePerformanceStats(result: TimestampSyncResult) {
-    if (!performanceMonitoring) return;
+  function searchAndJumpToContestant(contestantName: string) {
+    if (!metadata) return;
     
-    const now = performance.now();
-    const targetTimestamp = result.timestamp * 1000; // Convert to milliseconds
-    const latency = Math.abs(now - targetTimestamp);
-    
-    // Track latency measurements
-    performanceStats.latencyMeasurements.push(latency);
-    if (performanceStats.latencyMeasurements.length > 100) {
-      performanceStats.latencyMeasurements.shift(); // Keep only last 100 measurements
-    }
-    
-    // Calculate average latency
-    const sum = performanceStats.latencyMeasurements.reduce((a, b) => a + b, 0);
-    performanceStats.averageLatency = sum / performanceStats.latencyMeasurements.length;
-    
-    // Track frame drops (if time between frames is too long)
-    if (performanceStats.lastFrameTime > 0) {
-      const timeDelta = now - performanceStats.lastFrameTime;
-      const expectedFrameTime = 1000 / 60; // 60fps target
-      
-      if (timeDelta > expectedFrameTime * 1.5) {
-        performanceStats.frameDrops++;
+    // Find first occurrence of contestant
+    for (const frame of metadata.timeline) {
+      for (const contestant of frame.contestants) {
+        if (contestant.contestant_name === contestantName) {
+          jumpToTimestamp(frame.timestamp);
+          highlightedFace = contestant;
+          selectedFace = contestant;
+          return;
+        }
       }
     }
-    
-    performanceStats.frameCount++;
-    performanceStats.lastFrameTime = now;
-    
-    // Update sync stats for UI display
-    syncStats.averageLatency = performanceStats.averageLatency;
-    syncStats.frameDrops = performanceStats.frameDrops;
-    syncStats.confidence = result.confidence;
-    
-    // Get cache hit rate from synchronizer if available
-    if (synchronizer) {
-      const stats = synchronizer.getStats();
-      syncStats.cacheHitRate = stats.cacheHitRate;
+  }
+  
+  function jumpToTimestamp(timestamp: number) {
+    if (videoElement) {
+      videoElement.currentTime = timestamp;
+      currentTime = timestamp;
     }
   }
-
-  function resetPerformanceStats() {
-    performanceStats = {
-      frameCount: 0,
-      lastFrameTime: 0,
-      frameDrops: 0,
-      averageLatency: 0,
-      latencyMeasurements: []
-    };
-    
-    syncStats = {
-      averageLatency: 0,
-      frameDrops: 0,
-      cacheHitRate: 0,
-      confidence: 0
-    };
+  
+  function filterFacesByConfidence(faces: any[]) {
+    return faces.filter(face => face.confidence >= confidenceFilter);
   }
-
-  function togglePerformanceMonitoring() {
-    performanceMonitoring = !performanceMonitoring;
+  
+  function filterFacesBySearch(faces: any[]) {
+    if (!contestantSearch.trim()) return faces;
     
-    if (performanceMonitoring) {
-      resetPerformanceStats();
-    }
-    
-    // Update synchronizer options if available
-    if (synchronizer) {
-      synchronizer.updateOptions({
-        preloadBufferSeconds: performanceMonitoring ? 15 : 10,
-        maxCacheSize: performanceMonitoring ? 300 : 200
+    const searchTerm = contestantSearch.toLowerCase();
+    return faces.filter(face => 
+      face.contestant_name.toLowerCase().includes(searchTerm) ||
+      face.contestant_nickname.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  function getFilteredFaces() {
+    let filtered = currentFaces;
+    filtered = filterFacesByConfidence(filtered);
+    filtered = filterFacesBySearch(filtered);
+    return filtered;
+  }
+  
+  function getUniqueContestants() {
+    const contestants = new Map();
+    if (metadata) {
+      metadata.timeline.forEach((frame: any) => {
+        frame.contestants.forEach((face: any) => {
+          if (!contestants.has(face.contestant_id)) {
+            contestants.set(face.contestant_id, {
+              id: face.contestant_id,
+              name: face.contestant_name,
+              nickname: face.contestant_nickname,
+              appearances: 0
+            });
+          }
+          contestants.get(face.contestant_id).appearances++;
+        });
       });
     }
-  }
-
-  // Enhanced video player lifecycle management
-  function handleVideoPlay() {
-    playing = true;
-    
-    // Start synchronizer if available
-    if (synchronizer && videoElement) {
-      synchronizer.start(videoElement);
-      console.log('Advanced synchronizer started');
-    }
-  }
-
-  function handleVideoPause() {
-    playing = false;
-    
-    // Stop synchronizer to save resources
-    if (synchronizer) {
-      synchronizer.stop();
-      console.log('Advanced synchronizer stopped');
-    }
-  }
-
-  function handleVideoSeeked() {
-    // Clear cache and preload around new position
-    if (synchronizer && videoElement) {
-      const currentTime = videoElement.currentTime;
-      synchronizer.clearCache();
-      synchronizer.preloadTimeRange(
-        Math.max(0, currentTime - 5),
-        Math.min(duration, currentTime + 15)
-      );
-    }
+    return Array.from(contestants.values());
   }
 </script>
 
-<svelte:head>
-  <title>Video Player - MV Face Recognition</title>
-  <meta name="description" content="Watch videos with real-time face recognition overlays" />
-</svelte:head>
-
-<div class="video-player-page">
-  <header class="page-header">
-    <h1>Video Player</h1>
-    <p>Watch videos with real-time face recognition overlays</p>
-  </header>
-  
+<div class="video-player-page" data-testid="video-player">
   {#if loading}
     <div class="loading">
       <div class="spinner"></div>
@@ -713,259 +565,393 @@
   {:else if videos.length === 0}
     <div class="empty-state">
       <div class="empty-icon">🎬</div>
-      <h3>No Videos Available</h3>
-      <p>No processed videos found. Upload and process videos to get started.</p>
+      <h3>No videos found</h3>
+      <p>Please upload some videos to get started</p>
     </div>
   {:else}
     <div class="player-container">
-      <!-- Video Selection -->
-      <div class="video-selector">
+      <div class="page-header">
+        <h1>Video Player with Face Recognition</h1>
+        <p>Watch videos with real-time face detection and contestant identification</p>
+      </div>
+
+      <div class="video-selector" data-testid="video-selector">
         <label for="video-select">Select Video:</label>
-        <select id="video-select" on:change={(e) => selectVideo(videos.find(v => v.id === e.target.value))}>
+        <select 
+          id="video-select" 
+          bind:value={selectedVideo}
+          on:change={(e) => selectVideo(e.target.value)}
+        >
           {#each videos as video}
-            <option value={video.id} selected={selectedVideo?.id === video.id}>
-              {video.name}
-            </option>
+            <option value={video}>{video.name}</option>
           {/each}
         </select>
       </div>
-      
-      <!-- Main Player Area -->
+
+      {#if selectedVideo}
+        <div class="video-info">
+          <h2 data-testid="video-title">Now Playing: {selectedVideo.name}</h2>
+          <div class="video-meta">
+            <span data-testid="video-duration">Duration: {formatTime(selectedVideo.duration)}</span>
+          </div>
+        </div>
+      {/if}
+
       <div class="player-layout" class:with-sidebar={showSidebar}>
-        <!-- Video Player -->
         <div class="video-section">
-          <!-- Player Controls Top -->
           <div class="player-controls-top">
-            <button class="control-btn" on:click={toggleOverlay} class:active={showOverlay}>
-              🎯 Overlay
+            <button 
+              class="control-btn" 
+              class:active={showOverlay}
+              on:click={toggleOverlay}
+              data-testid="toggle-overlay"
+            >
+              {showOverlay ? 'Hide' : 'Show'} Overlay
             </button>
-            <button class="control-btn" on:click={toggleSidebar} class:active={showSidebar}>
-              👥 Sidebar
+            <button 
+              class="control-btn" 
+              on:click={toggleSidebar}
+              data-testid="toggle-sidebar"
+            >
+              {showSidebar ? 'Hide' : 'Show'} Sidebar
+            </button>
+            <button 
+              class="control-btn" 
+              on:click={handleExport}
+              data-testid="export-clip-button"
+            >
+              Export Clip
             </button>
             <div class="detection-indicator">
-              <span class="detection-count">{currentFaces.length}</span>
-              <span>faces detected</span>
+              <span>Detections:</span>
+              <span class="detection-count" data-testid="detection-count">
+                {currentFaces.length}
+              </span>
             </div>
-            <button class="control-btn" on:click={togglePerformanceMonitoring} class:active={performanceMonitoring}>
-              📊 Performance
-            </button>
           </div>
-          
-          <!-- Video Container -->
+
           <div class="video-container">
-            {#if selectedVideo}
+            {#if videoError}
+              <div class="error-message" data-testid="video-error">
+                <p>{errorMessage}</p>
+              </div>
+            {:else}
               <video
                 bind:this={videoElement}
-                src="/videos/{selectedVideo.filename}"
+                src="/videos/{selectedVideo?.filename}"
                 on:timeupdate={handleTimeUpdate}
                 on:canplay={handleCanPlay}
-                on:play={handleVideoPlay}
-                on:pause={handleVideoPause}
-                on:seeked={handleVideoSeeked}
-                preload="metadata"
-                crossorigin="anonymous"
+                on:error={handleVideoError}
+                data-testid="video-element"
               >
-                Your browser does not support the video tag.
+                <track kind="captions" src="" label="English" default />
               </video>
-              
-              {#if showOverlay}
-                <canvas
-                  bind:this={canvas}
-                  class="face-overlay"
-                  on:mousemove={handleCanvasMouseMove}
-                  on:click={handleCanvasClick}
-                  on:mouseleave={handleCanvasMouseLeave}
-                ></canvas>
-              {/if}
+              <canvas
+                bind:this={canvas}
+                class="face-overlay"
+                style:display={showOverlay ? 'block' : 'none'}
+                on:mousemove={handleCanvasMouseMove}
+                on:click={handleCanvasClick}
+                on:mouseleave={handleCanvasMouseLeave}
+                data-testid="face-overlay-canvas"
+              ></canvas>
             {/if}
           </div>
-          
-          <!-- Player Controls Bottom -->
-          <div class="player-controls">
-            <button class="play-button" on:click={togglePlay}>
-              {playing ? '⏸️' : '▶️'}
+
+          <div class="player-controls" data-testid="video-controls">
+            <button 
+              class="play-button" 
+              on:click={togglePlay}
+              aria-label={playing ? 'Pause' : 'Play'}
+              data-testid="play-button"
+            >
+              {playing ? '⏸' : '▶'}
             </button>
-            
-            <div class="time-display">
+            <div class="time-display" data-testid="video-time">
               {formatTime(currentTime)} / {formatTime(duration)}
             </div>
-            
             <input
               type="range"
               class="seek-bar"
               min="0"
               max={duration || 0}
-              value={currentTime}
+              step="0.1"
+              bind:value={currentTime}
               on:input={seek}
+              data-testid="video-timeline"
             />
-            
-            <div class="volume-control">
-              <span>🔊</span>
-            </div>
+            <div class="volume-control">🔊</div>
+          </div>
+
+          <div class="timeline-markers" data-testid="timeline-markers">
+            {#if metadata}
+              {#each metadata.timeline as frame}
+                {#if frame.contestants && frame.contestants.length > 0}
+                  <button
+                    class="timeline-marker"
+                    style="left: {(frame.timestamp / duration) * 100}%"
+                    title={`${frame.contestants.length} faces at ${formatTime(frame.timestamp)}`}
+                    on:click={() => jumpToTimestamp(frame.timestamp)}
+                    on:keydown={(e) => e.key === 'Enter' && jumpToTimestamp(frame.timestamp)}
+                    data-testid="timeline-marker"
+                    aria-label={`Jump to ${formatTime(frame.timestamp)} with ${frame.contestants.length} faces`}
+                  ></button>
+                {/if}
+              {/each}
+            {/if}
           </div>
         </div>
-        
-        <!-- Face Recognition Sidebar -->
+
         {#if showSidebar}
-          <div class="face-sidebar">
+          <div class="face-sidebar" class:hidden={!showSidebar} class:sm:block={showSidebar} data-testid="face-recognition-sidebar">
             <div class="sidebar-header">
-              <h3>Detected Faces</h3>
-              <span class="face-count">{currentFaces.length}</span>
+              <h3>Face Recognition</h3>
+              <span class="face-count">{getFilteredFaces().length}</span>
             </div>
-            
-            {#if currentFaces.length > 0}
-              <div class="faces-list">
-                {#each currentFaces as face}
-                  <div 
-                    class="face-card" 
-                    class:selected={selectedFace?.id === face.id}
-                    on:click={() => selectFace(face)}
-                  >
-                    <div class="face-info">
-                      <div class="face-avatar">
-                        <span>{face.contestant_name?.charAt(0) || '?'}</span>
+
+            <div class="recognition-stats" data-testid="recognition-stats">
+              <h4>Recognition Stats</h4>
+              <div class="stat-item">
+                <span class="stat-label">Current Faces:</span>
+                <span class="stat-value">{currentFaces.length}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">High Confidence:</span>
+                <span class="stat-value">{currentFaces.filter(f => f.confidence >= 0.8).length}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Total Contestants:</span>
+                <span class="stat-value">{getUniqueContestants().length}</span>
+              </div>
+            </div>
+
+            <div class="sidebar-controls">
+              <div class="control-group">
+                <label for="confidence-filter">Min Confidence:</label>
+                <input
+                  id="confidence-filter"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  bind:value={confidenceFilter}
+                  data-testid="confidence-filter"
+                />
+                <span>{Math.round(confidenceFilter * 100)}%</span>
+              </div>
+
+              <div class="control-group">
+                <label for="contestant-search">Search:</label>
+                <input
+                  id="contestant-search"
+                  type="text"
+                  placeholder="Search contestants..."
+                  bind:value={contestantSearch}
+                  data-testid="contestant-search"
+                />
+              </div>
+            </div>
+
+            <div class="faces-list" data-testid="contestants-list">
+              {#each getUniqueContestants() as contestant}
+                <div class="contestant-item">
+                  <div class="contestant-avatar">
+                    {contestant.name.charAt(0)}
+                  </div>
+                  <div class="contestant-info">
+                    <h4>{contestant.name}</h4>
+                    <p>{contestant.nickname}</p>
+                    <small>{contestant.appearances} appearances</small>
+                  </div>
+                </div>
+              {/each}
+            </div>
+
+            <div class="faces-list" data-testid="face-gallery">
+              {#each getFilteredFaces() as face}
+                <button
+                  class="face-card"
+                  class:selected={selectedFace?.id === face.id}
+                  class:highlighted={highlightedFace?.id === face.id}
+                  on:click={() => selectFace(face)}
+                  on:keydown={(e) => e.key === 'Enter' && selectFace(face)}
+                  data-testid={highlightedFace?.id === face.id ? "highlighted-face" : "face-item"}
+                >
+                  <div class="face-info">
+                    <div class="face-avatar">
+                      {face.contestant_name.charAt(0)}
+                    </div>
+                    <div class="face-details">
+                      <h4>{face.contestant_name}</h4>
+                      <p>{face.contestant_nickname}</p>
+                      <div class="confidence-bar">
+                        <div
+                          class="confidence-fill"
+                          style="width: {face.confidence * 100}%; background-color: {getConfidenceColor(face.confidence)}"
+                        ></div>
+                        <span class="confidence-text">{Math.round(face.confidence * 100)}%</span>
                       </div>
-                      <div class="face-details">
-                        <h4>{face.contestant_name || 'Unknown'}</h4>
-                        <p>{face.contestant_nickname || ''}</p>
-                        <div class="confidence-bar">
-                          <div 
-                            class="confidence-fill" 
-                            style="width: {face.confidence * 100}%; background-color: {getConfidenceColor(face.confidence)}"
-                          ></div>
-                          <span class="confidence-text">{Math.round(face.confidence * 100)}%</span>
-                        </div>
-                      </div>
+                      <small>at {formatTime(face.timestamp)}</small>
                     </div>
                   </div>
+                </button>
+              {/each}
+            </div>
+
+            <div class="contestant-search-section">
+              <h4>Search Contestants</h4>
+              <div class="search-results" data-testid="search-results">
+                {#each getUniqueContestants() as contestant}
+                  <button
+                    class="contestant-search-item"
+                    on:click={() => searchAndJumpToContestant(contestant.name)}
+                    data-testid="contestant-search-item"
+                  >
+                    <div class="contestant-avatar">
+                      {contestant.name.charAt(0)}
+                    </div>
+                    <div class="contestant-info">
+                      <span class="contestant-name">{contestant.name}</span>
+                      <small>{contestant.appearances} appearances</small>
+                    </div>
+                  </button>
                 {/each}
               </div>
-            {:else}
-              <div class="no-faces">
-                <p>No faces detected at current timestamp</p>
-              </div>
-            {/if}
-            
-            <!-- Face Details Panel -->
+            </div>
+
             {#if selectedFace}
-              <div class="face-details-panel">
+              <div class="face-details-panel" data-testid="face-details">
                 <h4>Face Details</h4>
                 <div class="detail-grid">
                   <div class="detail-item">
-                    <label>Name:</label>
+                    <span class="detail-label">Name:</span>
                     <span>{selectedFace.contestant_name}</span>
                   </div>
                   <div class="detail-item">
-                    <label>Nickname:</label>
+                    <span class="detail-label">Nickname:</span>
                     <span>{selectedFace.contestant_nickname}</span>
                   </div>
                   <div class="detail-item">
-                    <label>Confidence:</label>
+                    <span class="detail-label">Confidence:</span>
                     <span style="color: {getConfidenceColor(selectedFace.confidence)}">
                       {Math.round(selectedFace.confidence * 100)}%
                     </span>
                   </div>
                   <div class="detail-item">
-                    <label>Timestamp:</label>
+                    <span class="detail-label">Timestamp:</span>
                     <span>{formatTime(selectedFace.timestamp)}</span>
                   </div>
                   <div class="detail-item">
-                    <label>Bounding Box:</label>
+                    <span class="detail-label">Bounding Box:</span>
                     <span>
                       {Math.round(selectedFace.bounding_box.width)}×{Math.round(selectedFace.bounding_box.height)}
                     </span>
                   </div>
-                  {#if selectedFace.interpolated}
-                    <div class="detail-item">
-                      <label>Type:</label>
-                      <span class="interpolated-badge">Interpolated</span>
-                    </div>
-                  {/if}
                 </div>
-              </div>
-            {/if}
-            
-            <!-- Performance Monitoring Panel -->
-            {#if performanceMonitoring}
-              <div class="performance-panel">
-                <h4>Synchronization Performance</h4>
-                <div class="performance-stats">
-                  <div class="stat-item">
-                    <label>Avg Latency:</label>
-                    <span class="stat-value" class:good={syncStats.averageLatency < 16} class:warning={syncStats.averageLatency >= 16 && syncStats.averageLatency < 33} class:bad={syncStats.averageLatency >= 33}>
-                      {syncStats.averageLatency.toFixed(1)}ms
-                    </span>
-                  </div>
-                  <div class="stat-item">
-                    <label>Frame Drops:</label>
-                    <span class="stat-value" class:good={syncStats.frameDrops === 0} class:warning={syncStats.frameDrops < 5} class:bad={syncStats.frameDrops >= 5}>
-                      {syncStats.frameDrops}
-                    </span>
-                  </div>
-                  <div class="stat-item">
-                    <label>Cache Hit Rate:</label>
-                    <span class="stat-value" class:good={syncStats.cacheHitRate > 0.8} class:warning={syncStats.cacheHitRate > 0.6} class:bad={syncStats.cacheHitRate <= 0.6}>
-                      {Math.round(syncStats.cacheHitRate * 100)}%
-                    </span>
-                  </div>
-                  <div class="stat-item">
-                    <label>Sync Confidence:</label>
-                    <span class="stat-value" class:good={syncStats.confidence > 0.8} class:warning={syncStats.confidence > 0.6} class:bad={syncStats.confidence <= 0.6}>
-                      {Math.round(syncStats.confidence * 100)}%
-                    </span>
-                  </div>
-                  {#if synchronizer}
-                    <div class="stat-item">
-                      <label>Synchronizer:</label>
-                      <span class="stat-value good">Advanced</span>
-                    </div>
-                  {:else}
-                    <div class="stat-item">
-                      <label>Synchronizer:</label>
-                      <span class="stat-value warning">Basic</span>
-                    </div>
-                  {/if}
-                </div>
-                <div class="performance-actions">
-                  <button class="small-btn" on:click={resetPerformanceStats}>
-                    Reset Stats
-                  </button>
-                  {#if synchronizer}
-                    <button class="small-btn" on:click={() => synchronizer?.clearCache()}>
-                      Clear Cache
-                    </button>
-                  {/if}
-                </div>
+                <button
+                  class="jump-button"
+                  on:click={() => jumpToTimestamp(selectedFace.timestamp)}
+                >
+                  Jump to Timestamp
+                </button>
               </div>
             {/if}
           </div>
         {/if}
       </div>
     </div>
+
+    {#if showExportDialog}
+      <div class="export-dialog-overlay" data-testid="export-dialog">
+        <div class="export-dialog">
+          <h3>Export Video Clip</h3>
+          <div class="export-form">
+            <div class="form-group">
+              <label for="start-time">Start Time (seconds):</label>
+              <input
+                id="start-time"
+                type="number"
+                min="0"
+                max={duration}
+                bind:value={exportStartTime}
+                data-testid="start-time-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="end-time">End Time (seconds):</label>
+              <input
+                id="end-time"
+                type="number"
+                min="0"
+                max={duration}
+                bind:value={exportEndTime}
+                data-testid="end-time-input"
+              />
+            </div>
+            {#if isExporting}
+              <div class="export-progress" data-testid="export-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: {exportProgress}%"></div>
+                </div>
+                <p>Exporting... {exportProgress}%</p>
+              </div>
+            {/if}
+            <div class="export-actions">
+              <button
+                class="btn btn-primary"
+                on:click={startExport}
+                disabled={isExporting}
+                data-testid="confirm-export-button"
+              >
+                {isExporting ? 'Exporting...' : 'Export'}
+              </button>
+              <button
+                class="btn btn-secondary"
+                on:click={closeExportDialog}
+                disabled={isExporting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Mobile Menu Button -->
+    <button
+      class="mobile-menu-button"
+      class:visible={!showSidebar}
+      on:click={toggleSidebar}
+      data-testid="mobile-menu-button"
+    >
+      ☰
+    </button>
   {/if}
 </div>
 
 <style>
   .video-player-page {
     max-width: 100%;
+    padding: 1rem;
   }
-  
+
   .page-header {
     margin-bottom: 2rem;
   }
-  
+
   .page-header h1 {
     font-size: 2.5rem;
     font-weight: 700;
     margin: 0 0 0.5rem 0;
   }
-  
+
   .page-header p {
     font-size: 1.1rem;
     color: var(--text-secondary);
     margin: 0;
   }
-  
+
   .loading {
     display: flex;
     flex-direction: column;
@@ -973,7 +959,7 @@
     padding: 4rem 2rem;
     text-align: center;
   }
-  
+
   .spinner {
     width: 2rem;
     height: 2rem;
@@ -983,42 +969,51 @@
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
   }
-  
+
   .empty-state {
     text-align: center;
     padding: 4rem 2rem;
   }
-  
+
   .empty-icon {
     font-size: 4rem;
     margin-bottom: 1rem;
   }
-  
+
   .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 0.5rem;
     color: var(--text-color);
   }
-  
+
   .empty-state p {
     color: var(--text-secondary);
   }
-  
+
+  .error-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ef4444;
+    font-size: 1.2rem;
+  }
+
   .player-container {
     max-width: 100%;
   }
-  
+
   .video-selector {
     margin-bottom: 2rem;
   }
-  
+
   .video-selector label {
     display: inline-block;
     margin-right: 1rem;
     font-weight: 600;
     color: var(--text-color);
   }
-  
+
   .video-selector select {
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-color);
@@ -1028,17 +1023,17 @@
     font-size: 1rem;
     min-width: 300px;
   }
-  
+
   .player-layout {
     display: grid;
     grid-template-columns: 1fr;
     gap: 2rem;
   }
-  
+
   .player-layout.with-sidebar {
     grid-template-columns: 1fr 350px;
   }
-  
+
   .video-section {
     background-color: var(--surface-color);
     border: 1px solid var(--border-color);
@@ -1046,7 +1041,7 @@
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  
+
   .player-controls-top {
     display: flex;
     align-items: center;
@@ -1054,8 +1049,9 @@
     padding: 1rem;
     background-color: var(--background-color);
     border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
   }
-  
+
   .control-btn {
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-color);
@@ -1066,26 +1062,25 @@
     transition: all 0.2s;
     font-size: 0.9rem;
   }
-  
+
   .control-btn:hover {
     background-color: var(--border-color);
   }
-  
+
   .control-btn.active {
     background-color: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
   }
-  
+
   .detection-indicator {
-    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
     color: var(--text-secondary);
   }
-  
+
   .detection-count {
     background-color: var(--primary-color);
     color: white;
@@ -1094,19 +1089,19 @@
     font-weight: 600;
     font-size: 0.8rem;
   }
-  
+
   .video-container {
     position: relative;
     background-color: #000;
     aspect-ratio: 16/9;
   }
-  
+
   .video-container video {
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
-  
+
   .face-overlay {
     position: absolute;
     top: 0;
@@ -1116,7 +1111,37 @@
     pointer-events: auto;
     z-index: 10;
   }
-  
+
+  .timeline-markers {
+    position: relative;
+    height: 20px;
+    background-color: var(--background-color);
+    border-top: 1px solid var(--border-color);
+    overflow: hidden;
+  }
+
+  .timeline-marker {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 12px;
+    background-color: var(--primary-color);
+    cursor: pointer;
+    transition: height 0.2s;
+    border: none;
+    padding: 0;
+  }
+
+  .timeline-marker:hover {
+    height: 16px;
+  }
+
+  .timeline-marker:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
   .player-controls {
     display: flex;
     align-items: center;
@@ -1125,7 +1150,7 @@
     background-color: var(--background-color);
     border-top: 1px solid var(--border-color);
   }
-  
+
   .play-button {
     width: 3rem;
     height: 3rem;
@@ -1138,11 +1163,11 @@
     transition: background-color 0.2s;
     flex-shrink: 0;
   }
-  
+
   .play-button:hover {
     background-color: var(--primary-hover);
   }
-  
+
   .time-display {
     font-size: 0.9rem;
     color: var(--text-secondary);
@@ -1150,7 +1175,7 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  
+
   .seek-bar {
     flex: 1;
     height: 0.5rem;
@@ -1159,7 +1184,7 @@
     outline: none;
     cursor: pointer;
   }
-  
+
   .seek-bar::-webkit-slider-thumb {
     width: 1rem;
     height: 1rem;
@@ -1167,12 +1192,12 @@
     background-color: var(--primary-color);
     cursor: pointer;
   }
-  
+
   .volume-control {
     font-size: 1.2rem;
     flex-shrink: 0;
   }
-  
+
   /* Sidebar */
   .face-sidebar {
     background-color: var(--surface-color);
@@ -1185,7 +1210,7 @@
     display: flex;
     flex-direction: column;
   }
-  
+
   .sidebar-header {
     display: flex;
     justify-content: space-between;
@@ -1194,13 +1219,13 @@
     background-color: var(--background-color);
     border-bottom: 1px solid var(--border-color);
   }
-  
+
   .sidebar-header h3 {
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
   }
-  
+
   .face-count {
     background-color: var(--primary-color);
     color: white;
@@ -1209,14 +1234,82 @@
     font-size: 0.8rem;
     font-weight: 600;
   }
-  
+
+  .sidebar-controls {
+    padding: 1rem;
+    background-color: var(--background-color);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .control-group {
+    margin-bottom: 1rem;
+  }
+
+  .control-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-color);
+  }
+
+  .control-group input[type="range"] {
+    width: 100%;
+    margin-bottom: 0.25rem;
+  }
+
+  .control-group input[type="text"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--surface-color);
+    color: var(--text-color);
+  }
+
   .faces-list {
     flex: 1;
     overflow-y: auto;
     padding: 0.5rem;
     max-height: 400px;
   }
-  
+
+  .contestant-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+  }
+
+  .contestant-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .contestant-info h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .contestant-info p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
   .face-card {
     padding: 0.75rem;
     margin-bottom: 0.5rem;
@@ -1225,23 +1318,34 @@
     cursor: pointer;
     transition: all 0.2s;
   }
-  
+
   .face-card:hover {
     background-color: var(--border-color);
     transform: translateY(-1px);
   }
-  
+
   .face-card.selected {
     border-color: var(--primary-color);
     background-color: rgba(37, 99, 235, 0.1);
   }
-  
+
+  .face-card.highlighted {
+    border-color: #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 0 2px #f59e0b;
+  }
+
+  .face-card:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
   .face-info {
     display: flex;
     align-items: center;
     gap: 0.75rem;
   }
-  
+
   .face-avatar {
     width: 3rem;
     height: 3rem;
@@ -1255,25 +1359,25 @@
     font-size: 1.2rem;
     flex-shrink: 0;
   }
-  
+
   .face-details {
     flex: 1;
     min-width: 0;
   }
-  
+
   .face-details h4 {
     margin: 0 0 0.25rem 0;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-color);
   }
-  
+
   .face-details p {
     margin: 0 0 0.5rem 0;
     font-size: 0.8rem;
     color: var(--text-secondary);
   }
-  
+
   .confidence-bar {
     position: relative;
     height: 0.5rem;
@@ -1281,12 +1385,12 @@
     border-radius: 0.25rem;
     overflow: hidden;
   }
-  
+
   .confidence-fill {
     height: 100%;
     transition: width 0.3s ease;
   }
-  
+
   .confidence-text {
     position: absolute;
     right: 0.25rem;
@@ -1295,206 +1399,397 @@
     font-weight: 600;
     color: var(--text-secondary);
   }
-  
-  .no-faces {
-    padding: 2rem 1rem;
-    text-align: center;
-    color: var(--text-secondary);
-  }
-  
+
   .face-details-panel {
     padding: 1rem;
     border-top: 1px solid var(--border-color);
     background-color: var(--background-color);
   }
-  
+
   .face-details-panel h4 {
     margin: 0 0 1rem 0;
     font-size: 1rem;
     font-weight: 600;
   }
-  
+
   .detail-grid {
     display: grid;
     gap: 0.75rem;
   }
-  
+
   .detail-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
-  
-  .detail-item label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-  }
-  
+
+
+
   .detail-item span {
     font-size: 0.85rem;
     color: var(--text-color);
     font-weight: 600;
   }
 
-  .interpolated-badge {
-    background: #f59e0b;
-    color: white;
-    padding: 0.125rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  /* Performance Monitoring Panel */
-  .performance-panel {
+  .jump-button {
+    width: 100%;
     margin-top: 1rem;
-    padding: 1rem;
-    background: rgba(59, 130, 246, 0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 0.5rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.9rem;
   }
 
-  .performance-panel h4 {
-    margin: 0 0 1rem 0;
-    color: #60a5fa;
-    font-size: 0.9rem;
+  .jump-button:hover {
+    background-color: var(--primary-hover);
+  }
+
+  /* Export Dialog */
+  .export-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .export-dialog {
+    background-color: var(--surface-color);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow);
+  }
+
+  .export-dialog h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
     font-weight: 600;
   }
 
-  .performance-stats {
-    display: grid;
+  .export-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-weight: 500;
+    color: var(--text-color);
+  }
+
+  .form-group input {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--surface-color);
+    color: var(--text-color);
+  }
+
+  .export-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+  }
+
+  .btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-hover);
+  }
+
+  .btn-secondary {
+    background-color: var(--border-color);
+    color: var(--text-color);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--text-secondary);
+  }
+
+  /* Export Progress */
+  .export-progress {
+    margin: 1rem 0;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease;
+  }
+
+  /* Contestant Search */
+  .contestant-search-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .contestant-search-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background-color: var(--surface-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.5rem;
+  }
+
+  .contestant-search-item:hover {
+    background-color: var(--border-color);
+    border-color: var(--primary-color);
+  }
+
+  .contestant-search-item:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .contestant-name {
+    font-weight: 600;
+    color: var(--text-color);
+  }
+
+  /* Video Info */
+  .video-info {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+  }
+
+  .video-info h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    color: var(--text-color);
+  }
+
+  .video-meta {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  /* Detail Labels */
+  .detail-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  /* Highlighted Face */
+  .face-card.highlighted {
+    border-color: #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 0 2px #f59e0b;
+  }
+
+  .face-card:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+
+
+  /* Recognition Stats */
+  .recognition-stats {
+    padding: 1rem;
+    background-color: var(--background-color);
+    border-radius: 0.5rem;
     margin-bottom: 1rem;
+  }
+
+  .recognition-stats h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: var(--text-color);
   }
 
   .stat-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 0.25rem 0;
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
   }
 
-  .stat-item label {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
+  .stat-label {
+    color: var(--text-secondary);
   }
 
   .stat-value {
-    font-size: 0.8rem;
     font-weight: 600;
-    padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
   }
 
-  .stat-value.good {
-    background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-  }
-
-  .stat-value.warning {
-    background: rgba(245, 158, 11, 0.2);
-    color: #f59e0b;
-  }
-
-  .stat-value.bad {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-  }
-
-  .performance-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .small-btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    background: rgba(255, 255, 255, 0.1);
+  /* Mobile Menu Button */
+  .mobile-menu-button {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    width: 3rem;
+    height: 3rem;
+    background-color: var(--primary-color);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.5rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+    display: none;
+    z-index: 100;
   }
 
-  .small-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
+  .mobile-menu-button.visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  
+
   /* Mobile Responsiveness */
   @media (max-width: 1024px) {
     .player-layout.with-sidebar {
       grid-template-columns: 1fr;
       gap: 1rem;
     }
-    
+
     .face-sidebar {
       max-height: 300px;
     }
   }
-  
+
   @media (max-width: 768px) {
     .page-header h1 {
       font-size: 2rem;
     }
-    
+
     .video-selector {
       margin-bottom: 1rem;
     }
-    
+
     .video-selector select {
       min-width: 100%;
     }
-    
+
     .player-controls-top {
       flex-wrap: wrap;
       gap: 0.5rem;
     }
-    
+
     .detection-indicator {
       margin-left: 0;
       order: -1;
       flex-basis: 100%;
     }
-    
+
     .player-controls {
       gap: 0.5rem;
       padding: 0.75rem;
     }
-    
+
     .time-display {
       font-size: 0.8rem;
     }
+
+    .face-sidebar {
+      display: none;
+    }
+
+    .face-sidebar.hidden {
+      display: none;
+    }
+
+    .face-sidebar.sm\:block {
+      display: block;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 90%;
+      max-width: 400px;
+      height: 100vh;
+      background-color: var(--surface-color);
+      border-left: 1px solid var(--border-color);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .mobile-menu-button {
+      display: flex;
+    }
+
+    .mobile-menu-button.visible {
+      display: flex;
+    }
   }
-  
+
   @media (max-width: 480px) {
     .page-header h1 {
       font-size: 1.75rem;
     }
-    
+
     .player-controls {
       flex-wrap: wrap;
     }
-    
+
     .seek-bar {
       order: -1;
       flex-basis: 100%;
       margin-bottom: 0.5rem;
     }
-    
+
     .face-sidebar {
       max-height: 250px;
     }
-    
+
     .faces-list {
       max-height: 150px;
     }
+
+    .export-dialog {
+      margin: 1rem;
+      padding: 1.5rem;
+    }
   }
-  
+
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }

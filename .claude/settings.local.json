@@ -131,7 +131,8 @@
       "Bash(source:*)",
       "Bash(backlog task list:*)",
       "Bash(backlog task:*)",
-      "Bash(wrangler whoami:*)"
+      "Bash(wrangler whoami:*)",
+      "Bash(git merge:*)"
     ]
   },
   "enableAllProjectMcpServers": true

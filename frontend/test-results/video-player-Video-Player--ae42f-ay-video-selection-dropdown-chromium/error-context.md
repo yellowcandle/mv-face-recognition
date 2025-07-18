@@ -1,0 +1,128 @@
+# Page snapshot
+
+```yaml
+- text: Loading MV Face Recognition...
+- banner:
+  - heading "🎬 MV Face Recognition" [level=1]
+  - navigation:
+    - link "🏠 Dashboard":
+      - /url: /
+    - link "▶️ Video Player":
+      - /url: /video-player
+    - link "🎯 Face Recognition":
+      - /url: /face-recognition
+    - link "📊 Analytics":
+      - /url: /analytics
+    - link "⚙️ Settings":
+      - /url: /settings
+  - text: offline
+- main:
+  - heading "Video Player with Face Recognition" [level=1]
+  - paragraph: Watch videos with real-time face detection and contestant identification
+  - text: "Select Video:"
+  - combobox "Select Video:":
+    - option "《全民造星IV》主題曲" [selected]
+    - option "女團の駅 Performance"
+  - 'heading "Now Playing: 《全民造星IV》主題曲" [level=2]'
+  - text: "Duration: 3:00"
+  - button "Hide Overlay"
+  - button "Hide Sidebar"
+  - button "Export Clip"
+  - text: "Detections: 0"
+  - paragraph: Failed to load video. Please try again.
+  - button "Play": ▶
+  - text: 0:00 / 0:00
+  - slider: "0"
+  - text: 🔊
+  - button "Jump to 0:00 with 1 faces"
+  - button "Jump to 0:03 with 1 faces"
+  - button "Jump to 0:09 with 3 faces"
+  - button "Jump to 0:14 with 1 faces"
+  - button "Jump to 0:17 with 3 faces"
+  - button "Jump to 0:18 with 2 faces"
+  - button "Jump to 0:20 with 1 faces"
+  - button "Jump to 0:23 with 1 faces"
+  - button "Jump to 0:27 with 1 faces"
+  - button "Jump to 0:29 with 2 faces"
+  - button "Jump to 0:30 with 3 faces"
+  - button "Jump to 0:34 with 2 faces"
+  - button "Jump to 0:42 with 3 faces"
+  - button "Jump to 0:44 with 2 faces"
+  - button "Jump to 0:46 with 1 faces"
+  - button "Jump to 0:49 with 1 faces"
+  - button "Jump to 0:56 with 3 faces"
+  - button "Jump to 0:57 with 3 faces"
+  - button "Jump to 0:58 with 3 faces"
+  - button "Jump to 1:02 with 3 faces"
+  - button "Jump to 1:05 with 2 faces"
+  - button "Jump to 1:10 with 3 faces"
+  - button "Jump to 1:12 with 3 faces"
+  - button "Jump to 1:13 with 2 faces"
+  - button "Jump to 1:14 with 2 faces"
+  - button "Jump to 1:18 with 3 faces"
+  - button "Jump to 1:24 with 2 faces"
+  - button "Jump to 1:25 with 1 faces"
+  - button "Jump to 1:29 with 2 faces"
+  - button "Jump to 1:30 with 2 faces"
+  - button "Jump to 1:32 with 3 faces"
+  - button "Jump to 1:34 with 2 faces"
+  - button "Jump to 1:36 with 1 faces"
+  - button "Jump to 1:42 with 3 faces"
+  - button "Jump to 1:43 with 3 faces"
+  - button "Jump to 1:44 with 3 faces"
+  - button "Jump to 1:45 with 3 faces"
+  - button "Jump to 1:47 with 2 faces"
+  - button "Jump to 1:48 with 2 faces"
+  - button "Jump to 1:49 with 2 faces"
+  - button "Jump to 1:50 with 1 faces"
+  - button "Jump to 1:51 with 2 faces"
+  - button "Jump to 1:58 with 2 faces"
+  - button "Jump to 2:00 with 2 faces"
+  - button "Jump to 2:09 with 2 faces"
+  - button "Jump to 2:14 with 1 faces"
+  - button "Jump to 2:16 with 2 faces"
+  - button "Jump to 2:22 with 3 faces"
+  - button "Jump to 2:24 with 3 faces"
+  - button "Jump to 2:27 with 3 faces"
+  - button "Jump to 2:28 with 1 faces"
+  - button "Jump to 2:29 with 1 faces"
+  - button "Jump to 2:31 with 1 faces"
+  - button "Jump to 2:41 with 2 faces"
+  - button "Jump to 2:42 with 1 faces"
+  - button "Jump to 2:46 with 1 faces"
+  - button "Jump to 2:47 with 2 faces"
+  - button "Jump to 2:55 with 3 faces"
+  - button "Jump to 2:57 with 1 faces"
+  - button "Jump to 2:58 with 2 faces"
+  - heading "Face Recognition" [level=3]
+  - text: "0"
+  - heading "Recognition Stats" [level=4]
+  - text: "Current Faces: 0 High Confidence: 0 Total Contestants: 5 Min Confidence:"
+  - slider "Min Confidence:": "0.5"
+  - text: "50% Search:"
+  - textbox "Search:"
+  - text: 錢
+  - heading "錢七" [level=4]
+  - paragraph: 小張
+  - text: 23 appearances 張
+  - heading "張三" [level=4]
+  - paragraph: 小趙
+  - text: 20 appearances 王
+  - heading "王五" [level=4]
+  - paragraph: 小錢
+  - text: 28 appearances 張
+  - heading "張三" [level=4]
+  - paragraph: 小錢
+  - text: 22 appearances 李
+  - heading "李四" [level=4]
+  - paragraph: 小趙
+  - text: 29 appearances
+  - heading "Search Contestants" [level=4]
+  - button "錢 錢七 23 appearances"
+  - button "張 張三 20 appearances"
+  - button "王 王五 28 appearances"
+  - button "張 張三 22 appearances"
+  - button "李 李四 29 appearances"
+- contentinfo:
+  - paragraph: © 2024 MV Face Recognition. Powered by SvelteKit & Cloudflare Workers.
+```

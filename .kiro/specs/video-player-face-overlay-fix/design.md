@@ -88,11 +88,17 @@ interface BoundingBox {
 **Rendering Pipeline:**
 - **Frame Synchronization**: Match video timestamp to metadata timeline
 - **Coordinate Scaling**: Scale bounding boxes to canvas dimensions
-- **Visual Rendering**: Draw boxes, corners, labels with confidence colors
+- **Visual Rendering**: Draw boxes, corners, labels with confidence-based colors
+- **Label Display Logic**: Show contestant names above bounding boxes when confidence > 0.7
 - **Interactive Layer**: Handle mouse events for face selection
 
+**Confidence-Based Visual Styling:**
+- **High Confidence (> 0.7)**: Green bounding boxes (#10b981) with contestant names displayed
+- **Medium Confidence (0.5-0.7)**: Orange bounding boxes (#f59e0b) without names
+- **Low Confidence (< 0.5)**: Red bounding boxes (#ef4444) without names
+
 **Performance Optimizations:**
-- **RequestAnimationFrame**: 60fps rendering loop
+- **RequestAnimationFrame**: 60fps rendering loop without stuttering
 - **Dirty Region Updates**: Only redraw when faces change
 - **Canvas Pooling**: Reuse canvas contexts
 - **Debounced Updates**: Prevent excessive redraws during seeking
@@ -116,6 +122,11 @@ interface GalleryState {
   selectedFace: DetectedFace | null;
 }
 ```
+
+**Default Behavior:**
+- **Face Sorting**: Faces are sorted by confidence score (highest first) by default
+- **Empty State**: Display "No faces detected" when no faces are found in current frame
+- **Selection State**: Maintain visual selection state between canvas and gallery interactions
 
 ### 4. Metadata Loading System
 

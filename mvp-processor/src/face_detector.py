@@ -3,7 +3,7 @@ Face Detection and Recognition Module
 Handles face detection, encoding, and recognition against contestant database
 """
 
-# import face_recognition  # Temporarily disabled due to installation issues
+import face_recognition
 import cv2
 import numpy as np
 from pathlib import Path
@@ -67,23 +67,32 @@ class ContestantDatabase:
             logger.error(f"Failed to load contestants info: {e}")
 
     def build_face_encodings(self, force_rebuild: bool = False):
-        """Build face encodings for all contestants - simplified for testing"""
-        # For testing purposes, create mock encodings
-        logger.info("Building mock face encodings for testing...")
+        """Build face encodings for all contestants from local photos"""
+        logger.info("Building face encodings from local photos...")
 
         self.face_encodings = {}
         self.contestant_names = []
 
-        for contestant_id, info in self.contestants_info.items():
-            # Create a mock encoding (random vector for testing)
-            mock_encoding = np.random.rand(128)  # Standard face encoding size
-            self.face_encodings[contestant_id] = mock_encoding
-            self.contestant_names.append(contestant_id)
-            logger.debug(f"Created mock encoding for {info['nickname']}")
+        contestants_dir = self.photo_dir
+        for contestant_dir in contestants_dir.iterdir():
+            if contestant_dir.is_dir():
+                contestant_id = contestant_dir.name
+                if contestant_id in self.contestants_info:
+                    encodings = []
+                    for photo_path in contestant_dir.glob("*.jpg"):
+                        image = face_recognition.load_image_file(str(photo_path))
+                        face_encodings = face_recognition.face_encodings(image)
+                        if face_encodings:
+                            encodings.append(face_encodings[0])
+                            logger.debug(f"Encoded {photo_path} for contestant {contestant_id}")
 
-        logger.info(
-            f"Created {len(self.face_encodings)} mock face encodings for testing"
-        )
+                    if encodings:
+                        # Average multiple encodings if available
+                        avg_encoding = np.mean(encodings, axis=0)
+                        self.face_encodings[contestant_id] = avg_encoding
+                        self.contestant_names.append(contestant_id)
+
+        logger.info(f"Built {len(self.face_encodings)} face encodings")
 
     def get_contestant_info(self, contestant_id: str) -> Dict:
         """Get contestant information by ID"""
@@ -91,23 +100,18 @@ class ContestantDatabase:
 
 
 class FaceDetector:
-    """Handles face detection in video frames using OpenCV"""
+    """Handles face detection in video frames using face_recognition"""
 
     def __init__(self, config: dict):
         self.config = config
         self.model = config["face_detection"]["model"]
         self.min_confidence = config["face_detection"]["min_confidence"]
 
-        # Initialize OpenCV face detector
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
-
     def detect_faces(
         self, frame: np.ndarray, timestamp: float, frame_number: int
     ) -> List[FaceDetection]:
         """
-        Detect faces in a frame using OpenCV
+        Detect faces in a frame using face_recognition
 
         Args:
             frame: RGB frame array
@@ -118,29 +122,17 @@ class FaceDetector:
             List of FaceDetection objects
         """
         try:
-            # Convert RGB to grayscale for face detection
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-
-            # Detect faces
-            faces = self.face_cascade.detectMultiScale(
-                gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
-            )
+            face_locations = face_recognition.face_locations(frame, model=self.model)
+            face_encodings = face_recognition.face_encodings(frame, face_locations)
 
             detections = []
-            for x, y, w, h in faces:
-                # Convert OpenCV format (x, y, w, h) to face_recognition format (top, right, bottom, left)
-                top, right, bottom, left = y, x + w, y + h, x
-                location = (top, right, bottom, left)
-
-                # Create a mock encoding for testing (random vector)
-                mock_encoding = np.random.rand(128)
-
+            for (top, right, bottom, left), encoding in zip(face_locations, face_encodings):
                 detection = FaceDetection(
-                    location=location,
-                    encoding=mock_encoding,
+                    location=(top, right, bottom, left),
+                    encoding=encoding,
                     timestamp=timestamp,
                     frame_number=frame_number,
-                    confidence=0.8,  # Mock confidence for OpenCV detection
+                    confidence=1.0,  # face_recognition doesn't provide confidence, assume 1.0
                 )
                 detections.append(detection)
 
@@ -165,7 +157,7 @@ class FaceRecognizer:
 
     def recognize_faces(self, detections: List[FaceDetection]) -> List[FaceRecognition]:
         """
-        Recognize detected faces against contestant database - simplified for testing
+        Recognize detected faces against contestant database
 
         Args:
             detections: List of FaceDetection objects
@@ -179,21 +171,20 @@ class FaceRecognizer:
             logger.warning("No contestant encodings available for recognition")
             return recognitions
 
+        known_encodings = list(self.contestant_db.face_encodings.values())
         known_names = list(self.contestant_db.face_encodings.keys())
 
         for detection in detections:
             try:
-                # For testing purposes, randomly assign a contestant with mock confidence
-                import random
+                matches = face_recognition.face_distance(known_encodings, detection.encoding)
+                min_distance = min(matches)
+                if min_distance < self.tolerance:
+                    matched_index = np.argmin(matches)
+                    contestant_id = known_names[matched_index]
+                    contestant_info = self.contestant_db.get_contestant_info(contestant_id)
 
-                if random.random() > 0.3:  # 70% chance of "recognition"
-                    contestant_id = random.choice(known_names)
-                    contestant_info = self.contestant_db.get_contestant_info(
-                        contestant_id
-                    )
-
-                    # Mock confidence between 0.5 and 0.95
-                    confidence = 0.5 + (random.random() * 0.45)
+                    # Convert distance to confidence (lower distance = higher confidence)
+                    confidence = 1 - (min_distance / self.tolerance)
 
                     recognition = FaceRecognition(
                         detection=detection,
@@ -205,12 +196,12 @@ class FaceRecognizer:
                     recognitions.append(recognition)
 
                     logger.debug(
-                        f"Mock recognized {recognition.contestant_nickname} "
+                        f"Recognized {recognition.contestant_nickname} "
                         f"(confidence: {confidence:.3f})"
                     )
                 else:
                     logger.debug(
-                        f"No mock match for face at {detection.timestamp:.2f}s"
+                        f"No match for face at {detection.timestamp:.2f}s (min_distance: {min_distance:.3f})"
                     )
 
             except Exception as e:

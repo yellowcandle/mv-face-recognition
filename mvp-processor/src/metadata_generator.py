@@ -27,6 +27,7 @@ class MetadataGenerator:
         recognitions: List[FaceRecognition],
         frame_data: List[Dict],
         output_name: str,
+        thumbnail_paths: List[str],
     ) -> Dict:
         """
         Generate comprehensive metadata for a processed video
@@ -62,6 +63,7 @@ class MetadataGenerator:
             "contestant_timeline": contestant_timeline,
             "timeline_markers": timeline_markers,
             "frame_data": frame_data,
+            "thumbnails": thumbnail_paths,
             "recognition_config": {
                 "tolerance": self.config["face_recognition"]["tolerance"],
                 "min_confidence": 0.5,  # Used in filtering

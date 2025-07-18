@@ -1,115 +1,106 @@
-# Technology Stack
+---
+inclusion: always
+---
 
-## Core Technologies
+# Technical Guidelines
 
-### Frontend
-- **SvelteKit 2.x**: Modern web framework with static site generation and TypeScript support
-- **Vite**: Build tool with hot module replacement for development
-- **TypeScript**: Full type safety across the application
-- **Vitest + Playwright**: Unit testing and end-to-end testing frameworks
+## Code Style & Conventions
 
-### Backend Processing
-- **Python 3.8+**: Core runtime for video processing pipeline
-- **OpenCV**: Video processing and frame extraction
-- **InsightFace**: Face detection using buffalo_l model with hardware acceleration
-- **ChromaDB**: Vector database for 95 contestant face embeddings
-- **FFmpeg**: Audio preservation and video encoding
-- **NumPy + Pillow**: Image processing and manipulation
+### TypeScript/JavaScript
+- Use TypeScript for all frontend code with strict type checking
+- Prefer `const` over `let`, avoid `var` entirely
+- Use async/await over Promise chains
+- Export types and interfaces explicitly
+- Follow SvelteKit file-based routing conventions
 
-### Deployment & Infrastructure
-- **Cloudflare Workers**: Serverless edge computing platform
-- **Cloudflare R2**: Object storage for processed videos
-- **Cloudflare KV**: Metadata and configuration storage
-- **Wrangler CLI**: Deployment and development tooling
+### Python
+- Use Python 3.11+ with `uv` for dependency management
+- Follow PEP 8 style guidelines with 88-character line limit
+- Use type hints for all function parameters and return values
+- Prefer pathlib over os.path for file operations
+- Use dataclasses or Pydantic models for structured data
 
-## Build System
+### Error Handling
+- Always handle errors gracefully with try/catch blocks
+- Log errors with context using structured logging
+- Return meaningful error messages to users
+- Use proper HTTP status codes in API responses
 
-### Frontend Build
+## Architecture Patterns
+
+### Frontend (SvelteKit)
+- Use stores for shared state management
+- Keep components small and focused on single responsibilities
+- Implement proper loading states and error boundaries
+- Use TypeScript interfaces for API response types
+- Test components with Vitest, E2E scenarios with Playwright
+
+### Backend Processing (Python)
+- Separate concerns: video processing, face detection, metadata generation
+- Use configuration files (YAML) for processing parameters
+- Implement proper logging with different levels (DEBUG, INFO, ERROR)
+- Process videos in chunks to manage memory usage
+- Always preserve original audio tracks during processing
+
+### API Layer (Cloudflare Workers)
+- Keep worker functions lightweight and stateless
+- Use proper CORS headers for frontend integration
+- Implement rate limiting and error handling
+- Cache responses appropriately using Cloudflare KV
+- Return consistent JSON response formats
+
+## Development Workflow
+
+### Essential Commands
 ```bash
-# Development
+# Frontend development
 cd frontend && npm run dev
 
-# Production build
-cd frontend && npm run build
+# Python processing
+cd mvp-processor && python src/process_video.py --input ../source/videos/video.mp4
 
-# Preview production build
-cd frontend && npm run preview
-```
-
-### Python Processing
-```bash
-# Install dependencies
-cd mvp-processor && pip install -r requirements.txt
-
-# Process single video
-python src/process_video.py --input ../source/videos/video.mp4
-
-# Run tests
-pytest tests/unit/ -v
-```
-
-### Deployment
-```bash
-# Full automated pipeline
+# Full deployment pipeline
 node scripts/run-full-pipeline.js
 
-# Individual deployment steps
-node scripts/upload-to-r2.js        # Upload videos to R2
-node scripts/upload-metadata.js     # Upload metadata to KV
-node scripts/update-worker-assets.js # Embed frontend assets
-cd worker && wrangler deploy         # Deploy worker
-```
-
-## Common Commands
-
-### Development Workflow
-```bash
-# Setup environment (first time)
-node scripts/setup-environment.js
-
-# Local development server
-cd frontend && npm run dev
-
-# Process test video
-python mvp-processor/src/process_video.py --input source/videos/sample.mp4
-
-# Run all tests
-npm run test:all
-```
-
-### Testing
-```bash
-# Frontend tests
-cd frontend && npm run test:coverage
-
-# Python tests
+# Run tests before commits
+cd frontend && npm run test && npm run test:e2e
 cd mvp-processor && pytest tests/unit/ -v
-
-# Worker API tests
-cd worker && npm run test
-
-# E2E tests
-cd frontend && npm run test:e2e
 ```
 
-### Production Deployment
-```bash
-# Deploy everything
-node scripts/run-full-pipeline.js
+### Testing Requirements
+- Write unit tests for all utility functions
+- Test API endpoints with mock data
+- Include E2E tests for critical user flows
+- Maintain >80% code coverage for core modules
+- Test video processing with sample files before production
 
-# Check deployment health
-curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/system/status"
-```
+## Critical Dependencies
 
-## Hardware Requirements
+### Face Recognition Pipeline
+- **InsightFace buffalo_l model**: Use for face detection with GPU acceleration
+- **ChromaDB**: Store and query 95 contestant face embeddings
+- **OpenCV**: Frame extraction and video processing
+- **FFmpeg**: Audio preservation during video encoding
 
-### Processing
-- **GPU Acceleration**: Apple Silicon (M1/M2/M3/M4) or NVIDIA CUDA support
-- **Memory**: 8GB+ RAM recommended for video processing
-- **Storage**: SSD recommended for video file I/O
+### Deployment Stack
+- **Cloudflare Workers**: Edge computing with global distribution
+- **Cloudflare R2**: Video storage with CDN integration
+- **Cloudflare KV**: Metadata storage with edge caching
+- **Wrangler CLI**: Deployment and local development
 
-### Dependencies
-- **Node.js 23+**: Frontend development and build tools
-- **Python 3.11+**: Backend processing pipeline, use uv to manage dependencies
-- **FFmpeg**: System-level video processing
-- **Git LFS**: Large file storage for models and videos
+## Common Pitfalls to Avoid
+
+- Never process entire videos in memory - use streaming/chunking
+- Always validate file paths and handle missing files gracefully
+- Don't hardcode API endpoints - use environment variables
+- Avoid blocking operations in Cloudflare Workers (use async patterns)
+- Don't commit large files to git - use Git LFS for videos/models
+- Always test with actual video files, not just mock data
+
+## Performance Guidelines
+
+- Process every 5th frame for dense metadata (6x performance improvement)
+- Use GPU acceleration when available (Apple Silicon/NVIDIA CUDA)
+- Implement proper caching strategies for face embeddings
+- Optimize video encoding settings for web delivery
+- Use Cloudflare's edge network for global content delivery

@@ -57,6 +57,24 @@ output:
   thumbnails_dir: "../thumbnails"
   metadata_dir: "../metadata"  # For upload-metadata.js
   galleries_dir: "data/galleries"
+  
+  # Local-only mode configuration
+  local_mode:
+    enabled: false  # Set to true to enable local-only processing
+    base_output_dir: "../local_output"  # Base directory for all local outputs
+    processed_videos_dir: "../local_output/processed_videos"
+    thumbnails_dir: "../local_output/thumbnails"
+    metadata_dir: "../local_output/metadata"
+    galleries_dir: "../local_output/galleries"
+    clips_dir: "../local_output/clips"  # For future clip extraction
+    create_subdirs: true  # Create subdirectories per video
+
+# Thumbnail Generation Settings
+thumbnails:
+  interval: 60.0  # Generate thumbnail every 60 seconds
+  max_count: 20   # Maximum number of thumbnails per video
+  width: 320      # Thumbnail width in pixels
+  quality: 85     # JPEG quality (0-100)
 
 # Cloudflare Integration with Environment Variables
 cloudflare:

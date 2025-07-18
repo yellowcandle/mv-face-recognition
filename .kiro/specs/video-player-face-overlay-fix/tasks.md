@@ -54,7 +54,8 @@
 - [ ] 4.3 Implement search and filtering functionality
   - Add search input for filtering faces by contestant name
   - Create "Selected Only" filter toggle
-  - Implement sort options (confidence, name)
+  - Implement sort options (confidence, name) with confidence as default (highest first)
+  - Ensure proper empty state handling with "No faces detected" message
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
 - [x] 5. Create face details panel
@@ -95,42 +96,143 @@
   - Test error handling scenarios
   - _Requirements: All requirements validation_
 
-- [-] 9. Test video processing and Cloudflare deployment
-- [x] 9.1 Test video processing pipeline
-  - Process sample videos using mvp-processor Python pipeline
-  - Verify face detection and metadata generation
-  - Test dense timeline creation and interpolation
-  - _Requirements: 4.1, 4.2_
+- [x] 9. Complete backend infrastructure and deployment
+- [x] 9.1 Implement missing API endpoints in worker
+  - Add /api/contestants endpoint to serve contestant data
+  - Add /api/videos endpoint as alias to /api/videos/processed/list
+  - Add analytics and recognition endpoints referenced in frontend
+  - All API endpoints return proper JSON responses with CORS headers
+  - _Requirements: Backend API completeness_
 
-- [x] 9.2 Test Cloudflare Workers deployment
+- [x] 9.2 Implement video streaming from R2 bucket
+  - Add /videos/{filename} endpoint to stream videos from R2 bucket
+  - Implement range request support for video streaming
+  - Add proper MIME type detection and error handling
+  - _Requirements: Video streaming functionality_
+
+- [x] 9.3 Integrate contestant data from CSV
+  - Load contestant data from /source/contestant_info.csv
+  - Convert CSV to JSON format for API responses
+  - Update face recognition overlays to display real contestant names
+  - _Requirements: Real contestant data integration_
+
+- [x] 9.4 Update video metadata with Chinese titles
+  - Update MOCK_VIDEOS array with proper Chinese titles
+  - Expand from 2 to 5 videos with specified titles
+  - Deploy and verify changes in production
+  - _Requirements: Proper video metadata_
+
+- [x] 9.5 Test Cloudflare Workers deployment
   - Deploy worker with embedded frontend assets
   - Test video streaming from R2 bucket
   - Verify metadata serving from KV store
   - Test API endpoints in production environment
   - _Requirements: 4.3, 4.4_
 
-- [ ] 10. Optimize performance and memory management
-- [ ] 10.1 Implement efficient rendering optimizations
+- [x] 10. Transform video player into face recognition dashboard
+  - Implement professional 3-panel layout with header bar
+  - Create face detection grid with confidence-based styling
+  - Add real-time analytics panel with confidence chart
+  - Maintain all existing video player functionality
+  - _Requirements: Dashboard UI transformation_
+
+- [x] 11. Implement local video processing pipeline
+- [x] 11.1 Create CLI entrypoint for local video processing
+  - Add command-line interface to accept video file paths
+  - Add --local-only flag to disable cloud uploads
+  - Implement input validation and error handling
+  - _Requirements: Local processing capability_
+
+- [x] 11.2 Implement local face detection and recognition
+  - Remove mock code and implement actual face_recognition library usage
+  - Use face_recognition for detection and matching against local gallery
+  - Ensure all operations use local files without cloud dependencies
+  - _Requirements: Local face recognition_
+
+- [x] 11.3 Generate local metadata JSON
+  - Include video info, thumbnail paths, and face recognition results
+  - Save JSON file to metadata directory as part of processing pipeline
+  - Ensure no cloud dependencies in generation process
+  - _Requirements: Local metadata generation_
+
+- [x] 11.4 Implement local thumbnail generation
+  - Generate multiple thumbnails at 60-second intervals
+  - Save thumbnails to local thumbnails directory
+  - Integrate thumbnail generation into processing pipeline
+  - _Requirements: Local thumbnail creation_
+
+- [ ] 11.5 Configure local file saving and remove cloud dependencies
+  - Save all outputs (videos, thumbnails, metadata) to local directories
+  - Remove cloud upload attempts when running in local mode
+  - Add configuration options for output paths
+  - _Requirements: Complete local processing_
+
+- [x] 12. Create comprehensive testing infrastructure
+- [x] 12.1 Create backend testing agent
+  - Set up automated backend testing with Cloudflare Worker
+  - Test all API endpoints with error handling and performance checks
+  - Generate detailed test reports with logging
+  - _Requirements: Backend testing automation_
+
+- [x] 12.2 Create frontend integration testing agent
+  - Set up frontend testing that connects to real backend
+  - Run E2E tests for complete user workflows
+  - Test video streaming, face recognition UI, and analytics
+  - _Requirements: Frontend integration testing_
+
+- [x] 12.3 Create parallel test runner
+  - Orchestrate both testing agents to run simultaneously
+  - Implement unified test reporting and status tracking
+  - Add automatic backend startup and coordinated shutdown
+  - _Requirements: Comprehensive test orchestration_
+
+- [x] 13. Fix E2E test failures and add missing functionality
+  - Add missing data-testid attributes to all video player elements
+  - Implement video selection dropdown with actual video titles
+  - Add proper test ID and functionality to face recognition overlay canvas
+  - Create timeline markers for face detections that are visible and interactive
+  - Implement export dialog and functionality
+  - Add confidence filter controls that are functional
+  - Implement contestant search functionality
+  - Add mobile responsive features with mobile menu button
+  - Implement error handling UI for video loading failures
+  - _Requirements: Complete E2E test coverage_
+
+- [ ] 14. Optimize performance and memory management
+- [ ] 14.1 Implement efficient rendering optimizations
   - Add dirty region updates to avoid unnecessary redraws
   - Implement canvas context pooling and cleanup
   - Optimize animation loop with proper frame timing
   - _Requirements: 5.1, 5.2_
 
-- [ ] 10.2 Add memory management and cleanup
+- [ ] 14.2 Add memory management and cleanup
   - Implement proper cleanup of animation frames
   - Add event listener cleanup on component unmount
   - Optimize face data structures for memory efficiency
   - _Requirements: 5.2, 5.4_
 
-- [ ] 11. Enhance user experience features
-- [ ] 11.1 Add responsive design improvements
+- [ ] 15. Enhance user experience features
+- [ ] 15.1 Add responsive design improvements
   - Optimize layout for mobile and tablet devices
   - Implement collapsible sidebar for smaller screens
   - Add touch-friendly controls and interactions
   - _Requirements: 5.3_
 
-- [ ] 11.2 Implement accessibility features
+- [ ] 15.2 Implement accessibility features
   - Add keyboard navigation for face selection
   - Implement ARIA labels for screen readers
   - Add high contrast mode support
   - _Requirements: User experience enhancement_
+
+- [ ] 16. Address remaining technical debt
+- [ ] 16.1 Update video processor for hardware acceleration
+  - Add Apple Silicon (M1/M2/M3/M4) optimization support
+  - Implement NVIDIA CUDA acceleration where available
+  - Optimize processing pipeline for different hardware configurations
+  - _Requirements: Hardware acceleration optimization_
+
+- [ ] 16.2 Fix npm deprecation warnings
+  - Update deprecated npm packages in frontend and scripts
+  - Resolve security vulnerabilities in dependencies
+  - Ensure compatibility with latest Node.js versions
+  - _Requirements: Dependency maintenance_

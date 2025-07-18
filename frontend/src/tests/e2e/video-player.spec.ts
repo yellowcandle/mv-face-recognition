@@ -17,17 +17,16 @@ test.describe('Video Player', () => {
 		await expect(page.getByTestId('video-selector')).toBeVisible();
 		
 		// Open dropdown
-		await page.getByTestId('video-selector').click();
+		await page.getByLabel('Select Video:').click();
 		
 		// Should show video options
-		await expect(page.getByText('《全民造星IV》主題曲')).toBeVisible();
-		await expect(page.getByText('女團の駅 Performance')).toBeVisible();
+		await expect(page.getByRole('option', { name: '《全民造星IV》主題曲' })).toBeVisible();
+		await expect(page.getByRole('option', { name: '女團の駅 Performance' })).toBeVisible();
 	});
 
 	test('should load video when selected', async ({ page }) => {
 		// Select a video
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		// Wait for video to load
 		await expect(page.getByTestId('video-element')).toBeVisible();
@@ -39,8 +38,7 @@ test.describe('Video Player', () => {
 
 	test('should show face recognition overlay', async ({ page }) => {
 		// Load a video with face recognition data
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		// Wait for face recognition data to load
 		await page.waitForTimeout(1000);
@@ -53,8 +51,7 @@ test.describe('Video Player', () => {
 	});
 
 	test('should display contestant information in sidebar', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		// Wait for data to load
 		await page.waitForTimeout(1000);
@@ -65,8 +62,7 @@ test.describe('Video Player', () => {
 	});
 
 	test('should control video playback', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		// Wait for video to load
 		await page.waitForTimeout(2000);
@@ -83,8 +79,7 @@ test.describe('Video Player', () => {
 	});
 
 	test('should update timeline with face detections', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		await page.waitForTimeout(1000);
 		
@@ -116,16 +111,14 @@ test.describe('Video Player', () => {
 			route.fulfill({ status: 404, body: 'Video not found' });
 		});
 		
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		// Should show error message
 		await expect(page.getByText(/failed to load video/i)).toBeVisible();
 	});
 
 	test('should filter face detections by confidence', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		await page.waitForTimeout(1000);
 		
@@ -142,8 +135,7 @@ test.describe('Video Player', () => {
 	});
 
 	test('should export video clips', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		await page.waitForTimeout(1000);
 		
@@ -165,8 +157,7 @@ test.describe('Video Player', () => {
 	});
 
 	test('should search and jump to specific contestants', async ({ page }) => {
-		await page.getByTestId('video-selector').click();
-		await page.getByText('《全民造星IV》主題曲').click();
+		await page.getByLabel('Select Video:').selectOption('《全民造星IV》主題曲');
 		
 		await page.waitForTimeout(1000);
 		
@@ -177,7 +168,7 @@ test.describe('Video Player', () => {
 		await expect(page.getByText('張三')).toBeVisible();
 		
 		// Click on contestant to jump to their appearance
-		await page.getByText('張三').click();
+		await page.getByTestId('contestant-search-item').first().click();
 		
 		// Video should jump to contestant's timestamp
 		await page.waitForTimeout(500);

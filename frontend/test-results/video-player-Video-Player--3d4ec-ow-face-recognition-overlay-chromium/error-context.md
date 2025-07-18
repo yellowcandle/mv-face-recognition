@@ -1,0 +1,47 @@
+# Page snapshot
+
+```yaml
+- text: Loading MV Face Recognition...
+- banner:
+  - heading "🎬 MV Face Recognition" [level=1]
+  - navigation:
+    - link "🏠 Dashboard":
+      - /url: /
+    - link "▶️ Video Player":
+      - /url: /video-player
+    - link "🎯 Face Recognition":
+      - /url: /face-recognition
+    - link "📊 Analytics":
+      - /url: /analytics
+    - link "⚙️ Settings":
+      - /url: /settings
+  - text: offline
+- main:
+  - heading "Video Player with Face Recognition" [level=1]
+  - paragraph: Watch videos with real-time face detection and contestant identification
+  - text: "Select Video:"
+  - combobox "Select Video:":
+    - option "《全民造星IV》主題曲"
+    - option "女團の駅 Performance"
+  - heading "Now Playing:" [level=2]
+  - text: "Duration: NaN:NaN"
+  - button "Hide Overlay"
+  - button "Hide Sidebar"
+  - button "Export Clip"
+  - text: "Detections: 0"
+  - paragraph: Failed to load video. Please try again.
+  - button "Play": ▶
+  - text: 0:00 / 0:00
+  - slider: "0"
+  - text: 🔊
+  - heading "Face Recognition" [level=3]
+  - text: "0"
+  - heading "Recognition Stats" [level=4]
+  - text: "Current Faces: 0 High Confidence: 0 Total Contestants: 0 Min Confidence:"
+  - slider "Min Confidence:": "0.5"
+  - text: "50% Search:"
+  - textbox "Search:"
+  - heading "Search Contestants" [level=4]
+- contentinfo:
+  - paragraph: © 2024 MV Face Recognition. Powered by SvelteKit & Cloudflare Workers.
+```

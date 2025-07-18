@@ -7,6 +7,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:backend": "node test-backend-agent.js",
+    "test:frontend": "node test-frontend-agent.js",
+    "test:parallel": "node test-parallel.js",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

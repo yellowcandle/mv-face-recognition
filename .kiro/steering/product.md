@@ -1,23 +1,55 @@
-# Product Overview
+---
+inclusion: always
+---
 
-## MV Face Recognition System
+# MV Face Recognition System
 
-A production-ready video processing and annotation platform that transforms raw videos into annotated content with comprehensive face recognition overlays. The system identifies contestants from a database of 95 individuals and provides real-time video playback with face detection capabilities served globally via Cloudflare's edge network.
+Production video processing platform that identifies 95 contestants in videos and serves annotated content globally via Cloudflare's edge network.
 
-## Key Features
+## Core Requirements
 
-- **Face Recognition**: Identifies 95 contestants from a pre-trained database using InsightFace buffalo_l model
-- **Dense Video Processing**: Processes every 5th frame (6x improvement over sparse processing) with linear interpolation for smooth playback
-- **Real-time Video Player**: SvelteKit-based frontend with interactive face overlays, confidence indicators, and timeline visualization
-- **Global Distribution**: Cloudflare Workers deployment with 300+ edge locations for sub-100ms response times worldwide
-- **Audio Preservation**: FFmpeg integration maintains original audio tracks during processing
+### Face Recognition Pipeline
+- Use pre-computed embeddings from `source/photo/contestants/` directory
+- Process every 5th frame with linear interpolation for smooth overlays
+- Display recognition confidence scores and allow filtering by confidence levels
+- Always preserve original audio tracks during video processing
+- Reference `source/contestant_info.csv` for authoritative contestant data (編號,姓名,暱稱,年齡)
 
-## Architecture
+### Performance Standards
+- Target sub-100ms response times using Cloudflare's edge network
+- Process videos in chunks to avoid memory issues
+- Utilize GPU acceleration (Apple Silicon/NVIDIA CUDA) when available
+- Maintain >85% recognition accuracy for known contestants
+- Achieve 6x performance improvement over frame-by-frame processing
 
-Two-phase system:
-1. **Offline Batch Processing**: GPU-accelerated video analysis with dense metadata generation
-2. **Global Edge Serving**: Cloudflare Workers delivering annotated videos and real-time interfaces
+### User Experience
+- Interactive face overlays with contestant names and confidence scores
+- Timeline navigation to jump to specific contestants or segments
+- Mobile-responsive video player across all device sizes
+- Clear loading states and meaningful error messages
+- Proper accessibility with ARIA labels and keyboard navigation
 
-## Target Use Case
+## Architecture Patterns
 
-Video content analysis for entertainment/competition shows where contestant identification and tracking across video content is required, with emphasis on smooth user experience and global accessibility.
+### Two-Phase Processing
+1. **Offline Processing**: GPU-accelerated batch analysis generating dense metadata
+2. **Edge Serving**: Real-time video delivery with pre-computed annotations
+
+### Data Flow
+- Input videos from `source/videos/`
+- Face embeddings from `source/photo/contestants/`
+- Output to `processed_videos/`, `metadata/`, and `thumbnails/`
+- Deploy via Cloudflare Workers with R2 storage and KV metadata
+
+### Error Handling Rules
+- Gracefully handle missing contestants and low confidence detections
+- Ensure face detection timestamps align with video playback
+- Never fail silently - log errors with context
+- Provide fallback UI states for processing failures
+
+## Critical Constraints
+- Never load entire videos into memory
+- Always validate contestant data against CSV source
+- Maintain audio quality during video processing
+- Cache face embeddings and metadata at edge locations
+- Use appropriate video encoding for web delivery

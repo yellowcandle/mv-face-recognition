@@ -6,7 +6,7 @@ Handles video frame extraction, preprocessing, and format conversion
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Tuple, Generator
+from typing import Tuple, Generator, List
 
 # from moviepy.editor import VideoFileClip  # Temporarily disabled
 import logging
@@ -85,11 +85,92 @@ class VideoProcessor:
         cap.release()
         return info
 
+    def generate_thumbnails(
+        self,
+        video_path: str,
+        output_dir: str,
+        output_name: str,
+        interval: float = None,
+        max_thumbs: int = None,
+    ) -> List[str]:
+        """
+        Generate multiple thumbnails at regular intervals
+
+        Args:
+            video_path: Input video path
+            output_dir: Directory to save thumbnails
+            output_name: Base name for thumbnail files
+            interval: Time interval between thumbnails in seconds (uses config if None)
+            max_thumbs: Maximum number of thumbnails to generate (uses config if None)
+
+        Returns:
+            List of paths to created thumbnails
+        """
+        # Use configuration values if not provided
+        if interval is None:
+            interval = self.config.get("thumbnails", {}).get("interval", 60.0)
+        if max_thumbs is None:
+            max_thumbs = self.config.get("thumbnails", {}).get("max_count", 20)
+
+        thumbnail_width = self.config.get("thumbnails", {}).get("width", 320)
+        thumbnail_quality = self.config.get("thumbnails", {}).get("quality", 85)
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Could not open video file: {video_path}")
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_duration = cap.get(cv2.CAP_PROP_FRAME_COUNT) / fps
+
+        # Ensure output directory exists
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        thumbnail_paths = []
+        current_time = 0.0
+        thumb_count = 0
+
+        logger.info(f"Generating thumbnails for {video_path} at {interval}s intervals")
+        logger.info(
+            f"Video duration: {total_duration:.1f}s, estimated thumbnails: {min(int(total_duration / interval) + 1, max_thumbs)}"
+        )
+
+        while current_time < total_duration and thumb_count < max_thumbs:
+            frame_number = int(current_time * fps)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+            ret, frame = cap.read()
+
+            if ret:
+                output_path = f"{output_dir}/{output_name}_thumb_{thumb_count:03d}.jpg"
+                # Resize to thumbnail size (maintain aspect ratio)
+                height, width = frame.shape[:2]
+                thumbnail_height = int(height * thumbnail_width / width)
+
+                thumbnail = cv2.resize(frame, (thumbnail_width, thumbnail_height))
+
+                # Use configured JPEG quality settings
+                cv2.imwrite(
+                    output_path,
+                    thumbnail,
+                    [cv2.IMWRITE_JPEG_QUALITY, thumbnail_quality],
+                )
+
+                logger.info(
+                    f"Created thumbnail {thumb_count + 1}: {output_path} (at {current_time:.1f}s)"
+                )
+                thumbnail_paths.append(output_path)
+                thumb_count += 1
+
+            current_time += interval
+
+        cap.release()
+        logger.info(f"Generated {len(thumbnail_paths)} thumbnails for {output_name}")
+        return thumbnail_paths
+
     def create_thumbnail(
         self, video_path: str, output_path: str, timestamp: float = 5.0
     ) -> str:
         """
-        Create thumbnail from video at specified timestamp
+        Create single thumbnail from video at specified timestamp (legacy method)
 
         Args:
             video_path: Input video path

@@ -8,7 +8,7 @@ import yaml
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from tqdm import tqdm
 
 from video_processor import VideoProcessor, FrameProcessor
@@ -26,9 +26,15 @@ logger = logging.getLogger(__name__)
 class VideoProcessingPipeline:
     """Main video processing pipeline"""
 
-    def __init__(self, config_path: str, enable_upload: bool = True):
+    def __init__(self, config_path: str, enable_upload: bool = True, local_only: bool = False):
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
+
+        # Set local-only mode
+        self.local_only = local_only
+        if local_only:
+            self.config["output"]["local_mode"]["enabled"] = True
+            enable_upload = False  # Force disable upload in local-only mode
 
         # Initialize components
         self.video_processor = VideoProcessor(self.config)
@@ -38,9 +44,14 @@ class VideoProcessingPipeline:
         self.metadata_generator = MetadataGenerator(self.config)
 
         # Only initialize Cloudflare uploader if upload is enabled
-        self.cloudflare_uploader = None
-        if enable_upload:
-            self.cloudflare_uploader = CloudflareUploader(self.config)
+        self.cloudflare_uploader: Optional[CloudflareUploader] = None
+        if enable_upload and not local_only:
+            try:
+                self.cloudflare_uploader = CloudflareUploader(self.config)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Cloudflare uploader: {e}")
+                if not local_only:
+                    logger.warning("Continuing without cloud upload capability")
 
         # Setup output directories
         self.setup_output_dirs()
@@ -48,13 +59,44 @@ class VideoProcessingPipeline:
     def setup_output_dirs(self):
         """Create output directories"""
         output_config = self.config["output"]
-        for dir_key in [
-            "processed_dir",
-            "thumbnails_dir",
-            "metadata_dir",
-            "galleries_dir",
-        ]:
-            Path(output_config[dir_key]).mkdir(parents=True, exist_ok=True)
+        
+        if self.local_only or output_config.get("local_mode", {}).get("enabled", False):
+            # Use local-only directories
+            local_config = output_config["local_mode"]
+            
+            # Create base output directory
+            base_dir = Path(local_config["base_output_dir"])
+            base_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create all local output directories
+            local_dirs = [
+                "processed_videos_dir",
+                "thumbnails_dir", 
+                "metadata_dir",
+                "galleries_dir",
+                "clips_dir"
+            ]
+            
+            for dir_key in local_dirs:
+                if dir_key in local_config:
+                    Path(local_config[dir_key]).mkdir(parents=True, exist_ok=True)
+            
+            # Update config to use local directories
+            output_config["processed_dir"] = local_config["processed_videos_dir"]
+            output_config["thumbnails_dir"] = local_config["thumbnails_dir"]
+            output_config["metadata_dir"] = local_config["metadata_dir"]
+            output_config["galleries_dir"] = local_config["galleries_dir"]
+            
+            logger.info(f"Local-only mode: Using output directory {base_dir}")
+        else:
+            # Use standard directories
+            for dir_key in [
+                "processed_dir",
+                "thumbnails_dir",
+                "metadata_dir",
+                "galleries_dir",
+            ]:
+                Path(output_config[dir_key]).mkdir(parents=True, exist_ok=True)
 
     def initialize_database(self, force_rebuild: bool = False):
         """Initialize contestant database"""
@@ -65,7 +107,7 @@ class VideoProcessingPipeline:
             f"Database ready with {len(self.contestant_db.face_encodings)} contestants"
         )
 
-    def process_video(self, video_path: str, output_name: str = None) -> Dict:
+    def process_video(self, video_path: Path, output_name: Optional[str] = None) -> Dict:
         """
         Process a single video through the complete pipeline
 
@@ -76,7 +118,6 @@ class VideoProcessingPipeline:
         Returns:
             Processing results dictionary
         """
-        video_path = Path(video_path)
         if not video_path.exists():
             raise FileNotFoundError(f"Video not found: {video_path}")
 
@@ -93,11 +134,11 @@ class VideoProcessingPipeline:
             f"{video_info['fps']:.1f} fps"
         )
 
-        # Create thumbnail
-        thumbnail_path = (
-            Path(self.config["output"]["thumbnails_dir"]) / f"{output_name}_thumb.jpg"
+        # Generate multiple thumbnails
+        thumbnails_dir = self.config["output"]["thumbnails_dir"]
+        thumbnail_paths = self.video_processor.generate_thumbnails(
+            str(video_path), thumbnails_dir, output_name
         )
-        self.video_processor.create_thumbnail(str(video_path), str(thumbnail_path))
 
         # Process frames
         all_recognitions = []
@@ -159,6 +200,7 @@ class VideoProcessingPipeline:
             recognitions=filtered_recognitions,
             frame_data=frame_data,
             output_name=output_name,
+            thumbnail_paths=thumbnail_paths,
         )
 
         # Save metadata
@@ -173,6 +215,9 @@ class VideoProcessingPipeline:
             recognitions=filtered_recognitions, output_name=output_name
         )
 
+        # Save gallery data locally
+        self.save_gallery_data(gallery_data, output_name)
+
         # Convert video formats
         processed_videos = self.convert_video_formats(video_path, output_name)
 
@@ -182,7 +227,7 @@ class VideoProcessingPipeline:
             "metadata": metadata,
             "gallery_data": gallery_data,
             "processed_videos": processed_videos,
-            "thumbnail": str(thumbnail_path),
+            "thumbnails": thumbnail_paths,
             "metadata_file": str(metadata_path),
         }
 
@@ -209,13 +254,23 @@ class VideoProcessingPipeline:
 
         return processed_videos
 
+    def save_gallery_data(self, gallery_data: Dict, output_name: str):
+        """Save gallery data to local file"""
+        galleries_dir = Path(self.config["output"]["galleries_dir"])
+        gallery_path = galleries_dir / f"{output_name}_gallery.json"
+        
+        with open(gallery_path, "w", encoding="utf-8") as f:
+            json.dump(gallery_data, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Gallery data saved to: {gallery_path}")
+
     def upload_to_cloudflare(self, upload_package: Dict, upload_videos: bool = True):
         """Upload processed content to Cloudflare"""
-        if upload_videos:
+        if self.cloudflare_uploader and upload_videos:
             logger.info("Uploading to Cloudflare R2...")
             self.cloudflare_uploader.upload_package(upload_package)
         else:
-            logger.info("Skipping Cloudflare upload (upload_videos=False)")
+            logger.info("Skipping Cloudflare upload")
 
 
 @click.command()
@@ -227,6 +282,8 @@ class VideoProcessingPipeline:
     "--output-name", "-o", help="Custom output name (default: video filename)"
 )
 @click.option("--no-upload", is_flag=True, help="Skip Cloudflare upload")
+@click.option("--local-only", is_flag=True, help="Run in local-only mode without any cloud dependencies")
+@click.option("--output-dir", help="Custom base output directory for local-only mode")
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
@@ -234,6 +291,8 @@ def main(
     config: str,
     output_name: str,
     no_upload: bool,
+    local_only: bool,
+    output_dir: str,
     rebuild_db: bool,
     debug: bool,
 ):
@@ -243,39 +302,89 @@ def main(
         logging.getLogger().setLevel(logging.DEBUG)
 
     try:
-        # Initialize pipeline
-        pipeline = VideoProcessingPipeline(config, enable_upload=not no_upload)
+        # Input validation
+        video_path = Path(input)
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video file not found: {input}")
+        if video_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
+            raise ValueError(f"Unsupported video format: {video_path.suffix}")
 
-        # Initialize contestant database
-        pipeline.initialize_database(force_rebuild=rebuild_db)
+        # Load and modify configuration if custom output directory is specified
+        temp_config_path = None
+        original_config = config
+        
+        if output_dir and local_only:
+            with open(config, "r") as f:
+                config_data = yaml.safe_load(f)
+            
+            # Update local mode configuration with custom output directory
+            base_output_dir = Path(output_dir).resolve()
+            config_data["output"]["local_mode"]["base_output_dir"] = str(base_output_dir)
+            config_data["output"]["local_mode"]["processed_videos_dir"] = str(base_output_dir / "processed_videos")
+            config_data["output"]["local_mode"]["thumbnails_dir"] = str(base_output_dir / "thumbnails")
+            config_data["output"]["local_mode"]["metadata_dir"] = str(base_output_dir / "metadata")
+            config_data["output"]["local_mode"]["galleries_dir"] = str(base_output_dir / "galleries")
+            config_data["output"]["local_mode"]["clips_dir"] = str(base_output_dir / "clips")
+            
+            # Write temporary config file
+            temp_config_path = Path(config).parent / "temp_processing_config.yaml"
+            with open(temp_config_path, "w") as f:
+                yaml.dump(config_data, f, default_flow_style=False)
+            config = str(temp_config_path)
+            
+            logger.info(f"Using custom output directory: {base_output_dir}")
 
-        # Process video
-        upload_package = pipeline.process_video(input, output_name)
+        try:
+            # Initialize pipeline
+            enable_upload = not (no_upload or local_only)
+            pipeline = VideoProcessingPipeline(config, enable_upload=enable_upload, local_only=local_only)
 
-        # Upload to Cloudflare (unless disabled)
-        if not no_upload and pipeline.cloudflare_uploader:
-            pipeline.upload_to_cloudflare(upload_package)
+            # Initialize contestant database
+            pipeline.initialize_database(force_rebuild=rebuild_db)
 
-        logger.info("Processing complete!")
+            # Process video
+            upload_package = pipeline.process_video(video_path, output_name)
 
-        # Print summary
-        metadata = upload_package["metadata"]
-        print("\n📊 Processing Summary:")
-        print(f"   Video: {metadata['video_info']['filename']}")
-        print(f"   Duration: {metadata['video_info']['duration']:.1f}s")
-        print(
-            f"   Frames processed: {metadata['processing_summary']['frames_processed']}"
-        )
-        print(
-            f"   Faces detected: {metadata['processing_summary']['total_faces_detected']}"
-        )
-        print(
-            f"   Recognitions: {metadata['processing_summary']['total_recognitions']}"
-        )
-        print(f"   Unique contestants: {len(metadata['contestant_timeline'])}")
+            # Upload to Cloudflare (unless disabled or in local-only mode)
+            if not (no_upload or local_only) and pipeline.cloudflare_uploader:
+                pipeline.upload_to_cloudflare(upload_package)
 
-        if not no_upload:
-            print("   ☁️  Uploaded to Cloudflare R2")
+            logger.info("Processing complete!")
+
+            # Print summary
+            metadata = upload_package["metadata"]
+            print("\n📊 Processing Summary:")
+            print(f"   Video: {metadata['video_info']['filename']}")
+            print(f"   Duration: {metadata['video_info']['duration']:.1f}s")
+            print(
+                f"   Frames processed: {metadata['processing_summary']['frames_processed']}"
+            )
+            print(
+                f"   Faces detected: {metadata['processing_summary']['total_faces_detected']}"
+            )
+            print(
+                f"   Recognitions: {metadata['processing_summary']['total_recognitions']}"
+            )
+            print(f"   Unique contestants: {len(metadata['contestant_timeline'])}")
+
+            # Output location information
+            if local_only:
+                local_config = pipeline.config["output"]["local_mode"]
+                print(f"   📁  Local output saved to: {local_config['base_output_dir']}")
+                print(f"   📹  Processed videos: {local_config['processed_videos_dir']}")
+                print(f"   🖼️  Thumbnails: {local_config['thumbnails_dir']}")
+                print(f"   📄  Metadata: {local_config['metadata_dir']}")
+                print(f"   🎭  Galleries: {local_config['galleries_dir']}")
+            elif not no_upload and pipeline.cloudflare_uploader:
+                print("   ☁️  Uploaded to Cloudflare R2")
+            else:
+                print("   📁  Saved to local directories (cloud upload disabled)")
+
+        finally:
+            # Clean up temporary config file
+            if temp_config_path and temp_config_path.exists():
+                temp_config_path.unlink()
+                logger.debug("Cleaned up temporary config file")
 
     except Exception as e:
         logger.error(f"Processing failed: {e}")
@@ -283,4 +392,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pylint: disable=no-value-for-parameter
