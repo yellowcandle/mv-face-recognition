@@ -44,6 +44,9 @@ class VideoProcessingPipeline:
 
         # Setup output directories
         self.setup_output_dirs()
+        
+        # Initialize contestant database with face encodings
+        self.initialize_database()
 
     def setup_output_dirs(self):
         """Create output directories"""
@@ -173,8 +176,8 @@ class VideoProcessingPipeline:
             recognitions=filtered_recognitions, output_name=output_name
         )
 
-        # Convert video formats
-        processed_videos = self.convert_video_formats(video_path, output_name)
+        # Convert video formats with face recognition overlays
+        processed_videos = self.convert_video_formats_with_overlays(video_path, output_name, metadata)
 
         # Prepare upload package
         upload_package = {
@@ -188,8 +191,8 @@ class VideoProcessingPipeline:
 
         return upload_package
 
-    def convert_video_formats(self, input_path: Path, output_name: str) -> List[str]:
-        """Convert video to multiple formats"""
+    def convert_video_formats_with_overlays(self, input_path: Path, output_name: str, metadata: Dict) -> List[str]:
+        """Convert video to multiple formats with burned-in face recognition overlays"""
         output_dir = Path(self.config["output"]["processed_dir"])
         processed_videos = []
 
@@ -200,9 +203,9 @@ class VideoProcessingPipeline:
             output_filename = f"{output_name}_{resolution}.{format_name}"
             output_path = output_dir / output_filename
 
-            logger.info(f"Converting to {output_filename}...")
-            self.video_processor.convert_video_format(
-                str(input_path), str(output_path), format_config
+            logger.info(f"Converting to {output_filename} with face recognition overlays...")
+            self.video_processor.process_video_with_annotations(
+                str(input_path), str(output_path), metadata, format_config
             )
 
             processed_videos.append(str(output_path))
