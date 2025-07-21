@@ -11,13 +11,17 @@ dependencies = [
     "dlib>=19.24.0",
     "moviepy>=1.0.3",
     "requests>=2.31.0",
-    "boto3>=1.28.0",
     "PyYAML>=6.0",
     "click>=8.1.0",
     "tqdm>=4.65.0",
     "pandas>=2.0.3",
     "imageio-ffmpeg>=0.5.1",
     "face-recognition-models",
+]
+
+[project.optional-dependencies]
+cloud = [
+    "boto3>=1.28.0",
 ]
 
 [tool.uv.sources]

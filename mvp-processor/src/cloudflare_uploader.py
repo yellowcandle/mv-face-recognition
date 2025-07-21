@@ -5,11 +5,10 @@ Handles uploading processed videos and metadata to Cloudflare R2 and KV storage
 
 import os
 import json
-import boto3
+import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 import logging
-from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -20,18 +19,26 @@ class CloudflareUploader:
     def __init__(self, config: dict):
         self.config = config
         self.cf_config = config["cloudflare"]
-
-        # Initialize R2 client
-        self.r2_client = self._initialize_r2_client()
         self.bucket_name = self.cf_config["r2_bucket"]
-
+        
         # Initialize API client for KV
         self.api_token = self.cf_config["api_token"]
         self.account_id = self.cf_config["account_id"]
+        
+        # Initialize R2 client (may be None if credentials are missing)
+        self.r2_client = None
+        try:
+            self.r2_client = self._initialize_r2_client()
+        except Exception as e:
+            logger.warning(f"Cloudflare R2 client initialization failed: {e}")
+            logger.warning("Continuing in local-only mode")
 
     def _initialize_r2_client(self):
         """Initialize Cloudflare R2 client using S3-compatible API"""
         try:
+            import boto3
+            from botocore.config import Config
+            
             # R2 uses S3-compatible API
             client = boto3.client(
                 "s3",
@@ -46,6 +53,9 @@ class CloudflareUploader:
             logger.info(f"Connected to Cloudflare R2 bucket: {self.bucket_name}")
             return client
 
+        except ImportError as e:
+            logger.error("boto3 is required for Cloudflare uploads. Install with: uv add boto3")
+            raise ImportError("boto3 is required for Cloudflare uploads") from e
         except Exception as e:
             logger.error(f"Failed to initialize R2 client: {e}")
             logger.error(
@@ -60,6 +70,10 @@ class CloudflareUploader:
         Args:
             upload_package: Package containing videos, metadata, thumbnails, etc.
         """
+        if self.r2_client is None:
+            logger.warning("Cloudflare R2 client not available, skipping upload")
+            return
+            
         logger.info("Starting Cloudflare upload...")
 
         try:
@@ -127,6 +141,9 @@ class CloudflareUploader:
 
     def _upload_thumbnail(self, thumbnail_path: str, video_info: Dict):
         """Upload video thumbnail to R2"""
+        if self.r2_client is None:
+            return
+            
         thumbnail_file = Path(thumbnail_path)
         video_name = video_info["processed_name"]
         s3_key = f"videos/thumbnails/{video_name}_thumbnail.jpg"
@@ -155,6 +172,9 @@ class CloudflareUploader:
 
     def _upload_metadata_files(self, upload_package: Dict):
         """Upload metadata files to R2"""
+        if self.r2_client is None:
+            return
+            
         video_name = upload_package["video_info"]["processed_name"]
         metadata = upload_package["metadata"]
         gallery_data = upload_package["gallery_data"]
@@ -177,6 +197,9 @@ class CloudflareUploader:
 
     def _upload_json_to_r2(self, data: Dict, s3_key: str):
         """Upload JSON data to R2"""
+        if self.r2_client is None:
+            return
+            
         logger.info(f"Uploading metadata: {s3_key}")
 
         try:
@@ -190,7 +213,7 @@ class CloudflareUploader:
                 CacheControl="public, max-age=3600",  # 1 hour
                 Metadata={
                     "content-encoding": "utf-8",
-                    "upload-timestamp": str(int(os.time())),
+                    "upload-timestamp": str(int(time.time())),
                 },
             )
             logger.info(f"Successfully uploaded: {s3_key}")
@@ -201,6 +224,9 @@ class CloudflareUploader:
 
     def _update_kv_storage(self, upload_package: Dict):
         """Update Cloudflare KV storage with video index"""
+        if self.r2_client is None:
+            return
+            
         video_info = upload_package["video_info"]
         metadata = upload_package["metadata"]
 
@@ -237,6 +263,9 @@ class CloudflareUploader:
 
     def list_uploaded_videos(self) -> List[Dict]:
         """List all uploaded videos from R2"""
+        if self.r2_client is None:
+            return []
+            
         try:
             response = self.r2_client.list_objects_v2(
                 Bucket=self.bucket_name, Prefix="index/videos/", Delimiter="/"
