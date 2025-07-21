@@ -27,7 +27,7 @@ face_detection:
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
-  similarity_threshold: 0.7  # Confidence threshold
+  similarity_threshold: 0.4  # Confidence threshold (moderate for testing improved recognition)
   tolerance: 0.6  # Lower = more strict matching
   max_distance: 0.6  # Maximum face distance for recognition
   use_existing_embeddings: true
@@ -70,7 +70,7 @@ cloudflare:
 
 # Integration with Deployment Scripts
 integration:
-  upload_to_cloudflare: true
+  upload_to_cloudflare: false
   use_external_scripts: true  # Use Node.js upload scripts
   scripts_dir: "../scripts"
   auto_deploy_worker: false  # Manual deployment step

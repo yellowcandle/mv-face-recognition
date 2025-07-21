@@ -67,22 +67,50 @@ class ContestantDatabase:
             logger.error(f"Failed to load contestants info: {e}")
 
     def build_face_encodings(self, force_rebuild: bool = False):
-        """Build face encodings for all contestants - simplified for testing"""
-        # For testing purposes, create mock encodings
-        logger.info("Building mock face encodings for testing...")
+        """Build face encodings for all contestants using real embeddings"""
+        logger.info("Loading real face encodings from embeddings...")
 
         self.face_encodings = {}
         self.contestant_names = []
+        loaded_count = 0
 
         for contestant_id, info in self.contestants_info.items():
-            # Create a mock encoding (random vector for testing)
-            mock_encoding = np.random.rand(128)  # Standard face encoding size
-            self.face_encodings[contestant_id] = mock_encoding
-            self.contestant_names.append(contestant_id)
-            logger.debug(f"Created mock encoding for {info['nickname']}")
+            # Try to load real embedding by nickname (most likely to match filename)
+            nickname = info['nickname']
+            embedding_path = self.photo_dir / f"{nickname}_embedding.npy"
+            
+            encoding = None
+            try:
+                if embedding_path.exists():
+                    encoding = np.load(embedding_path)
+                    logger.debug(f"Loaded real embedding for {nickname} from {embedding_path}")
+                    loaded_count += 1
+                else:
+                    # Try alternative paths if direct nickname match doesn't work
+                    name = info['name']
+                    alt_paths = [
+                        self.photo_dir / f"{name}_embedding.npy",
+                        self.photo_dir / f"{contestant_id}_embedding.npy"
+                    ]
+                    
+                    for alt_path in alt_paths:
+                        if alt_path.exists():
+                            encoding = np.load(alt_path)
+                            logger.debug(f"Loaded real embedding for {nickname} from {alt_path}")
+                            loaded_count += 1
+                            break
+                
+                if encoding is not None:
+                    self.face_encodings[contestant_id] = encoding
+                    self.contestant_names.append(contestant_id)
+                else:
+                    logger.warning(f"No embedding found for {nickname} (ID: {contestant_id})")
+                    
+            except Exception as e:
+                logger.error(f"Failed to load embedding for {nickname}: {e}")
 
         logger.info(
-            f"Created {len(self.face_encodings)} mock face encodings for testing"
+            f"Loaded {loaded_count} real face encodings from {len(self.contestants_info)} contestants"
         )
 
     def get_contestant_info(self, contestant_id: str) -> Dict:
@@ -121,28 +149,81 @@ class FaceDetector:
             # Convert RGB to grayscale for face detection
             gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
 
-            # Detect faces
+            # Detect faces with more sensitive parameters for high-res video
             faces = self.face_cascade.detectMultiScale(
-                gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+                gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20)
             )
 
             detections = []
             for x, y, w, h in faces:
+                # Add minimum face size filtering for quality
+                min_face_size = 40  # Minimum 40x40 pixels for reliable face encoding
+                if w < min_face_size or h < min_face_size:
+                    logger.debug(f"Skipping small face: {w}x{h} pixels at {timestamp:.2f}s")
+                    continue
+                
                 # Convert OpenCV format (x, y, w, h) to face_recognition format (top, right, bottom, left)
                 top, right, bottom, left = y, x + w, y + h, x
                 location = (top, right, bottom, left)
 
-                # Create a mock encoding for testing (random vector)
-                mock_encoding = np.random.rand(128)
-
-                detection = FaceDetection(
-                    location=location,
-                    encoding=mock_encoding,
-                    timestamp=timestamp,
-                    frame_number=frame_number,
-                    confidence=0.8,  # Mock confidence for OpenCV detection
-                )
-                detections.append(detection)
+                # Extract face region for encoding generation with validation
+                face_region = frame[top:bottom, left:right]
+                
+                # Validate face region quality - SKIP invalid faces instead of using random
+                if face_region.size == 0:
+                    logger.debug(f"Empty face region at {timestamp:.2f}s - skipping")
+                    continue
+                
+                # Check face region has sufficient area 
+                if face_region.shape[0] < min_face_size or face_region.shape[1] < min_face_size:
+                    logger.debug(f"Face region too small: {face_region.shape} at {timestamp:.2f}s - skipping")
+                    continue
+                
+                # Check for sufficient contrast/variation (avoid blank regions)
+                face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY) if len(face_region.shape) == 3 else face_region
+                if np.std(face_gray) < 10:  # Low contrast threshold
+                    logger.debug(f"Low contrast face region at {timestamp:.2f}s (std={np.std(face_gray):.1f}) - skipping")
+                    continue
+                
+                # Generate improved face encoding from validated region
+                try:
+                    # Apply histogram equalization for better contrast
+                    face_gray_eq = cv2.equalizeHist(face_gray)
+                    
+                    # Resize to consistent dimensions for better comparison
+                    face_resized = cv2.resize(face_gray_eq, (64, 64))
+                    
+                    # Create enhanced feature vector
+                    face_encoding = face_resized.flatten().astype(np.float64)
+                    
+                    # Add gradient features for better discrimination
+                    grad_x = cv2.Sobel(face_resized, cv2.CV_64F, 1, 0, ksize=3).flatten()
+                    grad_y = cv2.Sobel(face_resized, cv2.CV_64F, 0, 1, ksize=3).flatten()
+                    
+                    # Combine features
+                    enhanced_features = np.concatenate([face_encoding, grad_x[:256], grad_y[:256]])
+                    
+                    # Normalize to unit vector for better distance calculation
+                    face_encoding = enhanced_features / (np.linalg.norm(enhanced_features) + 1e-8)
+                    
+                    # Pad or truncate to 512 dimensions to match stored embeddings
+                    if len(face_encoding) > 512:
+                        face_encoding = face_encoding[:512]
+                    else:
+                        face_encoding = np.pad(face_encoding, (0, 512 - len(face_encoding)), 'constant')
+                    
+                    detection = FaceDetection(
+                        location=location,
+                        encoding=face_encoding,
+                        timestamp=timestamp,
+                        frame_number=frame_number,
+                        confidence=0.8,  # Mock confidence for OpenCV detection
+                    )
+                    detections.append(detection)
+                    
+                except Exception as e:
+                    logger.debug(f"Failed to process face region at {timestamp:.2f}s: {e} - skipping")
+                    continue
 
             logger.debug(
                 f"Detected {len(detections)} faces at timestamp {timestamp:.2f}s"
@@ -181,37 +262,61 @@ class FaceRecognizer:
 
         known_names = list(self.contestant_db.face_encodings.keys())
 
+        similarity_threshold = self.config["face_recognition"]["similarity_threshold"]
+
         for detection in detections:
             try:
-                # For testing purposes, randomly assign a contestant with mock confidence
-                import random
+                # Calculate distances between detected face and all known faces
+                best_match_id = None
+                best_match_distance = float('inf')
+                
+                for contestant_id, known_encoding in self.contestant_db.face_encodings.items():
+                    # Ensure consistent dimensionality - flatten both to 1D arrays
+                    detection_encoding = detection.encoding.flatten()
+                    known_encoding_flat = known_encoding.flatten()
+                    
+                    # Calculate both Euclidean distance and cosine similarity for better matching
+                    euclidean_distance = np.linalg.norm(detection_encoding - known_encoding_flat)
+                    
+                    # Calculate cosine similarity (better for normalized vectors)
+                    dot_product = np.dot(detection_encoding, known_encoding_flat)
+                    norm_product = np.linalg.norm(detection_encoding) * np.linalg.norm(known_encoding_flat)
+                    if norm_product > 0:
+                        cosine_similarity = dot_product / norm_product
+                        cosine_distance = 1.0 - cosine_similarity
+                    else:
+                        cosine_distance = 1.0  # Maximum distance for zero vectors
+                    
+                    # Use weighted combination of both metrics for robust matching
+                    combined_distance = 0.6 * euclidean_distance + 0.4 * cosine_distance
+                    
+                    if combined_distance < best_match_distance:
+                        best_match_distance = combined_distance
+                        best_match_id = contestant_id
 
-                if random.random() > 0.3:  # 70% chance of "recognition"
-                    contestant_id = random.choice(known_names)
-                    contestant_info = self.contestant_db.get_contestant_info(
-                        contestant_id
-                    )
-
-                    # Mock confidence between 0.5 and 0.95
-                    confidence = 0.5 + (random.random() * 0.45)
+                # Check if best match meets similarity threshold
+                # Convert distance to confidence score (lower distance = higher confidence)
+                confidence = max(0.0, 1.0 - (best_match_distance / 1.5))  # Adjusted scaling for combined metric
+                
+                if best_match_id and confidence >= similarity_threshold:
+                    contestant_info = self.contestant_db.get_contestant_info(best_match_id)
 
                     recognition = FaceRecognition(
                         detection=detection,
-                        contestant_id=contestant_id,
+                        contestant_id=best_match_id,
                         contestant_name=contestant_info.get("name", "Unknown"),
                         contestant_nickname=contestant_info.get("nickname", "Unknown"),
                         match_confidence=confidence,
                     )
                     recognitions.append(recognition)
 
-                    logger.debug(
-                        f"Mock recognized {recognition.contestant_nickname} "
-                        f"(confidence: {confidence:.3f})"
+                    logger.info(
+                        f"Real recognized {recognition.contestant_nickname} "
+                        f"(confidence: {confidence:.3f}, distance: {best_match_distance:.3f})"
                     )
                 else:
-                    logger.debug(
-                        f"No mock match for face at {detection.timestamp:.2f}s"
-                    )
+                    logger.info(f"No match for face at {detection.timestamp:.2f}s "
+                               f"(best distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold})")
 
             except Exception as e:
                 logger.error(

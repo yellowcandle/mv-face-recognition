@@ -269,7 +269,10 @@ class VideoProcessor:
             timestamp_annotations.sort(key=lambda x: x['timestamp'])
         
         frame_count = 0
-        smoothing_window = 3  # Frames to smooth over
+        # Calculate smoothing window based on detection sampling rate
+        # With 6 FPS detection sampling, we want overlays to persist between detection frames
+        detection_interval = fps / self.fps_sample_rate  # frames between detections
+        smoothing_window = int(detection_interval * 1.5)  # 1.5x detection interval for smooth coverage
         
         while cap.isOpened():
             ret, frame = cap.read()
@@ -339,7 +342,8 @@ class VideoProcessor:
             return []
         
         # Find keyframes within smoothing window using actual video fps
-        window_time = smoothing_window / fps
+        # Use generous window time to account for detection sampling rate
+        window_time = max(smoothing_window / fps, 0.25)  # At least 0.25 seconds window
         candidate_frames = []
         
         for annotation in timestamp_annotations:
@@ -449,19 +453,31 @@ class VideoProcessor:
             estimated_text_width = int(len(label) * estimated_char_width)
             estimated_text_height = font_size + 5
             
-            # Ensure text fits within frame
-            text_y = max(estimated_text_height + 5, top - 5)
-            text_x = min(left, frame_width - estimated_text_width - 10)
+            # Calculate proper background rectangle position above the bounding box
+            bg_padding = 3
+            bg_height = estimated_text_height + (2 * bg_padding)
+            bg_width = estimated_text_width + (2 * bg_padding)
+            
+            # Position background rectangle above the face bounding box
+            bg_top = max(0, top - bg_height - 5)
+            bg_left = min(left, frame_width - bg_width)
+            bg_bottom = bg_top + bg_height
+            bg_right = bg_left + bg_width
+            
+            # Calculate text baseline position centered within background rectangle
+            # Text baseline should be positioned to center the text vertically in the background
+            text_baseline_y = bg_top + bg_padding + int(estimated_text_height * 0.8)  # Adjust for font baseline
+            text_x = bg_left + bg_padding
             
             # Draw background rectangle for text
             cv2.rectangle(frame, 
-                         (text_x, text_y - estimated_text_height - 5), 
-                         (text_x + estimated_text_width + 10, text_y + 5), 
+                         (bg_left, bg_top), 
+                         (bg_right, bg_bottom), 
                          (0, 0, 0), -1)
             
-            # Draw text with CJKV support
+            # Draw text with CJKV support - positioned at proper baseline
             frame = self._draw_text_with_cjkv_support(
-                frame, label, (text_x + 2, text_y), font_size, (255, 255, 255), is_interpolated
+                frame, label, (text_x, text_baseline_y), font_size, (255, 255, 255), is_interpolated
             )
         
         return frame
