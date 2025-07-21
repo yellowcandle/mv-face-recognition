@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run process_video.py -i \"source/videos/test-video-mv2.mp4\" --no-upload)",
+      "Bash(uv run process_video.py -i \"../source/videos/test-video-mv2.mp4\" --no-upload)"
+    ],
+    "deny": []
+  }
+}

@@ -14,7 +14,6 @@ from tqdm import tqdm
 from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
-from cloudflare_uploader import CloudflareUploader
 
 # Setup logging
 logging.basicConfig(
@@ -40,7 +39,16 @@ class VideoProcessingPipeline:
         # Only initialize Cloudflare uploader if upload is enabled
         self.cloudflare_uploader = None
         if enable_upload:
-            self.cloudflare_uploader = CloudflareUploader(self.config)
+            try:
+                from cloudflare_uploader import CloudflareUploader
+                self.cloudflare_uploader = CloudflareUploader(self.config)
+                logger.info("Cloudflare uploader initialized")
+            except ImportError as e:
+                logger.warning(f"Cloudflare uploader not available: {e}")
+                logger.warning("Running in local-only mode")
+            except Exception as e:
+                logger.warning(f"Cloudflare uploader initialization failed: {e}")
+                logger.warning("Running in local-only mode")
 
         # Setup output directories
         self.setup_output_dirs()
@@ -224,7 +232,7 @@ class VideoProcessingPipeline:
 @click.command()
 @click.option("--input", "-i", required=True, help="Input video file path")
 @click.option(
-    "--config", "-c", default="config/processing_config.yaml", help="Configuration file"
+    "--config", "-c", default="../config/processing_config.yaml", help="Configuration file"
 )
 @click.option(
     "--output-name", "-o", help="Custom output name (default: video filename)"
