@@ -25,6 +25,20 @@ face_detection:
   max_faces_per_frame: 10
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
   
+  # Hardware acceleration preferences (in order of preference)
+  backend_priority:
+    - "apple_silicon_metal"  # Apple Silicon M1/M2/M3 with Metal Performance Shaders
+    - "cuda"                 # NVIDIA CUDA GPU acceleration
+    - "cpu"                  # CPU fallback
+  
+  # Memory optimization settings
+  memory_optimization:
+    enable_unified_memory_optimization: true  # Apple Silicon unified memory optimization
+    prefer_fp16: true                        # Use half-precision for better Apple Silicon performance
+    adaptive_batch_size: true               # Automatically adjust batch size based on hardware
+    memory_pressure_relief: true            # Enable memory pressure management
+    garbage_collection_threshold: 0.85      # Trigger cleanup at 85% memory usage
+  
 # Face Recognition with ChromaDB Integration
 face_recognition:
   similarity_threshold: 0.4  # Confidence threshold (moderate for testing improved recognition)

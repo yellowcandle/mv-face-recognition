@@ -11,7 +11,7 @@ binding = "METADATA_KV"
 id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 
 [vars]
-ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv.herballemon.dev"
+ALLOWED_ORIGINS = "https://mv.herballemon.dev"
 ENVIRONMENT = "production"
 
 routes = [

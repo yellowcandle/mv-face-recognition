@@ -1,39 +1,21 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   
-  let systemStatus: any = null;
   let videos: any[] = [];
-  let contestants: any[] = [];
-  let recentActivity: any[] = [];
   let loading = true;
   let error = '';
   
   onMount(async () => {
     try {
-      await Promise.all([
-        loadSystemStatus(),
-        loadVideos(),
-        loadContestants(),
-        loadRecentActivity()
-      ]);
+      await loadVideos();
     } catch (err) {
-      error = 'Failed to load dashboard data';
-      console.error('Dashboard error:', err);
+      error = 'Failed to load videos';
+      console.error('Error:', err);
     } finally {
       loading = false;
     }
   });
-  
-  async function loadSystemStatus() {
-    try {
-      const response = await fetch('/api/system/status');
-      if (response.ok) {
-        systemStatus = await response.json();
-      }
-    } catch (err) {
-      console.error('Failed to load system status:', err);
-    }
-  }
   
   async function loadVideos() {
     try {
@@ -47,265 +29,111 @@
     }
   }
   
-  async function loadContestants() {
-    try {
-      const response = await fetch('/api/contestants');
-      if (response.ok) {
-        const data = await response.json();
-        contestants = data.contestants || [];
-      }
-    } catch (err) {
-      console.error('Failed to load contestants:', err);
-    }
+  function goToVideoPlayer() {
+    goto('/video-player');
   }
   
-  async function loadRecentActivity() {
-    // Mock recent activity data
-    recentActivity = [
-      {
-        id: 1,
-        type: 'video_processed',
-        message: 'Video "《全民造星IV》主題曲" processing completed',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        status: 'success'
-      },
-      {
-        id: 2,
-        type: 'recognition_complete',
-        message: '15 faces recognized in video "女團の駅 Performance"',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        status: 'success'
-      },
-      {
-        id: 3,
-        type: 'video_uploaded',
-        message: 'New video "Practice Session" uploaded for processing',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-        status: 'info'
-      },
-      {
-        id: 4,
-        type: 'system_update',
-        message: 'Face recognition model updated to v2.1',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        status: 'info'
-      }
-    ];
-  }
-  
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'completed': return 'var(--success-color)';
-      case 'processing': return 'var(--warning-color)';
-      case 'failed': return 'var(--error-color)';
-      default: return 'var(--secondary-color)';
-    }
-  }
-  
-  function getActivityIcon(type: string) {
-    switch (type) {
-      case 'video_processed': return '✅';
-      case 'recognition_complete': return '🎯';
-      case 'video_uploaded': return '📤';
-      case 'system_update': return '🔄';
-      default: return 'ℹ️';
-    }
-  }
-  
-  function formatTimeAgo(timestamp: string) {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMs = now.getTime() - time.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    
-    if (diffHours > 0) {
-      return `${diffHours}h ago`;
-    } else if (diffMinutes > 0) {
-      return `${diffMinutes}m ago`;
-    } else {
-      return 'Just now';
-    }
+  function formatDuration(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 </script>
 
 <svelte:head>
-  <title>Dashboard - MV Face Recognition</title>
-  <meta name="description" content="Dashboard overview of video processing and face recognition system" />
+  <title>MV Video Gallery</title>
 </svelte:head>
 
-<div class="dashboard">
-  <header class="page-header">
-    <h1>Dashboard</h1>
-    <p>System overview and recent activity</p>
-  </header>
-  
+<main class="home-container">
+  <div class="header">
+    <h1>MV Video Gallery</h1>
+    <p>Watch your favorite MV performances with face recognition annotations</p>
+  </div>
+
   {#if loading}
     <div class="loading">
       <div class="spinner"></div>
-      <p>Loading dashboard...</p>
+      <p>Loading videos...</p>
     </div>
   {:else if error}
     <div class="error">
       <p>{error}</p>
-      <button on:click={() => window.location.reload()}>Retry</button>
     </div>
   {:else}
-    <!-- System Status Cards -->
-    <section class="status-grid">
-      <div class="status-card">
-        <div class="status-header">
-          <h3>System Status</h3>
-          <span class="status-badge" class:online={systemStatus?.status === 'online'}>
-            {systemStatus?.status || 'unknown'}
-          </span>
-        </div>
-        <div class="status-details">
-          <p><strong>Version:</strong> {systemStatus?.version || 'N/A'}</p>
-          <p><strong>Environment:</strong> {systemStatus?.environment || 'N/A'}</p>
-          <p><strong>Last Updated:</strong> {systemStatus?.timestamp ? new Date(systemStatus.timestamp).toLocaleString() : 'N/A'}</p>
+    <div class="content">
+      <div class="hero-section">
+        <div class="hero-content">
+          <h2>Ready to Watch?</h2>
+          <p>Browse and watch your video collection with pre-processed face recognition annotations.</p>
+          <button on:click={goToVideoPlayer} class="cta-button">
+            Start Watching ▶️
+          </button>
         </div>
       </div>
-      
-      <div class="status-card">
-        <div class="status-header">
-          <h3>Videos</h3>
-          <span class="count-badge">{videos.length}</span>
-        </div>
-        <div class="status-details">
-          <p><strong>Completed:</strong> {videos.filter(v => v.status === 'completed').length}</p>
-          <p><strong>Processing:</strong> {videos.filter(v => v.status === 'processing').length}</p>
-          <p><strong>Failed:</strong> {videos.filter(v => v.status === 'failed').length}</p>
-        </div>
-      </div>
-      
-      <div class="status-card">
-        <div class="status-header">
-          <h3>Contestants</h3>
-          <span class="count-badge">{contestants.length}</span>
-        </div>
-        <div class="status-details">
-          <p><strong>Database:</strong> Ready</p>
-          <p><strong>Embeddings:</strong> Generated</p>
-          <p><strong>Recognition:</strong> Active</p>
-        </div>
-      </div>
-      
-      <div class="status-card">
-        <div class="status-header">
-          <h3>Features</h3>
-          <span class="feature-indicator">🚀</span>
-        </div>
-        <div class="status-details">
-          <p><strong>Video Streaming:</strong> {systemStatus?.features?.video_streaming ? '✅' : '❌'}</p>
-          <p><strong>Face Recognition:</strong> {systemStatus?.features?.face_recognition ? '✅' : '❌'}</p>
-          <p><strong>Metadata Storage:</strong> {systemStatus?.features?.metadata_storage ? '✅' : '❌'}</p>
-        </div>
-      </div>
-    </section>
-    
-    <!-- Quick Actions -->
-    <section class="quick-actions">
-      <h2>Quick Actions</h2>
-      <div class="actions-grid">
-        <a href="/video-player" class="action-card">
-          <div class="action-icon">▶️</div>
-          <div class="action-content">
-            <h3>Watch Videos</h3>
-            <p>View processed videos with face recognition overlays</p>
-          </div>
-        </a>
+
+      <div class="video-grid">
+        <h3>Available Videos ({videos.length})</h3>
         
-        <a href="/face-recognition" class="action-card">
-          <div class="action-icon">🎯</div>
-          <div class="action-content">
-            <h3>Recognition Results</h3>
-            <p>Browse and filter face recognition results</p>
-          </div>
-        </a>
-        
-        <a href="/analytics" class="action-card">
-          <div class="action-icon">📊</div>
-          <div class="action-content">
-            <h3>Analytics</h3>
-            <p>View processing statistics and performance metrics</p>
-          </div>
-        </a>
-        
-        <a href="/settings" class="action-card">
-          <div class="action-icon">⚙️</div>
-          <div class="action-content">
-            <h3>Settings</h3>
-            <p>Configure system preferences and parameters</p>
-          </div>
-        </a>
-      </div>
-    </section>
-    
-    <!-- Recent Activity -->
-    <section class="recent-activity">
-      <h2>Recent Activity</h2>
-      <div class="activity-list">
-        {#each recentActivity as activity}
-          <div class="activity-item">
-            <div class="activity-icon">{getActivityIcon(activity.type)}</div>
-            <div class="activity-content">
-              <p>{activity.message}</p>
-              <span class="activity-time">{formatTimeAgo(activity.timestamp)}</span>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </section>
-    
-    <!-- Video Overview -->
-    {#if videos.length > 0}
-      <section class="video-overview">
-        <h2>Recent Videos</h2>
-        <div class="video-grid">
-          {#each videos.slice(0, 6) as video}
-            <div class="video-card">
-              <div class="video-thumbnail">
-                <div class="thumbnail-placeholder">🎬</div>
-                <div class="video-status" style="background-color: {getStatusColor(video.status)}">
-                  {video.status}
+        {#if videos.length > 0}
+          <div class="videos">
+            {#each videos as video}
+              <div class="video-card" on:click={goToVideoPlayer}>
+                <div class="video-thumbnail">
+                  <img 
+                    src="/api/videos/{video.id}/thumbnail" 
+                    alt={video.name}
+                    loading="lazy"
+                    on:error={(e) => e.target.style.display = 'none'}
+                  />
+                  <div class="play-overlay">▶️</div>
+                </div>
+                <div class="video-info">
+                  <h4>{video.name}</h4>
+                  <div class="video-meta">
+                    <span class="duration">{formatDuration(video.duration || 0)}</span>
+                    <span class="status">Ready</span>
+                  </div>
                 </div>
               </div>
-              <div class="video-info">
-                <h4>{video.name}</h4>
-                <p>Duration: {Math.floor(video.duration / 60)}:{(video.duration % 60).toFixed(0).padStart(2, '0')}</p>
-                <p>Uploaded: {new Date(video.uploadedAt).toLocaleDateString()}</p>
-              </div>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {/if}
+            {/each}
+          </div>
+        {:else}
+          <div class="no-videos">
+            <div class="no-videos-icon">📹</div>
+            <h4>No videos available</h4>
+            <p>Process some videos locally and upload them to get started.</p>
+          </div>
+        {/if}
+      </div>
+    </div>
   {/if}
-</div>
+</main>
 
 <style>
-  .dashboard {
-    max-width: 100%;
+  .home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
   }
-  
-  .page-header {
-    margin-bottom: 2rem;
+
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
   }
-  
-  .page-header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 0 0 0.5rem 0;
-    color: var(--text-color);
+
+  .header h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    margin: 0 0 1rem 0;
+    color: #111827;
   }
-  
-  .page-header p {
+
+  .header p {
     font-size: 1.1rem;
-    color: var(--text-secondary);
+    color: #6b7280;
     margin: 0;
   }
-  
+
   .loading, .error {
     display: flex;
     flex-direction: column;
@@ -314,326 +142,210 @@
     padding: 4rem 2rem;
     text-align: center;
   }
-  
+
   .spinner {
     width: 2rem;
     height: 2rem;
-    border: 3px solid var(--border-color);
-    border-top: 3px solid var(--primary-color);
+    border: 2px solid #e5e7eb;
+    border-top: 2px solid #3b82f6;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
   }
-  
+
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
   }
-  
-  .error button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
+
+  .error {
+    color: #dc2626;
   }
-  
-  .error button:hover {
-    background-color: var(--primary-hover);
-  }
-  
-  /* Status Grid */
-  .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 3rem;
-  }
-  
-  .status-card {
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  
-  .status-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.15);
-  }
-  
-  .status-header {
+
+  .content {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
+    flex-direction: column;
+    gap: 3rem;
   }
-  
-  .status-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-color);
-  }
-  
-  .status-badge {
-    padding: 0.25rem 0.75rem;
+
+  .hero-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 1rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background-color: var(--secondary-color);
+    padding: 3rem;
+    text-align: center;
     color: white;
   }
-  
-  .status-badge.online {
-    background-color: var(--success-color);
-  }
-  
-  .count-badge, .feature-indicator {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
-  }
-  
-  .status-details p {
-    margin: 0.5rem 0;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-  }
-  
-  /* Quick Actions */
-  .quick-actions {
-    margin-bottom: 3rem;
-  }
-  
-  .quick-actions h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text-color);
-  }
-  
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .action-card {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    text-decoration: none;
-    color: var(--text-color);
-    box-shadow: var(--shadow);
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  
-  .action-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.15);
-  }
-  
-  .action-icon {
+
+  .hero-content h2 {
     font-size: 2.5rem;
-    flex-shrink: 0;
+    font-weight: bold;
+    margin: 0 0 1rem 0;
   }
-  
-  .action-content h3 {
-    margin: 0 0 0.5rem 0;
+
+  .hero-content p {
+    font-size: 1.1rem;
+    margin: 0 0 2rem 0;
+    opacity: 0.9;
+  }
+
+  .cta-button {
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 1rem 2rem;
     font-size: 1.1rem;
     font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
   }
-  
-  .action-content p {
-    margin: 0;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
+
+  .cta-button:hover {
+    transform: translateY(-2px);
   }
-  
-  /* Recent Activity */
-  .recent-activity {
-    margin-bottom: 3rem;
-  }
-  
-  .recent-activity h2 {
+
+  .video-grid h3 {
     font-size: 1.5rem;
     font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text-color);
+    margin: 0 0 1.5rem 0;
+    color: #111827;
   }
-  
-  .activity-list {
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    overflow: hidden;
-  }
-  
-  .activity-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .activity-item:last-child {
-    border-bottom: none;
-  }
-  
-  .activity-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-  }
-  
-  .activity-content {
-    flex: 1;
-  }
-  
-  .activity-content p {
-    margin: 0;
-    font-size: 0.95rem;
-    color: var(--text-color);
-  }
-  
-  .activity-time {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-  }
-  
-  /* Video Overview */
-  .video-overview {
-    margin-bottom: 2rem;
-  }
-  
-  .video-overview h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text-color);
-  }
-  
-  .video-grid {
+
+  .videos {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
   }
-  
+
   .video-card {
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
+    background: white;
     border-radius: 0.75rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
     overflow: hidden;
-    box-shadow: var(--shadow);
+    cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
   }
-  
+
   .video-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.15);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
   }
-  
+
   .video-thumbnail {
     position: relative;
-    height: 140px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    height: 160px;
+    background: #f3f4f6;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  
-  .thumbnail-placeholder {
-    font-size: 3rem;
-    color: white;
-    opacity: 0.8;
+
+  .video-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
-  
-  .video-status {
+
+  .play-overlay {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 600;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
     color: white;
-    text-transform: capitalize;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    opacity: 0;
+    transition: opacity 0.2s;
   }
-  
+
+  .video-card:hover .play-overlay {
+    opacity: 1;
+  }
+
   .video-info {
     padding: 1rem;
   }
-  
+
   .video-info h4 {
-    margin: 0 0 0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
-    color: var(--text-color);
+    margin: 0 0 0.5rem 0;
+    color: #111827;
     line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  
-  .video-info p {
-    margin: 0.25rem 0;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+
+  .video-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  
-  /* Mobile Responsiveness */
+
+  .duration {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  .status {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 0.375rem;
+  }
+
+  .no-videos {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .no-videos-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .no-videos h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: #374151;
+  }
+
+  .no-videos p {
+    color: #6b7280;
+    margin: 0;
+  }
+
   @media (max-width: 768px) {
-    .page-header h1 {
-      font-size: 2rem;
-    }
-    
-    .status-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    
-    .actions-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    
-    .action-card {
+    .home-container {
       padding: 1rem;
     }
     
-    .action-icon {
+    .header h1 {
       font-size: 2rem;
     }
     
-    .video-grid {
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 1rem;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .page-header h1 {
-      font-size: 1.75rem;
+    .hero-section {
+      padding: 2rem;
     }
     
-    .status-card, .action-card {
-      padding: 1rem;
+    .hero-content h2 {
+      font-size: 1.8rem;
     }
     
-    .activity-item {
-      padding: 0.75rem 1rem;
-    }
-    
-    .video-grid {
-      grid-template-columns: 1fr;
+    .videos {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
   }
 </style>

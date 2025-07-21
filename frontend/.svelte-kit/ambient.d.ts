@@ -26,12 +26,11 @@
  * ```
  */
 declare module '$env/static/private' {
-	export const NVM_INC: string;
-	export const CLAUDE_CODE_ENTRYPOINT: string;
+	export const OP_PLUGIN_ALIASES_SOURCED: string;
 	export const TERM_PROGRAM: string;
+	export const CLAUDE_CODE_ENTRYPOINT: string;
 	export const NODE: string;
 	export const INIT_CWD: string;
-	export const NVM_CD_FLAGS: string;
 	export const PYENV_ROOT: string;
 	export const TERM: string;
 	export const SHELL: string;
@@ -46,12 +45,10 @@ declare module '$env/static/private' {
 	export const COLOR: string;
 	export const npm_config_noproxy: string;
 	export const npm_config_local_prefix: string;
-	export const PNPM_HOME: string;
 	export const ENABLE_IDE_INTEGRATION: string;
 	export const GIT_EDITOR: string;
-	export const OBJC_DISABLE_INITIALIZE_FORK_SAFETY: string;
-	export const NVM_DIR: string;
 	export const USER: string;
+	export const API_TIMEOUT_MS: string;
 	export const COMMAND_MODE: string;
 	export const npm_config_globalconfig: string;
 	export const CLAUDE_CODE_SSE_PORT: string;
@@ -59,6 +56,7 @@ declare module '$env/static/private' {
 	export const VSCODE_PROFILE_INITIALIZED: string;
 	export const __CF_USER_TEXT_ENCODING: string;
 	export const npm_execpath: string;
+	export const GOOGLE_CLOUD_PROJECT: string;
 	export const PYDEVD_DISABLE_FILE_VALIDATION: string;
 	export const PATH: string;
 	export const npm_package_json: string;
@@ -76,7 +74,6 @@ declare module '$env/static/private' {
 	export const LANG: string;
 	export const BUNDLED_DEBUGPY_PATH: string;
 	export const npm_config_npm_version: string;
-	export const BUN_INSPECT_CONNECT_TO: string;
 	export const VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 	export const XPC_FLAGS: string;
 	export const npm_config_node_gyp: string;
@@ -87,20 +84,21 @@ declare module '$env/static/private' {
 	export const PYENV_SHELL: string;
 	export const SHLVL: string;
 	export const HOME: string;
+	export const ANTHROPIC_BASE_URL: string;
 	export const VSCODE_GIT_ASKPASS_MAIN: string;
 	export const HOMEBREW_PREFIX: string;
 	export const npm_config_cache: string;
+	export const ANTHROPIC_AUTH_TOKEN: string;
 	export const LOGNAME: string;
 	export const npm_lifecycle_script: string;
 	export const VSCODE_GIT_IPC_HANDLE: string;
 	export const COREPACK_ENABLE_AUTO_PIN: string;
 	export const BUN_INSTALL: string;
-	export const NVM_BIN: string;
 	export const npm_config_user_agent: string;
-	export const INFOPATH: string;
-	export const HOMEBREW_CELLAR: string;
 	export const VSCODE_GIT_ASKPASS_NODE: string;
 	export const GIT_ASKPASS: string;
+	export const INFOPATH: string;
+	export const HOMEBREW_CELLAR: string;
 	export const CLAUDECODE: string;
 	export const npm_node_execpath: string;
 	export const npm_config_prefix: string;
@@ -137,12 +135,11 @@ declare module '$env/static/public' {
  */
 declare module '$env/dynamic/private' {
 	export const env: {
-		NVM_INC: string;
-		CLAUDE_CODE_ENTRYPOINT: string;
+		OP_PLUGIN_ALIASES_SOURCED: string;
 		TERM_PROGRAM: string;
+		CLAUDE_CODE_ENTRYPOINT: string;
 		NODE: string;
 		INIT_CWD: string;
-		NVM_CD_FLAGS: string;
 		PYENV_ROOT: string;
 		TERM: string;
 		SHELL: string;
@@ -157,12 +154,10 @@ declare module '$env/dynamic/private' {
 		COLOR: string;
 		npm_config_noproxy: string;
 		npm_config_local_prefix: string;
-		PNPM_HOME: string;
 		ENABLE_IDE_INTEGRATION: string;
 		GIT_EDITOR: string;
-		OBJC_DISABLE_INITIALIZE_FORK_SAFETY: string;
-		NVM_DIR: string;
 		USER: string;
+		API_TIMEOUT_MS: string;
 		COMMAND_MODE: string;
 		npm_config_globalconfig: string;
 		CLAUDE_CODE_SSE_PORT: string;
@@ -170,6 +165,7 @@ declare module '$env/dynamic/private' {
 		VSCODE_PROFILE_INITIALIZED: string;
 		__CF_USER_TEXT_ENCODING: string;
 		npm_execpath: string;
+		GOOGLE_CLOUD_PROJECT: string;
 		PYDEVD_DISABLE_FILE_VALIDATION: string;
 		PATH: string;
 		npm_package_json: string;
@@ -187,7 +183,6 @@ declare module '$env/dynamic/private' {
 		LANG: string;
 		BUNDLED_DEBUGPY_PATH: string;
 		npm_config_npm_version: string;
-		BUN_INSPECT_CONNECT_TO: string;
 		VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 		XPC_FLAGS: string;
 		npm_config_node_gyp: string;
@@ -198,20 +193,21 @@ declare module '$env/dynamic/private' {
 		PYENV_SHELL: string;
 		SHLVL: string;
 		HOME: string;
+		ANTHROPIC_BASE_URL: string;
 		VSCODE_GIT_ASKPASS_MAIN: string;
 		HOMEBREW_PREFIX: string;
 		npm_config_cache: string;
+		ANTHROPIC_AUTH_TOKEN: string;
 		LOGNAME: string;
 		npm_lifecycle_script: string;
 		VSCODE_GIT_IPC_HANDLE: string;
 		COREPACK_ENABLE_AUTO_PIN: string;
 		BUN_INSTALL: string;
-		NVM_BIN: string;
 		npm_config_user_agent: string;
-		INFOPATH: string;
-		HOMEBREW_CELLAR: string;
 		VSCODE_GIT_ASKPASS_NODE: string;
 		GIT_ASKPASS: string;
+		INFOPATH: string;
+		HOMEBREW_CELLAR: string;
 		CLAUDECODE: string;
 		npm_node_execpath: string;
 		npm_config_prefix: string;

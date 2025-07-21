@@ -1,0 +1,65 @@
+# Face Tracking Configuration Examples
+# Choose the configuration that best fits your use case and copy to processing_config.yaml
+
+# Default Balanced Configuration
+default_tracking:
+  face_tracking:
+    enable_tracking: true
+    tracking_window: 3.0
+    max_trajectory_gap: 10
+    min_trajectory_length: 3
+    spatial_threshold: 0.3
+    confidence_threshold: 0.25
+    max_active_trajectories: 20
+
+# High Accuracy Configuration (slower, more accurate)
+high_accuracy_tracking:
+  face_tracking:
+    enable_tracking: true
+    tracking_window: 4.0              # Longer tracking window
+    max_trajectory_gap: 15            # More persistent trajectories
+    min_trajectory_length: 5          # Require more detections for stability
+    spatial_threshold: 0.2            # Stricter spatial correlation
+    confidence_threshold: 0.3         # Higher confidence requirement
+    min_stable_detections: 5          # More detections for stability
+    re_recognition_interval: 3        # More frequent re-recognition
+    max_active_trajectories: 15       # Fewer concurrent trajectories
+
+# High Performance Configuration (faster, less memory)
+high_performance_tracking:
+  face_tracking:
+    enable_tracking: true
+    tracking_window: 2.0              # Shorter tracking window
+    max_trajectory_gap: 8             # Expire trajectories faster
+    min_trajectory_length: 2          # Fewer required detections
+    spatial_threshold: 0.4            # More lenient spatial correlation
+    confidence_threshold: 0.2         # Lower confidence requirement
+    min_stable_detections: 2          # Fewer detections for stability
+    re_recognition_interval: 8        # Less frequent re-recognition
+    max_active_trajectories: 25       # More concurrent trajectories
+    trajectory_cleanup_interval: 20   # More frequent cleanup
+
+# Complex Scene Configuration (many faces, busy scenes)
+complex_scene_tracking:
+  face_tracking:
+    enable_tracking: true
+    tracking_window: 2.5
+    max_trajectory_gap: 12
+    min_trajectory_length: 4
+    spatial_threshold: 0.35
+    confidence_threshold: 0.28
+    max_active_trajectories: 30       # Support more faces
+    memory_optimization: true         # Essential for complex scenes
+    adaptive_threshold: true          # Adapt to scene complexity
+
+# Simple Scene Configuration (few faces, simple backgrounds)  
+simple_scene_tracking:
+  face_tracking:
+    enable_tracking: true
+    tracking_window: 3.5              # Can afford longer tracking
+    max_trajectory_gap: 8
+    min_trajectory_length: 3
+    spatial_threshold: 0.25           # Stricter matching
+    confidence_threshold: 0.3         # Higher confidence
+    max_active_trajectories: 10       # Fewer expected faces
+    memory_optimization: false        # Not needed for simple scenes

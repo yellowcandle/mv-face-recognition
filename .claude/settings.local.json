@@ -131,7 +131,10 @@
       "Bash(source:*)",
       "Bash(backlog task list:*)",
       "Bash(backlog task:*)",
-      "Bash(wrangler whoami:*)"
+      "Bash(wrangler whoami:*)",
+      "Bash(echo:*)",
+      "Bash(timeout:*)",
+      "Bash(git stash:*)"
     ]
   },
   "enableAllProjectMcpServers": true

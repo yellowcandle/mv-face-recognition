@@ -1,0 +1,22 @@
+{
+  "video_info": {
+    "path": "../source/videos/test-video-mv2.mp4",
+    "fps": 25.03267973856209,
+    "frame_count": 766,
+    "width": 3840,
+    "height": 1600,
+    "duration": 30.6,
+    "resolution": "3840x1600"
+  },
+  "detection_stats": [
+    {
+      "frame_number": 0,
+      "timestamp": 0.0,
+      "faces_detected": 1,
+      "detection_time": 0.599416971206665,
+      "avg_confidence": 0.8374184370040894,
+      "min_confidence": 0.8374184370040894,
+      "max_confidence": 0.8374184370040894,
+      "face_sizes": [
+        [
+          

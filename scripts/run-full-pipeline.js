@@ -10,9 +10,13 @@
  * 4. Update and deploy Cloudflare Worker with embedded assets
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync, spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync, spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const PROCESSOR_DIR = path.join(__dirname, '..', 'mvp-processor');
@@ -310,7 +314,7 @@ async function runPipeline(options = {}) {
 }
 
 // Handle command line arguments
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   
   if (args.includes('--help') || args.includes('-h')) {
@@ -349,4 +353,4 @@ Examples:
   runPipeline(options);
 }
 
-module.exports = { runPipeline };
+export { runPipeline };

@@ -119,23 +119,41 @@ class ContestantDatabase:
 
 
 class FaceDetector:
-    """Handles face detection in video frames using OpenCV"""
+    """Handles face detection in video frames using OpenCV or enhanced hardware acceleration"""
 
     def __init__(self, config: dict):
         self.config = config
         self.model = config["face_detection"]["model"]
         self.min_confidence = config["face_detection"]["min_confidence"]
-
-        # Initialize OpenCV face detector
+        self.enable_hardware_acceleration = config["face_detection"].get("enable_hardware_acceleration", False)
+        
+        # Choose detector based on configuration
+        if self.enable_hardware_acceleration and self.model == "insightface":
+            try:
+                from enhanced_face_detector import AcceleratedFaceDetector
+                self.detector = AcceleratedFaceDetector(config)
+                self.use_enhanced = True
+                logger.info("Using hardware-accelerated face detection")
+            except ImportError as e:
+                logger.warning(f"Enhanced face detector not available: {e}")
+                self.use_enhanced = False
+                self._init_opencv_detector()
+        else:
+            self.use_enhanced = False
+            self._init_opencv_detector()
+    
+    def _init_opencv_detector(self):
+        """Initialize OpenCV face detector"""
         self.face_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         )
+        logger.info("Using OpenCV face detection")
 
     def detect_faces(
         self, frame: np.ndarray, timestamp: float, frame_number: int
     ) -> List[FaceDetection]:
         """
-        Detect faces in a frame using OpenCV
+        Detect faces in a frame using the configured detection method
 
         Args:
             frame: RGB frame array
@@ -146,93 +164,126 @@ class FaceDetector:
             List of FaceDetection objects
         """
         try:
-            # Convert RGB to grayscale for face detection
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-
-            # Detect faces with more sensitive parameters for high-res video
-            faces = self.face_cascade.detectMultiScale(
-                gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20)
-            )
-
-            detections = []
-            for x, y, w, h in faces:
-                # Add minimum face size filtering for quality
-                min_face_size = 40  # Minimum 40x40 pixels for reliable face encoding
-                if w < min_face_size or h < min_face_size:
-                    logger.debug(f"Skipping small face: {w}x{h} pixels at {timestamp:.2f}s")
-                    continue
-                
-                # Convert OpenCV format (x, y, w, h) to face_recognition format (top, right, bottom, left)
-                top, right, bottom, left = y, x + w, y + h, x
-                location = (top, right, bottom, left)
-
-                # Extract face region for encoding generation with validation
-                face_region = frame[top:bottom, left:right]
-                
-                # Validate face region quality - SKIP invalid faces instead of using random
-                if face_region.size == 0:
-                    logger.debug(f"Empty face region at {timestamp:.2f}s - skipping")
-                    continue
-                
-                # Check face region has sufficient area 
-                if face_region.shape[0] < min_face_size or face_region.shape[1] < min_face_size:
-                    logger.debug(f"Face region too small: {face_region.shape} at {timestamp:.2f}s - skipping")
-                    continue
-                
-                # Check for sufficient contrast/variation (avoid blank regions)
-                face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY) if len(face_region.shape) == 3 else face_region
-                if np.std(face_gray) < 10:  # Low contrast threshold
-                    logger.debug(f"Low contrast face region at {timestamp:.2f}s (std={np.std(face_gray):.1f}) - skipping")
-                    continue
-                
-                # Generate improved face encoding from validated region
-                try:
-                    # Apply histogram equalization for better contrast
-                    face_gray_eq = cv2.equalizeHist(face_gray)
-                    
-                    # Resize to consistent dimensions for better comparison
-                    face_resized = cv2.resize(face_gray_eq, (64, 64))
-                    
-                    # Create enhanced feature vector
-                    face_encoding = face_resized.flatten().astype(np.float64)
-                    
-                    # Add gradient features for better discrimination
-                    grad_x = cv2.Sobel(face_resized, cv2.CV_64F, 1, 0, ksize=3).flatten()
-                    grad_y = cv2.Sobel(face_resized, cv2.CV_64F, 0, 1, ksize=3).flatten()
-                    
-                    # Combine features
-                    enhanced_features = np.concatenate([face_encoding, grad_x[:256], grad_y[:256]])
-                    
-                    # Normalize to unit vector for better distance calculation
-                    face_encoding = enhanced_features / (np.linalg.norm(enhanced_features) + 1e-8)
-                    
-                    # Pad or truncate to 512 dimensions to match stored embeddings
-                    if len(face_encoding) > 512:
-                        face_encoding = face_encoding[:512]
-                    else:
-                        face_encoding = np.pad(face_encoding, (0, 512 - len(face_encoding)), 'constant')
-                    
-                    detection = FaceDetection(
-                        location=location,
-                        encoding=face_encoding,
-                        timestamp=timestamp,
-                        frame_number=frame_number,
-                        confidence=0.8,  # Mock confidence for OpenCV detection
-                    )
-                    detections.append(detection)
-                    
-                except Exception as e:
-                    logger.debug(f"Failed to process face region at {timestamp:.2f}s: {e} - skipping")
-                    continue
-
-            logger.debug(
-                f"Detected {len(detections)} faces at timestamp {timestamp:.2f}s"
-            )
-            return detections
+            if self.use_enhanced:
+                # Use hardware-accelerated detection
+                return self.detector.detect_faces(frame, timestamp, frame_number)
+            else:
+                # Use enhanced OpenCV fallback detection
+                return self._detect_faces_opencv(frame, timestamp, frame_number)
 
         except Exception as e:
             logger.error(f"Face detection failed for frame {frame_number}: {e}")
             return []
+
+    def _detect_faces_opencv(
+        self, frame: np.ndarray, timestamp: float, frame_number: int
+    ) -> List[FaceDetection]:
+        """
+        Enhanced OpenCV face detection implementation with improved encoding
+
+        Args:
+            frame: RGB frame array
+            timestamp: Frame timestamp in seconds
+            frame_number: Frame number in video
+
+        Returns:
+            List of FaceDetection objects
+        """
+        # Convert RGB to grayscale for face detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+        # Detect faces with more sensitive parameters for high-res video
+        faces = self.face_cascade.detectMultiScale(
+            gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20)
+        )
+
+        detections = []
+        for x, y, w, h in faces:
+            # Add minimum face size filtering for quality
+            min_face_size = 40  # Minimum 40x40 pixels for reliable face encoding
+            if w < min_face_size or h < min_face_size:
+                logger.debug(f"Skipping small face: {w}x{h} pixels at {timestamp:.2f}s")
+                continue
+            
+            # Convert OpenCV format (x, y, w, h) to face_recognition format (top, right, bottom, left)
+            top, right, bottom, left = y, x + w, y + h, x
+            location = (top, right, bottom, left)
+
+            # Extract face region for encoding generation with validation
+            face_region = frame[top:bottom, left:right]
+            
+            # Validate face region quality - SKIP invalid faces instead of using random
+            if face_region.size == 0:
+                logger.debug(f"Empty face region at {timestamp:.2f}s - skipping")
+                continue
+            
+            # Check face region has sufficient area 
+            if face_region.shape[0] < min_face_size or face_region.shape[1] < min_face_size:
+                logger.debug(f"Face region too small: {face_region.shape} at {timestamp:.2f}s - skipping")
+                continue
+            
+            # Check for sufficient contrast/variation (avoid blank regions)
+            face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY) if len(face_region.shape) == 3 else face_region
+            if np.std(face_gray) < 10:  # Low contrast threshold
+                logger.debug(f"Low contrast face region at {timestamp:.2f}s (std={np.std(face_gray):.1f}) - skipping")
+                continue
+            
+            # Generate improved face encoding from validated region
+            try:
+                # Apply histogram equalization for better contrast
+                face_gray_eq = cv2.equalizeHist(face_gray)
+                
+                # Resize to consistent dimensions for better comparison
+                face_resized = cv2.resize(face_gray_eq, (64, 64))
+                
+                # Create enhanced feature vector
+                face_encoding = face_resized.flatten().astype(np.float64)
+                
+                # Add gradient features for better discrimination
+                grad_x = cv2.Sobel(face_resized, cv2.CV_64F, 1, 0, ksize=3).flatten()
+                grad_y = cv2.Sobel(face_resized, cv2.CV_64F, 0, 1, ksize=3).flatten()
+                
+                # Combine features
+                enhanced_features = np.concatenate([face_encoding, grad_x[:256], grad_y[:256]])
+                
+                # Normalize to unit vector for better distance calculation
+                face_encoding = enhanced_features / (np.linalg.norm(enhanced_features) + 1e-8)
+                
+                # Pad or truncate to 512 dimensions to match stored embeddings
+                if len(face_encoding) > 512:
+                    face_encoding = face_encoding[:512]
+                else:
+                    face_encoding = np.pad(face_encoding, (0, 512 - len(face_encoding)), 'constant')
+                
+                detection = FaceDetection(
+                    location=location,
+                    encoding=face_encoding,
+                    timestamp=timestamp,
+                    frame_number=frame_number,
+                    confidence=0.8,  # Mock confidence for OpenCV detection
+                )
+                detections.append(detection)
+                
+            except Exception as e:
+                logger.debug(f"Failed to process face region at {timestamp:.2f}s: {e} - skipping")
+                continue
+
+        logger.debug(
+            f"Detected {len(detections)} faces at timestamp {timestamp:.2f}s"
+        )
+        return detections
+
+    def get_performance_stats(self) -> Dict:
+        """Get performance statistics from the detector"""
+        if self.use_enhanced and hasattr(self.detector, 'get_performance_stats'):
+            return self.detector.get_performance_stats()
+        else:
+            return {"backend": "opencv_cpu", "performance": {}}
+
+    def cleanup(self):
+        """Clean up resources"""
+        if self.use_enhanced and hasattr(self.detector, 'cleanup'):
+            self.detector.cleanup()
 
 
 class FaceRecognizer:

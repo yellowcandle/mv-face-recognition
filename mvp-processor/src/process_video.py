@@ -122,6 +122,9 @@ class VideoProcessingPipeline:
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
         ):
+            # Calculate actual video frame number based on timestamp and fps
+            actual_frame_number = int(timestamp * video_info['fps'])
+            
             # Preprocess frame
             rgb_frame = FrameProcessor.preprocess_frame(frame)
 
@@ -135,13 +138,16 @@ class VideoProcessingPipeline:
                 recognitions = self.face_recognizer.recognize_faces(detections)
                 all_recognitions.extend(recognitions)
 
-                # Store frame data
+                # Store frame data with actual video frame number and processing dimensions
                 frame_data.append(
                     {
-                        "frame_number": int(frame_idx),
+                        "frame_number": int(actual_frame_number),
+                        "extraction_index": int(frame_idx),  # Keep for debugging
                         "timestamp": float(timestamp),
                         "detections_count": len(detections),
                         "recognitions_count": len(recognitions),
+                        "processing_width": rgb_frame.shape[1],  # Processing frame width
+                        "processing_height": rgb_frame.shape[0],  # Processing frame height
                         "recognitions": [
                             {
                                 "contestant_id": str(r.contestant_id),
@@ -184,8 +190,10 @@ class VideoProcessingPipeline:
             recognitions=filtered_recognitions, output_name=output_name
         )
 
-        # Convert video formats with face recognition overlays
-        processed_videos = self.convert_video_formats_with_overlays(video_path, output_name, metadata)
+        # Convert video formats with burned-in face recognition overlays
+        processed_videos = self.convert_video_formats_with_annotations(
+            video_path, output_name, metadata
+        )
 
         # Prepare upload package
         upload_package = {
@@ -199,7 +207,9 @@ class VideoProcessingPipeline:
 
         return upload_package
 
-    def convert_video_formats_with_overlays(self, input_path: Path, output_name: str, metadata: Dict) -> List[str]:
+    def convert_video_formats_with_annotations(
+        self, input_path: Path, output_name: str, metadata: dict
+    ) -> List[str]:
         """Convert video to multiple formats with burned-in face recognition overlays"""
         output_dir = Path(self.config["output"]["processed_dir"])
         processed_videos = []

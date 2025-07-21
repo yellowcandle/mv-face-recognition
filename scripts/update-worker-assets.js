@@ -122,16 +122,35 @@ try {
   let endLine = -1;
   
   for (let i = 0; i < workerLines.length; i++) {
-    // Look for the exact STATIC_ASSETS constant declaration
+    // Look for the STATIC_ASSETS constant declaration (empty or populated)
     if (workerLines[i].trim() === 'const STATIC_ASSETS = {};') {
       startLine = i;
       endLine = i; // Single line object, we'll replace this entire line
+      break;
+    } else if (workerLines[i].trim() === 'const STATIC_ASSETS = {') {
+      // Multi-line object - find the closing brace
+      startLine = i;
+      let braceCount = 1;
+      for (let j = i + 1; j < workerLines.length && braceCount > 0; j++) {
+        const line = workerLines[j].trim();
+        if (line.includes('{')) {
+          braceCount += (line.match(/\{/g) || []).length;
+        }
+        if (line.includes('}')) {
+          braceCount -= (line.match(/\}/g) || []).length;
+          if (braceCount === 0) {
+            endLine = j;
+            break;
+          }
+        }
+      }
       break;
     }
   }
   
   if (startLine === -1 || endLine === -1) {
     console.error('❌ Could not find STATIC_ASSETS object boundaries in worker file');
+    console.error('   Looking for: const STATIC_ASSETS = {} or const STATIC_ASSETS = {');
     process.exit(1);
   }
   

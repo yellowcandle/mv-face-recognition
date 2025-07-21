@@ -4,10 +4,8 @@
   
   // Navigation items
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: '🏠' },
+    { href: '/', label: 'Home', icon: '🏠' },
     { href: '/video-player', label: 'Video Player', icon: '▶️' },
-    { href: '/face-recognition', label: 'Face Recognition', icon: '🎯' },
-    { href: '/analytics', label: 'Analytics', icon: '📊' },
     { href: '/settings', label: 'Settings', icon: '⚙️' }
   ];
   
