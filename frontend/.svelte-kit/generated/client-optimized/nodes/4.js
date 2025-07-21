@@ -1,1 +1,1 @@
-export { default as component } from "../../../../src/routes/face-recognition/+page.svelte";
+export { default as component } from "../../../../src/routes/video-player/+page.svelte";

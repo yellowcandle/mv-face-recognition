@@ -6,6 +6,14 @@ Pillow>=10.0.0
 # Face detection and recognition
 face-recognition>=1.3.0
 dlib>=19.24.0
+insightface>=0.7.3
+
+# Hardware acceleration packages
+torch>=2.1.0  # For MPS (Metal Performance Shaders) support on Apple Silicon
+onnxruntime>=1.16.0  # Base ONNX runtime
+# Platform-specific ONNX runtime (install appropriate version):
+# onnxruntime-silicon>=1.16.0  # For Apple Silicon Metal
+# onnxruntime-gpu>=1.16.0      # For NVIDIA CUDA
 
 # Video processing
 moviepy>=1.0.3

@@ -1,0 +1,1947 @@
+{
+  "test_summary": {
+    "test_video": "test-video-mv2.mp4",
+    "test_timestamp": "2025-07-21T18:50:45.951709",
+    "frames_analyzed": 187,
+    "total_detections": 386,
+    "total_recognitions": 0
+  },
+  "configuration_tested": {
+    "tracking_window": 3.0,
+    "spatial_threshold": 0.3,
+    "confidence_smoothing": 0.95,
+    "max_trajectory_gap": 10
+  },
+  "test_results": {
+    "iou_results": {
+      "test_cases_passed": 4,
+      "test_cases_total": 4,
+      "iou_calculations": [
+        {
+          "test_case": 1,
+          "box1": [
+            100,
+            200,
+            200,
+            100
+          ],
+          "box2": [
+            100,
+            200,
+            200,
+            100
+          ],
+          "calculated_iou": 1.0,
+          "expected_range": [
+            0.95,
+            1.05
+          ],
+          "passed": true
+        },
+        {
+          "test_case": 2,
+          "box1": [
+            100,
+            200,
+            200,
+            100
+          ],
+          "box2": [
+            110,
+            210,
+            210,
+            110
+          ],
+          "calculated_iou": 0.680672268907563,
+          "expected_range": [
+            0.6,
+            0.8
+          ],
+          "passed": true
+        },
+        {
+          "test_case": 3,
+          "box1": [
+            100,
+            200,
+            200,
+            100
+          ],
+          "box2": [
+            150,
+            250,
+            250,
+            150
+          ],
+          "calculated_iou": 0.14285714285714285,
+          "expected_range": [
+            0.1,
+            0.3
+          ],
+          "passed": true
+        },
+        {
+          "test_case": 4,
+          "box1": [
+            100,
+            200,
+            200,
+            100
+          ],
+          "box2": [
+            300,
+            400,
+            400,
+            300
+          ],
+          "calculated_iou": 0.0,
+          "expected_range": [
+            -0.01,
+            0.01
+          ],
+          "passed": true
+        }
+      ],
+      "success_rate": 1.0
+    },
+    "trajectory_stats": {
+      "trajectories_created": 33,
+      "trajectories_expired": 32,
+      "max_active_trajectories": 6,
+      "frame_processing_stats": [
+        {
+          "frame_number": 0,
+          "timestamp": 0.0,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 3,
+          "timestamp": 0.1597911227154047,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 7,
+          "timestamp": 0.3195822454308094,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 12,
+          "timestamp": 0.4793733681462141,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 15,
+          "timestamp": 0.6391644908616188,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 20,
+          "timestamp": 0.7989556135770235,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 24,
+          "timestamp": 0.9587467362924282,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 28,
+          "timestamp": 1.118537859007833,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 31,
+          "timestamp": 1.2783289817232375,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 36,
+          "timestamp": 1.4381201044386422,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 40,
+          "timestamp": 1.597911227154047,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 44,
+          "timestamp": 1.7577023498694517,
+          "active_trajectories": 1,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 48,
+          "timestamp": 1.9174934725848565,
+          "active_trajectories": 2,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 1
+        },
+        {
+          "frame_number": 52,
+          "timestamp": 2.077284595300261,
+          "active_trajectories": 3,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 56,
+          "timestamp": 2.237075718015666,
+          "active_trajectories": 3,
+          "completed_trajectories": 0,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 60,
+          "timestamp": 2.3968668407310707,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 63,
+          "timestamp": 2.556657963446475,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 68,
+          "timestamp": 2.7164490861618797,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 72,
+          "timestamp": 2.8762402088772845,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 76,
+          "timestamp": 3.0360313315926892,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 80,
+          "timestamp": 3.195822454308094,
+          "active_trajectories": 2,
+          "completed_trajectories": 1,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 84,
+          "timestamp": 3.3556135770234987,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 88,
+          "timestamp": 3.5154046997389035,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 92,
+          "timestamp": 3.675195822454308,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 96,
+          "timestamp": 3.834986945169713,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 100,
+          "timestamp": 3.9947780678851177,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 104,
+          "timestamp": 4.154569190600522,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 108,
+          "timestamp": 4.314360313315927,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 112,
+          "timestamp": 4.474151436031332,
+          "active_trajectories": 1,
+          "completed_trajectories": 2,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 124,
+          "timestamp": 4.953524804177546,
+          "active_trajectories": 2,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 127,
+          "timestamp": 5.11331592689295,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 132,
+          "timestamp": 5.273107049608355,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 136,
+          "timestamp": 5.4328981723237595,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 140,
+          "timestamp": 5.592689295039165,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 144,
+          "timestamp": 5.752480417754569,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 148,
+          "timestamp": 5.912271540469974,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 152,
+          "timestamp": 6.0720626631853785,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 156,
+          "timestamp": 6.231853785900784,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 160,
+          "timestamp": 6.391644908616188,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 164,
+          "timestamp": 6.551436031331593,
+          "active_trajectories": 4,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 168,
+          "timestamp": 6.711227154046997,
+          "active_trajectories": 5,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 1
+        },
+        {
+          "frame_number": 172,
+          "timestamp": 6.871018276762402,
+          "active_trajectories": 5,
+          "completed_trajectories": 3,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 1
+        },
+        {
+          "frame_number": 176,
+          "timestamp": 7.030809399477807,
+          "active_trajectories": 5,
+          "completed_trajectories": 4,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 180,
+          "timestamp": 7.190600522193211,
+          "active_trajectories": 5,
+          "completed_trajectories": 4,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 184,
+          "timestamp": 7.350391644908616,
+          "active_trajectories": 4,
+          "completed_trajectories": 5,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 188,
+          "timestamp": 7.510182767624021,
+          "active_trajectories": 2,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 192,
+          "timestamp": 7.669973890339426,
+          "active_trajectories": 2,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 196,
+          "timestamp": 7.82976501305483,
+          "active_trajectories": 2,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 200,
+          "timestamp": 7.989556135770235,
+          "active_trajectories": 2,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 204,
+          "timestamp": 8.14934725848564,
+          "active_trajectories": 3,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 208,
+          "timestamp": 8.309138381201045,
+          "active_trajectories": 3,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 212,
+          "timestamp": 8.46892950391645,
+          "active_trajectories": 3,
+          "completed_trajectories": 7,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 216,
+          "timestamp": 8.628720626631853,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 219,
+          "timestamp": 8.788511749347258,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 224,
+          "timestamp": 8.948302872062664,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 228,
+          "timestamp": 9.108093994778068,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 232,
+          "timestamp": 9.267885117493472,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 235,
+          "timestamp": 9.427676240208877,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 240,
+          "timestamp": 9.587467362924283,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 244,
+          "timestamp": 9.747258485639687,
+          "active_trajectories": 2,
+          "completed_trajectories": 8,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 248,
+          "timestamp": 9.907049608355091,
+          "active_trajectories": 2,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 252,
+          "timestamp": 10.066840731070496,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 255,
+          "timestamp": 10.2266318537859,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 260,
+          "timestamp": 10.386422976501306,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 264,
+          "timestamp": 10.54621409921671,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 268,
+          "timestamp": 10.706005221932115,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 272,
+          "timestamp": 10.865796344647519,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 276,
+          "timestamp": 11.025587467362925,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 280,
+          "timestamp": 11.18537859007833,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 284,
+          "timestamp": 11.345169712793734,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 288,
+          "timestamp": 11.504960835509138,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 292,
+          "timestamp": 11.664751958224542,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 296,
+          "timestamp": 11.824543080939948,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 300,
+          "timestamp": 11.984334203655353,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 304,
+          "timestamp": 12.144125326370757,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 308,
+          "timestamp": 12.303916449086161,
+          "active_trajectories": 4,
+          "completed_trajectories": 9,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 312,
+          "timestamp": 12.463707571801567,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 316,
+          "timestamp": 12.623498694516972,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 320,
+          "timestamp": 12.783289817232376,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 324,
+          "timestamp": 12.94308093994778,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 328,
+          "timestamp": 13.102872062663186,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 332,
+          "timestamp": 13.26266318537859,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 336,
+          "timestamp": 13.422454308093995,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 340,
+          "timestamp": 13.5822454308094,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 344,
+          "timestamp": 13.742036553524803,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 348,
+          "timestamp": 13.90182767624021,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 352,
+          "timestamp": 14.061618798955614,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 356,
+          "timestamp": 14.221409921671018,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 360,
+          "timestamp": 14.381201044386422,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 364,
+          "timestamp": 14.540992167101829,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 368,
+          "timestamp": 14.700783289817233,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 372,
+          "timestamp": 14.860574412532637,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 376,
+          "timestamp": 15.020365535248041,
+          "active_trajectories": 1,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 380,
+          "timestamp": 15.180156657963446,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 384,
+          "timestamp": 15.339947780678852,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 388,
+          "timestamp": 15.499738903394256,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 392,
+          "timestamp": 15.65953002610966,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 396,
+          "timestamp": 15.819321148825065,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 400,
+          "timestamp": 15.97911227154047,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 403,
+          "timestamp": 16.138903394255873,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 408,
+          "timestamp": 16.29869451697128,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 412,
+          "timestamp": 16.458485639686685,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 416,
+          "timestamp": 16.61827676240209,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 420,
+          "timestamp": 16.778067885117494,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 424,
+          "timestamp": 16.9378590078329,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 428,
+          "timestamp": 17.097650130548303,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 432,
+          "timestamp": 17.257441253263707,
+          "active_trajectories": 2,
+          "completed_trajectories": 12,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 436,
+          "timestamp": 17.41723237597911,
+          "active_trajectories": 1,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 439,
+          "timestamp": 17.577023498694516,
+          "active_trajectories": 1,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 444,
+          "timestamp": 17.736814621409923,
+          "active_trajectories": 1,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 448,
+          "timestamp": 17.896605744125328,
+          "active_trajectories": 1,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 452,
+          "timestamp": 18.056396866840732,
+          "active_trajectories": 1,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 456,
+          "timestamp": 18.216187989556136,
+          "active_trajectories": 2,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 460,
+          "timestamp": 18.37597911227154,
+          "active_trajectories": 2,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 464,
+          "timestamp": 18.535770234986945,
+          "active_trajectories": 2,
+          "completed_trajectories": 13,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 468,
+          "timestamp": 18.69556135770235,
+          "active_trajectories": 1,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 471,
+          "timestamp": 18.855352480417753,
+          "active_trajectories": 1,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 475,
+          "timestamp": 19.015143603133158,
+          "active_trajectories": 1,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 480,
+          "timestamp": 19.174934725848566,
+          "active_trajectories": 3,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 484,
+          "timestamp": 19.33472584856397,
+          "active_trajectories": 3,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 488,
+          "timestamp": 19.494516971279374,
+          "active_trajectories": 3,
+          "completed_trajectories": 14,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 492,
+          "timestamp": 19.65430809399478,
+          "active_trajectories": 1,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 496,
+          "timestamp": 19.814099216710183,
+          "active_trajectories": 1,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 500,
+          "timestamp": 19.973890339425587,
+          "active_trajectories": 1,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 504,
+          "timestamp": 20.13368146214099,
+          "active_trajectories": 1,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 507,
+          "timestamp": 20.293472584856396,
+          "active_trajectories": 1,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 511,
+          "timestamp": 20.4532637075718,
+          "active_trajectories": 4,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 516,
+          "timestamp": 20.613054830287208,
+          "active_trajectories": 4,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 520,
+          "timestamp": 20.772845953002612,
+          "active_trajectories": 4,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 524,
+          "timestamp": 20.932637075718016,
+          "active_trajectories": 4,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 528,
+          "timestamp": 21.09242819843342,
+          "active_trajectories": 4,
+          "completed_trajectories": 16,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 532,
+          "timestamp": 21.252219321148825,
+          "active_trajectories": 4,
+          "completed_trajectories": 17,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 536,
+          "timestamp": 21.41201044386423,
+          "active_trajectories": 5,
+          "completed_trajectories": 17,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 1
+        },
+        {
+          "frame_number": 540,
+          "timestamp": 21.571801566579634,
+          "active_trajectories": 5,
+          "completed_trajectories": 17,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 544,
+          "timestamp": 21.731592689295038,
+          "active_trajectories": 6,
+          "completed_trajectories": 19,
+          "stable_trajectories": 0,
+          "detections_count": 5,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 548,
+          "timestamp": 21.891383812010442,
+          "active_trajectories": 5,
+          "completed_trajectories": 20,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 552,
+          "timestamp": 22.05117493472585,
+          "active_trajectories": 5,
+          "completed_trajectories": 20,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 556,
+          "timestamp": 22.210966057441254,
+          "active_trajectories": 2,
+          "completed_trajectories": 23,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 560,
+          "timestamp": 22.37075718015666,
+          "active_trajectories": 1,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 564,
+          "timestamp": 22.530548302872063,
+          "active_trajectories": 1,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 568,
+          "timestamp": 22.690339425587467,
+          "active_trajectories": 1,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 572,
+          "timestamp": 22.85013054830287,
+          "active_trajectories": 1,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 576,
+          "timestamp": 23.009921671018276,
+          "active_trajectories": 1,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 580,
+          "timestamp": 23.16971279373368,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 584,
+          "timestamp": 23.329503916449084,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 588,
+          "timestamp": 23.489295039164492,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 592,
+          "timestamp": 23.649086161879897,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 596,
+          "timestamp": 23.8088772845953,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 600,
+          "timestamp": 23.968668407310705,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 604,
+          "timestamp": 24.12845953002611,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 608,
+          "timestamp": 24.288250652741514,
+          "active_trajectories": 2,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 612,
+          "timestamp": 24.448041775456918,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 616,
+          "timestamp": 24.607832898172322,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 620,
+          "timestamp": 24.76762402088773,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 624,
+          "timestamp": 24.927415143603135,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 628,
+          "timestamp": 25.08720626631854,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 632,
+          "timestamp": 25.246997389033943,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 636,
+          "timestamp": 25.406788511749347,
+          "active_trajectories": 3,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 640,
+          "timestamp": 25.566579634464752,
+          "active_trajectories": 4,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 1
+        },
+        {
+          "frame_number": 644,
+          "timestamp": 25.726370757180156,
+          "active_trajectories": 5,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 648,
+          "timestamp": 25.88616187989556,
+          "active_trajectories": 5,
+          "completed_trajectories": 24,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 652,
+          "timestamp": 26.045953002610965,
+          "active_trajectories": 4,
+          "completed_trajectories": 25,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 656,
+          "timestamp": 26.205744125326373,
+          "active_trajectories": 4,
+          "completed_trajectories": 25,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 660,
+          "timestamp": 26.365535248041777,
+          "active_trajectories": 4,
+          "completed_trajectories": 25,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 664,
+          "timestamp": 26.52532637075718,
+          "active_trajectories": 3,
+          "completed_trajectories": 26,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 668,
+          "timestamp": 26.685117493472585,
+          "active_trajectories": 4,
+          "completed_trajectories": 27,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 672,
+          "timestamp": 26.84490861618799,
+          "active_trajectories": 4,
+          "completed_trajectories": 27,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 676,
+          "timestamp": 27.004699738903394,
+          "active_trajectories": 4,
+          "completed_trajectories": 27,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 680,
+          "timestamp": 27.1644908616188,
+          "active_trajectories": 4,
+          "completed_trajectories": 27,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 684,
+          "timestamp": 27.324281984334203,
+          "active_trajectories": 4,
+          "completed_trajectories": 27,
+          "stable_trajectories": 0,
+          "detections_count": 2,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 688,
+          "timestamp": 27.484073107049607,
+          "active_trajectories": 4,
+          "completed_trajectories": 28,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 692,
+          "timestamp": 27.643864229765015,
+          "active_trajectories": 4,
+          "completed_trajectories": 28,
+          "stable_trajectories": 0,
+          "detections_count": 4,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 696,
+          "timestamp": 27.80365535248042,
+          "active_trajectories": 4,
+          "completed_trajectories": 28,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 700,
+          "timestamp": 27.963446475195823,
+          "active_trajectories": 4,
+          "completed_trajectories": 28,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 704,
+          "timestamp": 28.123237597911228,
+          "active_trajectories": 3,
+          "completed_trajectories": 29,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 708,
+          "timestamp": 28.283028720626632,
+          "active_trajectories": 3,
+          "completed_trajectories": 29,
+          "stable_trajectories": 0,
+          "detections_count": 3,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 712,
+          "timestamp": 28.442819843342036,
+          "active_trajectories": 3,
+          "completed_trajectories": 29,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 728,
+          "timestamp": 29.081984334203657,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 732,
+          "timestamp": 29.24177545691906,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 736,
+          "timestamp": 29.401566579634466,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 740,
+          "timestamp": 29.56135770234987,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 744,
+          "timestamp": 29.721148825065274,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 748,
+          "timestamp": 29.88093994778068,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 752,
+          "timestamp": 30.040731070496083,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 756,
+          "timestamp": 30.200522193211487,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 760,
+          "timestamp": 30.36031331592689,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        },
+        {
+          "frame_number": 764,
+          "timestamp": 30.5201044386423,
+          "active_trajectories": 1,
+          "completed_trajectories": 32,
+          "stable_trajectories": 0,
+          "detections_count": 1,
+          "recognitions_count": 0
+        }
+      ],
+      "trajectory_durations": [
+        0.0,
+        0.7989556135770233,
+        4.474151436031332,
+        1.4381201044386431,
+        0.1597911227154043,
+        1.917493472584857,
+        0.0,
+        0.0,
+        4.474151436031331,
+        2.077284595300261,
+        1.917493472584857,
+        1.917493472584857,
+        1.7577023498694526,
+        0.0,
+        0.0,
+        0.0,
+        0.31958224543081215,
+        0.798955613577025,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.4381201044386422,
+        0.0,
+        0.3195822454308086,
+        1.7577023498694544,
+        0.3195822454308086,
+        0.15979112271540785,
+        10.546214099216709,
+        5.113315926892952,
+        1.5979112271540465
+      ],
+      "stability_statistics": {
+        "stable_trajectories_count": 0,
+        "unstable_trajectories_count": 32
+      },
+      "average_trajectory_duration": 1.353231070496084,
+      "median_trajectory_duration": 0.3195822454308104
+    },
+    "confidence_test": {
+      "confidence_sequence": [
+        0.8,
+        0.75,
+        0.9,
+        0.85,
+        0.7,
+        0.95,
+        0.8
+      ],
+      "aggregated_confidences": [
+        0.8,
+        0.8512820512820514,
+        0.9209465381244522,
+        0.9422554668283972,
+        0.9218647301219367,
+        0.9554868170973675,
+        0.9545773879524452
+      ],
+      "decay_factor": 0.95,
+      "final_aggregated_confidence": 0.9545773879524452,
+      "stability_achieved": true,
+      "validation_properties": {
+        "recent_bias": "More recent frames should have higher weight",
+        "smoothing_effect": "Decay factor 0.95 should smooth noise",
+        "stability_threshold": "Should achieve stability with multiple confident detections"
+      }
+    },
+    "statistics_validation": {
+      "statistics_structure": {
+        "active_trajectories": {
+          "present": true,
+          "value": 1,
+          "type": "int"
+        },
+        "completed_trajectories": {
+          "present": true,
+          "value": 32,
+          "type": "int"
+        },
+        "stable_trajectories": {
+          "present": true,
+          "value": 0,
+          "type": "int"
+        },
+        "average_trajectory_duration": {
+          "present": true,
+          "value": 1.353231070496084,
+          "type": "float"
+        },
+        "next_trajectory_id": {
+          "present": true,
+          "value": 34,
+          "type": "int"
+        }
+      },
+      "reasonableness_checks": [
+        {
+          "check": "positive_trajectory_ids",
+          "passed": true,
+          "value": 34
+        },
+        {
+          "check": "trajectory_accounting",
+          "passed": true,
+          "total": 33,
+          "accounted": 33
+        },
+        {
+          "check": "reasonable_avg_duration",
+          "passed": true,
+          "value": 1.353231070496084
+        }
+      ],
+      "validation_passed": true,
+      "raw_statistics": {
+        "active_trajectories": 1,
+        "completed_trajectories": 32,
+        "stable_trajectories": 0,
+        "average_trajectory_duration": 1.353231070496084,
+        "next_trajectory_id": 34
+      }
+    }
+  },
+  "acceptance_criteria_validation": {
+    "overall_passed": true,
+    "criteria": {
+      "spatial_correlation_effectiveness": {
+        "target": "> 80% IoU calculations accurate",
+        "actual": 100.0,
+        "passed": true
+      },
+      "trajectory_creation_rate": {
+        "target": "> 0 trajectories created for video with faces",
+        "actual": 33,
+        "passed": true
+      },
+      "confidence_aggregation_stability": {
+        "target": "Aggregated confidence computed without errors",
+        "actual": 0.9545773879524452,
+        "passed": true
+      },
+      "statistics_generation_completeness": {
+        "target": "All required statistics fields present and valid",
+        "actual": true,
+        "passed": true
+      }
+    }
+  },
+  "recommendations": []
+}
