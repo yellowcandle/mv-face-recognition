@@ -14,6 +14,14 @@ import tempfile
 
 import logging
 
+# Professional computer vision annotation
+try:
+    import supervision as sv
+    SUPERVISION_AVAILABLE = True
+except ImportError:
+    SUPERVISION_AVAILABLE = False
+    logging.warning("Supervision not available - falling back to OpenCV visualization")
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -31,6 +39,13 @@ class VideoProcessor:
         self.max_frames = config["video"]["max_frames"]
         self.resize_width = config["video"]["resize_width"]
         self.cjkv_font = self._load_cjkv_font()
+        
+        # Initialize professional visualization components
+        self._init_supervision_annotators()
+        
+        # Face tracking trails for TraceAnnotator
+        self.face_trajectories = {}
+        self.next_track_id = 1
 
     def extract_frames(
         self, video_path: str
@@ -325,6 +340,229 @@ class VideoProcessor:
         
         logger.info(f"Final video with overlays and audio: {output_path}")
 
+    def _init_supervision_annotators(self):
+        """Initialize Supervision annotators for professional visualization"""
+        if not SUPERVISION_AVAILABLE:
+            self.use_supervision = False
+            return
+            
+        self.use_supervision = True
+        
+        # Professional color palette based on confidence levels
+        self.confidence_colors = [
+            sv.Color.from_hex("#00FF00"),  # Bright green for high confidence (>= 0.8)
+            sv.Color.from_hex("#FFA500"),  # Orange for medium confidence (>= 0.6)
+            sv.Color.from_hex("#FF0000"),  # Red for low confidence (< 0.6)
+            sv.Color.from_hex("#90EE90"),  # Light green for interpolated high confidence
+            sv.Color.from_hex("#FFB366"),  # Light orange for interpolated medium
+            sv.Color.from_hex("#FF6666"),  # Light red for interpolated low
+        ]
+        
+        # Create annotators with professional styling
+        self.box_annotator = sv.BoxAnnotator(
+            color_lookup=sv.ColorLookup.INDEX,
+            thickness=2
+        )
+        
+        self.label_annotator = sv.LabelAnnotator(
+            color_lookup=sv.ColorLookup.INDEX,
+            text_padding=5,
+            text_scale=0.6,
+            text_thickness=1
+        )
+        
+        # Tracking trail annotator for face trajectories  
+        self.trace_annotator = sv.TraceAnnotator(
+            color_lookup=sv.ColorLookup.INDEX,
+            position=sv.Position.CENTER,
+            trace_length=30,
+            thickness=2
+        )
+        
+        logger.info("Supervision annotators initialized for professional visualization")
+
+    def _face_recognitions_to_detections(self, recognitions, scale_x: float, scale_y: float):
+        """
+        Convert face recognition data to Supervision Detections format
+        
+        Args:
+            recognitions: List of face recognition objects
+            scale_x: X-axis scaling factor for coordinates
+            scale_y: Y-axis scaling factor for coordinates
+            
+        Returns:
+            sv.Detections object with face detection data
+        """
+        if not recognitions or not SUPERVISION_AVAILABLE:
+            return None
+            
+        # Extract bounding boxes and scale coordinates
+        xyxy_boxes = []
+        confidences = []
+        class_ids = []
+        tracker_ids = []
+        labels = []
+        
+        for i, recognition in enumerate(recognitions):
+            # Get face location and scale it: [top, right, bottom, left] -> [x1, y1, x2, y2]
+            location = recognition['face_location']
+            top, right, bottom, left = location
+            
+            # Scale coordinates to target resolution
+            x1 = int(left * scale_x)
+            y1 = int(top * scale_y)  
+            x2 = int(right * scale_x)
+            y2 = int(bottom * scale_y)
+            
+            # Ensure coordinates are valid
+            if x1 >= x2 or y1 >= y2:
+                continue
+                
+            xyxy_boxes.append([x1, y1, x2, y2])
+            confidences.append(recognition['confidence'])
+            
+            # Assign color index based on confidence and interpolation status
+            is_interpolated = recognition.get('weight', 1.0) < 1.0
+            confidence = recognition['confidence']
+            
+            if is_interpolated:
+                # Muted colors for interpolated frames
+                if confidence >= 0.6:
+                    color_idx = 3  # Light green
+                elif confidence >= 0.4:
+                    color_idx = 4  # Light orange
+                else:
+                    color_idx = 5  # Light red
+            else:
+                # Bright colors for keyframes
+                if confidence >= 0.8:
+                    color_idx = 0  # Bright green
+                elif confidence >= 0.6:
+                    color_idx = 1  # Orange
+                else:
+                    color_idx = 2  # Red
+                    
+            class_ids.append(color_idx)
+            
+            # Create tracking ID for face trajectories
+            contestant_id = recognition.get('contestant_id', 'unknown')
+            tracker_id = self._get_or_create_tracker_id(contestant_id, recognition)
+            tracker_ids.append(tracker_id)
+            
+            # Create label with name and confidence
+            name = recognition.get('contestant_nickname', recognition.get('contestant_name', 'Unknown'))
+            interpolation_indicator = "~" if is_interpolated else ""
+            label = f"{interpolation_indicator}{name} ({confidence:.2f})"
+            labels.append(label)
+        
+        if not xyxy_boxes:
+            return None
+            
+        # Filter out None values and ensure data consistency
+        valid_tracker_ids = [tid for tid in tracker_ids if tid is not None] if tracker_ids else []
+        valid_class_ids = [cid for cid in class_ids if cid is not None]
+        
+        # Ensure all arrays have the same length
+        if len(valid_tracker_ids) != len(xyxy_boxes):
+            valid_tracker_ids = list(range(len(xyxy_boxes)))
+        
+        # Create Supervision Detections object with validated data
+        detections = sv.Detections(
+            xyxy=np.array(xyxy_boxes),
+            confidence=np.array(confidences),
+            class_id=np.array(valid_class_ids),
+            tracker_id=np.array(valid_tracker_ids) if valid_tracker_ids else None
+        )
+        
+        # Store labels as a custom attribute
+        detections.labels = labels
+        
+        return detections
+
+    def _draw_cjkv_labels_on_detections(self, frame, detections, labels):
+        """Draw CJKV-capable labels on supervision detections"""
+        if not labels or len(labels) == 0:
+            return frame
+            
+        # Get bounding boxes from detections
+        boxes = detections.xyxy  # [x1, y1, x2, y2] format
+        confidences = detections.confidence
+        class_ids = detections.class_id
+        
+        for i, (box, label) in enumerate(zip(boxes, labels)):
+            x1, y1, x2, y2 = box.astype(int)
+            
+            # Get confidence for color determination
+            confidence = confidences[i] if i < len(confidences) else 0.5
+            class_id = int(class_ids[i]) if i < len(class_ids) else 0
+            
+            # Determine if interpolated based on label prefix
+            is_interpolated = label.startswith('~')
+            
+            # Get color based on class_id (which maps to our confidence levels)
+            color = self._get_confidence_color_from_class_id(class_id)
+            
+            # Calculate font size based on bounding box size
+            box_height = y2 - y1
+            font_size = max(12, min(24, int(box_height * 0.15)))
+            
+            # Position label above the bounding box
+            text_position = (x1, max(0, y1 - 30))
+            
+            # Draw background rectangle for better readability
+            frame = self._draw_text_background(frame, label, text_position, font_size)
+            
+            # Draw the text with CJKV support
+            frame = self._draw_text_with_cjkv_support(
+                frame, label, text_position, font_size, color, is_interpolated
+            )
+            
+        return frame
+    
+    def _get_confidence_color_from_class_id(self, class_id: int):
+        """Convert class_id back to color for drawing"""
+        color_map = {
+            0: (0, 255, 0),    # Bright green for high confidence 
+            1: (0, 165, 255),  # Orange for medium confidence
+            2: (0, 0, 255),    # Red for low confidence
+            3: (0, 150, 0),    # Muted green for interpolated high
+            4: (0, 120, 180),  # Muted orange for interpolated medium
+            5: (0, 0, 150),    # Muted red for interpolated low
+        }
+        return color_map.get(class_id, (0, 255, 0))
+    
+    def _draw_text_background(self, frame, text, position, font_size):
+        """Draw background rectangle for text readability"""
+        x, y = position
+        
+        # Estimate text dimensions (rough approximation)
+        text_width = len(text) * int(font_size * 0.6)
+        text_height = int(font_size * 1.2)
+        
+        # Draw background rectangle
+        cv2.rectangle(frame, 
+                     (x, y - text_height), 
+                     (x + text_width, y + 5), 
+                     (0, 0, 0), -1)  # Black background
+        
+        return frame
+
+    def _get_or_create_tracker_id(self, contestant_id: str, recognition: dict) -> int:
+        """Get or create a tracking ID for face trajectory visualization"""
+        # Use location and contestant for trajectory matching
+        location = recognition['face_location']
+        center_x = (location[3] + location[1]) / 2  # left + right / 2
+        center_y = (location[0] + location[2]) / 2  # top + bottom / 2
+        
+        # Simple tracking based on contestant ID and spatial proximity
+        key = f"{contestant_id}_{int(center_x/50)}_{int(center_y/50)}"  # Spatial grid matching
+        
+        if key not in self.face_trajectories:
+            self.face_trajectories[key] = self.next_track_id
+            self.next_track_id += 1
+            
+        return self.face_trajectories[key]
+
     def _get_interpolated_annotations(self, timestamp: float, timestamp_annotations: list, smoothing_window: int, fps: float = 25.0):
         """
         Get annotations for a given timestamp with temporal interpolation and smoothing
@@ -404,7 +642,60 @@ class VideoProcessor:
         return interpolated_recognitions
 
     def _draw_frame_annotations(self, frame, recognitions, scale_x: float, scale_y: float):
-        """Draw face recognition annotations on a frame with improved interpolation handling"""
+        """Draw face recognition annotations on a frame using professional Supervision annotators"""
+        if self.use_supervision and SUPERVISION_AVAILABLE:
+            return self._draw_supervision_annotations(frame, recognitions, scale_x, scale_y)
+        else:
+            # Fallback to OpenCV rendering
+            return self._draw_opencv_annotations(frame, recognitions, scale_x, scale_y)
+
+    def _draw_supervision_annotations(self, frame, recognitions, scale_x: float, scale_y: float):
+        """Professional annotation using Supervision annotators"""
+        # Convert face recognitions to Supervision Detections format
+        detections = self._face_recognitions_to_detections(recognitions, scale_x, scale_y)
+        
+        if detections is None or len(detections) == 0:
+            return frame
+        
+        try:
+            # Apply professional bounding box annotation
+            try:
+                frame = self.box_annotator.annotate(
+                    scene=frame,
+                    detections=detections
+                )
+            except Exception as e:
+                logger.error(f"Box annotator failed: {e}")
+                raise e
+            
+            # Apply CJKV-capable label annotation (skip supervision labels, use our own)
+            # Supervision doesn't handle CJKV fonts well, so we draw labels manually
+            labels = getattr(detections, 'labels', [])
+            frame = self._draw_cjkv_labels_on_detections(frame, detections, labels)
+            
+            # Apply tracking trail annotation for face trajectories
+            if (hasattr(self, 'trace_annotator') and 
+                hasattr(detections, 'tracker_id') and 
+                detections.tracker_id is not None and 
+                len(detections.tracker_id) > 0):
+                try:
+                    frame = self.trace_annotator.annotate(
+                        scene=frame,
+                        detections=detections
+                    )
+                except Exception as e:
+                    logger.error(f"Trace annotator failed: {e}")
+                    # Don't fail for trace annotator - just skip it
+            
+            return frame
+            
+        except Exception as e:
+            logger.error(f"Error with Supervision annotation: {e}")
+            # Fallback to OpenCV if Supervision fails
+            return self._draw_opencv_annotations(frame, recognitions, scale_x, scale_y)
+
+    def _draw_opencv_annotations(self, frame, recognitions, scale_x: float, scale_y: float):
+        """Fallback OpenCV annotation (original implementation)"""
         for recognition in recognitions:
             # Get face location and scale it
             location = recognition['face_location']  # [top, right, bottom, left]

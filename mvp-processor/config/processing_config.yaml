@@ -21,8 +21,8 @@ video:
 face_detection:
   model: "insightface"  # Use InsightFace buffalo_l model
   model_path: "../models/buffalo_l"
-  min_confidence: 0.6
-  max_faces_per_frame: 10
+  min_confidence: 0.3
+  max_faces_per_frame: 25
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
   
   # Hardware acceleration preferences (in order of preference)
@@ -41,29 +41,74 @@ face_detection:
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
-  similarity_threshold: 0.4  # Confidence threshold (moderate for testing improved recognition)
-  tolerance: 0.6  # Lower = more strict matching
-  max_distance: 0.6  # Maximum face distance for recognition
+  similarity_threshold: 0.05  # Confidence threshold (much lower to allow more matches)
+  tolerance: 0.8  # Higher = more lenient matching  
+  max_distance: 15.0  # Much higher maximum face distance to allow more recognition
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
   enable_interpolation: true  # Linear interpolation between detections
   confidence_decay: 0.95  # For interpolated frames
+  
+  # Trajectory-based recognition thresholds
+  trajectory_confidence_threshold: 0.02  # Very low aggregate trajectory confidence 
+  single_frame_threshold: 0.02          # Very low fallback threshold
+  temporal_boost_factor: 1.2            # Confidence boost for consistent temporal recognition
 
 # Contestant Database (Critical Files)
 contestants:
-  photo_dir: "../source/photo/contestants"  # 95 contestant photos and embeddings
+  photo_dir: "../source/photo/contestants"  # 95 contestant photos and embeddings (fixed path)
   embeddings_cache: "data/embeddings_cache.pkl"
-  info_csv: "../source/contestant_info.csv"  # Essential contestant mapping
+  info_csv: "../source/contestant_info.csv"  # Essential contestant mapping (fixed path)
   chroma_db_path: "../database/chroma_db"
+
+# Face Tracking Configuration - Temporal Frame Correlation
+face_tracking:
+  enable_tracking: true
+  
+  # Tracking Algorithm Selection
+  algorithm: "supervision"  # Options: "custom", "supervision"
+  # custom: Original custom face tracker (faster, optimized for faces)  
+  # supervision: Optimized Supervision ByteTracker (proven algorithms with performance optimizations)
+  
+  # Temporal window settings
+  tracking_window: 1.0              # Duration (seconds) to maintain face trajectories
+  max_trajectory_gap: 10            # Maximum frames without detection before trajectory expiry
+  min_trajectory_length: 3          # Minimum detections required for stable trajectory
+  
+  # Spatial correlation thresholds
+  spatial_threshold: 0.3            # Minimum IoU for spatial correlation between frames
+  proximity_boost: 0.85             # Time proximity factor for trajectory matching
+  location_stability_factor: 0.75   # Stability preference for consistent face locations
+  
+  # Confidence smoothing and aggregation
+  confidence_smoothing: 0.95        # Temporal decay factor for confidence aggregation
+  confidence_threshold: 0.25        # Minimum aggregated confidence for stable trajectory
+  single_frame_fallback: 0.15       # Fallback threshold for single-frame recognitions
+  min_stable_detections: 3          # Minimum confident detections for trajectory stability
+  
+  # Re-identification configuration
+  re_recognition_interval: 6        # Frames between re-recognition attempts
+  identity_voting_weight: 1.0       # Weight for contestant identity voting in trajectory
+  temporal_consistency_bonus: 0.15  # Bonus for temporally consistent recognitions
+  
+  # Trajectory management
+  max_active_trajectories: 20       # Maximum concurrent active trajectories
+  trajectory_cleanup_interval: 30   # Frames between trajectory cleanup cycles
+  memory_optimization: true         # Enable memory-efficient trajectory management
+  
+  # Performance tuning (aligned with 6 FPS detection, 25 FPS video)
+  detection_sampling_rate: 6        # FPS for face detection (matches video.fps_sample_rate)
+  interpolation_smoothing: 0.85     # Smoothing factor for trajectory interpolation
+  adaptive_threshold: true          # Enable adaptive confidence thresholds based on scene complexity
 
 # Processing Settings for Dense Metadata
 processing:
-  enable_tracking: true
-  smoothing_window: 5
+  enable_tracking: true             # Global tracking enable flag (use face_tracking.enable_tracking for detailed control)
+  smoothing_window: 5               # Frame window for temporal smoothing (deprecated, use face_tracking.tracking_window)
   batch_size: 32
   parallel_processing: true
-  generate_dense_metadata: true  # Frame-level granularity
-  enable_interpolation: true
+  generate_dense_metadata: true     # Frame-level granularity
+  enable_interpolation: true        # Global interpolation flag (use face_tracking for detailed control)
 
 # Output Settings Aligned with Deployment Scripts
 output:
@@ -100,6 +145,36 @@ performance:
   hardware_acceleration: "auto"  # auto, apple_silicon, cuda, cpu
   processing_threads: 4
   memory_limit_gb: 8
+
+# Professional Visualization Configuration (Supervision)
+visualization:
+  enable_supervision: true  # Use professional Roboflow Supervision annotators
+  
+  # Bounding box styling
+  bbox_thickness: 2
+  interpolated_bbox_thickness: 1
+  
+  # Label styling
+  text_scale: 0.6
+  text_thickness: 1
+  text_padding: 5
+  
+  # Tracking trail visualization
+  enable_tracking_trails: true
+  trail_length: 30  # Number of points in tracking trail
+  trail_thickness: 2
+  
+  # Color scheme for confidence levels
+  color_palette:
+    high_confidence: "#00FF00"      # Bright green (>= 0.8)
+    medium_confidence: "#FFA500"    # Orange (>= 0.6)
+    low_confidence: "#FF0000"       # Red (< 0.6)
+    interpolated_high: "#90EE90"    # Light green (interpolated >= 0.6)
+    interpolated_medium: "#FFB366"  # Light orange (interpolated >= 0.4)
+    interpolated_low: "#FF6666"     # Light red (interpolated < 0.4)
+  
+  # Fallback configuration
+  fallback_to_opencv: true  # Use OpenCV if Supervision fails
 
 # Logging Configuration
 logging:

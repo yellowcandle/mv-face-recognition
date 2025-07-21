@@ -17,6 +17,9 @@ dependencies = [
     "pandas>=2.0.3",
     "imageio-ffmpeg>=0.5.1",
     "face-recognition-models",
+    "supervision>=0.25.1",
+    "moviepy>=1.0.3",
+    "boto3>=1.37.38",
 ]
 
 [project.optional-dependencies]

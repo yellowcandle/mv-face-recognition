@@ -134,7 +134,10 @@
       "Bash(wrangler whoami:*)",
       "Bash(echo:*)",
       "Bash(timeout:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(PYTHONPATH=mvp-processor/src python -m process_video --help)",
+      "Bash(PYTHONPATH=mvp-processor/src python -m process_video -i source/videos/test-video-mv2.mp4 --debug --no-upload)",
+      "Bash(PYTHONPATH=mvp-processor/src python -m process_video -i source/videos/test-video-mv2.mp4 --no-upload)"
     ]
   },
   "enableAllProjectMcpServers": true
