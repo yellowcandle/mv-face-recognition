@@ -7,6 +7,8 @@ import click
 import yaml
 import json
 import logging
+import os
+import numpy as np
 from pathlib import Path
 from typing import Dict, List
 from tqdm import tqdm
@@ -14,12 +16,25 @@ from tqdm import tqdm
 from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
+from supervision_face_tracker import SupervisionFaceTracker as FaceTracker
 
 # Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder for numpy data types"""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
 
 
 class VideoProcessingPipeline:
@@ -29,12 +44,25 @@ class VideoProcessingPipeline:
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
+        # Resolve relative paths in config based on project root
+        self._resolve_config_paths(config_path)
+
         # Initialize components
         self.video_processor = VideoProcessor(self.config)
         self.face_detector = FaceDetector(self.config)
         self.contestant_db = ContestantDatabase(self.config)
         self.face_recognizer = FaceRecognizer(self.config, self.contestant_db)
         self.metadata_generator = MetadataGenerator(self.config)
+        
+        # Initialize face tracker if tracking is enabled (check both old and new config sections)
+        self.face_tracker = None
+        tracking_enabled = (
+            self.config.get("face_tracking", {}).get("enable_tracking", False) or 
+            self.config.get("processing", {}).get("enable_tracking", False)
+        )
+        if tracking_enabled:
+            self.face_tracker = FaceTracker(self.config)
+            logger.info("Face tracking enabled")
 
         # Only initialize Cloudflare uploader if upload is enabled
         self.cloudflare_uploader = None
@@ -52,9 +80,43 @@ class VideoProcessingPipeline:
 
         # Setup output directories
         self.setup_output_dirs()
+
+    def _resolve_config_paths(self, config_path: str):
+        """Resolve relative paths in config to absolute paths based on project root"""
+        # Get project root directory (2 levels up from config file: config -> mvp-processor -> project root)
+        config_dir = os.path.dirname(os.path.abspath(config_path))  # mvp-processor/config
+        mvp_processor_dir = os.path.dirname(config_dir)             # mvp-processor  
+        project_root = os.path.dirname(mvp_processor_dir)           # project root
         
-        # Initialize contestant database with face encodings
-        self.initialize_database()
+        logger.debug(f"Config file: {config_path}")
+        logger.debug(f"Project root: {project_root}")
+        
+        # Paths that need resolution
+        path_mappings = {
+            ('contestants', 'photo_dir'): '../source/photo/contestants',
+            ('contestants', 'info_csv'): '../source/contestant_info.csv',
+            ('contestants', 'chroma_db_path'): '../database/chroma_db',
+            ('face_recognition', 'embeddings_path'): '../source/photo/contestants',
+            ('output', 'processed_dir'): '../processed_videos',
+            ('output', 'thumbnails_dir'): '../thumbnails',
+            ('output', 'metadata_dir'): '../metadata'
+        }
+        
+        # Resolve each path
+        for keys, default_path in path_mappings.items():
+            config_section = self.config
+            for key in keys[:-1]:
+                if key in config_section:
+                    config_section = config_section[key]
+                else:
+                    break
+            else:
+                if keys[-1] in config_section:
+                    relative_path = config_section[keys[-1]]
+                    if relative_path.startswith('../'):
+                        # Convert relative path to absolute
+                        absolute_path = os.path.join(project_root, relative_path[3:])
+                        config_section[keys[-1]] = absolute_path
 
     def setup_output_dirs(self):
         """Create output directories"""
@@ -113,6 +175,10 @@ class VideoProcessingPipeline:
         # Process frames
         all_recognitions = []
         frame_data = []
+        
+        # Initialize face tracker for this video if enabled
+        if self.face_tracker:
+            self.face_tracker.reset()
 
         frames_generator = self.video_processor.extract_frames(str(video_path))
         frames_list = list(frames_generator)  # Convert to list for progress bar
@@ -133,10 +199,39 @@ class VideoProcessingPipeline:
                 rgb_frame, timestamp, frame_idx
             )
 
+            # Update detections with correct frame number for tracking
+            for detection in detections:
+                detection.frame_number = actual_frame_number
+
+            frame_recognitions = []
             if detections:
-                # Recognize faces
-                recognitions = self.face_recognizer.recognize_faces(detections)
-                all_recognitions.extend(recognitions)
+                if self.face_tracker:
+                    # Use face tracking for temporal correlation
+                    raw_recognitions = self.face_recognizer.recognize_faces(detections)
+                    
+                    # Update trajectories with new detections and recognitions
+                    active_trajectories = self.face_tracker.update_trajectories(detections, raw_recognitions)
+                    
+                    # Get stable recognitions from tracking
+                    frame_recognitions = self.face_tracker.get_stable_recognitions()
+                    
+                    # Add raw recognitions for frames without stable tracking (fallback)
+                    trajectory_locations = set()
+                    for recognition in frame_recognitions:
+                        trajectory_locations.add(recognition.detection.location)
+                    
+                    # Add non-tracked detections
+                    for raw_recognition in raw_recognitions:
+                        if raw_recognition.detection.location not in trajectory_locations:
+                            frame_recognitions.append(raw_recognition)
+                            
+                    logger.debug(f"Frame {actual_frame_number}: {len(active_trajectories)} active trajectories, "
+                               f"{len(frame_recognitions)} recognitions")
+                else:
+                    # Traditional frame-by-frame processing (no tracking)
+                    frame_recognitions = self.face_recognizer.recognize_faces(detections)
+                
+                all_recognitions.extend(frame_recognitions)
 
                 # Store frame data with actual video frame number and processing dimensions
                 frame_data.append(
@@ -145,7 +240,7 @@ class VideoProcessingPipeline:
                         "extraction_index": int(frame_idx),  # Keep for debugging
                         "timestamp": float(timestamp),
                         "detections_count": len(detections),
-                        "recognitions_count": len(recognitions),
+                        "recognitions_count": len(frame_recognitions),
                         "processing_width": rgb_frame.shape[1],  # Processing frame width
                         "processing_height": rgb_frame.shape[0],  # Processing frame height
                         "recognitions": [
@@ -156,15 +251,27 @@ class VideoProcessingPipeline:
                                 "confidence": float(r.match_confidence),
                                 "face_location": [int(x) for x in r.detection.location],
                             }
-                            for r in recognitions
+                            for r in frame_recognitions
                         ],
                     }
                 )
+            else:
+                # No detections - update tracker with empty detections
+                if self.face_tracker:
+                    self.face_tracker.update_trajectories([], [])
 
-        # Filter low-confidence recognitions
+        # Filter low-confidence recognitions using config similarity_threshold
         filtered_recognitions = self.face_recognizer.filter_recognitions(
-            all_recognitions, min_confidence=0.5
+            all_recognitions
         )
+
+        # Get tracking statistics if tracking was enabled
+        tracking_stats = {}
+        if self.face_tracker:
+            tracking_stats = self.face_tracker.get_tracking_stats()
+            logger.info(f"Tracking stats: {tracking_stats['active_trajectories']} active, "
+                       f"{tracking_stats['completed_trajectories']} completed, "
+                       f"{tracking_stats['stable_trajectories']} stable trajectories")
 
         logger.info(
             f"Processing complete: {len(filtered_recognitions)} recognitions found"
@@ -177,13 +284,17 @@ class VideoProcessingPipeline:
             frame_data=frame_data,
             output_name=output_name,
         )
+        
+        # Add tracking statistics to metadata
+        if tracking_stats:
+            metadata["tracking_stats"] = tracking_stats
 
         # Save metadata
         metadata_path = (
             Path(self.config["output"]["metadata_dir"]) / f"{output_name}_metadata.json"
         )
         with open(metadata_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+            json.dump(metadata, f, indent=2, ensure_ascii=False, cls=NumpyEncoder)
 
         # Generate galleries
         gallery_data = self.metadata_generator.generate_face_galleries(
@@ -242,7 +353,7 @@ class VideoProcessingPipeline:
 @click.command()
 @click.option("--input", "-i", required=True, help="Input video file path")
 @click.option(
-    "--config", "-c", default="../config/processing_config.yaml", help="Configuration file"
+    "--config", "-c", default=None, help="Configuration file"
 )
 @click.option(
     "--output-name", "-o", help="Custom output name (default: video filename)"
@@ -262,6 +373,26 @@ def main(
 
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Set default config path if not provided
+    if config is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config = os.path.join(script_dir, "../config/processing_config.yaml")
+
+    # Convert input path to absolute path if relative
+    logger.debug(f"Current working directory: {os.getcwd()}")
+    logger.debug(f"Input video path: {input}")
+    if not os.path.isabs(input):
+        # If we're running from mvp-processor/src, adjust path resolution to project root
+        cwd = os.getcwd()
+        if cwd.endswith('mvp-processor/src'):
+            # Go up 2 levels to project root
+            project_root = os.path.dirname(os.path.dirname(cwd))
+            input = os.path.join(project_root, input)
+        else:
+            # Resolve relative to current working directory
+            input = os.path.abspath(input)
+        logger.debug(f"Resolved video path: {input}")
 
     try:
         # Initialize pipeline
