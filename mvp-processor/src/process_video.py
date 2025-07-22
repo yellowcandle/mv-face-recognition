@@ -15,14 +15,19 @@ from tqdm import tqdm
 
 from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
+from unified_face_detector import UnifiedFaceDetector
 from metadata_generator import MetadataGenerator
-from supervision_face_tracker import SupervisionFaceTracker as FaceTracker
-
-# Setup logging
+# Setup logging first
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+try:
+    from supervision_face_tracker import SupervisionFaceTracker as FaceTracker
+except ImportError:
+    logger.warning("Supervision not available - using standard face tracker")
+    from face_tracker import FaceTracker
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -44,15 +49,30 @@ class VideoProcessingPipeline:
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
+        # Initialize components first (needed for _resolve_config_paths)
+        self.video_processor = VideoProcessor(self.config)
+        
+        # Use unified face detection and recognition system
+        use_unified_system = self.config.get("face_detection", {}).get("use_unified_system", True)
+        if use_unified_system:
+            self.unified_face_detector = UnifiedFaceDetector(self.config)
+            # Legacy components for compatibility
+            self.face_detector = None
+            self.contestant_db = self.unified_face_detector.contestant_db
+            self.face_recognizer = None
+            logger.info("Using unified face detection and recognition system")
+        else:
+            # Use legacy system
+            self.face_detector = FaceDetector(self.config)
+            self.contestant_db = ContestantDatabase(self.config)
+            self.face_recognizer = FaceRecognizer(self.config, self.contestant_db)
+            self.unified_face_detector = None
+            logger.info("Using legacy face detection and recognition system")
+            
+        self.metadata_generator = MetadataGenerator(self.config)
+
         # Resolve relative paths in config based on project root
         self._resolve_config_paths(config_path)
-
-        # Initialize components
-        self.video_processor = VideoProcessor(self.config)
-        self.face_detector = FaceDetector(self.config)
-        self.contestant_db = ContestantDatabase(self.config)
-        self.face_recognizer = FaceRecognizer(self.config, self.contestant_db)
-        self.metadata_generator = MetadataGenerator(self.config)
         
         # Initialize face tracker if tracking is enabled (check both old and new config sections)
         self.face_tracker = None
@@ -201,9 +221,14 @@ class VideoProcessingPipeline:
             rgb_frame = FrameProcessor.preprocess_frame(frame)
 
             # Detect faces
-            detections = self.face_detector.detect_faces(
-                rgb_frame, timestamp, frame_idx
-            )
+            if self.unified_face_detector:
+                detections = self.unified_face_detector.detect_faces(
+                    rgb_frame, timestamp, frame_idx
+                )
+            else:
+                detections = self.face_detector.detect_faces(
+                    rgb_frame, timestamp, frame_idx
+                )
 
             # Update detections with correct frame number for tracking
             for detection in detections:
@@ -213,7 +238,10 @@ class VideoProcessingPipeline:
             if detections:
                 if self.face_tracker:
                     # Use face tracking for temporal correlation
-                    raw_recognitions = self.face_recognizer.recognize_faces(detections)
+                    if self.unified_face_detector:
+                        raw_recognitions = self.unified_face_detector.recognize_faces(detections)
+                    else:
+                        raw_recognitions = self.face_recognizer.recognize_faces(detections)
                     
                     # Update trajectories with new detections and recognitions
                     active_trajectories = self.face_tracker.update_trajectories(detections, raw_recognitions)
@@ -235,7 +263,10 @@ class VideoProcessingPipeline:
                                f"{len(frame_recognitions)} recognitions")
                 else:
                     # Traditional frame-by-frame processing (no tracking)
-                    frame_recognitions = self.face_recognizer.recognize_faces(detections)
+                    if self.unified_face_detector:
+                        frame_recognitions = self.unified_face_detector.recognize_faces(detections)
+                    else:
+                        frame_recognitions = self.face_recognizer.recognize_faces(detections)
                 
                 all_recognitions.extend(frame_recognitions)
 
@@ -267,9 +298,16 @@ class VideoProcessingPipeline:
                     self.face_tracker.update_trajectories([], [])
 
         # Filter low-confidence recognitions using config similarity_threshold
-        filtered_recognitions = self.face_recognizer.filter_recognitions(
-            all_recognitions
-        )
+        if self.unified_face_detector:
+            # Apply filtering manually for unified system
+            min_confidence = self.config["face_recognition"]["similarity_threshold"]
+            filtered_recognitions = [r for r in all_recognitions if r.match_confidence >= min_confidence]
+            logger.info(f"Filtered {len(all_recognitions)} recognitions to {len(filtered_recognitions)} "
+                       f"(min_confidence: {min_confidence})")
+        else:
+            filtered_recognitions = self.face_recognizer.filter_recognitions(
+                all_recognitions
+            )
 
         # Get tracking statistics if tracking was enabled
         tracking_stats = {}
@@ -365,7 +403,7 @@ class VideoProcessingPipeline:
 @click.option(
     "--config",
     "-c",
-    default="../config/processing_config.yaml",
+    default="config/processing_config.yaml",
     help="Configuration file",
 )
 @click.option(
@@ -386,26 +424,29 @@ def main(
 
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
 
     # Set default config path if not provided
     if config is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         config = os.path.join(script_dir, "../config/processing_config.yaml")
+        logger.debug(f"Default config path resolved to: {config}")
+        logger.debug(f"Config file exists: {os.path.exists(config)}")
 
     # Convert input path to absolute path if relative
     logger.debug(f"Current working directory: {os.getcwd()}")
-    logger.debug(f"Input video path: {input}")
-    if not os.path.isabs(input):
+    logger.debug(f"Input video path: {input_path}")
+    if not os.path.isabs(input_path):
         # If we're running from mvp-processor/src, adjust path resolution to project root
         cwd = os.getcwd()
         if cwd.endswith('mvp-processor/src'):
             # Go up 2 levels to project root
             project_root = os.path.dirname(os.path.dirname(cwd))
-            input = os.path.join(project_root, input)
+            input_path = os.path.join(project_root, input_path)
         else:
             # Resolve relative to current working directory
-            input = os.path.abspath(input)
-        logger.debug(f"Resolved video path: {input}")
+            input_path = os.path.abspath(input_path)
+        logger.debug(f"Resolved video path: {input_path}")
 
     try:
         # Initialize pipeline

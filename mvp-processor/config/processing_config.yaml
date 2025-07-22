@@ -24,6 +24,7 @@ face_detection:
   min_confidence: 0.3
   max_faces_per_frame: 25
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
+  use_unified_system: true  # Enable unified embedding system for consistent recognition
   
   # Hardware acceleration preferences (in order of preference)
   backend_priority:
