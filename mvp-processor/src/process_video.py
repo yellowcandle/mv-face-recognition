@@ -69,13 +69,14 @@ class VideoProcessingPipeline:
         if enable_upload:
             try:
                 from cloudflare_uploader import CloudflareUploader
+
                 self.cloudflare_uploader = CloudflareUploader(self.config)
                 logger.info("Cloudflare uploader initialized")
             except ImportError as e:
-                logger.warning(f"Cloudflare uploader not available: {e}")
+                logger.warning("Cloudflare uploader not available: %s", e)
                 logger.warning("Running in local-only mode")
             except Exception as e:
-                logger.warning(f"Cloudflare uploader initialization failed: {e}")
+                logger.warning("Cloudflare uploader initialization failed: %s", e)
                 logger.warning("Running in local-only mode")
 
         # Setup output directories
@@ -118,6 +119,9 @@ class VideoProcessingPipeline:
                         absolute_path = os.path.join(project_root, relative_path[3:])
                         config_section[keys[-1]] = absolute_path
 
+        # Initialize contestant database with face encodings
+        self.initialize_database()
+
     def setup_output_dirs(self):
         """Create output directories"""
         output_config = self.config["output"]
@@ -135,7 +139,7 @@ class VideoProcessingPipeline:
         self.contestant_db.load_contestants_info()
         self.contestant_db.build_face_encodings(force_rebuild=force_rebuild)
         logger.info(
-            f"Database ready with {len(self.contestant_db.face_encodings)} contestants"
+            "Database ready with %d contestants", len(self.contestant_db.face_encodings)
         )
 
     def process_video(self, video_path: str, output_name: str = None) -> Dict:
@@ -156,14 +160,16 @@ class VideoProcessingPipeline:
         if output_name is None:
             output_name = video_path.stem
 
-        logger.info(f"Processing video: {video_path}")
+        logger.info("Processing video: %s", video_path)
 
         # Get video info
         video_info = self.video_processor.get_video_info(str(video_path))
         logger.info(
-            f"Video info: {video_info['duration']:.1f}s, "
-            f"{video_info['width']}x{video_info['height']}, "
-            f"{video_info['fps']:.1f} fps"
+            "Video info: %.1fs, %dx%d, %.1f fps",
+            video_info["duration"],
+            video_info["width"],
+            video_info["height"],
+            video_info["fps"],
         )
 
         # Create thumbnail
@@ -183,7 +189,7 @@ class VideoProcessingPipeline:
         frames_generator = self.video_processor.extract_frames(str(video_path))
         frames_list = list(frames_generator)  # Convert to list for progress bar
 
-        logger.info(f"Processing {len(frames_list)} frames...")
+        logger.info("Processing %d frames...", len(frames_list))
 
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
@@ -274,7 +280,7 @@ class VideoProcessingPipeline:
                        f"{tracking_stats['stable_trajectories']} stable trajectories")
 
         logger.info(
-            f"Processing complete: {len(filtered_recognitions)} recognitions found"
+            "Processing complete: %d recognitions found", len(filtered_recognitions)
         )
 
         # Generate metadata
@@ -301,8 +307,8 @@ class VideoProcessingPipeline:
             recognitions=filtered_recognitions, output_name=output_name
         )
 
-        # Convert video formats with burned-in face recognition overlays
-        processed_videos = self.convert_video_formats_with_annotations(
+        # Convert video formats with face recognition overlays
+        processed_videos = self.convert_video_formats_with_overlays(
             video_path, output_name, metadata
         )
 
@@ -318,10 +324,10 @@ class VideoProcessingPipeline:
 
         return upload_package
 
-    def convert_video_formats_with_annotations(
-        self, input_path: Path, output_name: str, metadata: dict
+    def convert_video_formats_with_overlays(
+        self, input_path: Path, output_name: str, metadata: Dict
     ) -> List[str]:
-        """Convert video to multiple formats with burned-in face recognition overlays"""
+        """Convert video to multiple formats with burned-in overlays."""
         output_dir = Path(self.config["output"]["processed_dir"])
         processed_videos = []
 
@@ -332,7 +338,9 @@ class VideoProcessingPipeline:
             output_filename = f"{output_name}_{resolution}.{format_name}"
             output_path = output_dir / output_filename
 
-            logger.info(f"Converting to {output_filename} with face recognition overlays...")
+            logger.info(
+                "Converting to %s with face recognition overlays...", output_filename
+            )
             self.video_processor.process_video_with_annotations(
                 str(input_path), str(output_path), metadata, format_config
             )
@@ -351,9 +359,14 @@ class VideoProcessingPipeline:
 
 
 @click.command()
-@click.option("--input", "-i", required=True, help="Input video file path")
 @click.option(
-    "--config", "-c", default=None, help="Configuration file"
+    "--input", "-i", "input_path", required=True, help="Input video file path"
+)
+@click.option(
+    "--config",
+    "-c",
+    default="../config/processing_config.yaml",
+    help="Configuration file",
 )
 @click.option(
     "--output-name", "-o", help="Custom output name (default: video filename)"
@@ -362,7 +375,7 @@ class VideoProcessingPipeline:
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
-    input: str,
+    input_path: str,
     config: str,
     output_name: str,
     no_upload: bool,
@@ -402,7 +415,7 @@ def main(
         pipeline.initialize_database(force_rebuild=rebuild_db)
 
         # Process video
-        upload_package = pipeline.process_video(input, output_name)
+        upload_package = pipeline.process_video(input_path, output_name)
 
         # Upload to Cloudflare (unless disabled)
         if not no_upload and pipeline.cloudflare_uploader:
@@ -430,7 +443,7 @@ def main(
             print("   ☁️  Uploaded to Cloudflare R2")
 
     except Exception as e:
-        logger.error(f"Processing failed: {e}")
+        logger.error("Processing failed: %s", e)
         raise
 
 

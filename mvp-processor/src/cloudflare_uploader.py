@@ -7,7 +7,7 @@ import os
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,17 +20,17 @@ class CloudflareUploader:
         self.config = config
         self.cf_config = config["cloudflare"]
         self.bucket_name = self.cf_config["r2_bucket"]
-        
+
         # Initialize API client for KV
         self.api_token = self.cf_config["api_token"]
         self.account_id = self.cf_config["account_id"]
-        
+
         # Initialize R2 client (may be None if credentials are missing)
         self.r2_client = None
         try:
             self.r2_client = self._initialize_r2_client()
         except Exception as e:
-            logger.warning(f"Cloudflare R2 client initialization failed: {e}")
+            logger.warning("Cloudflare R2 client initialization failed: %s", e)
             logger.warning("Continuing in local-only mode")
 
     def _initialize_r2_client(self):
@@ -38,7 +38,7 @@ class CloudflareUploader:
         try:
             import boto3
             from botocore.config import Config
-            
+
             # R2 uses S3-compatible API
             client = boto3.client(
                 "s3",
@@ -50,16 +50,19 @@ class CloudflareUploader:
 
             # Test connection
             client.head_bucket(Bucket=self.bucket_name)
-            logger.info(f"Connected to Cloudflare R2 bucket: {self.bucket_name}")
+            logger.info("Connected to Cloudflare R2 bucket: %s", self.bucket_name)
             return client
 
         except ImportError as e:
-            logger.error("boto3 is required for Cloudflare uploads. Install with: uv add boto3")
+            logger.error(
+                "boto3 is required for Cloudflare uploads. Install with: uv add boto3"
+            )
             raise ImportError("boto3 is required for Cloudflare uploads") from e
         except Exception as e:
-            logger.error(f"Failed to initialize R2 client: {e}")
+            logger.error("Failed to initialize R2 client: %s", e)
             logger.error(
-                "Make sure CLOUDFLARE_R2_ACCESS_KEY_ID and CLOUDFLARE_R2_SECRET_ACCESS_KEY are set"
+                "Make sure CLOUDFLARE_R2_ACCESS_KEY_ID and "
+                "CLOUDFLARE_R2_SECRET_ACCESS_KEY are set"
             )
             raise
 
@@ -73,7 +76,7 @@ class CloudflareUploader:
         if self.r2_client is None:
             logger.warning("Cloudflare R2 client not available, skipping upload")
             return
-            
+
         logger.info("Starting Cloudflare upload...")
 
         try:
@@ -96,7 +99,7 @@ class CloudflareUploader:
             logger.info("Cloudflare upload completed successfully")
 
         except Exception as e:
-            logger.error(f"Cloudflare upload failed: {e}")
+            logger.error("Cloudflare upload failed: %s", e)
             raise
 
     def _upload_videos(self, video_paths: List[str], video_info: Dict):
@@ -114,7 +117,7 @@ class CloudflareUploader:
             else:
                 s3_key = f"videos/processed/{video_name}/{video_file.name}"
 
-            logger.info(f"Uploading video: {video_file.name} -> {s3_key}")
+            logger.info("Uploading video: %s -> %s", video_file.name, s3_key)
 
             try:
                 # Upload with appropriate content type and caching headers
@@ -133,22 +136,22 @@ class CloudflareUploader:
                         },
                     },
                 )
-                logger.info(f"Successfully uploaded: {s3_key}")
+                logger.info("Successfully uploaded: %s", s3_key)
 
             except Exception as e:
-                logger.error(f"Failed to upload {video_path}: {e}")
+                logger.error("Failed to upload %s: %s", video_path, e)
                 raise
 
     def _upload_thumbnail(self, thumbnail_path: str, video_info: Dict):
         """Upload video thumbnail to R2"""
         if self.r2_client is None:
             return
-            
-        thumbnail_file = Path(thumbnail_path)
+
+        # thumbnail_file = Path(thumbnail_path)  # Unused variable
         video_name = video_info["processed_name"]
         s3_key = f"videos/thumbnails/{video_name}_thumbnail.jpg"
 
-        logger.info(f"Uploading thumbnail: {s3_key}")
+        logger.info("Uploading thumbnail: %s", s3_key)
 
         try:
             self.r2_client.upload_file(
@@ -164,17 +167,17 @@ class CloudflareUploader:
                     },
                 },
             )
-            logger.info(f"Successfully uploaded thumbnail: {s3_key}")
+            logger.info("Successfully uploaded thumbnail: %s", s3_key)
 
         except Exception as e:
-            logger.error(f"Failed to upload thumbnail: {e}")
+            logger.error("Failed to upload thumbnail: %s", e)
             raise
 
     def _upload_metadata_files(self, upload_package: Dict):
         """Upload metadata files to R2"""
         if self.r2_client is None:
             return
-            
+
         video_name = upload_package["video_info"]["processed_name"]
         metadata = upload_package["metadata"]
         gallery_data = upload_package["gallery_data"]
@@ -199,8 +202,8 @@ class CloudflareUploader:
         """Upload JSON data to R2"""
         if self.r2_client is None:
             return
-            
-        logger.info(f"Uploading metadata: {s3_key}")
+
+        logger.info("Uploading metadata: %s", s3_key)
 
         try:
             json_content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -216,17 +219,17 @@ class CloudflareUploader:
                     "upload-timestamp": str(int(time.time())),
                 },
             )
-            logger.info(f"Successfully uploaded: {s3_key}")
+            logger.info("Successfully uploaded: %s", s3_key)
 
         except Exception as e:
-            logger.error(f"Failed to upload JSON to {s3_key}: {e}")
+            logger.error("Failed to upload JSON to %s: %s", s3_key, e)
             raise
 
     def _update_kv_storage(self, upload_package: Dict):
         """Update Cloudflare KV storage with video index"""
         if self.r2_client is None:
             return
-            
+
         video_info = upload_package["video_info"]
         metadata = upload_package["metadata"]
 
@@ -243,14 +246,40 @@ class CloudflareUploader:
             "unique_contestants": metadata["processing_summary"]["unique_contestants"],
             "recognition_rate": metadata["processing_summary"]["recognition_rate"],
             "stream_urls": {
-                "1080p": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/videos/processed/{video_info['processed_name']}/{video_info['processed_name']}_1080p.mp4",
-                "720p": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/videos/processed/{video_info['processed_name']}/{video_info['processed_name']}_720p.mp4",
+                "1080p": (
+                    f"https://{self.bucket_name}.{self.account_id}."
+                    f"r2.cloudflarestorage.com/videos/processed/"
+                    f"{video_info['processed_name']}/"
+                    f"{video_info['processed_name']}_1080p.mp4"
+                ),
+                "720p": (
+                    f"https://{self.bucket_name}.{self.account_id}."
+                    f"r2.cloudflarestorage.com/videos/processed/"
+                    f"{video_info['processed_name']}/"
+                    f"{video_info['processed_name']}_720p.mp4"
+                ),
             },
-            "thumbnail_url": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/videos/thumbnails/{video_info['processed_name']}_thumbnail.jpg",
+            "thumbnail_url": (
+                f"https://{self.bucket_name}.{self.account_id}."
+                f"r2.cloudflarestorage.com/videos/thumbnails/"
+                f"{video_info['processed_name']}_thumbnail.jpg"
+            ),
             "metadata_urls": {
-                "metadata": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/metadata/videos/{video_info['processed_name']}/metadata.json",
-                "gallery": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/metadata/galleries/{video_info['processed_name']}/gallery.json",
-                "timeline": f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com/metadata/timelines/{video_info['processed_name']}/timeline.json",
+                "metadata": (
+                    f"https://{self.bucket_name}.{self.account_id}."
+                    f"r2.cloudflarestorage.com/metadata/videos/"
+                    f"{video_info['processed_name']}/metadata.json"
+                ),
+                "gallery": (
+                    f"https://{self.bucket_name}.{self.account_id}."
+                    f"r2.cloudflarestorage.com/metadata/galleries/"
+                    f"{video_info['processed_name']}/gallery.json"
+                ),
+                "timeline": (
+                    f"https://{self.bucket_name}.{self.account_id}."
+                    f"r2.cloudflarestorage.com/metadata/timelines/"
+                    f"{video_info['processed_name']}/timeline.json"
+                ),
             },
         }
 
@@ -259,13 +288,13 @@ class CloudflareUploader:
         video_index_key = f"index/videos/{video_info['processed_name']}.json"
         self._upload_json_to_r2(video_entry, video_index_key)
 
-        logger.info(f"Updated video index for: {video_info['processed_name']}")
+        logger.info("Updated video index for: %s", video_info["processed_name"])
 
     def list_uploaded_videos(self) -> List[Dict]:
         """List all uploaded videos from R2"""
         if self.r2_client is None:
             return []
-            
+
         try:
             response = self.r2_client.list_objects_v2(
                 Bucket=self.bucket_name, Prefix="index/videos/", Delimiter="/"
@@ -284,7 +313,7 @@ class CloudflareUploader:
             return videos
 
         except Exception as e:
-            logger.error(f"Failed to list uploaded videos: {e}")
+            logger.error("Failed to list uploaded videos: %s", e)
             return []
 
     def delete_video(self, video_name: str):
@@ -299,7 +328,7 @@ class CloudflareUploader:
             f"index/videos/{video_name}.json",
         ]
 
-        logger.info(f"Deleting video: {video_name}")
+        logger.info("Deleting video: %s", video_name)
 
         for prefix in prefixes:
             try:
@@ -318,13 +347,15 @@ class CloudflareUploader:
                         Bucket=self.bucket_name, Delete={"Objects": objects_to_delete}
                     )
                     logger.info(
-                        f"Deleted {len(objects_to_delete)} objects with prefix: {prefix}"
+                        "Deleted %d objects with prefix: %s",
+                        len(objects_to_delete),
+                        prefix,
                     )
 
             except Exception as e:
-                logger.error(f"Failed to delete objects with prefix {prefix}: {e}")
+                logger.error("Failed to delete objects with prefix %s: %s", prefix, e)
 
-        logger.info(f"Video deletion completed: {video_name}")
+        logger.info("Video deletion completed: %s", video_name)
 
 
 class CloudflareEnvironmentSetup:
@@ -350,7 +381,7 @@ class CloudflareEnvironmentSetup:
 
 ## 3. Set Environment Variables
 export CLOUDFLARE_ACCOUNT_ID="your-account-id"
-export CLOUDFLARE_API_TOKEN="your-api-token"  
+export CLOUDFLARE_API_TOKEN="your-api-token"
 export CLOUDFLARE_R2_ACCESS_KEY_ID="your-r2-access-key"
 export CLOUDFLARE_R2_SECRET_ACCESS_KEY="your-r2-secret-key"
 

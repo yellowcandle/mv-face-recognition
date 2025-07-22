@@ -11,7 +11,7 @@ import cv2
 import yaml
 from unittest.mock import Mock, patch
 import boto3
-from moto import mock_s3
+from moto import mock_aws
 
 
 @pytest.fixture
@@ -227,7 +227,7 @@ def mock_face_detection():
 @pytest.fixture
 def mock_cloudflare():
     """Mock Cloudflare services"""
-    with mock_s3():
+    with mock_aws():
         # Create mock S3 client for R2
         s3_client = boto3.client(
             "s3",
