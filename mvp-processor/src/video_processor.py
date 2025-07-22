@@ -430,7 +430,7 @@ class VideoProcessor:
             # Extract audio from original
             if original_video.audio is not None:
                 # Set the processed video's audio to the original audio
-                final_video = processed_video.set_audio(original_video.audio)
+                final_video = processed_video.with_audio(original_video.audio)
 
                 # Write the final video with audio
                 final_video.write_videofile(
