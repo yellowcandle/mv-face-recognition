@@ -76,36 +76,42 @@ class ContestantDatabase:
 
         for contestant_id, info in self.contestants_info.items():
             # Try to load real embedding by nickname (most likely to match filename)
-            nickname = info['nickname']
+            nickname = info["nickname"]
             embedding_path = self.photo_dir / f"{nickname}_embedding.npy"
-            
+
             encoding = None
             try:
                 if embedding_path.exists():
                     encoding = np.load(embedding_path)
-                    logger.debug(f"Loaded real embedding for {nickname} from {embedding_path}")
+                    logger.debug(
+                        f"Loaded real embedding for {nickname} from {embedding_path}"
+                    )
                     loaded_count += 1
                 else:
                     # Try alternative paths if direct nickname match doesn't work
-                    name = info['name']
+                    name = info["name"]
                     alt_paths = [
                         self.photo_dir / f"{name}_embedding.npy",
-                        self.photo_dir / f"contestant_{contestant_id}_embedding.npy"
+                        self.photo_dir / f"{contestant_id}_embedding.npy",
                     ]
-                    
+
                     for alt_path in alt_paths:
                         if alt_path.exists():
                             encoding = np.load(alt_path)
-                            logger.debug(f"Loaded real embedding for {nickname} from {alt_path}")
+                            logger.debug(
+                                f"Loaded real embedding for {nickname} from {alt_path}"
+                            )
                             loaded_count += 1
                             break
-                
+
                 if encoding is not None:
                     self.face_encodings[contestant_id] = encoding
                     self.contestant_names.append(contestant_id)
                 else:
-                    logger.warning(f"No embedding found for {nickname} (ID: {contestant_id})")
-                    
+                    logger.warning(
+                        f"No embedding found for {nickname} (ID: {contestant_id})"
+                    )
+
             except Exception as e:
                 logger.error(f"Failed to load embedding for {nickname}: {e}")
 
@@ -311,8 +317,6 @@ class FaceRecognizer:
             logger.warning("No contestant encodings available for recognition")
             return recognitions
 
-        known_names = list(self.contestant_db.face_encodings.keys())
-
         similarity_threshold = self.config["face_recognition"]["similarity_threshold"]
 
         for detection in detections:
@@ -326,23 +330,26 @@ class FaceRecognizer:
                     # Ensure consistent dimensionality - flatten both to 1D arrays
                     detection_encoding = detection.encoding.flatten()
                     known_encoding_flat = known_encoding.flatten()
-                    
+
                     # Calculate both Euclidean distance and cosine similarity for better matching
-                    euclidean_distance = np.linalg.norm(detection_encoding - known_encoding_flat)
-                    
+                    euclidean_distance = np.linalg.norm(
+                        detection_encoding - known_encoding_flat
+                    )
+
                     # Calculate cosine similarity (better for normalized vectors)
                     dot_product = np.dot(detection_encoding, known_encoding_flat)
-                    norm_product = np.linalg.norm(detection_encoding) * np.linalg.norm(known_encoding_flat)
+                    norm_product = np.linalg.norm(detection_encoding) * np.linalg.norm(
+                        known_encoding_flat
+                    )
                     if norm_product > 0:
                         cosine_similarity = dot_product / norm_product
                         cosine_distance = 1.0 - cosine_similarity
                     else:
                         cosine_distance = 1.0  # Maximum distance for zero vectors
-                    
+
                     # Use weighted combination of both metrics for robust matching
                     combined_distance = 0.6 * euclidean_distance + 0.4 * cosine_distance
                     all_distances.append((contestant_id, combined_distance))
-                    
                     if combined_distance < best_match_distance:
                         best_match_distance = combined_distance
                         best_match_id = contestant_id
@@ -369,7 +376,9 @@ class FaceRecognizer:
                 logger.debug(f"Best match: {self.contestant_db.contestants_info.get(best_match_id, {}).get('nickname', best_match_id) if best_match_id else 'None'}, distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold}")
                 
                 if best_match_id and confidence >= similarity_threshold:
-                    contestant_info = self.contestant_db.get_contestant_info(best_match_id)
+                    contestant_info = self.contestant_db.get_contestant_info(
+                        best_match_id
+                    )
 
                     recognition = FaceRecognition(
                         detection=detection,
@@ -385,8 +394,10 @@ class FaceRecognizer:
                         f"(confidence: {confidence:.3f}, distance: {best_match_distance:.3f})"
                     )
                 else:
-                    logger.info(f"No match for face at {detection.timestamp:.2f}s "
-                               f"(best distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold})")
+                    logger.info(
+                        f"No match for face at {detection.timestamp:.2f}s "
+                        f"(best distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold})"
+                    )
 
             except Exception as e:
                 logger.error(

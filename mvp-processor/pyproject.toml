@@ -26,6 +26,25 @@ dependencies = [
 cloud = [
     "boto3>=1.28.0",
 ]
+dev = [
+    # Testing dependencies
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "pytest-asyncio>=0.21.1",
+    "pytest-benchmark>=4.0.0",
+    # Test data and mocking
+    "moto>=5.0.0",
+    "fakeredis>=2.17.0",
+    "responses>=0.23.1",
+    "httpretty>=1.1.4",
+    # Test utilities
+    "factory-boy>=3.3.0",
+    "Faker>=19.3.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv.sources]
 face-recognition-models = { git = "https://github.com/ageitgey/face_recognition_models" }

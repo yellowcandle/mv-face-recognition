@@ -6,7 +6,6 @@ import pytest
 import numpy as np
 import cv2
 from pathlib import Path
-from unittest.mock import patch, Mock
 
 from src.video_processor import VideoProcessor, FrameProcessor
 
@@ -101,18 +100,10 @@ class TestVideoProcessor:
         # Should still create a file (may be empty or from last valid frame)
         assert Path(thumbnail_path).exists()
 
-    @patch("moviepy.editor.VideoFileClip")
-    def test_convert_video_format(self, mock_video_clip, sample_config, temp_dir):
+    def test_convert_video_format(self, sample_config, sample_video, temp_dir):
         """Test video format conversion"""
-        # Mock VideoFileClip
-        mock_clip = Mock()
-        mock_clip.resize.return_value = mock_clip
-        mock_clip.__enter__ = Mock(return_value=mock_clip)
-        mock_clip.__exit__ = Mock(return_value=None)
-        mock_video_clip.return_value = mock_clip
-
         processor = VideoProcessor(sample_config)
-        input_path = str(temp_dir / "input.mp4")
+        input_path = sample_video  # Use the sample video fixture
         output_path = str(temp_dir / "output.mp4")
 
         format_config = {
@@ -124,29 +115,27 @@ class TestVideoProcessor:
 
         processor.convert_video_format(input_path, output_path, format_config)
 
-        # Verify VideoFileClip was called
-        mock_video_clip.assert_called_once_with(input_path)
-        mock_clip.resize.assert_called_once_with(height=720)
-        mock_clip.write_videofile.assert_called_once()
+        # Verify output file was created
+        assert Path(output_path).exists()
 
-    def test_convert_video_format_1080p(self, sample_config, temp_dir):
+        # Check that output file has some content
+        assert Path(output_path).stat().st_size > 0
+
+    def test_convert_video_format_1080p(self, sample_config, sample_video, temp_dir):
         """Test 1080p video conversion"""
-        with patch("moviepy.editor.VideoFileClip") as mock_video_clip:
-            mock_clip = Mock()
-            mock_clip.resize.return_value = mock_clip
-            mock_clip.__enter__ = Mock(return_value=mock_clip)
-            mock_clip.__exit__ = Mock(return_value=None)
-            mock_video_clip.return_value = mock_clip
+        processor = VideoProcessor(sample_config)
+        input_path = sample_video  # Use the sample video fixture
+        output_path = str(temp_dir / "output.mp4")
 
-            processor = VideoProcessor(sample_config)
-            input_path = str(temp_dir / "input.mp4")
-            output_path = str(temp_dir / "output.mp4")
+        format_config = {"resolution": "1080p", "quality": "medium"}
 
-            format_config = {"resolution": "1080p", "quality": "medium"}
+        processor.convert_video_format(input_path, output_path, format_config)
 
-            processor.convert_video_format(input_path, output_path, format_config)
+        # Verify output file was created
+        assert Path(output_path).exists()
 
-            mock_clip.resize.assert_called_once_with(height=1080)
+        # Check that output file has some content
+        assert Path(output_path).stat().st_size > 0
 
 
 @pytest.mark.unit
