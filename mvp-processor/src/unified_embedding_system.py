@@ -60,6 +60,31 @@ class UnifiedEmbeddingSystem:
         
         self._initialize_backends()
 
+    def _load_image_from_path(self, image_path: Union[str, Path]) -> np.ndarray:
+        """Load and preprocess image from file path"""
+        try:
+            image_path = Path(image_path)
+            if not image_path.exists():
+                raise FileNotFoundError(f"Image file not found: {image_path}")
+            
+            # Load image using OpenCV
+            image = cv2.imread(str(image_path))
+            if image is None:
+                raise ValueError(f"Could not load image: {image_path}")
+            
+            # Convert BGR to RGB
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # Validate image dimensions
+            if len(image_rgb.shape) != 3 or image_rgb.shape[2] != 3:
+                raise ValueError(f"Invalid image format: expected RGB, got shape {image_rgb.shape}")
+            
+            return image_rgb
+            
+        except Exception as e:
+            logger.error(f"Failed to load image from {image_path}: {e}")
+            raise
+
     def _load_embedding_config(self, config: dict) -> EmbeddingConfig:
         """Load embedding configuration with intelligent defaults"""
         face_detection_config = config.get("face_detection", {})
@@ -96,22 +121,25 @@ class UnifiedEmbeddingSystem:
         except Exception as e:
             logger.debug(f"InsightFace initialization failed: {e}")
             
-        # Try to initialize face_recognition
-        try:
-            import face_recognition
-            self.face_recognition_available = True
-            logger.info("face_recognition backend available")
-        except Exception as e:
-            logger.debug(f"face_recognition not available: {e}")
+        # Only try to initialize face_recognition if InsightFace failed or if explicitly configured
+        if self.insightface_model is None or self.embedding_config.method == EmbeddingMethod.FACE_RECOGNITION:
+            try:
+                import face_recognition
+                self.face_recognition_available = True
+                logger.info("face_recognition backend available")
+            except Exception as e:
+                logger.debug(f"face_recognition not available: {e}")
+        else:
+            logger.info("Skipping face_recognition initialization (InsightFace available and preferred)")
 
     def generate_embedding(self, 
-                          face_image: np.ndarray, 
+                          face_image: Union[np.ndarray, str, Path], 
                           method: Optional[EmbeddingMethod] = None) -> Tuple[np.ndarray, Dict]:
         """
         Generate a normalized face embedding using the specified or best available method
         
         Args:
-            face_image: RGB face image (cropped to face region)
+            face_image: RGB face image (cropped to face region) or path to image file
             method: Optional specific method to use, defaults to configured method
             
         Returns:
@@ -119,6 +147,10 @@ class UnifiedEmbeddingSystem:
         """
         if method is None:
             method = self.embedding_config.method
+            
+        # Handle file path input
+        if isinstance(face_image, (str, Path)):
+            face_image = self._load_image_from_path(face_image)
             
         metadata = {
             "method": method.value,
@@ -177,6 +209,13 @@ class UnifiedEmbeddingSystem:
     def _generate_insightface_embedding(self, face_image: np.ndarray) -> np.ndarray:
         """Generate embedding using InsightFace model"""
         
+        # Validate input
+        if not isinstance(face_image, np.ndarray):
+            raise TypeError(f"Expected numpy array, got {type(face_image)}")
+        
+        if len(face_image.shape) != 3 or face_image.shape[2] != 3:
+            raise ValueError(f"Expected RGB image with shape (H, W, 3), got {face_image.shape}")
+        
         # Convert RGB to BGR for InsightFace
         bgr_image = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
         
@@ -196,6 +235,13 @@ class UnifiedEmbeddingSystem:
         """Generate embedding using face_recognition library"""
         import face_recognition
         
+        # Validate input
+        if not isinstance(face_image, np.ndarray):
+            raise TypeError(f"Expected numpy array, got {type(face_image)}")
+        
+        if len(face_image.shape) != 3 or face_image.shape[2] != 3:
+            raise ValueError(f"Expected RGB image with shape (H, W, 3), got {face_image.shape}")
+        
         # face_recognition expects RGB format
         encodings = face_recognition.face_encodings(face_image)
         
@@ -207,11 +253,19 @@ class UnifiedEmbeddingSystem:
     def _generate_opencv_embedding(self, face_image: np.ndarray) -> np.ndarray:
         """Generate custom embedding using OpenCV features (enhanced version of current method)"""
         
+        # Validate input
+        if not isinstance(face_image, np.ndarray):
+            raise TypeError(f"Expected numpy array, got {type(face_image)}")
+        
         # Convert to grayscale if needed
         if len(face_image.shape) == 3:
+            if face_image.shape[2] != 3:
+                raise ValueError(f"Expected RGB image with 3 channels, got {face_image.shape[2]}")
             face_gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
-        else:
+        elif len(face_image.shape) == 2:
             face_gray = face_image.copy()
+        else:
+            raise ValueError(f"Expected 2D or 3D image, got shape {face_image.shape}")
             
         # Check for sufficient contrast
         if np.std(face_gray) < 10:
@@ -325,6 +379,11 @@ class UnifiedEmbeddingSystem:
         Returns:
             Distance value (lower = more similar)
         """
+        
+        # Ensure both embeddings have the same dimension
+        target_dim = self.embedding_config.embedding_dimension
+        embedding1 = self._ensure_dimension(embedding1, target_dim)
+        embedding2 = self._ensure_dimension(embedding2, target_dim)
         
         if method == "cosine":
             # Cosine distance (1 - cosine similarity)

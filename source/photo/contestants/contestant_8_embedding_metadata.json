@@ -1,0 +1,13 @@
+{
+  "contestant_id": "8",
+  "name": "陳玥伶",
+  "nickname": "小砂",
+  "source_photo": "source/photo/contestants/8/8-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:01.266613",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.78765296936035,
+  "final_norm": 1.0
+}

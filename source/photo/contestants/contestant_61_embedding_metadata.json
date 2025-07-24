@@ -1,0 +1,13 @@
+{
+  "contestant_id": "61",
+  "name": "曾業喬",
+  "nickname": "燒賣",
+  "source_photo": "source/photo/contestants/61/61-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:10.317493",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.842819213867188,
+  "final_norm": 0.9999999403953552
+}

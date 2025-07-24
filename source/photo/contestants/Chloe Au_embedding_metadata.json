@@ -1,8 +1,0 @@
-{
-  "method": "insightface",
-  "dimension": 512,
-  "normalized": true,
-  "migrated_from": "legacy_embedding",
-  "migration_timestamp": "2025-07-22T14:50:37.626959",
-  "final_norm": 0.9999998807907104
-}

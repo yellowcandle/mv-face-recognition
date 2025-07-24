@@ -236,8 +236,10 @@ class VideoProcessor:
 
             # Draw annotations if they exist
             if annotations:
+                # Pass original video dimensions to fix coordinate scaling
                 frame = self._draw_frame_annotations(
-                    frame, annotations, target_width / width, target_height / height
+                    frame, annotations, target_width / width, target_height / height, 
+                    original_width=width, original_height=height
                 )
 
             out.write(frame)
@@ -280,19 +282,52 @@ class VideoProcessor:
         return []
 
     def _draw_frame_annotations(
-        self, frame, recognitions, scale_x: float, scale_y: float
+        self, frame, recognitions, scale_x: float, scale_y: float,
+        original_width: int = None, original_height: int = None
     ):
-        """Draw face recognition annotations on a frame"""
+        """Draw face recognition annotations on a frame with CJKV font support"""
         for recognition in recognitions:
             # Get face location and scale it
             location = recognition["face_location"]  # [top, right, bottom, left]
             top, right, bottom, left = location
 
-            # Scale coordinates to target resolution
-            left = int(left * scale_x)
-            right = int(right * scale_x)
-            top = int(top * scale_y)
-            bottom = int(bottom * scale_y)
+            # CRITICAL FIX: Face detection coordinates are already in the detection frame coordinate system
+            # (resized to resize_width=1920px during detection), but we're applying scaling as if they were
+            # in the original video coordinate system. We need to account for this mismatch.
+            
+            # Transform coordinates: detection_frame_coords -> original_coords -> target_frame_coords
+            
+            # Get current target frame dimensions
+            target_frame_height, target_frame_width = frame.shape[:2]
+            
+            if original_width and original_height:
+                # We have original dimensions, so we can calculate precise transformations
+                
+                # Step 1: Convert from detection coordinates back to original coordinates
+                # Detection frames are resized to self.resize_width maintaining aspect ratio
+                detection_height = int(original_height * self.resize_width / original_width)
+                
+                # Scale from detection frame back to original frame coordinates
+                orig_left = left * original_width / self.resize_width
+                orig_right = right * original_width / self.resize_width
+                orig_top = top * original_height / detection_height
+                orig_bottom = bottom * original_height / detection_height
+                
+                # Step 2: Scale from original coordinates to target frame coordinates
+                left = int(orig_left * target_frame_width / original_width)
+                right = int(orig_right * target_frame_width / original_width)
+                top = int(orig_top * target_frame_height / original_height)
+                bottom = int(orig_bottom * target_frame_height / original_height)
+                
+            else:
+                # Fallback: Direct scaling from detection to target (less precise)
+                detection_scale_x = target_frame_width / self.resize_width
+                detection_scale_y = detection_scale_x  # Maintain aspect ratio
+                
+                left = int(left * detection_scale_x)
+                right = int(right * detection_scale_x)
+                top = int(top * detection_scale_y)
+                bottom = int(bottom * detection_scale_y)
 
             # Ensure coordinates are within frame bounds
             frame_height, frame_width = frame.shape[:2]
@@ -317,40 +352,128 @@ class VideoProcessor:
             # Draw bounding box
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
 
-            # Draw label with name and confidence
+            # Draw label with name and confidence using CJKV-capable rendering
             name = recognition.get(
                 "contestant_nickname", recognition.get("contestant_name", "Unknown")
             )
             label = f"{name} ({confidence:.2f})"
 
-            # Calculate text position
-            text_x = left
-            text_y = max(0, top - 10)
-
-            # Draw background rectangle for text
-            (text_width, text_height), _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-            )
-            cv2.rectangle(
-                frame,
-                (text_x, text_y - text_height - 5),
-                (text_x + text_width, text_y + 5),
-                (0, 0, 0),
-                -1,
-            )
-
-            # Draw text
-            cv2.putText(
-                frame,
-                label,
-                (text_x, text_y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (255, 255, 255),
-                2,
+            # Use PIL for CJKV text rendering if CJKV font is available
+            frame = self._draw_text_with_cjkv_support(
+                frame, label, (left, max(0, top - 10)), color
             )
 
         return frame
+
+    def _draw_text_with_cjkv_support(self, frame, text, position, color):
+        """Draw text with CJKV support using PIL if needed, fallback to OpenCV"""
+        text_x, text_y = position
+        
+        # Check if text contains CJKV characters
+        has_cjkv = self._contains_cjkv_characters(text)
+        
+        if has_cjkv and self.cjkv_font is not None:
+            # Use PIL for CJKV text rendering
+            frame = self._draw_text_with_pil(frame, text, (text_x, text_y), color)
+        else:
+            # Use OpenCV for ASCII text (faster)
+            self._draw_text_with_opencv(frame, text, (text_x, text_y), color)
+            
+        return frame
+
+    def _contains_cjkv_characters(self, text):
+        """Check if text contains CJKV (Chinese, Japanese, Korean, Vietnamese) characters"""
+        for char in text:
+            # Unicode ranges for CJKV characters
+            code = ord(char)
+            if (
+                (0x4E00 <= code <= 0x9FFF) or    # CJK Unified Ideographs
+                (0x3400 <= code <= 0x4DBF) or    # CJK Extension A
+                (0x20000 <= code <= 0x2A6DF) or  # CJK Extension B
+                (0x2A700 <= code <= 0x2B73F) or  # CJK Extension C
+                (0x2B740 <= code <= 0x2B81F) or  # CJK Extension D
+                (0x2B820 <= code <= 0x2CEAF) or  # CJK Extension E
+                (0x2CEB0 <= code <= 0x2EBEF) or  # CJK Extension F
+                (0x3040 <= code <= 0x309F) or    # Hiragana
+                (0x30A0 <= code <= 0x30FF) or    # Katakana
+                (0xAC00 <= code <= 0xD7AF) or    # Hangul Syllables
+                (0x1100 <= code <= 0x11FF) or    # Hangul Jamo
+                (0x3130 <= code <= 0x318F) or    # Hangul Compatibility Jamo
+                (0xA960 <= code <= 0xA97F) or    # Hangul Jamo Extended-A
+                (0xD7B0 <= code <= 0xD7FF)       # Hangul Jamo Extended-B
+            ):
+                return True
+        return False
+
+    def _draw_text_with_pil(self, frame, text, position, color):
+        """Draw text using PIL with proper CJKV support"""
+        try:
+            # Convert OpenCV frame (BGR) to PIL Image (RGB)
+            pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(pil_image)
+            
+            text_x, text_y = position
+            
+            # Get text size for background rectangle
+            try:
+                bbox = draw.textbbox((0, 0), text, font=self.cjkv_font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+            except Exception:
+                # Fallback if textbbox not available
+                text_width = len(text) * 12  # Rough estimate
+                text_height = 16
+            
+            # Draw background rectangle (black with transparency)
+            background_coords = [
+                (text_x, text_y - text_height - 5),
+                (text_x + text_width + 10, text_y + 5)
+            ]
+            draw.rectangle(background_coords, fill=(0, 0, 0, 180))
+            
+            # Convert BGR color to RGB for PIL
+            text_color = (color[2], color[1], color[0])  # BGR to RGB
+            
+            # Draw text with CJKV font
+            draw.text((text_x + 2, text_y - text_height), text, font=self.cjkv_font, fill=text_color)
+            
+            # Convert back to OpenCV format (RGB to BGR)
+            frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            
+        except Exception as e:
+            logger.warning(f"Failed to draw text with PIL: {e}, falling back to OpenCV")
+            self._draw_text_with_opencv(frame, text, position, color)
+            
+        return frame
+
+    def _draw_text_with_opencv(self, frame, text, position, color):
+        """Draw text using OpenCV (for ASCII text)"""
+        text_x, text_y = position
+        
+        # Get text size for background rectangle
+        (text_width, text_height), _ = cv2.getTextSize(
+            text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+        )
+        
+        # Draw background rectangle for text
+        cv2.rectangle(
+            frame,
+            (text_x, text_y - text_height - 5),
+            (text_x + text_width, text_y + 5),
+            (0, 0, 0),
+            -1,
+        )
+
+        # Draw text
+        cv2.putText(
+            frame,
+            text,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 255),
+            2,
+        )
 
     def _load_cjkv_font(self):
         """Load appropriate font for CJKV text rendering"""
@@ -543,6 +666,8 @@ class FrameProcessor:
         # Draw label
         if label:
             label_text = f"{label} ({confidence:.2f})" if confidence > 0 else label
+            # Note: This method doesn't have access to CJKV font instance,
+            # so we use OpenCV. For proper CJKV support, use VideoProcessor._draw_text_with_cjkv_support
             cv2.putText(
                 frame,
                 label_text,

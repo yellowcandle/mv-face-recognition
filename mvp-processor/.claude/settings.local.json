@@ -6,7 +6,14 @@
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(find:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(uv add:*)",
+      "Bash(uv run:*)",
+      "Bash(backlog task list:*)",
+      "Bash(backlog task create:*)",
+      "Bash(backlog task:*)",
+      "Bash(grep:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

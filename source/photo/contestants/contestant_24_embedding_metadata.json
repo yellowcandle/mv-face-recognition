@@ -1,0 +1,13 @@
+{
+  "contestant_id": "24",
+  "name": "曾家瑩",
+  "nickname": "Ariel",
+  "source_photo": "source/photo/contestants/24/24-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:04.149403",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.794355392456055,
+  "final_norm": 0.9999999403953552
+}

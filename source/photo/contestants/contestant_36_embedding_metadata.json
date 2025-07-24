@@ -1,0 +1,13 @@
+{
+  "contestant_id": "36",
+  "name": "陳曉藍",
+  "nickname": "精靈",
+  "source_photo": "source/photo/contestants/36/36-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:06.315795",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.490962982177734,
+  "final_norm": 1.0
+}

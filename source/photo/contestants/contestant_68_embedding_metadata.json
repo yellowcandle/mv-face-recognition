@@ -1,0 +1,13 @@
+{
+  "contestant_id": "68",
+  "name": "傅奕思",
+  "nickname": "阿 J",
+  "source_photo": "source/photo/contestants/68/68-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:11.422890",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.45909881591797,
+  "final_norm": 1.0
+}

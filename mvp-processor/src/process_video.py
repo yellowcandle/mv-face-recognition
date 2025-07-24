@@ -139,8 +139,7 @@ class VideoProcessingPipeline:
                         absolute_path = os.path.join(project_root, relative_path[3:])
                         config_section[keys[-1]] = absolute_path
 
-        # Initialize contestant database with face encodings
-        self.initialize_database()
+        # Database already initialized by unified system - no additional initialization needed
 
     def setup_output_dirs(self):
         """Create output directories"""
@@ -157,7 +156,15 @@ class VideoProcessingPipeline:
         """Initialize contestant database"""
         logger.info("Initializing contestant database...")
         self.contestant_db.load_contestants_info()
-        self.contestant_db.build_face_encodings(force_rebuild=force_rebuild)
+        
+        # Use appropriate build method based on system type
+        if self.unified_face_detector:
+            # Use unified system method
+            self.contestant_db.build_unified_face_encodings(force_rebuild=force_rebuild)
+        else:
+            # Use legacy system method
+            self.contestant_db.build_face_encodings(force_rebuild=force_rebuild)
+            
         logger.info(
             "Database ready with %d contestants", len(self.contestant_db.face_encodings)
         )
@@ -449,11 +456,15 @@ def main(
         logger.debug(f"Resolved video path: {input_path}")
 
     try:
-        # Initialize pipeline
+        # Initialize pipeline (database is automatically initialized by unified system)
         pipeline = VideoProcessingPipeline(config, enable_upload=not no_upload)
 
-        # Initialize contestant database
-        pipeline.initialize_database(force_rebuild=rebuild_db)
+        # Force rebuild database if requested
+        if rebuild_db:
+            if pipeline.unified_face_detector:
+                pipeline.unified_face_detector.contestant_db.build_unified_face_encodings(force_rebuild=True)
+            else:
+                pipeline.initialize_database(force_rebuild=True)
 
         # Process video
         upload_package = pipeline.process_video(input_path, output_name)

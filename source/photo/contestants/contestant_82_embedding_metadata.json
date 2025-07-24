@@ -1,0 +1,13 @@
+{
+  "contestant_id": "82",
+  "name": "周卓盈",
+  "nickname": "阿 Mic",
+  "source_photo": "source/photo/contestants/82/82-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:13.600398",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.369823455810547,
+  "final_norm": 1.0
+}

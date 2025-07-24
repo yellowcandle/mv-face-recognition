@@ -1,0 +1,13 @@
+{
+  "contestant_id": "34",
+  "name": "黃斯琪",
+  "nickname": "CK",
+  "source_photo": "source/photo/contestants/34/34-1.png",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:06.017294",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 22.390792846679688,
+  "final_norm": 1.0
+}

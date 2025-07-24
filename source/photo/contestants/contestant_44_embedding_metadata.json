@@ -1,0 +1,13 @@
+{
+  "contestant_id": "44",
+  "name": "曾美欣",
+  "nickname": "Mei Mei",
+  "source_photo": "source/photo/contestants/44/44-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:07.601093",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.298154830932617,
+  "final_norm": 0.9999999403953552
+}

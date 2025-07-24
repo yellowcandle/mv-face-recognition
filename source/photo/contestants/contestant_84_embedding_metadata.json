@@ -1,0 +1,13 @@
+{
+  "contestant_id": "84",
+  "name": "趙展彤",
+  "nickname": "VAL",
+  "source_photo": "source/photo/contestants/84/84-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:13.920099",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.526052474975586,
+  "final_norm": 0.9999999403953552
+}

@@ -1,0 +1,13 @@
+{
+  "contestant_id": "2",
+  "name": "黃雅慧",
+  "nickname": "咖喱",
+  "source_photo": "source/photo/contestants/2/2-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:00.245593",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 23.86431884765625,
+  "final_norm": 1.0
+}

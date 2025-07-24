@@ -72,7 +72,7 @@ face_tracking:
   # supervision: Optimized Supervision ByteTracker (proven algorithms with performance optimizations)
   
   # Temporal window settings
-  tracking_window: 1.0              # Duration (seconds) to maintain face trajectories
+  tracking_window: 0.2             # Duration (seconds) to maintain face trajectories
   max_trajectory_gap: 10            # Maximum frames without detection before trajectory expiry
   min_trajectory_length: 3          # Minimum detections required for stable trajectory
   
@@ -88,7 +88,7 @@ face_tracking:
   min_stable_detections: 3          # Minimum confident detections for trajectory stability
   
   # Re-identification configuration
-  re_recognition_interval: 6        # Frames between re-recognition attempts
+  re_recognition_interval: 1        # Frames between re-recognition attempts
   identity_voting_weight: 1.0       # Weight for contestant identity voting in trajectory
   temporal_consistency_bonus: 0.15  # Bonus for temporally consistent recognitions
   
@@ -98,7 +98,7 @@ face_tracking:
   memory_optimization: true         # Enable memory-efficient trajectory management
   
   # Performance tuning (aligned with 6 FPS detection, 25 FPS video)
-  detection_sampling_rate: 6        # FPS for face detection (matches video.fps_sample_rate)
+  detection_sampling_rate: 25        # FPS for face detection (matches video.fps_sample_rate)
   interpolation_smoothing: 0.85     # Smoothing factor for trajectory interpolation
   adaptive_threshold: true          # Enable adaptive confidence thresholds based on scene complexity
 

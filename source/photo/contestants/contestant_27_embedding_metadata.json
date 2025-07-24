@@ -1,0 +1,13 @@
+{
+  "contestant_id": "27",
+  "name": "姜咏鑫",
+  "nickname": "Ada 仔",
+  "source_photo": "source/photo/contestants/27/27-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:04.787363",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 18.49800682067871,
+  "final_norm": 1.0
+}

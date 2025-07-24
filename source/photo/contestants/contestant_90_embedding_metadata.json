@@ -1,0 +1,13 @@
+{
+  "contestant_id": "90",
+  "name": "鄭嘉欣",
+  "nickname": "Christine",
+  "source_photo": "source/photo/contestants/90/90-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:14.881291",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.11528778076172,
+  "final_norm": 1.0
+}

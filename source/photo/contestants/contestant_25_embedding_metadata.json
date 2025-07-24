@@ -1,0 +1,13 @@
+{
+  "contestant_id": "25",
+  "name": "徐嘉蔚",
+  "nickname": "Emiko",
+  "source_photo": "source/photo/contestants/25/25-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:04.418464",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 18.461490631103516,
+  "final_norm": 1.0
+}

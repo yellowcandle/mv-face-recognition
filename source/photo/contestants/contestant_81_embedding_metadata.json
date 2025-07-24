@@ -1,0 +1,13 @@
+{
+  "contestant_id": "81",
+  "name": "鍾卓穎",
+  "nickname": "Ash",
+  "source_photo": "source/photo/contestants/81/81-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:13.441064",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.960620880126953,
+  "final_norm": 0.9999999403953552
+}

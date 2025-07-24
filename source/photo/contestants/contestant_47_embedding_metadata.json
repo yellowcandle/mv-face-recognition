@@ -1,0 +1,13 @@
+{
+  "contestant_id": "47",
+  "name": "周曉欣",
+  "nickname": "Ace",
+  "source_photo": "source/photo/contestants/47/47-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:08.069858",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.454267501831055,
+  "final_norm": 1.0
+}

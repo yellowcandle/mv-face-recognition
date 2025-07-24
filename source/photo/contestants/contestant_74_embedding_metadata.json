@@ -1,0 +1,13 @@
+{
+  "contestant_id": "74",
+  "name": "蘇芷晴",
+  "nickname": "So Ching",
+  "source_photo": "source/photo/contestants/74/74-1.png",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:12.328619",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.432865142822266,
+  "final_norm": 1.0
+}

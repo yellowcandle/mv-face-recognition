@@ -1,0 +1,13 @@
+{
+  "contestant_id": "95",
+  "name": "許寶恆",
+  "nickname": "Alice",
+  "source_photo": "source/photo/contestants/95/95-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:15.651007",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 22.00527572631836,
+  "final_norm": 1.0
+}
