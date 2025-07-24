@@ -1,0 +1,13 @@
+{
+  "contestant_id": "30",
+  "name": "羅思雅",
+  "nickname": "Caca",
+  "source_photo": "source/photo/contestants/30/30-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:05.267515",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 23.196666717529297,
+  "final_norm": 1.0000001192092896
+}

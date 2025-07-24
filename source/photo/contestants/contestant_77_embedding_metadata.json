@@ -1,0 +1,13 @@
+{
+  "contestant_id": "77",
+  "name": "吳秀明",
+  "nickname": "TABI",
+  "source_photo": "source/photo/contestants/77/77-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:12.794458",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 23.75971794128418,
+  "final_norm": 1.0
+}

@@ -1,0 +1,13 @@
+{
+  "contestant_id": "3",
+  "name": "邱彥筒",
+  "nickname": "Marf",
+  "source_photo": "source/photo/contestants/3/3-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:00.400824",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.609525680541992,
+  "final_norm": 1.0
+}

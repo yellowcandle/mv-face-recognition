@@ -1,0 +1,13 @@
+{
+  "contestant_id": "17",
+  "name": "黃詠霖",
+  "nickname": "阿蛋",
+  "source_photo": "source/photo/contestants/17/17-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:02.669259",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.059818267822266,
+  "final_norm": 0.9999998807907104
+}

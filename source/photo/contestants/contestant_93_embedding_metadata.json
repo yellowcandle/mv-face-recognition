@@ -1,0 +1,13 @@
+{
+  "contestant_id": "93",
+  "name": "廖雪蕎",
+  "nickname": "Liu 哥",
+  "source_photo": "source/photo/contestants/93/93-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:15.340559",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.304765701293945,
+  "final_norm": 1.0
+}

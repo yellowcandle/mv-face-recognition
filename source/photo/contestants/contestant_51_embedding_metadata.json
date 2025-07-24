@@ -1,0 +1,13 @@
+{
+  "contestant_id": "51",
+  "name": "歐陽巧霖",
+  "nickname": "Bubu",
+  "source_photo": "source/photo/contestants/51/51-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:08.692792",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 16.277565002441406,
+  "final_norm": 0.9999999403953552
+}

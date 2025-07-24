@@ -86,22 +86,47 @@ class UnifiedFaceDetector:
             # Use enhanced detector which already generates embeddings
             detections = self.detection_backend.detect_faces(frame, timestamp, frame_number)
             
-            # Convert embeddings to unified format
+            # Use enhanced detector embeddings directly when compatible
             unified_detections = []
             for detection in detections:
-                # Regenerate embedding using unified system from detected face region
-                face_region = self._extract_face_region(frame, detection.location)
-                if face_region is not None:
-                    unified_embedding, metadata = self.embedding_system.generate_embedding(face_region)
+                # Check if the enhanced detector embedding is compatible with unified system
+                if (hasattr(detection, 'encoding') and detection.encoding is not None and 
+                    self.embedding_system.validate_embedding(detection.encoding)):
                     
+                    # Use the enhanced detector's embedding directly (already from InsightFace)
                     unified_detection = FaceDetection(
                         location=detection.location,
-                        encoding=unified_embedding,
+                        encoding=detection.encoding,
                         timestamp=timestamp,
                         frame_number=frame_number,
                         confidence=detection.confidence
                     )
                     unified_detections.append(unified_detection)
+                    logger.debug(f"Using enhanced detector embedding directly at {timestamp:.2f}s")
+                    
+                else:
+                    # Fallback: regenerate embedding from extracted face region with improved extraction
+                    face_region = self._extract_face_region(frame, detection.location)
+                    if face_region is not None and self._validate_face_quality(face_region):
+                        try:
+                            unified_embedding, metadata = self.embedding_system.generate_embedding(face_region)
+                            
+                            unified_detection = FaceDetection(
+                                location=detection.location,
+                                encoding=unified_embedding,
+                                timestamp=timestamp,
+                                frame_number=frame_number,
+                                confidence=detection.confidence
+                            )
+                            unified_detections.append(unified_detection)
+                            logger.debug(f"Generated fallback embedding at {timestamp:.2f}s")
+                            
+                        except Exception as e:
+                            logger.debug(f"Failed to generate fallback embedding at {timestamp:.2f}s: {e}")
+                            continue
+                    else:
+                        logger.debug(f"Face quality validation failed at {timestamp:.2f}s")
+                        continue
                     
             return unified_detections
             
@@ -169,23 +194,85 @@ class UnifiedFaceDetector:
         return detections
 
     def _extract_face_region(self, frame: np.ndarray, location: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
-        """Extract face region from frame given location"""
+        """Extract face region from frame given location with padding for better recognition"""
         try:
             top, right, bottom, left = location
             
+            # Validate input coordinates
+            if top >= bottom or left >= right:
+                logger.debug(f"Invalid face coordinates: top={top}, right={right}, bottom={bottom}, left={left}")
+                return None
+            
+            # Add generous padding for better face recognition (25% on each side)
+            face_height = bottom - top
+            face_width = right - left
+            padding_h = int(face_height * 0.25)
+            padding_w = int(face_width * 0.25)
+            
+            # Apply padding
+            top_padded = top - padding_h
+            bottom_padded = bottom + padding_h
+            left_padded = left - padding_w
+            right_padded = right + padding_w
+            
             # Ensure coordinates are within frame bounds
             h, w = frame.shape[:2]
-            top = max(0, top)
-            bottom = min(h, bottom)
-            left = max(0, left)
-            right = min(w, right)
+            top_padded = max(0, top_padded)
+            bottom_padded = min(h, bottom_padded)
+            left_padded = max(0, left_padded)
+            right_padded = min(w, right_padded)
             
-            # Extract face region
-            face_region = frame[top:bottom, left:right]
-            
-            # Ensure minimum size
-            if face_region.shape[0] < 30 or face_region.shape[1] < 30:
+            # Ensure we still have a valid region after padding adjustment
+            if top_padded >= bottom_padded or left_padded >= right_padded:
+                logger.debug(f"Invalid padded coordinates")
                 return None
+            
+            # Extract face region with padding
+            face_region = frame[top_padded:bottom_padded, left_padded:right_padded]
+            
+            # Validate extraction was successful
+            if face_region.size == 0:
+                logger.debug(f"Empty face region extracted")
+                return None
+            
+            # Ensure minimum size for InsightFace (at least 112x112 for better quality)
+            min_size = 112
+            if face_region.shape[0] < min_size or face_region.shape[1] < min_size:
+                # Resize maintaining aspect ratio, pad to square if needed
+                target_size = max(min_size, max(face_region.shape[0], face_region.shape[1]))
+                
+                # Calculate new dimensions maintaining aspect ratio
+                aspect_ratio = face_region.shape[1] / face_region.shape[0]
+                if aspect_ratio > 1:
+                    new_width = target_size
+                    new_height = int(target_size / aspect_ratio)
+                else:
+                    new_height = target_size
+                    new_width = int(target_size * aspect_ratio)
+                
+                face_region = cv2.resize(face_region, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+                
+                # Pad to square if necessary
+                if new_width != new_height:
+                    delta_w = target_size - new_width
+                    delta_h = target_size - new_height
+                    top_pad = delta_h // 2
+                    bottom_pad = delta_h - top_pad
+                    left_pad = delta_w // 2
+                    right_pad = delta_w - left_pad
+                    
+                    face_region = cv2.copyMakeBorder(
+                        face_region, top_pad, bottom_pad, left_pad, right_pad,
+                        cv2.BORDER_CONSTANT, value=(128, 128, 128)  # Gray padding
+                    )
+            
+            # Ensure maximum size for efficiency (no larger than 224x224)
+            max_size = 224
+            if face_region.shape[0] > max_size or face_region.shape[1] > max_size:
+                scale = max_size / max(face_region.shape[0], face_region.shape[1])
+                new_width = int(face_region.shape[1] * scale)
+                new_height = int(face_region.shape[0] * scale)
+                face_region = cv2.resize(face_region, (new_width, new_height), interpolation=cv2.INTER_AREA)
                 
             return face_region
             
@@ -196,23 +283,46 @@ class UnifiedFaceDetector:
     def _validate_face_quality(self, face_region: np.ndarray) -> bool:
         """Validate face region quality for reliable embedding generation"""
         
-        # Convert to grayscale if needed
-        if len(face_region.shape) == 3:
-            face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY)
-        else:
-            face_gray = face_region
-        
-        # Check for sufficient contrast/variation
-        if np.std(face_gray) < 10:
+        # Check basic size requirements (updated for better minimum)
+        if face_region.shape[0] < 80 or face_region.shape[1] < 80:
+            logger.debug(f"Face region too small: {face_region.shape}")
             return False
         
-        # Check for reasonable brightness
+        # Validate we have a color image
+        if len(face_region.shape) != 3 or face_region.shape[2] != 3:
+            logger.debug(f"Invalid face region shape: {face_region.shape}")
+            return False
+        
+        # Convert to grayscale for quality checks
+        face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY)
+        
+        # Check for sufficient contrast/variation (more lenient threshold)
+        std_dev = np.std(face_gray)
+        if std_dev < 6:
+            logger.debug(f"Face region lacks contrast: std={std_dev:.2f}")
+            return False
+        
+        # Check for reasonable brightness (more permissive range)
         mean_brightness = np.mean(face_gray)
-        if mean_brightness < 20 or mean_brightness > 235:
+        if mean_brightness < 10 or mean_brightness > 245:
+            logger.debug(f"Face region poor brightness: mean={mean_brightness:.2f}")
             return False
         
-        # Check for minimum size
-        if face_region.shape[0] < 30 or face_region.shape[1] < 30:
+        # Check for blurriness using Laplacian variance (more lenient)
+        laplacian_var = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+        if laplacian_var < 30:  # Relaxed blur threshold
+            logger.debug(f"Face region too blurry: laplacian_var={laplacian_var:.2f}")
+            return False
+        
+        # Check for extreme aspect ratios (more permissive)
+        aspect_ratio = face_region.shape[1] / face_region.shape[0]
+        if aspect_ratio < 0.3 or aspect_ratio > 3.0:
+            logger.debug(f"Face region extreme aspect ratio: {aspect_ratio:.2f}")
+            return False
+        
+        # Check for all-zero or constant regions
+        if np.max(face_gray) - np.min(face_gray) < 10:
+            logger.debug(f"Face region lacks dynamic range")
             return False
             
         return True
@@ -354,28 +464,39 @@ class UnifiedContestantDatabase(ContestantDatabase):
         for contestant_id, info in self.contestants_info.items():
             nickname = info["nickname"]
             
-            # Try to load unified embedding first
-            unified_path = self.photo_dir / f"{nickname}_unified_embedding.npy"
-            metadata_path = self.photo_dir / f"{nickname}_embedding_metadata.json"
+            # Try to load unified embedding first (using ID-based naming)
+            unified_path = self.photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+            metadata_path = self.photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+            
+            # Fallback paths for legacy nickname-based naming
+            legacy_unified_path = self.photo_dir / f"{nickname}_unified_embedding.npy"
+            legacy_metadata_path = self.photo_dir / f"{nickname}_embedding_metadata.json"
             
             encoding = None
             is_unified = False
             
             try:
-                if unified_path.exists() and metadata_path.exists() and not force_rebuild:
+                # Try ID-based naming first (current standard)
+                current_path, current_metadata = unified_path, metadata_path
+                if not (unified_path.exists() and metadata_path.exists()):
+                    # Fallback to legacy nickname-based naming
+                    current_path, current_metadata = legacy_unified_path, legacy_metadata_path
+                
+                if current_path.exists() and current_metadata.exists() and not force_rebuild:
                     # Load unified embedding
-                    encoding = np.load(unified_path)
+                    encoding = np.load(current_path)
                     
                     # Verify it's truly unified by checking metadata
                     try:
-                        with open(metadata_path, 'r') as f:
+                        with open(current_metadata, 'r') as f:
                             metadata = json.load(f)
                         
                         expected_method = self.embedding_system.embedding_config.method.value
                         if metadata.get("method") == expected_method:
                             is_unified = True
                             unified_count += 1
-                            logger.debug(f"Loaded unified embedding for {nickname} (method: {metadata['method']})")
+                            file_source = "ID-based" if current_path == unified_path else "nickname-based"
+                            logger.debug(f"Loaded unified embedding for {nickname} from {file_source} file (method: {metadata['method']})")
                         else:
                             logger.debug(f"Unified embedding for {nickname} has wrong method: {metadata.get('method')} vs {expected_method}")
                             encoding = None
@@ -436,8 +557,15 @@ class UnifiedContestantDatabase(ContestantDatabase):
         
         for contestant_id, info in self.contestants_info.items():
             nickname = info["nickname"]
-            unified_path = self.photo_dir / f"{nickname}_unified_embedding.npy"
-            metadata_path = self.photo_dir / f"{nickname}_embedding_metadata.json"
+            
+            # Try ID-based naming first (current standard)
+            unified_path = self.photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+            metadata_path = self.photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+            
+            # Fallback to legacy nickname-based naming
+            if not (unified_path.exists() and metadata_path.exists()):
+                unified_path = self.photo_dir / f"{nickname}_unified_embedding.npy"
+                metadata_path = self.photo_dir / f"{nickname}_embedding_metadata.json"
             
             if unified_path.exists() and metadata_path.exists():
                 try:
@@ -463,9 +591,9 @@ class UnifiedContestantDatabase(ContestantDatabase):
         for contestant_id, info in self.contestants_info.items():
             nickname = info["nickname"]
             
-            # Check if unified embedding already exists
-            unified_path = self.photo_dir / f"{nickname}_unified_embedding.npy"
-            metadata_path = self.photo_dir / f"{nickname}_embedding_metadata.json"
+            # Check if unified embedding already exists (using ID-based naming)
+            unified_path = self.photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+            metadata_path = self.photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
             
             if unified_path.exists() and metadata_path.exists() and not force_regenerate:
                 stats["skipped"] += 1

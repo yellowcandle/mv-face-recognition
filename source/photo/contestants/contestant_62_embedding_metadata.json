@@ -1,0 +1,13 @@
+{
+  "contestant_id": "62",
+  "name": "何榛綦",
+  "nickname": "榛綦",
+  "source_photo": "source/photo/contestants/62/62-1.png",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:10.493039",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 21.016918182373047,
+  "final_norm": 1.0
+}

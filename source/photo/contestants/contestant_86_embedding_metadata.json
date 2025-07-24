@@ -1,0 +1,13 @@
+{
+  "contestant_id": "86",
+  "name": "黎美萱",
+  "nickname": "Michelle",
+  "source_photo": "source/photo/contestants/86/86-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:14.228286",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.252992630004883,
+  "final_norm": 1.0
+}

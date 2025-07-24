@@ -1,0 +1,12 @@
+{
+  "contestant_id": "72",
+  "name": "廖芷嘉",
+  "nickname": "Ika",
+  "source_photo": "source/photo/contestants/72/72-1.jpg",
+  "backend": "random_fallback",
+  "generated_at": "2025-07-24T08:19:11.994774",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "error": "No face detected by InsightFace in provided image"
+}

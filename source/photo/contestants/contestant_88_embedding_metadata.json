@@ -1,0 +1,13 @@
+{
+  "contestant_id": "88",
+  "name": "劉展翹",
+  "nickname": "Jackie",
+  "source_photo": "source/photo/contestants/88/88-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:14.543503",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 23.356571197509766,
+  "final_norm": 1.0
+}

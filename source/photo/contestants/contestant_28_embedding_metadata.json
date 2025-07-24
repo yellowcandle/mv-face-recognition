@@ -1,0 +1,13 @@
+{
+  "contestant_id": "28",
+  "name": "王家晴",
+  "nickname": "Candy",
+  "source_photo": "source/photo/contestants/28/28-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:04.933257",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.184526443481445,
+  "final_norm": 0.9999999403953552
+}

@@ -1,0 +1,13 @@
+{
+  "contestant_id": "59",
+  "name": "張嘉慧",
+  "nickname": "嘉嘉",
+  "source_photo": "source/photo/contestants/59/59-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:09.981006",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 20.3905029296875,
+  "final_norm": 1.0
+}

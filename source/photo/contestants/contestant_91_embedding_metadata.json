@@ -1,0 +1,13 @@
+{
+  "contestant_id": "91",
+  "name": "許軼",
+  "nickname": "Day",
+  "source_photo": "source/photo/contestants/91/91-1.jpg",
+  "backend": "insightface",
+  "generated_at": "2025-07-24T08:19:15.036493",
+  "method": "insightface",
+  "dimension": 512,
+  "normalized": true,
+  "norm_factor": 19.14520263671875,
+  "final_norm": 0.9999999403953552
+}
