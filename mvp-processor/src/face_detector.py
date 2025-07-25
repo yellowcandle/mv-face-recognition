@@ -131,12 +131,15 @@ class FaceDetector:
         self.config = config
         self.model = config["face_detection"]["model"]
         self.min_confidence = config["face_detection"]["min_confidence"]
-        self.enable_hardware_acceleration = config["face_detection"].get("enable_hardware_acceleration", False)
-        
+        self.enable_hardware_acceleration = config["face_detection"].get(
+            "enable_hardware_acceleration", False
+        )
+
         # Choose detector based on configuration
         if self.enable_hardware_acceleration and self.model == "insightface":
             try:
                 from enhanced_face_detector import AcceleratedFaceDetector
+
                 self.detector = AcceleratedFaceDetector(config)
                 self.use_enhanced = True
                 logger.info("Using hardware-accelerated face detection")
@@ -147,7 +150,7 @@ class FaceDetector:
         else:
             self.use_enhanced = False
             self._init_opencv_detector()
-    
+
     def _init_opencv_detector(self):
         """Initialize OpenCV face detector"""
         self.face_cascade = cv2.CascadeClassifier(
@@ -210,57 +213,74 @@ class FaceDetector:
             if w < min_face_size or h < min_face_size:
                 logger.debug(f"Skipping small face: {w}x{h} pixels at {timestamp:.2f}s")
                 continue
-            
+
             # Convert OpenCV format (x, y, w, h) to face_recognition format (top, right, bottom, left)
             top, right, bottom, left = y, x + w, y + h, x
             location = (top, right, bottom, left)
 
             # Extract face region for encoding generation with validation
             face_region = frame[top:bottom, left:right]
-            
+
             # Validate face region quality - SKIP invalid faces instead of using random
             if face_region.size == 0:
                 logger.debug(f"Empty face region at {timestamp:.2f}s - skipping")
                 continue
-            
-            # Check face region has sufficient area 
-            if face_region.shape[0] < min_face_size or face_region.shape[1] < min_face_size:
-                logger.debug(f"Face region too small: {face_region.shape} at {timestamp:.2f}s - skipping")
+
+            # Check face region has sufficient area
+            if (
+                face_region.shape[0] < min_face_size
+                or face_region.shape[1] < min_face_size
+            ):
+                logger.debug(
+                    f"Face region too small: {face_region.shape} at {timestamp:.2f}s - skipping"
+                )
                 continue
-            
+
             # Check for sufficient contrast/variation (avoid blank regions)
-            face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY) if len(face_region.shape) == 3 else face_region
+            face_gray = (
+                cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY)
+                if len(face_region.shape) == 3
+                else face_region
+            )
             if np.std(face_gray) < 10:  # Low contrast threshold
-                logger.debug(f"Low contrast face region at {timestamp:.2f}s (std={np.std(face_gray):.1f}) - skipping")
+                logger.debug(
+                    f"Low contrast face region at {timestamp:.2f}s (std={np.std(face_gray):.1f}) - skipping"
+                )
                 continue
-            
+
             # Generate improved face encoding from validated region
             try:
                 # Apply histogram equalization for better contrast
                 face_gray_eq = cv2.equalizeHist(face_gray)
-                
+
                 # Resize to consistent dimensions for better comparison
                 face_resized = cv2.resize(face_gray_eq, (64, 64))
-                
+
                 # Create enhanced feature vector
                 face_encoding = face_resized.flatten().astype(np.float64)
-                
+
                 # Add gradient features for better discrimination
                 grad_x = cv2.Sobel(face_resized, cv2.CV_64F, 1, 0, ksize=3).flatten()
                 grad_y = cv2.Sobel(face_resized, cv2.CV_64F, 0, 1, ksize=3).flatten()
-                
+
                 # Combine features
-                enhanced_features = np.concatenate([face_encoding, grad_x[:256], grad_y[:256]])
-                
+                enhanced_features = np.concatenate(
+                    [face_encoding, grad_x[:256], grad_y[:256]]
+                )
+
                 # Normalize to unit vector for better distance calculation
-                face_encoding = enhanced_features / (np.linalg.norm(enhanced_features) + 1e-8)
-                
+                face_encoding = enhanced_features / (
+                    np.linalg.norm(enhanced_features) + 1e-8
+                )
+
                 # Pad or truncate to 512 dimensions to match stored embeddings
                 if len(face_encoding) > 512:
                     face_encoding = face_encoding[:512]
                 else:
-                    face_encoding = np.pad(face_encoding, (0, 512 - len(face_encoding)), 'constant')
-                
+                    face_encoding = np.pad(
+                        face_encoding, (0, 512 - len(face_encoding)), "constant"
+                    )
+
                 detection = FaceDetection(
                     location=location,
                     encoding=face_encoding,
@@ -269,26 +289,26 @@ class FaceDetector:
                     confidence=0.8,  # Mock confidence for OpenCV detection
                 )
                 detections.append(detection)
-                
+
             except Exception as e:
-                logger.debug(f"Failed to process face region at {timestamp:.2f}s: {e} - skipping")
+                logger.debug(
+                    f"Failed to process face region at {timestamp:.2f}s: {e} - skipping"
+                )
                 continue
 
-        logger.debug(
-            f"Detected {len(detections)} faces at timestamp {timestamp:.2f}s"
-        )
+        logger.debug(f"Detected {len(detections)} faces at timestamp {timestamp:.2f}s")
         return detections
 
     def get_performance_stats(self) -> Dict:
         """Get performance statistics from the detector"""
-        if self.use_enhanced and hasattr(self.detector, 'get_performance_stats'):
+        if self.use_enhanced and hasattr(self.detector, "get_performance_stats"):
             return self.detector.get_performance_stats()
         else:
             return {"backend": "opencv_cpu", "performance": {}}
 
     def cleanup(self):
         """Clean up resources"""
-        if self.use_enhanced and hasattr(self.detector, 'cleanup'):
+        if self.use_enhanced and hasattr(self.detector, "cleanup"):
             self.detector.cleanup()
 
 
@@ -323,10 +343,13 @@ class FaceRecognizer:
             try:
                 # Calculate distances between detected face and all known faces
                 best_match_id = None
-                best_match_distance = float('inf')
+                best_match_distance = float("inf")
                 all_distances = []  # Debug: track all distances
-                
-                for contestant_id, known_encoding in self.contestant_db.face_encodings.items():
+
+                for (
+                    contestant_id,
+                    known_encoding,
+                ) in self.contestant_db.face_encodings.items():
                     # Ensure consistent dimensionality - flatten both to 1D arrays
                     detection_encoding = detection.encoding.flatten()
                     known_encoding_flat = known_encoding.flatten()
@@ -358,23 +381,31 @@ class FaceRecognizer:
                 # CRITICAL FIX: OpenCV embeddings use different scale than stored embeddings
                 # Analysis shows stored embeddings have distances 0.01-0.26, but OpenCV generates 7.6-7.9
                 # This is a 300x scaling difference - we need to normalize the comparison
-                
+
                 # Convert distance to confidence score using the correct scale for OpenCV vs stored embedding comparison
                 # Based on analysis: stored embeddings range 0.01-0.26, OpenCV embeddings produce distances 7.6-7.9
                 # We need a more lenient distance threshold for this mixed comparison
-                
-                if best_match_distance < 8.5:  # Very lenient threshold for cross-method comparison
+
+                if (
+                    best_match_distance < 8.5
+                ):  # Very lenient threshold for cross-method comparison
                     # Map distance 7.5-8.5 to confidence 0.8-0.1 (higher confidence for lower distances)
-                    confidence = max(0.0, 0.9 - ((best_match_distance - 7.5) / 1.0) * 0.8)
+                    confidence = max(
+                        0.0, 0.9 - ((best_match_distance - 7.5) / 1.0) * 0.8
+                    )
                 else:
                     confidence = 0.0
-                
+
                 # Debug: Show top 5 closest matches and why recognition failed/succeeded
                 all_distances.sort(key=lambda x: x[1])
                 top_matches = all_distances[:5]
-                logger.debug(f"Top 5 matches: {[(self.contestant_db.contestants_info.get(cid, {}).get('nickname', cid), dist) for cid, dist in top_matches]}")
-                logger.debug(f"Best match: {self.contestant_db.contestants_info.get(best_match_id, {}).get('nickname', best_match_id) if best_match_id else 'None'}, distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold}")
-                
+                logger.debug(
+                    f"Top 5 matches: {[(self.contestant_db.contestants_info.get(cid, {}).get('nickname', cid), dist) for cid, dist in top_matches]}"
+                )
+                logger.debug(
+                    f"Best match: {self.contestant_db.contestants_info.get(best_match_id, {}).get('nickname', best_match_id) if best_match_id else 'None'}, distance: {best_match_distance:.3f}, confidence: {confidence:.3f}, threshold: {similarity_threshold}"
+                )
+
                 if best_match_id and confidence >= similarity_threshold:
                     contestant_info = self.contestant_db.get_contestant_info(
                         best_match_id
@@ -412,7 +443,7 @@ class FaceRecognizer:
         """Filter recognitions by confidence threshold using config similarity_threshold"""
         if min_confidence is None:
             min_confidence = self.config["face_recognition"]["similarity_threshold"]
-        
+
         filtered = [r for r in recognitions if r.match_confidence >= min_confidence]
         logger.info(
             f"Filtered {len(recognitions)} recognitions to {len(filtered)} "

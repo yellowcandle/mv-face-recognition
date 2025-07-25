@@ -30,7 +30,7 @@ def test_embedding_distances():
         return
     
     print(f"Found {len(unified_files)} unified embeddings")
-    print(f"Testing distance calculations...")
+    print("Testing distance calculations...")
     
     # Load first 5 embeddings for testing
     embeddings = {}
@@ -48,7 +48,7 @@ def test_embedding_distances():
         return
     
     # Test distance calculations between pairs
-    print(f"\nDistance calculations:")
+    print("\nDistance calculations:")
     names = list(embeddings.keys())
     
     for i, name1 in enumerate(names[:3]):  # Test first 3

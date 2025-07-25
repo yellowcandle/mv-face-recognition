@@ -33,8 +33,19 @@ class SupervisionFaceTrajectory:
 
     # Contestant identity tracking
     contestant_votes: Dict[str, float] = field(default_factory=dict)
+    vote_timestamps: Dict[str, List[float]] = field(
+        default_factory=dict
+    )  # Track vote timing for decay
     recognized_contestant_id: Optional[str] = None
     recognition_confidence: float = 0.0
+
+    # Majority voting state tracking
+    consecutive_winner_frames: int = 0
+    current_winner: Optional[str] = None
+    decision_confidence: float = 0.0
+    vote_distribution_entropy: float = 0.0
+    runner_up_candidate: Optional[str] = None
+    confidence_gap: float = 0.0
 
     # Trajectory state
     is_active: bool = True
@@ -52,6 +63,10 @@ class SupervisionFaceTrajectory:
         tracker_config: Optional[dict] = None,
     ):
         """Add a new detection to this trajectory"""
+        # Store tracker config for majority voting
+        if tracker_config:
+            self._tracker_config = tracker_config
+
         self.detections.append(detection)
         self.recognitions.append(recognition)
         self.timestamps.append(detection.timestamp)
@@ -86,6 +101,16 @@ class SupervisionFaceTrajectory:
                     voting_weight = tracker_config.get("identity_voting_weight", 1.0)
 
                 vote_value = base_confidence * voting_weight
+
+                # Store vote with timestamp for temporal decay
+                if recognition.contestant_id not in self.vote_timestamps:
+                    self.vote_timestamps[recognition.contestant_id] = []
+
+                self.vote_timestamps[recognition.contestant_id].append(
+                    detection.timestamp
+                )
+
+                # Accumulate vote (legacy system - will be replaced by temporal decay in majority voting)
                 self.contestant_votes[recognition.contestant_id] = (
                     self.contestant_votes.get(recognition.contestant_id, 0) + vote_value
                 )
@@ -145,13 +170,32 @@ class SupervisionFaceTrajectory:
         )
 
     def _update_recognized_identity(self):
-        """Determine the most likely contestant identity based on votes"""
+        """Determine the most likely contestant identity based on majority voting"""
         if not self.contestant_votes:
             self.recognized_contestant_id = None
             self.recognition_confidence = 0.0
+            self._reset_voting_state()
             return
 
-        # Find contestant with highest vote score
+        # Get tracker config for majority voting parameters
+        # This will be passed from the tracker instance
+        # For now, use fallback to legacy behavior if not available
+        if not hasattr(self, "_tracker_config"):
+            self._legacy_update_recognized_identity()
+            return
+
+        tracker_config = self._tracker_config
+        majority_voting_enabled = tracker_config.get("majority_voting_enabled", True)
+
+        if not majority_voting_enabled:
+            self._legacy_update_recognized_identity()
+            return
+
+        # Apply majority voting logic
+        self._majority_voting_update(tracker_config)
+
+    def _legacy_update_recognized_identity(self):
+        """Original simple voting logic for backward compatibility"""
         best_contestant = max(self.contestant_votes.items(), key=lambda x: x[1])
         self.recognized_contestant_id = best_contestant[0]
 
@@ -160,6 +204,160 @@ class SupervisionFaceTrajectory:
             self.recognition_confidence = best_contestant[1] / total_votes
         else:
             self.recognition_confidence = 0.0
+
+    def _majority_voting_update(self, config: dict):
+        """Enhanced majority voting logic with consensus and stability requirements"""
+        import math
+
+        # Extract configuration parameters
+        min_votes = config.get("min_votes_for_decision", 3)
+        consensus_threshold = config.get("consensus_threshold", 0.6)
+        confidence_gap_threshold = config.get("confidence_gap_threshold", 0.2)
+        stability_requirement = config.get("stability_requirement", 5)
+
+        # Apply temporal decay to votes
+        current_time = self.timestamps[-1] if self.timestamps else 0.0
+        temporal_decay_factor = config.get("temporal_decay_factor", 0.9)
+        decayed_votes = self._calculate_decayed_votes(
+            current_time, temporal_decay_factor
+        )
+
+        # Calculate total votes using decayed values
+        total_votes = sum(decayed_votes.values())
+        total_detections = len([r for r in self.recognitions if r is not None])
+
+        # Check minimum votes requirement
+        if total_detections < min_votes:
+            self.recognized_contestant_id = None
+            self.recognition_confidence = 0.0
+            self.decision_confidence = 0.0
+            self._reset_voting_state()
+            return
+
+        # Sort candidates by decayed vote score
+        sorted_candidates = sorted(
+            decayed_votes.items(), key=lambda x: x[1], reverse=True
+        )
+
+        if not sorted_candidates:
+            self._reset_voting_state()
+            return
+
+        winner = sorted_candidates[0]
+        winner_id, winner_votes = winner
+        winner_proportion = winner_votes / total_votes if total_votes > 0 else 0
+
+        # Calculate runner-up and confidence gap
+        runner_up_votes = sorted_candidates[1][1] if len(sorted_candidates) > 1 else 0
+        confidence_gap = (
+            (winner_votes - runner_up_votes) / total_votes if total_votes > 0 else 1.0
+        )
+
+        # Store analysis results
+        self.runner_up_candidate = (
+            sorted_candidates[1][0] if len(sorted_candidates) > 1 else None
+        )
+        self.confidence_gap = confidence_gap
+
+        # Calculate vote distribution entropy for decision confidence
+        vote_proportions = [
+            votes / total_votes for _, votes in sorted_candidates if total_votes > 0
+        ]
+        if vote_proportions:
+            self.vote_distribution_entropy = -sum(
+                p * math.log2(p) for p in vote_proportions if p > 0
+            )
+        else:
+            self.vote_distribution_entropy = 0.0
+
+        # Decision logic: check consensus requirements
+        meets_consensus = winner_proportion >= consensus_threshold
+        meets_confidence_gap = confidence_gap >= confidence_gap_threshold
+
+        # Check if this is the same winner as before (stability tracking)
+        if winner_id == self.current_winner:
+            self.consecutive_winner_frames += 1
+        else:
+            self.consecutive_winner_frames = 1
+            self.current_winner = winner_id
+
+        # Stability requirement: need minimum consecutive frames for identity change
+        stable_enough = True
+        if (
+            self.recognized_contestant_id is not None
+            and self.recognized_contestant_id != winner_id
+        ):
+            # Identity change requires stability
+            stable_enough = self.consecutive_winner_frames >= stability_requirement
+
+        # Make final decision with FIXED logic
+        if meets_consensus and meets_confidence_gap and stable_enough:
+            # Strong evidence: assign identity with high confidence
+            self.recognized_contestant_id = winner_id
+            self.recognition_confidence = winner_proportion
+            self.decision_confidence = min(1.0, winner_proportion + confidence_gap)
+        elif meets_consensus or (winner_proportion > 0.35 and confidence_gap > 0.1):
+            # FIXED: Moderate evidence - still assign identity but with lower confidence
+            self.recognized_contestant_id = winner_id
+            self.recognition_confidence = winner_proportion * 0.7  # Reduced confidence
+            self.decision_confidence = winner_proportion
+        else:
+            # FIXED: Keep previous identity if we had one, don't clear aggressively
+            if self.recognized_contestant_id is None:
+                # Only assign new identity if we have some reasonable evidence
+                if winner_proportion > 0.25:
+                    self.recognized_contestant_id = winner_id
+                    self.recognition_confidence = winner_proportion * 0.5
+                    self.decision_confidence = winner_proportion * 0.5
+            # If we already have an identity, keep it unless there's strong counter-evidence
+            elif winner_proportion < 0.15:  # Very low confidence in new winner
+                # Only clear identity if evidence is very weak
+                self.recognized_contestant_id = None
+                self.recognition_confidence = 0.0
+                self.decision_confidence = 0.0
+
+    def _calculate_decayed_votes(
+        self, current_time: float, decay_factor: float
+    ) -> Dict[str, float]:
+        """Calculate temporally decayed votes giving more weight to recent recognitions"""
+        decayed_votes = {}
+
+        for contestant_id, timestamps in self.vote_timestamps.items():
+            if not timestamps:
+                continue
+
+            total_decayed_vote = 0.0
+
+            # Get corresponding confidence scores for this contestant
+            contestant_recognitions = [
+                (i, r)
+                for i, r in enumerate(self.recognitions)
+                if r is not None and r.contestant_id == contestant_id
+            ]
+
+            for recognition_idx, recognition in contestant_recognitions:
+                if recognition_idx < len(self.timestamps):
+                    vote_time = self.timestamps[recognition_idx]
+                    time_diff = current_time - vote_time
+
+                    # Apply exponential decay: newer votes have higher weight
+                    decay_weight = decay_factor**time_diff
+                    vote_value = recognition.match_confidence * decay_weight
+                    total_decayed_vote += vote_value
+
+            if total_decayed_vote > 0:
+                decayed_votes[contestant_id] = total_decayed_vote
+
+        return decayed_votes
+
+    def _reset_voting_state(self):
+        """Reset majority voting state variables"""
+        self.consecutive_winner_frames = 0
+        self.current_winner = None
+        self.decision_confidence = 0.0
+        self.vote_distribution_entropy = 0.0
+        self.runner_up_candidate = None
+        self.confidence_gap = 0.0
 
     def get_latest_location(self) -> Optional[Tuple[int, int, int, int]]:
         """Get the most recent face location in original format (top, right, bottom, left)"""
@@ -219,6 +417,25 @@ class SupervisionFaceTracker:
             "identity_voting_weight", 1.0
         )
 
+        # Majority voting parameters
+        majority_voting_config = self.tracking_config.get("majority_voting", {})
+        self.majority_voting_enabled = majority_voting_config.get("enable", True)
+        self.min_votes_for_decision = majority_voting_config.get(
+            "min_votes_for_decision", 3
+        )
+        self.consensus_threshold = majority_voting_config.get(
+            "consensus_threshold", 0.6
+        )
+        self.confidence_gap_threshold = majority_voting_config.get(
+            "confidence_gap_threshold", 0.2
+        )
+        self.temporal_decay_factor = majority_voting_config.get(
+            "temporal_decay_factor", 0.9
+        )
+        self.stability_requirement = majority_voting_config.get(
+            "stability_requirement", 5
+        )
+
         # Performance parameters
         self.max_active_trajectories = self.tracking_config.get(
             "max_active_trajectories", 20
@@ -250,11 +467,11 @@ class SupervisionFaceTracker:
         )  # Use face detection rate, not video rate
 
         # Optimized parameters for face tracking
-        face_optimized_activation = 0.4  # Higher threshold to reduce false tracks
+        face_optimized_activation = 0.3  # Lowered threshold for better track initiation
         face_optimized_matching = 0.5  # Optimized for face IoU patterns
-        face_optimized_buffer = min(
-            self.max_trajectory_gap, 8
-        )  # Limit buffer for efficiency
+        face_optimized_buffer = (
+            3  # Increased buffer for stability while preventing persistence
+        )
 
         self.byte_tracker = sv.ByteTrack(
             track_activation_threshold=face_optimized_activation,
@@ -398,10 +615,11 @@ class SupervisionFaceTracker:
                 if trajectory_id is None:
                     trajectory_id = self._create_new_trajectory(tracker_id, detection)
 
-                # Add detection to trajectory
+                # Add detection to trajectory with enhanced config
                 if trajectory_id in self.active_trajectories:
+                    enhanced_config = self._get_enhanced_tracking_config()
                     self.active_trajectories[trajectory_id].add_detection(
-                        detection, recognition, self.tracking_config
+                        detection, recognition, enhanced_config
                     )
 
         # Efficient handling of lost trajectories
@@ -427,10 +645,11 @@ class SupervisionFaceTracker:
                 break
 
         # Use simplified tracking for single face
+        enhanced_config = self._get_enhanced_tracking_config()
         if self.active_trajectories:
             # Continue existing trajectory
             trajectory = next(iter(self.active_trajectories.values()))
-            trajectory.add_detection(detection, recognition, self.tracking_config)
+            trajectory.add_detection(detection, recognition, enhanced_config)
         else:
             # Create first trajectory
             trajectory_id = self.next_trajectory_id
@@ -442,7 +661,7 @@ class SupervisionFaceTracker:
                 first_frame=detection.frame_number,
                 last_frame=detection.frame_number,
             )
-            new_trajectory.add_detection(detection, recognition, self.tracking_config)
+            new_trajectory.add_detection(detection, recognition, enhanced_config)
             self.active_trajectories[trajectory_id] = new_trajectory
 
         return list(self.active_trajectories.values())
@@ -624,6 +843,24 @@ class SupervisionFaceTracker:
         self.frames_since_cleanup = 0
         self.byte_tracker.reset()
         logger.info("SupervisionFaceTracker reset for new video")
+
+    def _get_enhanced_tracking_config(self) -> dict:
+        """Get enhanced tracking configuration with majority voting parameters"""
+        enhanced_config = self.tracking_config.copy()
+
+        # Add majority voting parameters from instance
+        enhanced_config.update(
+            {
+                "majority_voting_enabled": self.majority_voting_enabled,
+                "min_votes_for_decision": self.min_votes_for_decision,
+                "consensus_threshold": self.consensus_threshold,
+                "confidence_gap_threshold": self.confidence_gap_threshold,
+                "temporal_decay_factor": self.temporal_decay_factor,
+                "stability_requirement": self.stability_requirement,
+            }
+        )
+
+        return enhanced_config
 
 
 # Backward compatibility alias

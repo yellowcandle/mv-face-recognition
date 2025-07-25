@@ -17,7 +17,6 @@ Usage:
 """
 
 import sys
-import os
 import cv2
 import numpy as np
 import pandas as pd
@@ -582,13 +581,13 @@ def main(backend, config, force, validate_only, contestant_id, contestant_list, 
     
     if validate_only:
         # Validation mode
-        click.echo(f"🔍 Validating embeddings...")
+        click.echo("🔍 Validating embeddings...")
         results = generator.validate_embeddings(contestant_ids)
         
         if output_format == 'json':
             click.echo(json.dumps(results, indent=2, ensure_ascii=False))
         elif output_format == 'detailed':
-            click.echo(f"\nValidation Results:")
+            click.echo("\nValidation Results:")
             click.echo(f"Total: {results['total']}")
             click.echo(f"Valid: {results['valid']}")
             click.echo(f"Missing: {results['missing']}")
@@ -615,7 +614,7 @@ def main(backend, config, force, validate_only, contestant_id, contestant_list, 
             result = {**stats, "duration_seconds": elapsed.total_seconds(), "backend": generator.backend.value}
             click.echo(json.dumps(result, indent=2))
         else:
-            click.echo(f"\n✅ Generation completed!")
+            click.echo("\n✅ Generation completed!")
             click.echo(f"   Backend:   {generator.backend.value}")
             click.echo(f"   Total:     {stats['total']} contestants")
             click.echo(f"   Success:   {stats['success']} embeddings")

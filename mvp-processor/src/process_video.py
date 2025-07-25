@@ -17,6 +17,7 @@ from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from unified_face_detector import UnifiedFaceDetector
 from metadata_generator import MetadataGenerator
+
 # Setup logging first
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -32,6 +33,7 @@ except ImportError:
 
 class NumpyEncoder(json.JSONEncoder):
     """Custom JSON encoder for numpy data types"""
+
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -51,9 +53,11 @@ class VideoProcessingPipeline:
 
         # Initialize components first (needed for _resolve_config_paths)
         self.video_processor = VideoProcessor(self.config)
-        
+
         # Use unified face detection and recognition system
-        use_unified_system = self.config.get("face_detection", {}).get("use_unified_system", True)
+        use_unified_system = self.config.get("face_detection", {}).get(
+            "use_unified_system", True
+        )
         if use_unified_system:
             self.unified_face_detector = UnifiedFaceDetector(self.config)
             # Legacy components for compatibility
@@ -68,18 +72,17 @@ class VideoProcessingPipeline:
             self.face_recognizer = FaceRecognizer(self.config, self.contestant_db)
             self.unified_face_detector = None
             logger.info("Using legacy face detection and recognition system")
-            
+
         self.metadata_generator = MetadataGenerator(self.config)
 
         # Resolve relative paths in config based on project root
         self._resolve_config_paths(config_path)
-        
+
         # Initialize face tracker if tracking is enabled (check both old and new config sections)
         self.face_tracker = None
-        tracking_enabled = (
-            self.config.get("face_tracking", {}).get("enable_tracking", False) or 
-            self.config.get("processing", {}).get("enable_tracking", False)
-        )
+        tracking_enabled = self.config.get("face_tracking", {}).get(
+            "enable_tracking", False
+        ) or self.config.get("processing", {}).get("enable_tracking", False)
         if tracking_enabled:
             self.face_tracker = FaceTracker(self.config)
             logger.info("Face tracking enabled")
@@ -105,24 +108,26 @@ class VideoProcessingPipeline:
     def _resolve_config_paths(self, config_path: str):
         """Resolve relative paths in config to absolute paths based on project root"""
         # Get project root directory (2 levels up from config file: config -> mvp-processor -> project root)
-        config_dir = os.path.dirname(os.path.abspath(config_path))  # mvp-processor/config
-        mvp_processor_dir = os.path.dirname(config_dir)             # mvp-processor  
-        project_root = os.path.dirname(mvp_processor_dir)           # project root
-        
+        config_dir = os.path.dirname(
+            os.path.abspath(config_path)
+        )  # mvp-processor/config
+        mvp_processor_dir = os.path.dirname(config_dir)  # mvp-processor
+        project_root = os.path.dirname(mvp_processor_dir)  # project root
+
         logger.debug(f"Config file: {config_path}")
         logger.debug(f"Project root: {project_root}")
-        
+
         # Paths that need resolution
         path_mappings = {
-            ('contestants', 'photo_dir'): '../source/photo/contestants',
-            ('contestants', 'info_csv'): '../source/contestant_info.csv',
-            ('contestants', 'chroma_db_path'): '../database/chroma_db',
-            ('face_recognition', 'embeddings_path'): '../source/photo/contestants',
-            ('output', 'processed_dir'): '../processed_videos',
-            ('output', 'thumbnails_dir'): '../thumbnails',
-            ('output', 'metadata_dir'): '../metadata'
+            ("contestants", "photo_dir"): "../source/photo/contestants",
+            ("contestants", "info_csv"): "../source/contestant_info.csv",
+            ("contestants", "chroma_db_path"): "../database/chroma_db",
+            ("face_recognition", "embeddings_path"): "../source/photo/contestants",
+            ("output", "processed_dir"): "../processed_videos",
+            ("output", "thumbnails_dir"): "../thumbnails",
+            ("output", "metadata_dir"): "../metadata",
         }
-        
+
         # Resolve each path
         for keys, default_path in path_mappings.items():
             config_section = self.config
@@ -134,7 +139,7 @@ class VideoProcessingPipeline:
             else:
                 if keys[-1] in config_section:
                     relative_path = config_section[keys[-1]]
-                    if relative_path.startswith('../'):
+                    if relative_path.startswith("../"):
                         # Convert relative path to absolute
                         absolute_path = os.path.join(project_root, relative_path[3:])
                         config_section[keys[-1]] = absolute_path
@@ -156,7 +161,7 @@ class VideoProcessingPipeline:
         """Initialize contestant database"""
         logger.info("Initializing contestant database...")
         self.contestant_db.load_contestants_info()
-        
+
         # Use appropriate build method based on system type
         if self.unified_face_detector:
             # Use unified system method
@@ -164,7 +169,7 @@ class VideoProcessingPipeline:
         else:
             # Use legacy system method
             self.contestant_db.build_face_encodings(force_rebuild=force_rebuild)
-            
+
         logger.info(
             "Database ready with %d contestants", len(self.contestant_db.face_encodings)
         )
@@ -208,7 +213,7 @@ class VideoProcessingPipeline:
         # Process frames
         all_recognitions = []
         frame_data = []
-        
+
         # Initialize face tracker for this video if enabled
         if self.face_tracker:
             self.face_tracker.reset()
@@ -222,8 +227,8 @@ class VideoProcessingPipeline:
             tqdm(frames_list, desc="Processing frames")
         ):
             # Calculate actual video frame number based on timestamp and fps
-            actual_frame_number = int(timestamp * video_info['fps'])
-            
+            actual_frame_number = int(timestamp * video_info["fps"])
+
             # Preprocess frame
             rgb_frame = FrameProcessor.preprocess_frame(frame)
 
@@ -246,35 +251,50 @@ class VideoProcessingPipeline:
                 if self.face_tracker:
                     # Use face tracking for temporal correlation
                     if self.unified_face_detector:
-                        raw_recognitions = self.unified_face_detector.recognize_faces(detections)
+                        raw_recognitions = self.unified_face_detector.recognize_faces(
+                            detections
+                        )
                     else:
-                        raw_recognitions = self.face_recognizer.recognize_faces(detections)
-                    
+                        raw_recognitions = self.face_recognizer.recognize_faces(
+                            detections
+                        )
+
                     # Update trajectories with new detections and recognitions
-                    active_trajectories = self.face_tracker.update_trajectories(detections, raw_recognitions)
-                    
+                    active_trajectories = self.face_tracker.update_trajectories(
+                        detections, raw_recognitions
+                    )
+
                     # Get stable recognitions from tracking
                     frame_recognitions = self.face_tracker.get_stable_recognitions()
-                    
+
                     # Add raw recognitions for frames without stable tracking (fallback)
                     trajectory_locations = set()
                     for recognition in frame_recognitions:
                         trajectory_locations.add(recognition.detection.location)
-                    
+
                     # Add non-tracked detections
                     for raw_recognition in raw_recognitions:
-                        if raw_recognition.detection.location not in trajectory_locations:
+                        if (
+                            raw_recognition.detection.location
+                            not in trajectory_locations
+                        ):
                             frame_recognitions.append(raw_recognition)
-                            
-                    logger.debug(f"Frame {actual_frame_number}: {len(active_trajectories)} active trajectories, "
-                               f"{len(frame_recognitions)} recognitions")
+
+                    logger.debug(
+                        f"Frame {actual_frame_number}: {len(active_trajectories)} active trajectories, "
+                        f"{len(frame_recognitions)} recognitions"
+                    )
                 else:
                     # Traditional frame-by-frame processing (no tracking)
                     if self.unified_face_detector:
-                        frame_recognitions = self.unified_face_detector.recognize_faces(detections)
+                        frame_recognitions = self.unified_face_detector.recognize_faces(
+                            detections
+                        )
                     else:
-                        frame_recognitions = self.face_recognizer.recognize_faces(detections)
-                
+                        frame_recognitions = self.face_recognizer.recognize_faces(
+                            detections
+                        )
+
                 all_recognitions.extend(frame_recognitions)
 
                 # Store frame data with actual video frame number and processing dimensions
@@ -285,8 +305,12 @@ class VideoProcessingPipeline:
                         "timestamp": float(timestamp),
                         "detections_count": len(detections),
                         "recognitions_count": len(frame_recognitions),
-                        "processing_width": rgb_frame.shape[1],  # Processing frame width
-                        "processing_height": rgb_frame.shape[0],  # Processing frame height
+                        "processing_width": rgb_frame.shape[
+                            1
+                        ],  # Processing frame width
+                        "processing_height": rgb_frame.shape[
+                            0
+                        ],  # Processing frame height
                         "recognitions": [
                             {
                                 "contestant_id": str(r.contestant_id),
@@ -308,9 +332,13 @@ class VideoProcessingPipeline:
         if self.unified_face_detector:
             # Apply filtering manually for unified system
             min_confidence = self.config["face_recognition"]["similarity_threshold"]
-            filtered_recognitions = [r for r in all_recognitions if r.match_confidence >= min_confidence]
-            logger.info(f"Filtered {len(all_recognitions)} recognitions to {len(filtered_recognitions)} "
-                       f"(min_confidence: {min_confidence})")
+            filtered_recognitions = [
+                r for r in all_recognitions if r.match_confidence >= min_confidence
+            ]
+            logger.info(
+                f"Filtered {len(all_recognitions)} recognitions to {len(filtered_recognitions)} "
+                f"(min_confidence: {min_confidence})"
+            )
         else:
             filtered_recognitions = self.face_recognizer.filter_recognitions(
                 all_recognitions
@@ -320,9 +348,11 @@ class VideoProcessingPipeline:
         tracking_stats = {}
         if self.face_tracker:
             tracking_stats = self.face_tracker.get_tracking_stats()
-            logger.info(f"Tracking stats: {tracking_stats['active_trajectories']} active, "
-                       f"{tracking_stats['completed_trajectories']} completed, "
-                       f"{tracking_stats['stable_trajectories']} stable trajectories")
+            logger.info(
+                f"Tracking stats: {tracking_stats['active_trajectories']} active, "
+                f"{tracking_stats['completed_trajectories']} completed, "
+                f"{tracking_stats['stable_trajectories']} stable trajectories"
+            )
 
         logger.info(
             "Processing complete: %d recognitions found", len(filtered_recognitions)
@@ -335,7 +365,7 @@ class VideoProcessingPipeline:
             frame_data=frame_data,
             output_name=output_name,
         )
-        
+
         # Add tracking statistics to metadata
         if tracking_stats:
             metadata["tracking_stats"] = tracking_stats
@@ -446,7 +476,7 @@ def main(
     if not os.path.isabs(input_path):
         # If we're running from mvp-processor/src, adjust path resolution to project root
         cwd = os.getcwd()
-        if cwd.endswith('mvp-processor/src'):
+        if cwd.endswith("mvp-processor/src"):
             # Go up 2 levels to project root
             project_root = os.path.dirname(os.path.dirname(cwd))
             input_path = os.path.join(project_root, input_path)
@@ -462,7 +492,9 @@ def main(
         # Force rebuild database if requested
         if rebuild_db:
             if pipeline.unified_face_detector:
-                pipeline.unified_face_detector.contestant_db.build_unified_face_encodings(force_rebuild=True)
+                pipeline.unified_face_detector.contestant_db.build_unified_face_encodings(
+                    force_rebuild=True
+                )
             else:
                 pipeline.initialize_database(force_rebuild=True)
 
