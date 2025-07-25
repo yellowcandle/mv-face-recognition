@@ -537,7 +537,6 @@ class UnifiedContestantDatabase(ContestantDatabase):
             )
 
             encoding = None
-            is_unified = False
 
             try:
                 # Try ID-based naming first (current standard)
@@ -566,7 +565,6 @@ class UnifiedContestantDatabase(ContestantDatabase):
                             self.embedding_system.embedding_config.method.value
                         )
                         if metadata.get("method") == expected_method:
-                            is_unified = True
                             unified_count += 1
                             file_source = (
                                 "ID-based"
@@ -613,7 +611,6 @@ class UnifiedContestantDatabase(ContestantDatabase):
                             with open(metadata_path, "w") as f:
                                 json.dump(metadata, f, indent=2)
 
-                            is_unified = True
                             unified_count += 1
                             logger.info(
                                 f"Migrated and saved unified embedding for {nickname}"

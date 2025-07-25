@@ -78,19 +78,37 @@ class VideoProcessor:
         # Face tracking trails for TraceAnnotator
         self.face_trajectories = {}
         self.next_track_id = 1
-        
+
         # AGGRESSIVE ANTI-FLICKERING SYSTEM
         self.anti_flicker_config = config.get("anti_flicker", {})
-        self.position_smoothing_factor = self.anti_flicker_config.get("position_smoothing_factor", 0.95)
-        self.spatial_distance_threshold = self.anti_flicker_config.get("spatial_distance_threshold", 800)
-        self.minimum_movement_threshold = self.anti_flicker_config.get("minimum_movement_threshold", 5)
-        self.visual_state_lock_duration = self.anti_flicker_config.get("visual_state_lock_duration", 1.0)
-        self.confidence_hysteresis = self.anti_flicker_config.get("confidence_hysteresis", 0.15)
-        self.minimum_display_frames = self.anti_flicker_config.get("minimum_display_frames", 8)
-        self.use_single_color_per_trajectory = self.anti_flicker_config.get("use_single_color_per_trajectory", True)
-        self.enable_static_rendering = self.anti_flicker_config.get("enable_static_rendering", False)
-        self.disable_confidence_indicators = self.anti_flicker_config.get("disable_confidence_indicators", False)
-        
+        self.position_smoothing_factor = self.anti_flicker_config.get(
+            "position_smoothing_factor", 0.95
+        )
+        self.spatial_distance_threshold = self.anti_flicker_config.get(
+            "spatial_distance_threshold", 800
+        )
+        self.minimum_movement_threshold = self.anti_flicker_config.get(
+            "minimum_movement_threshold", 5
+        )
+        self.visual_state_lock_duration = self.anti_flicker_config.get(
+            "visual_state_lock_duration", 1.0
+        )
+        self.confidence_hysteresis = self.anti_flicker_config.get(
+            "confidence_hysteresis", 0.15
+        )
+        self.minimum_display_frames = self.anti_flicker_config.get(
+            "minimum_display_frames", 8
+        )
+        self.use_single_color_per_trajectory = self.anti_flicker_config.get(
+            "use_single_color_per_trajectory", True
+        )
+        self.enable_static_rendering = self.anti_flicker_config.get(
+            "enable_static_rendering", False
+        )
+        self.disable_confidence_indicators = self.anti_flicker_config.get(
+            "disable_confidence_indicators", False
+        )
+
         # Position smoothing state per trajectory
         self.smoothed_positions = {}  # trajectory_id -> smoothed_bbox
         self.locked_visual_states = {}  # trajectory_id -> {color, confidence, locked_until_timestamp}
@@ -225,7 +243,7 @@ class VideoProcessor:
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # Apply resolution scaling if specified
         if "width" in format_config:
@@ -478,9 +496,11 @@ class VideoProcessor:
                 min_distance = distance
                 best_match = rec
 
-        # Only return if spatially close (within reasonable bounds) 
+        # Only return if spatially close (within reasonable bounds)
         # ANTI-FLICKER FIX: Use configurable threshold to prevent jumping
-        if min_distance < self.spatial_distance_threshold:  # Anti-flicker spatial threshold
+        if (
+            min_distance < self.spatial_distance_threshold
+        ):  # Anti-flicker spatial threshold
             return best_match
 
         return None
@@ -549,27 +569,31 @@ class VideoProcessor:
 
         return predicted_bbox
 
-    def _smooth_position(self, trajectory_id: str, new_bbox: List[float], timestamp: float) -> List[float]:
+    def _smooth_position(
+        self, trajectory_id: str, new_bbox: List[float], timestamp: float
+    ) -> List[float]:
         """Apply position smoothing to reduce flickering"""
         if trajectory_id not in self.smoothed_positions:
             # First detection for this trajectory
             self.smoothed_positions[trajectory_id] = new_bbox.copy()
             return new_bbox
-        
+
         prev_bbox = self.smoothed_positions[trajectory_id]
-        
+
         # Calculate movement distance
         prev_center_x = (prev_bbox[0] + prev_bbox[2]) / 2
         prev_center_y = (prev_bbox[1] + prev_bbox[3]) / 2
-        new_center_x = (new_bbox[0] + new_bbox[2]) / 2  
+        new_center_x = (new_bbox[0] + new_bbox[2]) / 2
         new_center_y = (new_bbox[1] + new_bbox[3]) / 2
-        
-        movement_distance = ((new_center_x - prev_center_x) ** 2 + (new_center_y - prev_center_y) ** 2) ** 0.5
-        
+
+        movement_distance = (
+            (new_center_x - prev_center_x) ** 2 + (new_center_y - prev_center_y) ** 2
+        ) ** 0.5
+
         # Ignore tiny movements to prevent micro-flickering
         if movement_distance < self.minimum_movement_threshold:
             return prev_bbox
-        
+
         # Apply exponential moving average smoothing
         smoothing = self.position_smoothing_factor
         smoothed_bbox = [
@@ -578,52 +602,63 @@ class VideoProcessor:
             prev_bbox[2] * smoothing + new_bbox[2] * (1 - smoothing),  # x2
             prev_bbox[3] * smoothing + new_bbox[3] * (1 - smoothing),  # y2
         ]
-        
+
         self.smoothed_positions[trajectory_id] = smoothed_bbox
         return smoothed_bbox
 
-    def _get_locked_visual_state(self, trajectory_id: str, confidence: float, timestamp: float) -> dict:
+    def _get_locked_visual_state(
+        self, trajectory_id: str, confidence: float, timestamp: float
+    ) -> dict:
         """Get or create locked visual state for trajectory to prevent color flickering"""
         current_state = self.locked_visual_states.get(trajectory_id)
-        
+
         # Check if we have a locked state that's still valid
         if current_state and timestamp < current_state.get("locked_until_timestamp", 0):
             # State is locked, use existing visual properties
             return current_state
-        
+
         # Check confidence hysteresis - require significant change to update
-        if current_state and abs(confidence - current_state.get("confidence", 0)) < self.confidence_hysteresis:
+        if (
+            current_state
+            and abs(confidence - current_state.get("confidence", 0))
+            < self.confidence_hysteresis
+        ):
             # Extend lock duration for stable states
-            current_state["locked_until_timestamp"] = timestamp + self.visual_state_lock_duration
+            current_state["locked_until_timestamp"] = (
+                timestamp + self.visual_state_lock_duration
+            )
             return current_state
-        
+
         # Generate new stable color based on trajectory ID for consistency
         if self.use_single_color_per_trajectory:
             # Use hash of trajectory ID for consistent colors
             import hashlib
-            color_hash = int(hashlib.md5(str(trajectory_id).encode()).hexdigest()[:6], 16)
+
+            color_hash = int(
+                hashlib.md5(str(trajectory_id).encode()).hexdigest()[:6], 16
+            )
             color = (
                 (color_hash & 0xFF),
-                ((color_hash >> 8) & 0xFF), 
-                ((color_hash >> 16) & 0xFF)
+                ((color_hash >> 8) & 0xFF),
+                ((color_hash >> 16) & 0xFF),
             )
         else:
             # Use confidence-based colors but lock them in place
             if confidence >= 0.8:
                 color = (0, 255, 0)  # Green for high confidence
             elif confidence >= 0.6:
-                color = (0, 165, 255)  # Orange for medium confidence  
+                color = (0, 165, 255)  # Orange for medium confidence
             else:
                 color = (0, 0, 255)  # Red for low confidence
-        
+
         # Create new locked state
         new_state = {
             "color": color,
             "confidence": confidence,
             "locked_until_timestamp": timestamp + self.visual_state_lock_duration,
-            "trajectory_id": trajectory_id
+            "trajectory_id": trajectory_id,
         }
-        
+
         self.locked_visual_states[trajectory_id] = new_state
         return new_state
 
@@ -632,15 +667,18 @@ class VideoProcessor:
         if trajectory_id not in self.static_trajectory_colors:
             # Use hash of trajectory ID for deterministic color assignment
             import hashlib
-            color_hash = int(hashlib.md5(str(trajectory_id).encode()).hexdigest()[:6], 16)
+
+            color_hash = int(
+                hashlib.md5(str(trajectory_id).encode()).hexdigest()[:6], 16
+            )
             # Generate brighter, more visible colors
             color = (
-                max(100, (color_hash & 0xFF)),           # Red component (at least 100)
-                max(100, ((color_hash >> 8) & 0xFF)),    # Green component (at least 100) 
-                max(100, ((color_hash >> 16) & 0xFF))    # Blue component (at least 100)
+                max(100, (color_hash & 0xFF)),  # Red component (at least 100)
+                max(100, ((color_hash >> 8) & 0xFF)),  # Green component (at least 100)
+                max(100, ((color_hash >> 16) & 0xFF)),  # Blue component (at least 100)
             )
             self.static_trajectory_colors[trajectory_id] = color
-        
+
         return self.static_trajectory_colors[trajectory_id]
 
     def _draw_frame_annotations(
@@ -677,10 +715,12 @@ class VideoProcessor:
             # ANTI-FLICKERING: Get trajectory ID and apply position smoothing
             trajectory_id = recognition.get("trajectory_id", f"unknown_{left}_{top}")
             current_timestamp = recognition.get("timestamp", 0.0)
-            
+
             # Apply position smoothing to reduce micro-movements
             original_bbox = [left, top, right, bottom]
-            smoothed_bbox = self._smooth_position(trajectory_id, original_bbox, current_timestamp)
+            smoothed_bbox = self._smooth_position(
+                trajectory_id, original_bbox, current_timestamp
+            )
             left, top, right, bottom = smoothed_bbox
 
             # CRITICAL FIX: Face detection coordinates are already in the detection frame coordinate system
@@ -737,37 +777,39 @@ class VideoProcessor:
             # EMERGENCY STATIC MODE: Maximum stability, zero flickering
             confidence = recognition["confidence"]
             is_interpolated = recognition.get("is_interpolated", False)
-            
+
             if self.enable_static_rendering:
                 # EMERGENCY MODE: Use completely static rendering
                 color = self._get_static_color(trajectory_id)
-                
+
                 # Static label without confidence indicators
                 name = recognition.get(
                     "contestant_nickname", recognition.get("contestant_name", "Unknown")
                 )
-                
+
                 if self.disable_confidence_indicators:
                     label = name  # Just the name, no confidence/interpolation info
                 else:
                     label = f"{name} ({confidence:.1f})"  # Minimal info
-                    
+
             else:
-                # ADVANCED ANTI-FLICKERING: Use locked visual states  
-                visual_state = self._get_locked_visual_state(trajectory_id, confidence, current_timestamp)
+                # ADVANCED ANTI-FLICKERING: Use locked visual states
+                visual_state = self._get_locked_visual_state(
+                    trajectory_id, confidence, current_timestamp
+                )
                 color = visual_state["color"]
-                
+
                 # Standard label with interpolation info
                 name = recognition.get(
                     "contestant_nickname", recognition.get("contestant_name", "Unknown")
                 )
-                
+
                 if is_interpolated:
                     interpolation_factor = recognition.get("interpolation_factor", 0.0)
                     label = f"{name} ({confidence:.2f}) [I:{interpolation_factor:.1f}]"
                 else:
                     label = f"{name} ({confidence:.2f})"
-            
+
             # Track frame count for minimum display duration
             if trajectory_id not in self.trajectory_frame_counts:
                 self.trajectory_frame_counts[trajectory_id] = 0

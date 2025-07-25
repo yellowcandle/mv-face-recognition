@@ -279,7 +279,7 @@ class OptimizedTrackerValidator:
         report.append("")
 
         successful_tests = [r for r in results.values() if r["status"] == "success"]
-        failed_tests = [r for r in results.values() if r["status"] == "failed"]
+        [r for r in results.values() if r["status"] == "failed"]
 
         report.append(f"- **Tests Completed**: {len(successful_tests)}/{len(results)}")
         report.append(

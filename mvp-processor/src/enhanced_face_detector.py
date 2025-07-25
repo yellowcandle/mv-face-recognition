@@ -97,7 +97,7 @@ class AcceleratedFaceDetector:
                 return False
 
             # Set MPS device
-            device = torch.device("mps")
+            torch.device("mps")
 
             # Initialize InsightFace with MPS
             self.face_detector = insightface.app.FaceAnalysis(
