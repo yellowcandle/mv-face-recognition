@@ -1,7 +1,7 @@
 # MV Face Recognition MVP Configuration - Integrated with Deployment Architecture
 video:
-  # Dense frame processing for 6x improvement  
-  fps_sample_rate: 6  # Extract 6 frames per second (aligned with video_processor.py)
+  # ANTI-FLICKER FIX: Process more frames to eliminate gaps
+  fps_sample_rate: 12  # Process double density to reduce gaps (was 6, max gap now ~0.08s)
   max_frames: 0  # 0 = process entire video
   resize_width: 1920  # Maximum width for processing
   preserve_audio: true  # Use FFmpeg to maintain original audio tracks
@@ -47,8 +47,8 @@ face_recognition:
   max_distance: 15.0  # Much higher maximum face distance to allow more recognition
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
-  enable_interpolation: true  # Linear interpolation between detections
-  confidence_decay: 0.95  # For interpolated frames
+  enable_interpolation: false  # Disabled to prevent bbox persistence between detections
+  confidence_decay: 0.95  # For interpolated frames (not used when interpolation disabled)
   
   # Trajectory-based recognition thresholds
   trajectory_confidence_threshold: 0.02  # Very low aggregate trajectory confidence 
@@ -62,7 +62,7 @@ contestants:
   info_csv: "../source/contestant_info.csv"  # Essential contestant mapping (fixed path)
   chroma_db_path: "../database/chroma_db"
 
-# Face Tracking Configuration - Temporal Frame Correlation
+# Face Tracking Configuration - Anti-Flickering Optimized
 face_tracking:
   enable_tracking: true
   
@@ -71,36 +71,45 @@ face_tracking:
   # custom: Original custom face tracker (faster, optimized for faces)  
   # supervision: Optimized Supervision ByteTracker (proven algorithms with performance optimizations)
   
-  # Temporal window settings
-  tracking_window: 0.2             # Duration (seconds) to maintain face trajectories
-  max_trajectory_gap: 10            # Maximum frames without detection before trajectory expiry
-  min_trajectory_length: 3          # Minimum detections required for stable trajectory
+  # Temporal window settings - Extended for stability
+  tracking_window: 2.0              # Extended duration for better temporal stability (4x longer)
+  max_trajectory_gap: 6             # Extended gap tolerance to maintain continuity
+  min_trajectory_length: 5          # Higher minimum for more stable trajectories
   
-  # Spatial correlation thresholds
-  spatial_threshold: 0.3            # Minimum IoU for spatial correlation between frames
-  proximity_boost: 0.85             # Time proximity factor for trajectory matching
-  location_stability_factor: 0.75   # Stability preference for consistent face locations
+  # Spatial correlation thresholds - Tightened for stability
+  spatial_threshold: 0.5            # Higher IoU requirement (0.3 → 0.5) to prevent jumping
+  proximity_boost: 0.95             # Stronger proximity preference for temporal consistency
+  location_stability_factor: 0.90   # Much higher stability preference for consistent locations
   
-  # Confidence smoothing and aggregation
-  confidence_smoothing: 0.95        # Temporal decay factor for confidence aggregation
-  confidence_threshold: 0.25        # Minimum aggregated confidence for stable trajectory
-  single_frame_fallback: 0.15       # Fallback threshold for single-frame recognitions
-  min_stable_detections: 3          # Minimum confident detections for trajectory stability
+  # Confidence smoothing and aggregation - Stronger smoothing
+  confidence_smoothing: 0.95        # Much stronger temporal smoothing (0.85 → 0.95) 
+  confidence_threshold: 0.20        # Slightly lower aggregated threshold for stability
+  single_frame_fallback: 0.10       # Lower fallback threshold to reduce noise
+  min_stable_detections: 5          # Higher minimum for trajectory stability (3 → 5)
   
-  # Re-identification configuration
-  re_recognition_interval: 1        # Frames between re-recognition attempts
-  identity_voting_weight: 1.0       # Weight for contestant identity voting in trajectory
-  temporal_consistency_bonus: 0.15  # Bonus for temporally consistent recognitions
+  # Re-identification configuration - Reduced frequency
+  re_recognition_interval: 8        # Much less frequent re-ID to prevent switching (3 → 8)
+  identity_voting_weight: 1.2       # Slightly higher voting weight for stability
+  temporal_consistency_bonus: 0.25  # Higher bonus for consistent recognitions (0.15 → 0.25)
   
   # Trajectory management
-  max_active_trajectories: 20       # Maximum concurrent active trajectories
-  trajectory_cleanup_interval: 30   # Frames between trajectory cleanup cycles
+  max_active_trajectories: 20       # Keep same for performance
+  trajectory_cleanup_interval: 45   # Less frequent cleanup (30 → 45) for stability
   memory_optimization: true         # Enable memory-efficient trajectory management
   
-  # Performance tuning (aligned with 6 FPS detection, 25 FPS video)
-  detection_sampling_rate: 25        # FPS for face detection (matches video.fps_sample_rate)
-  interpolation_smoothing: 0.85     # Smoothing factor for trajectory interpolation
+  # Performance tuning (aligned with 12 FPS detection)  
+  detection_sampling_rate: 12        # Match doubled FPS sampling rate
+  interpolation_smoothing: 0.95     # Stronger interpolation smoothing (0.85 → 0.95)
   adaptive_threshold: true          # Enable adaptive confidence thresholds based on scene complexity
+  
+  # Majority Voting System - FIXED for Better Recognition
+  majority_voting:
+    enable: true                    # Enable enhanced majority voting system
+    min_votes_for_decision: 2       # FIXED: Lowered from 5 to 2 for faster decisions
+    consensus_threshold: 0.45       # FIXED: Lowered from 65% to 45% for more lenient consensus
+    confidence_gap_threshold: 0.15  # FIXED: Lowered from 30% to 15% for achievable gaps
+    temporal_decay_factor: 0.95     # FIXED: Slower decay (0.9 → 0.95) to preserve voting history
+    stability_requirement: 3        # FIXED: Lowered from 6 to 3 frames for faster identity assignment
 
 # Processing Settings for Dense Metadata
 processing:
@@ -109,7 +118,34 @@ processing:
   batch_size: 32
   parallel_processing: true
   generate_dense_metadata: true     # Frame-level granularity
-  enable_interpolation: true        # Global interpolation flag (use face_tracking for detailed control)
+  enable_interpolation: false       # Disabled to prevent bbox persistence - use display interpolation instead
+
+# Smart Frame Interpolation - Enhanced Anti-Flickering Display
+interpolation:
+  enable_display_interpolation: true    # Enable smooth bbox display across all video frames
+  max_interpolation_gap: 0.6           # Extended interpolation window (0.4 → 0.6s) for smoother display
+  interpolation_confidence_decay: 0.97  # Much slower confidence decay (0.9 → 0.97) to maintain stability
+  min_interpolation_confidence: 0.15    # Lower minimum threshold (0.25 → 0.15) for extended display
+  max_interpolation_frames: 18          # More interpolation frames (12 → 18) for 25fps * 0.7s
+  enable_position_prediction: true      # Use trajectory velocity for position prediction
+  trajectory_termination_strict: false  # Allow brief extension (true → false) for smoother transitions
+
+# AGGRESSIVE ANTI-FLICKERING SYSTEM
+anti_flicker:
+  # Position stability
+  position_smoothing_factor: 0.95       # Strong position smoothing (exponential moving average)
+  spatial_distance_threshold: 800       # Large spatial tolerance to prevent jumping (was 200px)
+  minimum_movement_threshold: 5         # Ignore tiny movements below 5 pixels
+  
+  # Visual state locking  
+  visual_state_lock_duration: 1.0       # Lock visual appearance for 1 second minimum
+  confidence_hysteresis: 0.15           # Require 0.15 confidence change to update colors
+  minimum_display_frames: 8             # Force minimum 8 frame visibility
+  
+  # Emergency static mode
+  enable_static_rendering: true         # EMERGENCY ENABLED: disable all dynamic visual effects
+  use_single_color_per_trajectory: true # One color per trajectory, never changes
+  disable_confidence_indicators: true   # Remove confidence from labels to prevent text flicker
 
 # Output Settings Aligned with Deployment Scripts
 output:

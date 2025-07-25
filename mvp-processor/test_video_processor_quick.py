@@ -6,26 +6,26 @@ Tests core video processing functionality without full face recognition pipeline
 
 import sys
 import yaml
-from pathlib import Path
 
 # Add src to path
-sys.path.append('src')
+sys.path.append("src")
 
 from video_processor import VideoProcessor
 
+
 def test_video_processor():
     """Test video processor functionality"""
-    
+
     # Load config
-    with open('config/processing_config.yaml') as f:
+    with open("config/processing_config.yaml") as f:
         config = yaml.safe_load(f)
 
     # Test video processor
     processor = VideoProcessor(config)
-    video_path = '../source/videos/test-video-mv2.mp4'
-    
+    video_path = "../source/videos/test-video-mv2.mp4"
+
     print("🧪 Testing Video Processor...")
-    
+
     # 1. Test video info extraction
     print("\n1. Testing video info extraction...")
     try:
@@ -37,7 +37,7 @@ def test_video_processor():
     except Exception as e:
         print(f"   ❌ Failed: {e}")
         return False
-    
+
     # 2. Test frame extraction
     print("\n2. Testing frame extraction...")
     try:
@@ -57,7 +57,7 @@ def test_video_processor():
     except Exception as e:
         print(f"   ❌ Failed: {e}")
         return False
-    
+
     # 3. Test thumbnail creation (fixed)
     print("\n3. Testing thumbnail creation...")
     try:
@@ -66,17 +66,17 @@ def test_video_processor():
         cap.set(processor.cv2.CAP_PROP_POS_MSEC, 5000)  # 5 seconds
         ret, frame = cap.read()
         cap.release()
-        
+
         if ret:
             thumbnail = processor._resize_frame(frame, 320)  # Resize to thumbnail size
             print(f"   ✅ Created thumbnail: {thumbnail.shape}")
         else:
-            print(f"   ❌ Could not extract frame at 5s")
+            print("   ❌ Could not extract frame at 5s")
             return False
     except Exception as e:
         print(f"   ❌ Failed: {e}")
         return False
-    
+
     # 4. Test frame preprocessing
     print("\n4. Testing frame preprocessing...")
     try:
@@ -90,16 +90,17 @@ def test_video_processor():
     except Exception as e:
         print(f"   ❌ Failed: {e}")
         return False
-    
+
     print("\n🎉 All video processor tests passed!")
     print("\n📋 Video Processor Status:")
-    print(f"   • Video loading: ✅ Working")
-    print(f"   • Frame extraction: ✅ Working") 
-    print(f"   • Frame preprocessing: ✅ Working")
-    print(f"   • Video info: ✅ Working")
-    print(f"   • CJKV font support: ✅ Available")
-    
+    print("   • Video loading: ✅ Working")
+    print("   • Frame extraction: ✅ Working")
+    print("   • Frame preprocessing: ✅ Working")
+    print("   • Video info: ✅ Working")
+    print("   • CJKV font support: ✅ Available")
+
     return True
+
 
 if __name__ == "__main__":
     success = test_video_processor()

@@ -52,75 +52,94 @@ class TestVideoProcessor:
     def test_overlay_coordinate_transformation(self, sample_config):
         """Test that overlay positioning correctly handles coordinate transformations"""
         processor = VideoProcessor(sample_config)
-        
+
         # Create a test frame (720p)
         target_width, target_height = 1280, 720
         test_frame = np.zeros((target_height, target_width, 3), dtype=np.uint8)
-        
+
         # Original video dimensions (1080p)
         original_width, original_height = 1920, 1080
-        
+
         # Face detection coordinates (in detection frame which uses sample_config resize_width=640px)
         # Face at center of detection frame
         detection_width = processor.resize_width  # 640 from sample_config
-        detection_height = int(original_height * detection_width / original_width)  # 360
-        
+        detection_height = int(
+            original_height * detection_width / original_width
+        )  # 360
+
         face_center_x = detection_width // 2  # 320
         face_center_y = detection_height // 2  # 180
         face_size = 80  # Proportionally smaller for 640px width
-        
-        mock_recognitions = [{
-            "face_location": [
-                face_center_y - face_size//2,  # top: 140
-                face_center_x + face_size//2,  # right: 360
-                face_center_y + face_size//2,  # bottom: 220
-                face_center_x - face_size//2   # left: 280
-            ],
-            "contestant_name": "Test Person",
-            "contestant_nickname": "测试",
-            "confidence": 0.85
-        }]
-        
+
+        mock_recognitions = [
+            {
+                "face_location": [
+                    face_center_y - face_size // 2,  # top: 140
+                    face_center_x + face_size // 2,  # right: 360
+                    face_center_y + face_size // 2,  # bottom: 220
+                    face_center_x - face_size // 2,  # left: 280
+                ],
+                "contestant_name": "Test Person",
+                "contestant_nickname": "测试",
+                "confidence": 0.85,
+            }
+        ]
+
         # Apply overlay positioning with our fix
         result_frame = processor._draw_frame_annotations(
-            test_frame, mock_recognitions,
+            test_frame,
+            mock_recognitions,
             target_width / original_width,  # scale_x
             target_height / original_height,  # scale_y
             original_width=original_width,
-            original_height=original_height
+            original_height=original_height,
         )
-        
+
         # The overlay should position the face box at the center of the 720p frame
         # Expected center in 720p: (640, 360)
         expected_center_x = target_width // 2  # 640
         expected_center_y = target_height // 2  # 360
-        
+
         # Verify that the transformation logic is working
         # We can't easily inspect the drawn rectangles, but we can verify the math
-        
+
         # Calculate what the coordinates should be after transformation
         # Step 1: Convert detection coords back to original coords
         orig_left = 280 * original_width / detection_width  # 280 * 1920/640 = 840
         orig_right = 360 * original_width / detection_width  # 360 * 1920/640 = 1080
         orig_top = 140 * original_height / detection_height  # 140 * 1080/360 = 420
         orig_bottom = 220 * original_height / detection_height  # 220 * 1080/360 = 660
-        
+
         # Step 2: Convert to target coords
-        target_left = int(orig_left * target_width / original_width)  # 840 * 1280/1920 = 560
-        target_right = int(orig_right * target_width / original_width)  # 1080 * 1280/1920 = 720
-        target_top = int(orig_top * target_height / original_height)  # 420 * 720/1080 = 280
-        target_bottom = int(orig_bottom * target_height / original_height)  # 660 * 720/1080 = 440
-        
+        target_left = int(
+            orig_left * target_width / original_width
+        )  # 840 * 1280/1920 = 560
+        target_right = int(
+            orig_right * target_width / original_width
+        )  # 1080 * 1280/1920 = 720
+        target_top = int(
+            orig_top * target_height / original_height
+        )  # 420 * 720/1080 = 280
+        target_bottom = int(
+            orig_bottom * target_height / original_height
+        )  # 660 * 720/1080 = 440
+
         # Calculate actual center
         actual_center_x = (target_left + target_right) / 2
         actual_center_y = (target_top + target_bottom) / 2
-        
+
         # The face should be centered in the target frame
-        assert abs(actual_center_x - expected_center_x) < 5, f"Face X center {actual_center_x} should be near {expected_center_x}"
-        assert abs(actual_center_y - expected_center_y) < 5, f"Face Y center {actual_center_y} should be near {expected_center_y}"
-        
+        assert abs(actual_center_x - expected_center_x) < 5, (
+            f"Face X center {actual_center_x} should be near {expected_center_x}"
+        )
+        assert abs(actual_center_y - expected_center_y) < 5, (
+            f"Face Y center {actual_center_y} should be near {expected_center_y}"
+        )
+
         # Frame should be modified (not all zeros)
-        assert not np.array_equal(result_frame, test_frame), "Frame should be modified by overlay"
+        assert not np.array_equal(result_frame, test_frame), (
+            "Frame should be modified by overlay"
+        )
 
     def test_extract_frames_with_resize(self, sample_config, sample_video):
         """Test frame extraction with resizing"""
