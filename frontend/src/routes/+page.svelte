@@ -77,7 +77,7 @@
         {#if videos.length > 0}
           <div class="videos">
             {#each videos as video}
-              <div class="video-card" on:click={goToVideoPlayer}>
+              <button class="video-card" on:click={goToVideoPlayer} on:keydown={(e) => e.key === 'Enter' && goToVideoPlayer()} role="button" tabindex="0" aria-label="Play video: {video.name}">
                 <div class="video-thumbnail">
                   <img 
                     src="/api/videos/{video.id}/thumbnail" 
@@ -94,7 +94,7 @@
                     <span class="status">Ready</span>
                   </div>
                 </div>
-              </div>
+              </button>
             {/each}
           </div>
         {:else}
@@ -217,12 +217,17 @@
   }
 
   .video-card {
+    display: block;
+    width: 100%;
     background: white;
+    border: none;
     border-radius: 0.75rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
+    text-align: left;
+    padding: 0;
   }
 
   .video-card:hover {
