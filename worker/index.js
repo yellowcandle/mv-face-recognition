@@ -72,6 +72,31 @@ const VIDEOS = [
   }
 ];
 
+// Contestant data from CSV
+const CONTESTANTS = [
+  { id: 1, name: "蘇雅琳", nickname: "Ivy So", age: 20 },
+  { id: 2, name: "黃雅慧", nickname: "咖喱", age: 27 },
+  { id: 3, name: "邱彥筒", nickname: "Marf", age: 19 },
+  { id: 4, name: "穎蕎", nickname: "穎蕎", age: 24 },
+  { id: 5, name: "坂部佩莎", nickname: "莎莎", age: 20 },
+  { id: 6, name: "陳玉幸", nickname: "Hannah", age: 23 },
+  { id: 7, name: "梁式昕", nickname: "Catrina", age: 27 },
+  { id: 8, name: "陳玥伶", nickname: "小砂", age: 29 },
+  { id: 9, name: "羅洛家", nickname: "Carmina", age: 26 },
+  { id: 10, name: "余潔瀅", nickname: "Zoe", age: 24 },
+  { id: 11, name: "鍾君珩", nickname: "Dru", age: 28 },
+  { id: 12, name: "何洛瑤", nickname: "Sica", age: 21 },
+  { id: 13, name: "曾善婷", nickname: "Ashi", age: 27 },
+  { id: 14, name: "鄭芷淇", nickname: "Elka", age: 18 },
+  { id: 15, name: "李晞彤", nickname: "Carina", age: 19 },
+  { id: 16, name: "夏子涓", nickname: "子涓", age: 26 },
+  { id: 17, name: "黃詠霖", nickname: "阿蛋", age: 19 },
+  { id: 18, name: "陳莉詩", nickname: "蘇菲", age: 26 },
+  { id: 19, name: "黃筠兒", nickname: "筠兒", age: 27 },
+  { id: 20, name: "鄭芷妍", nickname: "Kimmy", age: 24 }
+  // Add more contestants as needed - truncated for brevity
+];
+
 // CORS headers
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -302,6 +327,129 @@ async function handleApiRequest(request, env, url) {
           error: 'Failed to test R2 object',
           message: error.message,
           key: 'videos/video-1_720p.mp4'
+        }, 500);
+      }
+    }
+
+    // Contestants endpoints
+    if (pathname === '/api/contestants') {
+      return jsonResponse({
+        contestants: CONTESTANTS,
+        total: CONTESTANTS.length
+      });
+    }
+
+    if (pathname.match(/^\/api\/contestants\/(\d+)$/)) {
+      const contestantId = parseInt(pathname.match(/^\/api\/contestants\/(\d+)$/)[1]);
+      const contestant = CONTESTANTS.find(c => c.id === contestantId);
+      if (!contestant) {
+        return jsonResponse({ error: 'Contestant not found' }, 404);
+      }
+      return jsonResponse(contestant);
+    }
+
+    if (pathname.match(/^\/api\/contestants\/(\d+)\/photo$/)) {
+      const contestantId = parseInt(pathname.match(/^\/api\/contestants\/(\d+)\/photo$/)[1]);
+      const contestant = CONTESTANTS.find(c => c.id === contestantId);
+      
+      if (!contestant && contestantId !== 0) { // 0 is default photo
+        return jsonResponse({ error: 'Contestant not found' }, 404);
+      }
+      
+      // For now, return a placeholder response - in production this would serve actual photos
+      const photoKey = contestantId === 0 ? 'photos/default.jpg' : `photos/contestant-${contestantId}.jpg`;
+      
+      try {
+        const photoObject = await env.VIDEOS_BUCKET?.get(photoKey);
+        if (photoObject) {
+          return new Response(photoObject.body, {
+            headers: {
+              'Content-Type': 'image/jpeg',
+              'Cache-Control': 'public, max-age=86400',
+              ...CORS_HEADERS
+            }
+          });
+        }
+        
+        // Fallback to default if specific photo not found
+        if (contestantId !== 0) {
+          const defaultPhoto = await env.VIDEOS_BUCKET?.get('photos/default.jpg');
+          if (defaultPhoto) {
+            return new Response(defaultPhoto.body, {
+              headers: {
+                'Content-Type': 'image/jpeg',
+                'Cache-Control': 'public, max-age=86400',
+                ...CORS_HEADERS
+              }
+            });
+          }
+        }
+        
+        // Final fallback - return 1x1 transparent pixel
+        const transparentPixel = new Uint8Array([
+          0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+          0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+          0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+          0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+          0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+          0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+        ]);
+        
+        return new Response(transparentPixel, {
+          headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'public, max-age=86400',
+            ...CORS_HEADERS
+          }
+        });
+        
+      } catch (error) {
+        return jsonResponse({ error: 'Failed to load photo', message: error.message }, 500);
+      }
+    }
+
+    // Video metadata endpoints
+    if (pathname.match(/^\/api\/videos\/(\d+)\/metadata$/)) {
+      const videoId = pathname.match(/^\/api\/videos\/(\d+)\/metadata$/)[1];
+      
+      try {
+        // Try to get metadata from KV storage
+        const metadataKey = `video_${videoId}_metadata`;
+        const metadata = await env.METADATA_KV?.get(metadataKey);
+        
+        if (metadata) {
+          const parsedMetadata = JSON.parse(metadata);
+          return jsonResponse(parsedMetadata);
+        }
+        
+        // Fallback to basic video info if no metadata
+        const video = VIDEOS.find(v => v.id === videoId);
+        if (!video) {
+          return jsonResponse({ error: 'Video not found' }, 404);
+        }
+        
+        return jsonResponse({
+          video_id: videoId,
+          video_name: video.name,
+          duration: video.duration || 0,
+          contestant_timeline: {},
+          total_faces: 0,
+          total_contestants: 0,
+          confidence_stats: {
+            average: 0,
+            min: 0,
+            max: 0
+          },
+          processing_info: {
+            status: 'no_metadata',
+            message: 'Face recognition metadata not available for this video'
+          }
+        });
+        
+      } catch (error) {
+        return jsonResponse({ 
+          error: 'Failed to load video metadata', 
+          message: error.message 
         }, 500);
       }
     }

@@ -521,7 +521,7 @@ describe('Video Player Integration Tests', () => {
             json: () => Promise.resolve({ videos: mockVideos })
           });
         }
-        if (url.includes('/api/videos/metadata/dense/')) {
+        if (url.includes('/api/videos/') && url.includes('/metadata')) {
           return Promise.resolve({
             ok: false,
             status: 404,
@@ -538,7 +538,7 @@ describe('Video Player Integration Tests', () => {
       expect(videosData.videos).toEqual(mockVideos);
 
       // Test API call for metadata (should fail)
-      const metadataResponse = await fetch('/api/videos/metadata/dense/1');
+      const metadataResponse = await fetch('/api/videos/1/metadata');
       expect(metadataResponse.ok).toBe(false);
       expect(metadataResponse.status).toBe(404);
 
