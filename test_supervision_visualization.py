@@ -53,12 +53,10 @@ def test_supervision_visualization():
     try:
         import supervision as sv
 
-        supervision_available = True
         logger.info(
             f"✅ Supervision library available - version {sv.__version__ if hasattr(sv, '__version__') else 'unknown'}"
         )
     except ImportError:
-        supervision_available = False
         logger.warning(
             "❌ Supervision library not available - will use OpenCV fallback"
         )
@@ -163,10 +161,6 @@ def test_color_mapping():
 
     for confidence, is_interpolated, description in confidence_tests:
         # Mock recognition object
-        recognition = {
-            "confidence": confidence,
-            "weight": 0.7 if is_interpolated else 1.0,
-        }
 
         # Simulate the color assignment logic
         if is_interpolated:

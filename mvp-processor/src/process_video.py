@@ -218,13 +218,101 @@ class VideoProcessingPipeline:
         if self.face_tracker:
             self.face_tracker.reset()
 
-        frames_generator = self.video_processor.extract_frames(str(video_path))
-        frames_list = list(frames_generator)  # Convert to list for progress bar
+        # Check if optimized pipeline is enabled
+        config = self.config or {}
+        processing_config = config.get("processing", {})
+        if processing_config.get("enable_optimized_pipeline", False):
+            try:
+                # Use optimized processing with streaming batches
+                from optimized_video_processor import StreamingVideoProcessorAdapter
 
-        logger.info("Processing %d frames...", len(frames_list))
+                optimized_processor = StreamingVideoProcessorAdapter(config)
+                if optimized_processor.optimized:
+                    logger.info(
+                        "Using optimized pipeline for memory-efficient processing"
+                    )
+                    # Use direct optimized processing method
+                    all_recognitions = optimized_processor.process_video_optimized(
+                        str(video_path),
+                        self.unified_face_detector or self.face_detector,
+                        self.face_recognizer,
+                        self.face_tracker,
+                    )
 
-        for frame_idx, (frame, timestamp) in enumerate(
-            tqdm(frames_list, desc="Processing frames")
+                    # Log performance stats
+                    stats = optimized_processor.get_performance_stats()
+                    if isinstance(stats, dict):
+                        batches = stats.get("batches_processed", 0)
+                        cache_stats = stats.get("cache_stats", {})
+                        memory_stats = stats.get("memory_stats", {})
+                        hit_rate = (
+                            cache_stats.get("hit_rate", 0)
+                            if isinstance(cache_stats, dict)
+                            else 0
+                        )
+                        peak_mb = (
+                            memory_stats.get("peak_mb", 0)
+                            if isinstance(memory_stats, dict)
+                            else 0
+                        )
+
+                        logger.info(
+                            f"Optimization stats: {batches} batches, "
+                            f"{hit_rate:.1%} cache hit rate, "
+                            f"{peak_mb:.1f}MB peak memory"
+                        )
+
+                    # Filter recognitions based on confidence if needed
+                    face_recognition_config = config.get("face_recognition", {})
+                    min_confidence = face_recognition_config.get("min_confidence", 0)
+                    if min_confidence > 0:
+                        filtered_count = len(
+                            [
+                                r
+                                for r in all_recognitions
+                                if hasattr(r, "confidence")
+                                and r.confidence >= min_confidence
+                            ]
+                        )
+                        logger.info(
+                            f"Filtered {len(all_recognitions)} recognitions to {filtered_count} (min_confidence: {min_confidence})"
+                        )
+                        all_recognitions = [
+                            r
+                            for r in all_recognitions
+                            if hasattr(r, "confidence")
+                            and r.confidence >= min_confidence
+                        ]
+
+                    return all_recognitions
+            except ImportError as e:
+                logger.warning(
+                    f"Optimized processor not available: {e}. Falling back to standard processing."
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error in optimized processing: {e}. Falling back to standard processing."
+                )
+
+        # Fallback to standard processing
+        self.video_processor.extract_frames(str(video_path))
+
+        # Memory-efficient frame processing - avoid loading all frames at once
+        logger.info("Processing frames with standard pipeline...")
+
+        # Count frames for progress tracking without loading all into memory
+        total_frames = 0
+        for _ in self.video_processor.extract_frames(str(video_path)):
+            total_frames += 1
+
+        logger.info("Processing %d frames...", total_frames)
+
+        # Process frames one by one to conserve memory
+        frame_idx = 0
+        for frame, timestamp in tqdm(
+            self.video_processor.extract_frames(str(video_path)),
+            total=total_frames,
+            desc="Processing frames",
         ):
             # Calculate actual video frame number based on timestamp and fps
             actual_frame_number = int(timestamp * video_info["fps"])

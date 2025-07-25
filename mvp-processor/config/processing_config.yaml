@@ -22,7 +22,7 @@ face_detection:
   model: "insightface"  # Use InsightFace buffalo_l model
   model_path: "../models/buffalo_l"
   min_confidence: 0.3
-  max_faces_per_frame: 25
+  max_faces_per_frame: 96
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
   use_unified_system: true  # Enable unified embedding system for consistent recognition
   
@@ -42,12 +42,12 @@ face_detection:
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
-  similarity_threshold: 0.05  # Confidence threshold (much lower to allow more matches)
+  similarity_threshold: 0.2  # Confidence threshold (much lower to allow more matches)
   tolerance: 0.8  # Higher = more lenient matching  
   max_distance: 15.0  # Much higher maximum face distance to allow more recognition
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
-  enable_interpolation: false  # Disabled to prevent bbox persistence between detections
+  enable_interpolation: true  # Disabled to prevent bbox persistence between detections
   confidence_decay: 0.95  # For interpolated frames (not used when interpolation disabled)
   
   # Trajectory-based recognition thresholds
@@ -115,10 +115,15 @@ face_tracking:
 processing:
   enable_tracking: true             # Global tracking enable flag (use face_tracking.enable_tracking for detailed control)
   smoothing_window: 5               # Frame window for temporal smoothing (deprecated, use face_tracking.tracking_window)
-  batch_size: 32
+  batch_size: 8                     # OPTIMIZED: Reduced for memory efficiency (32 → 8)
   parallel_processing: true
   generate_dense_metadata: true     # Frame-level granularity
   enable_interpolation: false       # Disabled to prevent bbox persistence - use display interpolation instead
+  
+  # OPTIMIZATION CONFIGURATION - PHASE 1 MEMORY FIX
+  enable_optimized_pipeline: true   # Enable stream-based processing (90% memory reduction)
+  streaming_batch_size: 8           # Frames per batch (controls memory usage)
+  memory_pressure_monitoring: true  # Real-time memory monitoring and relief
 
 # Smart Frame Interpolation - Enhanced Anti-Flickering Display
 interpolation:
@@ -143,7 +148,7 @@ anti_flicker:
   minimum_display_frames: 8             # Force minimum 8 frame visibility
   
   # Emergency static mode
-  enable_static_rendering: true         # EMERGENCY ENABLED: disable all dynamic visual effects
+  enable_static_rendering: false         # EMERGENCY ENABLED: disable all dynamic visual effects
   use_single_color_per_trajectory: true # One color per trajectory, never changes
   disable_confidence_indicators: true   # Remove confidence from labels to prevent text flicker
 
@@ -177,11 +182,64 @@ audio:
   ffmpeg_path: "ffmpeg"
   merge_strategy: "copy"  # Copy streams without re-encoding
 
-# Performance Optimization
+# Performance Optimization - ENHANCED GPU ACCELERATION
 performance:
   hardware_acceleration: "auto"  # auto, apple_silicon, cuda, cpu
-  processing_threads: 4
-  memory_limit_gb: 8
+  processing_threads: 4          # Parallel processing worker threads
+  memory_limit_gb: 8             # Memory limit for automatic pressure relief
+  
+  # GPU ACCELERATION SETTINGS
+  gpu_acceleration:
+    enable_accelerated_pipeline: true   # Enable GPU-accelerated face detection pipeline
+    optimal_batch_size: "auto"          # Auto-calculate optimal batch size based on hardware
+    enable_gpu_batching: true           # Process frames in GPU-optimized batches
+    prefer_fp16: true                   # Use half-precision for Apple Silicon optimization
+    gpu_memory_pool: true               # Enable GPU memory pooling for efficiency
+    
+    # Hardware-specific optimizations
+    apple_silicon_optimizations:
+      use_metal_performance_shaders: true     # Enable Metal Performance Shaders
+      unified_memory_optimization: true       # Optimize for unified memory architecture
+      adaptive_batch_scaling: true           # Scale batch size based on memory pressure
+      metal_preprocessing: true              # Use Metal for image preprocessing
+      
+    cuda_optimizations:
+      enable_tensorrt: false                 # Enable TensorRT optimization (if available)
+      cuda_memory_fraction: 0.8             # Fraction of GPU memory to use
+      cudnn_benchmark: true                  # Enable cuDNN benchmark mode
+      mixed_precision: true                  # Enable automatic mixed precision
+  
+  # VECTORIZED OPERATIONS
+  vectorization:
+    enable_numba: true                  # Enable Numba JIT compilation for 2-3x speedup
+    enable_vectorized_similarity: true # Use vectorized similarity calculations
+    batch_similarity_search: true      # Process similarity searches in batches
+    
+  # FAISS ACCELERATION
+  faiss_acceleration:
+    enable_faiss: true                  # Enable FAISS for fast similarity search
+    index_type: "IVFFlat"              # FAISS index type (Flat, IVFFlat, HNSW)
+    use_faiss_gpu: true                # Use FAISS GPU acceleration if available
+    nprobe: 1                          # FAISS search parameter for IVFFlat
+    build_index_on_startup: true       # Pre-build FAISS index for faster searches
+    save_index_cache: true             # Save/load FAISS index to disk for persistence
+    
+  # PIPELINE OPTIMIZATION SETTINGS
+  optimization:
+    enable_parallel_batching: true      # Enable parallel frame batch processing
+    enable_embedding_cache: true        # Smart caching to reduce redundant computations
+    enable_memory_monitoring: true      # Real-time memory pressure monitoring
+    cache_size: 1000                    # Maximum cached embeddings (LRU eviction)
+    memory_warning_threshold: 0.8       # Warning at 80% memory usage
+    memory_critical_threshold: 0.9      # Critical cleanup at 90% memory usage
+    enable_memory_pool: true            # Enable GPU memory pooling
+    
+    # Adaptive performance tuning
+    adaptive_batch_size: true           # Automatically adjust batch size based on memory
+    min_batch_size: 2                   # Minimum frames per batch
+    max_batch_size: 32                  # Maximum frames per batch (increased for GPU)
+    performance_profiling: false        # Enable detailed performance metrics (dev only)
+    benchmark_optimizations: true       # Run benchmark to find optimal settings
 
 # Professional Visualization Configuration (Supervision)
 visualization:

@@ -134,7 +134,7 @@ def main():
     print("=" * 50)
 
     try:
-        contestant_db = regenerate_embeddings()
+        regenerate_embeddings()
         list_photo_directories()
 
         print("\n" + "=" * 50)

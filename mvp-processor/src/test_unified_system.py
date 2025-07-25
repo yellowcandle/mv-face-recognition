@@ -277,7 +277,7 @@ def main():
 
     try:
         # Test 1: Embedding consistency
-        embedding_system = test_embedding_consistency()
+        test_embedding_consistency()
 
         # Test 2: Unified detector
         unified_detector = test_unified_detector()

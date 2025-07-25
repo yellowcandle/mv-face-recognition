@@ -534,7 +534,7 @@ def main():
 
     # Run test
     try:
-        results = tester.test_face_detection_accuracy(test_video)
+        tester.test_face_detection_accuracy(test_video)
 
         # Print summary
         tester.print_summary()
