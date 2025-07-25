@@ -179,8 +179,20 @@ class UnifiedEmbeddingSystem:
                 method == EmbeddingMethod.INSIGHTFACE
                 and self.insightface_model is not None
             ):
-                embedding = self._generate_insightface_embedding(face_image)
-                metadata["backend"] = "insightface"
+                try:
+                    embedding = self._generate_insightface_embedding(face_image)
+                    metadata["backend"] = "insightface"
+                except Exception as e:
+                    logger.warning(f"InsightFace failed: {e}, falling back to face_recognition")
+                    if self.face_recognition_available:
+                        embedding = self._generate_face_recognition_embedding(face_image)
+                        metadata["backend"] = "face_recognition_fallback"
+                        method = EmbeddingMethod.FACE_RECOGNITION
+                    else:
+                        logger.warning("face_recognition not available, falling back to OpenCV")
+                        embedding = self._generate_opencv_embedding(face_image)
+                        metadata["backend"] = "opencv_fallback"
+                        method = EmbeddingMethod.OPENCV_CUSTOM
 
             elif (
                 method == EmbeddingMethod.FACE_RECOGNITION
@@ -222,14 +234,81 @@ class UnifiedEmbeddingSystem:
             return embedding, metadata
 
         except Exception as e:
-            logger.error(f"Embedding generation failed with {method.value}: {e}")
-            # Emergency fallback to random normalized vector
-            embedding = np.random.randn(
-                self.embedding_config.embedding_dimension
-            ).astype(np.float32)
-            embedding = embedding / np.linalg.norm(embedding)
-            metadata.update({"backend": "random_fallback", "error": str(e)})
+            logger.error(f"All embedding methods failed: {e}")
+            # Try emergency fallback with different preprocessing
+            try:
+                logger.info("Attempting emergency fallback with enhanced preprocessing")
+                
+                # Apply more aggressive preprocessing for difficult cases
+                if isinstance(face_image, np.ndarray):
+                    processed_image = self._emergency_preprocess_image(face_image)
+                    
+                    # Try OpenCV method with processed image
+                    embedding = self._generate_opencv_embedding(processed_image)
+                    metadata.update({"backend": "opencv_emergency", "preprocessing": "enhanced"})
+                    
+                else:
+                    raise ValueError("Cannot preprocess non-array input")
+                    
+            except Exception as fallback_error:
+                logger.error(f"Emergency fallback also failed: {fallback_error}")
+                # Last resort: create a pseudo-random but deterministic vector
+                # Based on image statistics for some consistency
+                if isinstance(face_image, np.ndarray):
+                    # Use image statistics to create deterministic vector
+                    img_stats = [
+                        np.mean(face_image),
+                        np.std(face_image),
+                        np.min(face_image),
+                        np.max(face_image)
+                    ]
+                    seed = int(sum(img_stats) * 1000) % 2**32
+                    np.random.seed(seed)
+                else:
+                    np.random.seed(42)  # Fixed seed for file paths
+                    
+                embedding = np.random.randn(
+                    self.embedding_config.embedding_dimension
+                ).astype(np.float32)
+                embedding = embedding / np.linalg.norm(embedding)
+                metadata.update({"backend": "deterministic_fallback", "error": f"{e} | {fallback_error}"})
+            
             return embedding, metadata
+
+    def _emergency_preprocess_image(self, face_image: np.ndarray) -> np.ndarray:
+        """Emergency preprocessing for difficult face images"""
+        try:
+            # Ensure we have a valid RGB image
+            if len(face_image.shape) != 3 or face_image.shape[2] != 3:
+                logger.warning(f"Invalid image shape for preprocessing: {face_image.shape}")
+                return face_image
+                
+            # Convert to float for processing
+            img_float = face_image.astype(np.float32) / 255.0
+            
+            # Apply gamma correction to enhance contrast
+            gamma = 0.8
+            img_gamma = np.power(img_float, gamma)
+            
+            # Apply unsharp masking for edge enhancement
+            blur = cv2.GaussianBlur(img_gamma, (5, 5), 1.0)
+            unsharp = cv2.addWeighted(img_gamma, 1.5, blur, -0.5, 0)
+            
+            # Ensure values are in valid range
+            unsharp = np.clip(unsharp, 0, 1)
+            
+            # Convert back to uint8
+            enhanced = (unsharp * 255).astype(np.uint8)
+            
+            # Apply bilateral filter to smooth while preserving edges
+            enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+            
+            logger.debug("Applied emergency preprocessing to face image")
+            return enhanced
+            
+        except Exception as e:
+            logger.debug(f"Emergency preprocessing failed: {e}, using original")
+            return face_image
 
     def _generate_insightface_embedding(self, face_image: np.ndarray) -> np.ndarray:
         """Generate embedding using InsightFace model"""

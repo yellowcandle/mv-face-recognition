@@ -239,11 +239,11 @@ class UnifiedFaceDetector:
                 )
                 return None
 
-            # Add generous padding for better face recognition (25% on each side)
+            # Add more generous padding for better face recognition (40% on each side)
             face_height = bottom - top
             face_width = right - left
-            padding_h = int(face_height * 0.25)
-            padding_w = int(face_width * 0.25)
+            padding_h = int(face_height * 0.40)
+            padding_w = int(face_width * 0.40)
 
             # Apply padding
             top_padded = top - padding_h
@@ -271,6 +271,9 @@ class UnifiedFaceDetector:
                 logger.debug("Empty face region extracted")
                 return None
 
+            # Apply histogram equalization and preprocessing for better quality
+            face_region = self._preprocess_face_region(face_region)
+            
             # Ensure minimum size for InsightFace (at least 112x112 for better quality)
             min_size = 112
             if face_region.shape[0] < min_size or face_region.shape[1] < min_size:
@@ -330,8 +333,8 @@ class UnifiedFaceDetector:
     def _validate_face_quality(self, face_region: np.ndarray) -> bool:
         """Validate face region quality for reliable embedding generation"""
 
-        # Check basic size requirements (updated for better minimum)
-        if face_region.shape[0] < 80 or face_region.shape[1] < 80:
+        # Check basic size requirements (relaxed for better detection)
+        if face_region.shape[0] < 40 or face_region.shape[1] < 40:
             logger.debug(f"Face region too small: {face_region.shape}")
             return False
 
@@ -343,36 +346,63 @@ class UnifiedFaceDetector:
         # Convert to grayscale for quality checks
         face_gray = cv2.cvtColor(face_region, cv2.COLOR_RGB2GRAY)
 
-        # Check for sufficient contrast/variation (more lenient threshold)
+        # Check for sufficient contrast/variation (much more lenient threshold)
         std_dev = np.std(face_gray)
-        if std_dev < 6:
+        if std_dev < 3:
             logger.debug(f"Face region lacks contrast: std={std_dev:.2f}")
             return False
 
-        # Check for reasonable brightness (more permissive range)
+        # Check for reasonable brightness (very permissive range)
         mean_brightness = np.mean(face_gray)
-        if mean_brightness < 10 or mean_brightness > 245:
+        if mean_brightness < 5 or mean_brightness > 250:
             logger.debug(f"Face region poor brightness: mean={mean_brightness:.2f}")
             return False
 
-        # Check for blurriness using Laplacian variance (more lenient)
+        # Check for blurriness using Laplacian variance (very lenient)
         laplacian_var = cv2.Laplacian(face_gray, cv2.CV_64F).var()
-        if laplacian_var < 30:  # Relaxed blur threshold
+        if laplacian_var < 15:  # Much more relaxed blur threshold
             logger.debug(f"Face region too blurry: laplacian_var={laplacian_var:.2f}")
             return False
 
         # Check for extreme aspect ratios (more permissive)
         aspect_ratio = face_region.shape[1] / face_region.shape[0]
-        if aspect_ratio < 0.3 or aspect_ratio > 3.0:
+        if aspect_ratio < 0.2 or aspect_ratio > 5.0:
             logger.debug(f"Face region extreme aspect ratio: {aspect_ratio:.2f}")
             return False
 
-        # Check for all-zero or constant regions
-        if np.max(face_gray) - np.min(face_gray) < 10:
+        # Check for all-zero or constant regions (more lenient)
+        if np.max(face_gray) - np.min(face_gray) < 5:
             logger.debug("Face region lacks dynamic range")
             return False
 
         return True
+
+    def _preprocess_face_region(self, face_region: np.ndarray) -> np.ndarray:
+        """Preprocess face region to improve embedding generation quality"""
+        try:
+            # Convert to LAB color space for better histogram equalization
+            lab = cv2.cvtColor(face_region, cv2.COLOR_RGB2LAB)
+            l_channel, a_channel, b_channel = cv2.split(lab)
+            
+            # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to L channel
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            enhanced_l = clahe.apply(l_channel)
+            
+            # Merge channels back
+            enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
+            enhanced_face = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+            
+            # Apply slight Gaussian blur to reduce noise
+            enhanced_face = cv2.GaussianBlur(enhanced_face, (3, 3), 0.5)
+            
+            # Normalize pixel values to ensure consistent brightness
+            enhanced_face = cv2.normalize(enhanced_face, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            
+            return enhanced_face
+            
+        except Exception as e:
+            logger.debug(f"Face preprocessing failed, using original: {e}")
+            return face_region
 
     def recognize_faces(
         self, detections: List[FaceDetection], similarity_threshold: float = None
