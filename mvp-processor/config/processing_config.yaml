@@ -21,7 +21,7 @@ video:
 face_detection:
   model: "insightface"  # Use InsightFace buffalo_l model
   model_path: "../models/buffalo_l"
-  min_confidence: 0.3
+  min_confidence: 0.2  # Lowered for better detection coverage
   max_faces_per_frame: 96
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
   use_unified_system: true  # Enable unified embedding system for consistent recognition
@@ -42,18 +42,18 @@ face_detection:
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
-  similarity_threshold: 0.2  # Confidence threshold (much lower to allow more matches)
-  tolerance: 0.8  # Higher = more lenient matching  
-  max_distance: 15.0  # Much higher maximum face distance to allow more recognition
+  similarity_threshold: 0.15  # Even lower confidence threshold for more matches
+  tolerance: 0.9  # Much higher = more lenient matching  
+  max_distance: 20.0  # Even higher maximum face distance to allow more recognition
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
   enable_interpolation: true  # Disabled to prevent bbox persistence between detections
   confidence_decay: 0.95  # For interpolated frames (not used when interpolation disabled)
   
   # Trajectory-based recognition thresholds
-  trajectory_confidence_threshold: 0.02  # Very low aggregate trajectory confidence 
-  single_frame_threshold: 0.02          # Very low fallback threshold
-  temporal_boost_factor: 1.2            # Confidence boost for consistent temporal recognition
+  trajectory_confidence_threshold: 0.01  # Extremely low aggregate trajectory confidence 
+  single_frame_threshold: 0.01          # Extremely low fallback threshold
+  temporal_boost_factor: 1.3            # Higher confidence boost for consistent temporal recognition
 
 # Contestant Database (Critical Files)
 contestants:
