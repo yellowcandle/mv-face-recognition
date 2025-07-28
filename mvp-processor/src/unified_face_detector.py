@@ -239,11 +239,11 @@ class UnifiedFaceDetector:
                 )
                 return None
 
-            # Add more generous padding for better face recognition (40% on each side)
+            # Add more generous padding for better face recognition (50% on each side for InsightFace)
             face_height = bottom - top
             face_width = right - left
-            padding_h = int(face_height * 0.40)
-            padding_w = int(face_width * 0.40)
+            padding_h = int(face_height * 0.50)
+            padding_w = int(face_width * 0.50)
 
             # Apply padding
             top_padded = top - padding_h
@@ -274,13 +274,19 @@ class UnifiedFaceDetector:
             # Apply histogram equalization and preprocessing for better quality
             face_region = self._preprocess_face_region(face_region)
             
-            # Ensure minimum size for InsightFace (at least 112x112 for better quality)
+            # Ensure minimum size for InsightFace (at least 112x112, prefer 224x224 for better quality)
             min_size = 112
-            if face_region.shape[0] < min_size or face_region.shape[1] < min_size:
-                # Resize maintaining aspect ratio, pad to square if needed
-                target_size = max(
-                    min_size, max(face_region.shape[0], face_region.shape[1])
-                )
+            preferred_size = 224
+            current_max = max(face_region.shape[0], face_region.shape[1])
+            
+            if current_max < min_size:
+                target_size = preferred_size  # Upscale small faces significantly
+            elif current_max < preferred_size:
+                target_size = preferred_size  # Moderate upscaling
+            else:
+                target_size = current_max  # Keep large faces as-is
+                
+            if face_region.shape[0] < target_size or face_region.shape[1] < target_size:
 
                 # Calculate new dimensions maintaining aspect ratio
                 aspect_ratio = face_region.shape[1] / face_region.shape[0]

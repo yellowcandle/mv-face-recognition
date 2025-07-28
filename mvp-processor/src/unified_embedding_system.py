@@ -180,16 +180,33 @@ class UnifiedEmbeddingSystem:
                 and self.insightface_model is not None
             ):
                 try:
-                    embedding = self._generate_insightface_embedding(face_image)
-                    metadata["backend"] = "insightface"
-                except Exception as e:
-                    logger.warning(f"InsightFace failed: {e}, falling back to face_recognition")
-                    if self.face_recognition_available:
-                        embedding = self._generate_face_recognition_embedding(face_image)
-                        metadata["backend"] = "face_recognition_fallback"
-                        method = EmbeddingMethod.FACE_RECOGNITION
+                    # Pre-check face image quality for InsightFace
+                    if self._is_suitable_for_insightface(face_image):
+                        embedding = self._generate_insightface_embedding(face_image)
+                        metadata["backend"] = "insightface"
                     else:
-                        logger.warning("face_recognition not available, falling back to OpenCV")
+                        # Skip InsightFace for poor quality images
+                        raise ValueError("Image quality unsuitable for InsightFace, using fallback")
+                        
+                except Exception as e:
+                    fallback_reason = str(e)
+                    metadata["insightface_failure"] = fallback_reason
+                    
+                    # Intelligent fallback selection based on failure reason
+                    if "No face detected" in fallback_reason and self.face_recognition_available:
+                        logger.debug(f"InsightFace detection failed: {e}, trying face_recognition")
+                        try:
+                            embedding = self._generate_face_recognition_embedding(face_image)
+                            metadata["backend"] = "face_recognition_fallback"
+                            method = EmbeddingMethod.FACE_RECOGNITION
+                        except Exception as fr_e:
+                            logger.debug(f"face_recognition also failed: {fr_e}, using OpenCV")
+                            embedding = self._generate_opencv_embedding(face_image)
+                            metadata["backend"] = "opencv_double_fallback"
+                            method = EmbeddingMethod.OPENCV_CUSTOM
+                            metadata["face_recognition_failure"] = str(fr_e)
+                    else:
+                        logger.debug(f"InsightFace failed ({e}), using OpenCV directly")
                         embedding = self._generate_opencv_embedding(face_image)
                         metadata["backend"] = "opencv_fallback"
                         method = EmbeddingMethod.OPENCV_CUSTOM
@@ -310,8 +327,134 @@ class UnifiedEmbeddingSystem:
             logger.debug(f"Emergency preprocessing failed: {e}, using original")
             return face_image
 
+    def _enhance_face_for_insightface(self, face_image: np.ndarray) -> np.ndarray:
+        """Enhanced preprocessing specifically for InsightFace face detection"""
+        try:
+            # Ensure minimum size for InsightFace (112x112 is optimal)
+            h, w = face_image.shape[:2]
+            min_size = 112
+            
+            if h < min_size or w < min_size:
+                # Calculate new dimensions to maintain aspect ratio
+                scale = max(min_size / h, min_size / w)
+                new_h, new_w = int(h * scale), int(w * scale)
+                face_image = cv2.resize(face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+            
+            # Convert to LAB for better preprocessing
+            lab = cv2.cvtColor(face_image, cv2.COLOR_RGB2LAB)
+            l_channel, a_channel, b_channel = cv2.split(lab)
+            
+            # Apply CLAHE to improve contrast for face detection
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced_l = clahe.apply(l_channel)
+            
+            # Merge back to RGB
+            enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
+            enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+            
+            # Slight sharpening to help with face detection
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(enhanced_rgb, -1, kernel)
+            
+            # Blend original and sharpened (mild effect)
+            result = cv2.addWeighted(enhanced_rgb, 0.7, sharpened, 0.3, 0)
+            
+            return result.astype(np.uint8)
+            
+        except Exception as e:
+            logger.debug(f"InsightFace enhancement failed: {e}, using original")
+            return face_image
+
+    def _aggressive_face_enhancement(self, face_image: np.ndarray) -> np.ndarray:
+        """Aggressive enhancement for difficult face images"""
+        try:
+            # Resize to at least 224x224 for better detection
+            h, w = face_image.shape[:2]
+            target_size = 224
+            
+            if h < target_size or w < target_size:
+                scale = max(target_size / h, target_size / w)
+                new_h, new_w = int(h * scale), int(w * scale)
+                face_image = cv2.resize(face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+            
+            # Normalize brightness
+            gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
+            mean_brightness = np.mean(gray)
+            
+            if mean_brightness < 100:
+                # Brighten dark images
+                gamma = 0.7
+                corrected = np.power(face_image / 255.0, gamma) * 255.0
+                face_image = corrected.astype(np.uint8)
+            elif mean_brightness > 180:
+                # Darken bright images  
+                gamma = 1.3
+                corrected = np.power(face_image / 255.0, gamma) * 255.0
+                face_image = corrected.astype(np.uint8)
+            
+            # Aggressive contrast enhancement
+            lab = cv2.cvtColor(face_image, cv2.COLOR_RGB2LAB)
+            l_channel, a_channel, b_channel = cv2.split(lab)
+            
+            # More aggressive CLAHE
+            clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
+            enhanced_l = clahe.apply(l_channel)
+            
+            # Merge back
+            enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
+            enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+            
+            # Apply bilateral filter for noise reduction while preserving edges
+            filtered = cv2.bilateralFilter(enhanced_rgb, 9, 75, 75)
+            
+            # Ensure valid range
+            result = np.clip(filtered, 0, 255)
+            
+            return result.astype(np.uint8)
+            
+        except Exception as e:
+            logger.debug(f"Aggressive enhancement failed: {e}, using original")
+            return face_image
+
+    def _is_suitable_for_insightface(self, face_image: np.ndarray) -> bool:
+        """Check if face image is suitable for InsightFace processing"""
+        try:
+            # Check minimum size requirements
+            h, w = face_image.shape[:2]
+            if h < 50 or w < 50:  # Too small for reliable detection
+                return False
+                
+            # Check image quality metrics
+            gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
+            
+            # Check contrast (standard deviation)
+            std_dev = np.std(gray)
+            if std_dev < 10:  # Too low contrast
+                return False
+                
+            # Check brightness range
+            mean_brightness = np.mean(gray)
+            if mean_brightness < 10 or mean_brightness > 245:  # Too dark or too bright
+                return False
+                
+            # Check for blur using Laplacian variance
+            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+            if laplacian_var < 50:  # Too blurry
+                return False
+                
+            # Check aspect ratio
+            aspect_ratio = w / h
+            if aspect_ratio < 0.3 or aspect_ratio > 3.0:  # Extreme aspect ratios
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.debug(f"Suitability check failed: {e}, assuming suitable")
+            return True  # Conservative: assume suitable if check fails
+
     def _generate_insightface_embedding(self, face_image: np.ndarray) -> np.ndarray:
-        """Generate embedding using InsightFace model"""
+        """Generate embedding using InsightFace model with enhanced preprocessing"""
 
         # Validate input
         if not isinstance(face_image, np.ndarray):
@@ -322,14 +465,28 @@ class UnifiedEmbeddingSystem:
                 f"Expected RGB image with shape (H, W, 3), got {face_image.shape}"
             )
 
+        # Enhanced preprocessing for better InsightFace detection
+        preprocessed_image = self._enhance_face_for_insightface(face_image)
+        
         # Convert RGB to BGR for InsightFace
-        bgr_image = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
+        bgr_image = cv2.cvtColor(preprocessed_image, cv2.COLOR_RGB2BGR)
 
         # Get face analysis (should contain embeddings)
         faces = self.insightface_model.get(bgr_image)
 
         if len(faces) == 0:
-            raise ValueError("No face detected by InsightFace in provided image")
+            # Try with original image if preprocessing failed
+            bgr_original = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
+            faces = self.insightface_model.get(bgr_original)
+            
+            if len(faces) == 0:
+                # Try with additional enhancement techniques
+                enhanced_image = self._aggressive_face_enhancement(face_image)
+                bgr_enhanced = cv2.cvtColor(enhanced_image, cv2.COLOR_RGB2BGR)
+                faces = self.insightface_model.get(bgr_enhanced)
+                
+                if len(faces) == 0:
+                    raise ValueError("No face detected by InsightFace in provided image")
 
         # Use the first (most confident) face
         face = faces[0]

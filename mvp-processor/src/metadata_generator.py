@@ -27,6 +27,7 @@ class MetadataGenerator:
         recognitions: List[FaceRecognition],
         frame_data: List[Dict],
         output_name: str,
+        trajectory_data: List = None,  # New: optional trajectory data
     ) -> Dict:
         """
         Generate comprehensive metadata for a processed video
@@ -36,6 +37,7 @@ class MetadataGenerator:
             recognitions: List of face recognitions
             frame_data: Per-frame processing data
             output_name: Output video name
+            trajectory_data: Optional trajectory data from face tracker
 
         Returns:
             Structured metadata dictionary
@@ -43,6 +45,10 @@ class MetadataGenerator:
 
         # Group recognitions by contestant
         contestant_timeline = self._build_contestant_timeline(recognitions)
+        
+        # Add trajectory information if available
+        if trajectory_data:
+            self._add_trajectory_information(contestant_timeline, trajectory_data)
 
         # Generate processing summary
         processing_summary = self._generate_processing_summary(recognitions, frame_data)
@@ -72,7 +78,7 @@ class MetadataGenerator:
         return metadata
 
     def _build_contestant_timeline(self, recognitions: List[FaceRecognition]) -> Dict:
-        """Build timeline of contestant appearances"""
+        """Build timeline of contestant appearances with trajectory grouping support"""
         timeline = defaultdict(
             lambda: {
                 "appearances": [],
@@ -81,6 +87,7 @@ class MetadataGenerator:
                 "first_appearance": None,
                 "last_appearance": None,
                 "contestant_info": {},
+                "trajectory_segments": [],  # New: trajectory-based grouping
             }
         )
 
@@ -156,6 +163,54 @@ class MetadataGenerator:
             },
             "processing_timestamp": datetime.now().isoformat(),
         }
+
+    def _add_trajectory_information(self, contestant_timeline: Dict, trajectory_data: List):
+        """Add trajectory-based information to contestant timeline"""
+        for trajectory in trajectory_data:
+            # Skip trajectories without consensus identity
+            if not hasattr(trajectory, 'trajectory_consensus_id') or not trajectory.trajectory_consensus_id:
+                continue
+                
+            contestant_id = trajectory.trajectory_consensus_id
+            
+            if contestant_id not in contestant_timeline:
+                continue
+                
+            # Build trajectory segment information
+            trajectory_segment = {
+                "trajectory_id": trajectory.trajectory_id,
+                "start_time": min(trajectory.timestamps) if trajectory.timestamps else 0,
+                "end_time": max(trajectory.timestamps) if trajectory.timestamps else 0,
+                "duration": trajectory.get_trajectory_duration(),
+                "total_frames": len(trajectory.detections),
+                "recognized_frames": trajectory.total_recognized_frames,
+                "consensus_confidence": trajectory.trajectory_consensus_confidence,
+                "frame_distribution": dict(trajectory.frame_counts_per_contestant),
+                "is_completed": trajectory.trajectory_completed,
+                "stable_trajectory": trajectory.is_stable,
+            }
+            
+            # Add first and last frame information
+            if trajectory.detections:
+                trajectory_segment["first_frame"] = trajectory.detections[0].frame_number
+                trajectory_segment["last_frame"] = trajectory.detections[-1].frame_number
+                
+            # Add bounding box statistics
+            if trajectory.bounding_boxes:
+                # Calculate average bounding box size and position
+                boxes = trajectory.bounding_boxes
+                avg_x = sum(box[0] for box in boxes) / len(boxes)
+                avg_y = sum(box[1] for box in boxes) / len(boxes)
+                avg_width = sum(box[2] - box[0] for box in boxes) / len(boxes)
+                avg_height = sum(box[3] - box[1] for box in boxes) / len(boxes)
+                
+                trajectory_segment["bounding_box_stats"] = {
+                    "average_position": [avg_x, avg_y],
+                    "average_size": [avg_width, avg_height],
+                    "total_detections": len(boxes)
+                }
+            
+            contestant_timeline[contestant_id]["trajectory_segments"].append(trajectory_segment)
 
     def _create_timeline_markers(
         self, recognitions: List[FaceRecognition], video_duration: float
