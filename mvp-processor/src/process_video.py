@@ -355,18 +355,27 @@ class VideoProcessingPipeline:
                     # Get stable recognitions from tracking
                     frame_recognitions = self.face_tracker.get_stable_recognitions()
 
-                    # Add raw recognitions for frames without stable tracking (fallback)
-                    trajectory_locations = set()
-                    for recognition in frame_recognitions:
-                        trajectory_locations.add(recognition.detection.location)
+                    # Check trajectory consensus configuration
+                    trajectory_consensus_config = self.config.get("face_tracking", {}).get("trajectory_consensus", {})
+                    use_consensus_for_output = trajectory_consensus_config.get("use_consensus_for_output", False)
+                    
+                    if use_consensus_for_output:
+                        logger.debug(f"Frame {actual_frame_number}: Using trajectory consensus mode - {len(frame_recognitions)} consensus recognitions")
+                    
+                    if not use_consensus_for_output:
+                        # Legacy behavior: Add raw recognitions for frames without stable tracking (fallback)
+                        trajectory_locations = set()
+                        for recognition in frame_recognitions:
+                            trajectory_locations.add(recognition.detection.location)
 
-                    # Add non-tracked detections
-                    for raw_recognition in raw_recognitions:
-                        if (
-                            raw_recognition.detection.location
-                            not in trajectory_locations
-                        ):
-                            frame_recognitions.append(raw_recognition)
+                        # Add non-tracked detections
+                        for raw_recognition in raw_recognitions:
+                            if (
+                                raw_recognition.detection.location
+                                not in trajectory_locations
+                            ):
+                                frame_recognitions.append(raw_recognition)
+                    # When consensus is enabled, do NOT add raw recognitions - use only consensus results
 
                     logger.debug(
                         f"Frame {actual_frame_number}: {len(active_trajectories)} active trajectories, "
@@ -446,12 +455,32 @@ class VideoProcessingPipeline:
             "Processing complete: %d recognitions found", len(filtered_recognitions)
         )
 
+        # Collect trajectory data if tracking was enabled
+        trajectory_data = None
+        if self.face_tracker:
+            # Combine active and completed trajectories for metadata
+            all_trajectories = []
+            
+            # Add completed trajectories (these have consensus data)
+            all_trajectories.extend(self.face_tracker.completed_trajectories)
+            
+            # Add active trajectories (finalize consensus for active ones)
+            for trajectory in self.face_tracker.active_trajectories.values():
+                # Finalize consensus for active trajectories before metadata generation
+                if hasattr(trajectory, 'finalize_trajectory_consensus'):
+                    trajectory.finalize_trajectory_consensus()
+                all_trajectories.append(trajectory)
+            
+            trajectory_data = all_trajectories
+            logger.info(f"Collected {len(trajectory_data)} trajectories for metadata generation")
+
         # Generate metadata
         metadata = self.metadata_generator.generate_metadata(
             video_info=video_info,
             recognitions=filtered_recognitions,
             frame_data=frame_data,
             output_name=output_name,
+            trajectory_data=trajectory_data,
         )
 
         # Add tracking statistics to metadata
