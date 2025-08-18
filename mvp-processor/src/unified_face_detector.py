@@ -225,6 +225,136 @@ class UnifiedFaceDetector:
         )
         return detections
 
+    def detect_faces_batch(
+        self, 
+        frames: List[np.ndarray], 
+        timestamps: List[float], 
+        frame_numbers: List[int]
+    ) -> List[List[FaceDetection]]:
+        """
+        Detect faces in multiple frames simultaneously using batch processing
+        
+        Args:
+            frames: List of RGB frame arrays
+            timestamps: List of frame timestamps in seconds
+            frame_numbers: List of frame numbers
+            
+        Returns:
+            List of lists, where each inner list contains FaceDetection objects for that frame
+        """
+        if not frames or len(frames) != len(timestamps) or len(frames) != len(frame_numbers):
+            logger.error("Invalid input: frames, timestamps, and frame_numbers must have same length")
+            return [[] for _ in frames]
+            
+        all_detections = []
+        
+        # First pass: detect face locations in all frames
+        all_face_regions = []
+        all_face_locations = []
+        frame_face_counts = []
+        
+        for frame_idx, (frame, timestamp, frame_number) in enumerate(zip(frames, timestamps, frame_numbers)):
+            if self.backend_type == "enhanced":
+                # Use enhanced detector for location detection
+                frame_detections = self.detection_backend.detect_faces(frame, timestamp, frame_number)
+                locations = [det.location for det in frame_detections]
+            else:
+                # Use OpenCV for location detection
+                locations = self._detect_face_locations_opencv(frame)
+                
+            frame_face_regions = []
+            frame_face_locations = []
+            
+            max_faces = self.config["face_detection"]["max_faces_per_frame"]
+            for location in locations[:max_faces]:
+                face_region = self._extract_face_region(frame, location)
+                if face_region is not None and self._validate_face_quality(face_region):
+                    frame_face_regions.append(face_region)
+                    frame_face_locations.append(location)
+                    
+            all_face_regions.extend(frame_face_regions)
+            all_face_locations.extend(frame_face_locations)
+            frame_face_counts.append(len(frame_face_regions))
+            
+        # Second pass: generate embeddings for all faces in batch
+        if all_face_regions:
+            try:
+                batch_results = self.embedding_system.generate_batch_embeddings(all_face_regions)
+                logger.info(f"Generated {len(batch_results)} embeddings in batch for {len(frames)} frames")
+            except Exception as e:
+                logger.error(f"Batch embedding generation failed: {e}")
+                # Fallback to individual processing
+                batch_results = []
+                for face_region in all_face_regions:
+                    try:
+                        embedding, metadata = self.embedding_system.generate_embedding(face_region)
+                        batch_results.append((embedding, metadata))
+                    except:
+                        null_embedding = np.zeros(self.embedding_system.embedding_config.embedding_dimension, dtype=np.float32)
+                        null_metadata = {"backend": "failed", "error": "individual_fallback_failed"}
+                        batch_results.append((null_embedding, null_metadata))
+        else:
+            batch_results = []
+            
+        # Third pass: reconstruct detections per frame
+        result_idx = 0
+        for frame_idx, face_count in enumerate(frame_face_counts):
+            frame_detections = []
+            
+            for _ in range(face_count):
+                if result_idx < len(batch_results) and result_idx < len(all_face_locations):
+                    embedding, metadata = batch_results[result_idx]
+                    location = all_face_locations[result_idx]
+                    
+                    # Validate embedding
+                    if self.embedding_system.validate_embedding(embedding):
+                        detection = FaceDetection(
+                            location=location,
+                            encoding=embedding,
+                            timestamp=timestamps[frame_idx],
+                            frame_number=frame_numbers[frame_idx],
+                            confidence=0.8,  # Default confidence for batch processing
+                        )
+                        frame_detections.append(detection)
+                        
+                        logger.debug(
+                            f"Batch processed face at {timestamps[frame_idx]:.2f}s "
+                            f"using {metadata.get('backend', 'unknown')}"
+                        )
+                
+                result_idx += 1
+                
+            all_detections.append(frame_detections)
+            
+        logger.info(f"Batch processed {len(frames)} frames with total {sum(len(dets) for dets in all_detections)} faces")
+        return all_detections
+        
+    def _detect_face_locations_opencv(self, frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
+        """Detect face locations using OpenCV (without embeddings)"""
+        if self.backend_type != "opencv":
+            # Initialize OpenCV detector if not using it as primary backend
+            opencv_detector = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            )
+        else:
+            opencv_detector = self.detection_backend
+            
+        # Convert to grayscale for detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        
+        # Detect faces
+        faces = opencv_detector.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+        )
+        
+        # Convert to face_recognition format (top, right, bottom, left)
+        locations = []
+        for x, y, w, h in faces:
+            top, right, bottom, left = y, x + w, y + h, x
+            locations.append((top, right, bottom, left))
+            
+        return locations
+
     def _extract_face_region(
         self, frame: np.ndarray, location: Tuple[int, int, int, int]
     ) -> Optional[np.ndarray]:

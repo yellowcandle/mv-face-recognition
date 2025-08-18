@@ -470,6 +470,78 @@ class GPUMemoryManager:
             # For direct allocation, just delete reference
             del tensor
 
+    def _preallocate_face_detection_memory(self, batch_size: int):
+        """Pre-allocate memory specifically for face detection batch processing"""
+        if not self.memory_pool:
+            return
+            
+        logger.info(f"Pre-allocating memory for face detection batch size {batch_size}")
+        
+        # Common face detection tensor shapes for different batch sizes
+        face_detection_shapes = [
+            # Face region tensors (224x224 is common for face processing)
+            (1, 3, 224, 224),  # Single face
+            (batch_size, 3, 224, 224),  # Batch of faces
+            (batch_size * 2, 3, 224, 224),  # Double batch for pipeline parallelism
+            
+            # Embedding tensors
+            (batch_size, 512),  # Face embeddings batch
+            (batch_size * 2, 512),  # Double embedding batch
+            
+            # Feature map tensors (common intermediate sizes)
+            (batch_size, 256, 56, 56),  # Feature maps
+            (batch_size, 512, 28, 28),  # Deeper feature maps
+            (batch_size, 1024, 14, 14), # High-level features
+            
+            # Detection output tensors
+            (batch_size, 10, 4),  # Bounding boxes (up to 10 faces per image)
+            (batch_size, 10),     # Confidence scores
+        ]
+        
+        # Pre-allocate and immediately return to pool
+        preallocated_count = 0
+        for shape in face_detection_shapes:
+            try:
+                tensor = self.allocate_tensor(shape)
+                if tensor is not None:
+                    self.deallocate_tensor(tensor)
+                    preallocated_count += 1
+                    logger.debug(f"Pre-allocated tensor shape {shape}")
+            except Exception as e:
+                logger.debug(f"Failed to pre-allocate tensor shape {shape}: {e}")
+                
+        logger.info(f"Successfully pre-allocated {preallocated_count}/{len(face_detection_shapes)} face detection tensors")
+        
+    def get_optimal_batch_size(self, workload_type: str = "face_detection") -> int:
+        """Calculate optimal batch size based on available memory"""
+        if workload_type == "face_detection":
+            memory_info = self.get_memory_info()
+            available_memory_gb = memory_info.get("current_usage_gb", 0)
+            
+            if self.device == "mps":
+                # Apple Silicon unified memory - can use larger batches
+                if available_memory_gb > 16:
+                    return 16
+                elif available_memory_gb > 8:
+                    return 12
+                else:
+                    return 8
+                    
+            elif self.device == "cuda":
+                # CUDA VRAM - more conservative
+                total_memory = memory_info.get("total_memory_gb", 8)
+                if total_memory > 12:
+                    return 16
+                elif total_memory > 8:
+                    return 12
+                elif total_memory > 6:
+                    return 8
+                else:
+                    return 4
+                    
+        # Default fallback
+        return 8
+
     def register_pressure_callback(self, callback: Callable):
         """Register callback for memory pressure events"""
         self.pressure_callbacks.append(callback)
@@ -477,6 +549,9 @@ class GPUMemoryManager:
     def optimize_for_workload(self, workload_type: str, batch_size: int = 8):
         """Optimize memory configuration for specific workload"""
         if workload_type == "face_detection":
+            # Pre-allocate memory for face detection batch processing
+            self._preallocate_face_detection_memory(batch_size)
+            
             # Optimize for face detection workload
             if self.device == "mps":
                 # Apple Silicon optimizations

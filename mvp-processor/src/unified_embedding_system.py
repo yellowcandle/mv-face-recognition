@@ -7,7 +7,7 @@ with proper normalization and distance scaling
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional, Union, List
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -291,6 +291,146 @@ class UnifiedEmbeddingSystem:
                 metadata.update({"backend": "deterministic_fallback", "error": f"{e} | {fallback_error}"})
             
             return embedding, metadata
+
+    def generate_batch_embeddings(
+        self, 
+        face_images: List[np.ndarray], 
+        method: Optional[EmbeddingMethod] = None
+    ) -> List[Tuple[np.ndarray, Dict]]:
+        """
+        Generate embeddings for a batch of face images efficiently.
+        
+        Args:
+            face_images: List of RGB face image arrays (cropped to face regions)
+            method: Optional specific method to use, defaults to configured method
+            
+        Returns:
+            List of (normalized_embedding, metadata) tuples
+        """
+        if not face_images:
+            return []
+            
+        if method is None:
+            method = self.embedding_config.method
+            
+        # Try batch processing for supported methods
+        if method == EmbeddingMethod.INSIGHTFACE and self.insightface_model is not None:
+            try:
+                return self._generate_insightface_batch_embeddings(face_images)
+            except Exception as e:
+                logger.warning(f"Batch InsightFace processing failed: {e}, falling back to individual processing")
+                
+        # Fallback to individual processing for non-batch methods or failures
+        results = []
+        for face_image in face_images:
+            try:
+                embedding, metadata = self.generate_embedding(face_image, method)
+                results.append((embedding, metadata))
+            except Exception as e:
+                logger.debug(f"Failed to generate embedding for face in batch: {e}")
+                # Generate a null embedding for failed faces to maintain batch alignment
+                null_embedding = np.zeros(self.embedding_config.embedding_dimension, dtype=np.float32)
+                null_metadata = {
+                    "method": method.value,
+                    "dimension": self.embedding_config.embedding_dimension,
+                    "normalized": self.embedding_config.normalize_embeddings,
+                    "backend": "failed",
+                    "error": str(e)
+                }
+                results.append((null_embedding, null_metadata))
+                
+        return results
+
+    def _generate_insightface_batch_embeddings(self, face_images: List[np.ndarray]) -> List[Tuple[np.ndarray, Dict]]:
+        """Generate embeddings for multiple faces using InsightFace batch processing"""
+        results = []
+        
+        # Process in smaller batches to manage memory
+        batch_size = min(len(face_images), 8)  # Adjust based on GPU memory
+        
+        for i in range(0, len(face_images), batch_size):
+            batch = face_images[i:i + batch_size]
+            
+            # Pre-process all images in the batch
+            processed_images = []
+            valid_indices = []
+            
+            for idx, face_image in enumerate(batch):
+                if self._is_suitable_for_insightface(face_image):
+                    # Convert to BGR for InsightFace
+                    bgr_image = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
+                    processed_images.append(bgr_image)
+                    valid_indices.append(i + idx)
+                else:
+                    # Mark invalid images for individual fallback processing
+                    processed_images.append(None)
+                    valid_indices.append(None)
+            
+            # Process valid images in batch
+            batch_embeddings = []
+            if any(img is not None for img in processed_images):
+                try:
+                    # InsightFace batch processing
+                    valid_images = [img for img in processed_images if img is not None]
+                    if valid_images:
+                        # Use InsightFace's batch processing if available
+                        for valid_img in valid_images:
+                            faces = self.insightface_model.get(valid_img)
+                            if faces:
+                                embedding = faces[0].embedding  # Use first/best face
+                                if self.embedding_config.normalize_embeddings:
+                                    embedding = self._normalize_embedding(embedding)
+                                batch_embeddings.append(embedding)
+                            else:
+                                # No face detected, create null embedding
+                                batch_embeddings.append(np.zeros(512, dtype=np.float32))
+                        
+                except Exception as e:
+                    logger.debug(f"Batch InsightFace processing failed: {e}")
+                    # Fall back to individual processing for this batch
+                    batch_embeddings = []
+                    for img in valid_images:
+                        try:
+                            faces = self.insightface_model.get(img)
+                            if faces:
+                                embedding = faces[0].embedding
+                                if self.embedding_config.normalize_embeddings:
+                                    embedding = self._normalize_embedding(embedding)
+                                batch_embeddings.append(embedding)
+                            else:
+                                batch_embeddings.append(np.zeros(512, dtype=np.float32))
+                        except:
+                            batch_embeddings.append(np.zeros(512, dtype=np.float32))
+            
+            # Combine results with metadata
+            valid_idx = 0
+            for idx, original_image in enumerate(batch):
+                metadata = {
+                    "method": EmbeddingMethod.INSIGHTFACE.value,
+                    "dimension": 512,
+                    "normalized": self.embedding_config.normalize_embeddings,
+                    "backend": "insightface_batch"
+                }
+                
+                if processed_images[idx] is not None and valid_idx < len(batch_embeddings):
+                    # Valid embedding from batch processing
+                    embedding = batch_embeddings[valid_idx]
+                    valid_idx += 1
+                else:
+                    # Fallback for invalid images
+                    try:
+                        embedding, fallback_metadata = self.generate_embedding(
+                            original_image, EmbeddingMethod.FACE_RECOGNITION
+                        )
+                        metadata.update(fallback_metadata)
+                        metadata["backend"] = "fallback_from_batch"
+                    except:
+                        embedding = np.zeros(self.embedding_config.embedding_dimension, dtype=np.float32)
+                        metadata["backend"] = "failed_batch"
+                
+                results.append((embedding, metadata))
+        
+        return results
 
     def _emergency_preprocess_image(self, face_image: np.ndarray) -> np.ndarray:
         """Emergency preprocessing for difficult face images"""
