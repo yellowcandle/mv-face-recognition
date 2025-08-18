@@ -111,6 +111,15 @@ face_tracking:
     temporal_decay_factor: 0.95     # FIXED: Slower decay (0.9 → 0.95) to preserve voting history
     stability_requirement: 3        # FIXED: Lowered from 6 to 3 frames for faster identity assignment
 
+  # Trajectory Consensus System - Frame-Count Based Recognition
+  trajectory_consensus:
+    enable: true                    # Enable trajectory-based consensus recognition
+    min_frames_for_consensus: 2     # Minimum frames required for consensus calculation
+    use_consensus_for_output: true  # Use consensus identity instead of frame-by-frame switching
+    dominance_threshold: 0.3        # Confidence boost threshold for dominant contestants (30% more frames)
+    confidence_boost: 0.1           # Additional confidence for dominant contestants
+    finalize_on_completion: true    # Finalize consensus when trajectory completes
+
 # Processing Settings for Dense Metadata
 processing:
   enable_tracking: true             # Global tracking enable flag (use face_tracking.enable_tracking for detailed control)
