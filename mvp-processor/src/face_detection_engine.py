@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FaceDetection:
     """Represents a detected face in a frame"""
+
     location: Tuple[int, int, int, int]  # (top, right, bottom, left)
     encoding: np.ndarray
     timestamp: float
@@ -73,6 +74,7 @@ class FaceDetectionEngine:
         """Check if InsightFace is available"""
         try:
             import insightface  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -81,6 +83,7 @@ class FaceDetectionEngine:
         """Check if ONNX Runtime is available"""
         try:
             import onnxruntime as ort  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -94,6 +97,7 @@ class FaceDetectionEngine:
             if self.config["face_detection"].get("enable_hardware_acceleration", False):
                 try:
                     from hardware_detector import HardwareDetector
+
                     self.hardware_detector = HardwareDetector()
                 except ImportError:
                     self.hardware_detector = None
@@ -167,7 +171,9 @@ class FaceDetectionEngine:
 
         try:
             if self.backend == "insightface":
-                detections = self._detect_with_insightface(frame, timestamp, frame_number)
+                detections = self._detect_with_insightface(
+                    frame, timestamp, frame_number
+                )
             elif self.backend == "onnx":
                 detections = self._detect_with_onnx(frame, timestamp, frame_number)
             else:
@@ -206,7 +212,7 @@ class FaceDetectionEngine:
         faces = self.detector.get(bgr_frame)
 
         detections = []
-        for face in faces[:self.max_faces_per_frame]:
+        for face in faces[: self.max_faces_per_frame]:
             if face.det_score < self.min_confidence:
                 continue
 
@@ -253,7 +259,7 @@ class FaceDetectionEngine:
         )
 
         detections = []
-        for x, y, w, h in faces[:self.max_faces_per_frame]:
+        for x, y, w, h in faces[: self.max_faces_per_frame]:
             # Skip small faces
             if w < 40 or h < 40:
                 continue
@@ -295,7 +301,9 @@ class FaceDetectionEngine:
             grad_x = cv2.Sobel(face_resized, cv2.CV_64F, 1, 0, ksize=3).flatten()
             grad_y = cv2.Sobel(face_resized, cv2.CV_64F, 0, 1, ksize=3).flatten()
 
-            enhanced_features = np.concatenate([face_encoding, grad_x[:256], grad_y[:256]])
+            enhanced_features = np.concatenate(
+                [face_encoding, grad_x[:256], grad_y[:256]]
+            )
             encoding = enhanced_features / (np.linalg.norm(enhanced_features) + 1e-8)
 
             # Ensure 512 dimensions
@@ -318,7 +326,10 @@ class FaceDetectionEngine:
         hardware_info = self.hardware_detector.detect_hardware()
 
         # Apple Silicon unified memory optimization
-        if hasattr(hardware_info, 'supports_unified_memory') and hardware_info.supports_unified_memory:
+        if (
+            hasattr(hardware_info, "supports_unified_memory")
+            and hardware_info.supports_unified_memory
+        ):
             if not frame.flags["C_CONTIGUOUS"]:
                 frame = np.ascontiguousarray(frame)
 
@@ -335,8 +346,11 @@ class FaceDetectionEngine:
         return frame
 
     def _postprocess_onnx_outputs(
-        self, outputs: List[np.ndarray], frame: np.ndarray,
-        timestamp: float, frame_number: int
+        self,
+        outputs: List[np.ndarray],
+        frame: np.ndarray,
+        timestamp: float,
+        frame_number: int,
     ) -> List[FaceDetection]:
         """Post-process ONNX outputs (placeholder implementation)"""
         # This would need to be implemented based on specific model architecture
@@ -352,7 +366,9 @@ class FaceDetectionEngine:
             "backend": self.backend,
             "total_frames": self.frame_count,
             "avg_detection_time": np.mean(self.detection_times),
-            "avg_fps": 1.0 / np.mean(self.detection_times) if self.detection_times else 0,
+            "avg_fps": 1.0 / np.mean(self.detection_times)
+            if self.detection_times
+            else 0,
         }
 
     def cleanup(self):
@@ -366,6 +382,7 @@ class FaceDetectionEngine:
 # Legacy compatibility imports
 class FaceDetector:
     """Legacy compatibility wrapper"""
+
     def __init__(self, config: dict):
         self.engine = FaceDetectionEngine(config)
 
@@ -382,6 +399,7 @@ class FaceDetector:
 # Enhanced detector compatibility
 class AcceleratedFaceDetector:
     """Legacy compatibility wrapper for enhanced detector"""
+
     def __init__(self, config: dict):
         self.engine = FaceDetectionEngine(config)
 

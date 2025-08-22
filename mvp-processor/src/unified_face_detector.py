@@ -226,86 +226,110 @@ class UnifiedFaceDetector:
         return detections
 
     def detect_faces_batch(
-        self, 
-        frames: List[np.ndarray], 
-        timestamps: List[float], 
-        frame_numbers: List[int]
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float],
+        frame_numbers: List[int],
     ) -> List[List[FaceDetection]]:
         """
         Detect faces in multiple frames simultaneously using batch processing
-        
+
         Args:
             frames: List of RGB frame arrays
             timestamps: List of frame timestamps in seconds
             frame_numbers: List of frame numbers
-            
+
         Returns:
             List of lists, where each inner list contains FaceDetection objects for that frame
         """
-        if not frames or len(frames) != len(timestamps) or len(frames) != len(frame_numbers):
-            logger.error("Invalid input: frames, timestamps, and frame_numbers must have same length")
+        if (
+            not frames
+            or len(frames) != len(timestamps)
+            or len(frames) != len(frame_numbers)
+        ):
+            logger.error(
+                "Invalid input: frames, timestamps, and frame_numbers must have same length"
+            )
             return [[] for _ in frames]
-            
+
         all_detections = []
-        
+
         # First pass: detect face locations in all frames
         all_face_regions = []
         all_face_locations = []
         frame_face_counts = []
-        
-        for frame_idx, (frame, timestamp, frame_number) in enumerate(zip(frames, timestamps, frame_numbers)):
+
+        for frame_idx, (frame, timestamp, frame_number) in enumerate(
+            zip(frames, timestamps, frame_numbers)
+        ):
             if self.backend_type == "enhanced":
                 # Use enhanced detector for location detection
-                frame_detections = self.detection_backend.detect_faces(frame, timestamp, frame_number)
+                frame_detections = self.detection_backend.detect_faces(
+                    frame, timestamp, frame_number
+                )
                 locations = [det.location for det in frame_detections]
             else:
                 # Use OpenCV for location detection
                 locations = self._detect_face_locations_opencv(frame)
-                
+
             frame_face_regions = []
             frame_face_locations = []
-            
+
             max_faces = self.config["face_detection"]["max_faces_per_frame"]
             for location in locations[:max_faces]:
                 face_region = self._extract_face_region(frame, location)
                 if face_region is not None and self._validate_face_quality(face_region):
                     frame_face_regions.append(face_region)
                     frame_face_locations.append(location)
-                    
+
             all_face_regions.extend(frame_face_regions)
             all_face_locations.extend(frame_face_locations)
             frame_face_counts.append(len(frame_face_regions))
-            
+
         # Second pass: generate embeddings for all faces in batch
         if all_face_regions:
             try:
-                batch_results = self.embedding_system.generate_batch_embeddings(all_face_regions)
-                logger.info(f"Generated {len(batch_results)} embeddings in batch for {len(frames)} frames")
+                batch_results = self.embedding_system.generate_batch_embeddings(
+                    all_face_regions
+                )
+                logger.info(
+                    f"Generated {len(batch_results)} embeddings in batch for {len(frames)} frames"
+                )
             except Exception as e:
                 logger.error(f"Batch embedding generation failed: {e}")
                 # Fallback to individual processing
                 batch_results = []
                 for face_region in all_face_regions:
                     try:
-                        embedding, metadata = self.embedding_system.generate_embedding(face_region)
+                        embedding, metadata = self.embedding_system.generate_embedding(
+                            face_region
+                        )
                         batch_results.append((embedding, metadata))
                     except:
-                        null_embedding = np.zeros(self.embedding_system.embedding_config.embedding_dimension, dtype=np.float32)
-                        null_metadata = {"backend": "failed", "error": "individual_fallback_failed"}
+                        null_embedding = np.zeros(
+                            self.embedding_system.embedding_config.embedding_dimension,
+                            dtype=np.float32,
+                        )
+                        null_metadata = {
+                            "backend": "failed",
+                            "error": "individual_fallback_failed",
+                        }
                         batch_results.append((null_embedding, null_metadata))
         else:
             batch_results = []
-            
+
         # Third pass: reconstruct detections per frame
         result_idx = 0
         for frame_idx, face_count in enumerate(frame_face_counts):
             frame_detections = []
-            
+
             for _ in range(face_count):
-                if result_idx < len(batch_results) and result_idx < len(all_face_locations):
+                if result_idx < len(batch_results) and result_idx < len(
+                    all_face_locations
+                ):
                     embedding, metadata = batch_results[result_idx]
                     location = all_face_locations[result_idx]
-                    
+
                     # Validate embedding
                     if self.embedding_system.validate_embedding(embedding):
                         detection = FaceDetection(
@@ -316,20 +340,24 @@ class UnifiedFaceDetector:
                             confidence=0.8,  # Default confidence for batch processing
                         )
                         frame_detections.append(detection)
-                        
+
                         logger.debug(
                             f"Batch processed face at {timestamps[frame_idx]:.2f}s "
                             f"using {metadata.get('backend', 'unknown')}"
                         )
-                
+
                 result_idx += 1
-                
+
             all_detections.append(frame_detections)
-            
-        logger.info(f"Batch processed {len(frames)} frames with total {sum(len(dets) for dets in all_detections)} faces")
+
+        logger.info(
+            f"Batch processed {len(frames)} frames with total {sum(len(dets) for dets in all_detections)} faces"
+        )
         return all_detections
-        
-    def _detect_face_locations_opencv(self, frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
+
+    def _detect_face_locations_opencv(
+        self, frame: np.ndarray
+    ) -> List[Tuple[int, int, int, int]]:
         """Detect face locations using OpenCV (without embeddings)"""
         if self.backend_type != "opencv":
             # Initialize OpenCV detector if not using it as primary backend
@@ -338,21 +366,21 @@ class UnifiedFaceDetector:
             )
         else:
             opencv_detector = self.detection_backend
-            
+
         # Convert to grayscale for detection
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        
+
         # Detect faces
         faces = opencv_detector.detectMultiScale(
             gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
         )
-        
+
         # Convert to face_recognition format (top, right, bottom, left)
         locations = []
         for x, y, w, h in faces:
             top, right, bottom, left = y, x + w, y + h, x
             locations.append((top, right, bottom, left))
-            
+
         return locations
 
     def _extract_face_region(
@@ -403,21 +431,20 @@ class UnifiedFaceDetector:
 
             # Apply histogram equalization and preprocessing for better quality
             face_region = self._preprocess_face_region(face_region)
-            
+
             # Ensure minimum size for InsightFace (at least 112x112, prefer 224x224 for better quality)
             min_size = 112
             preferred_size = 224
             current_max = max(face_region.shape[0], face_region.shape[1])
-            
+
             if current_max < min_size:
                 target_size = preferred_size  # Upscale small faces significantly
             elif current_max < preferred_size:
                 target_size = preferred_size  # Moderate upscaling
             else:
                 target_size = current_max  # Keep large faces as-is
-                
-            if face_region.shape[0] < target_size or face_region.shape[1] < target_size:
 
+            if face_region.shape[0] < target_size or face_region.shape[1] < target_size:
                 # Calculate new dimensions maintaining aspect ratio
                 aspect_ratio = face_region.shape[1] / face_region.shape[0]
                 if aspect_ratio > 1:
@@ -519,23 +546,25 @@ class UnifiedFaceDetector:
             # Convert to LAB color space for better histogram equalization
             lab = cv2.cvtColor(face_region, cv2.COLOR_RGB2LAB)
             l_channel, a_channel, b_channel = cv2.split(lab)
-            
+
             # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to L channel
             clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
             enhanced_l = clahe.apply(l_channel)
-            
+
             # Merge channels back
             enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
             enhanced_face = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
-            
+
             # Apply slight Gaussian blur to reduce noise
             enhanced_face = cv2.GaussianBlur(enhanced_face, (3, 3), 0.5)
-            
+
             # Normalize pixel values to ensure consistent brightness
-            enhanced_face = cv2.normalize(enhanced_face, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            
+            enhanced_face = cv2.normalize(
+                enhanced_face, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+            )
+
             return enhanced_face
-            
+
         except Exception as e:
             logger.debug(f"Face preprocessing failed, using original: {e}")
             return face_region

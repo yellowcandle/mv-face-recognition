@@ -159,7 +159,6 @@ if __name__ == "__main__":
 
     # Check for optimization dependencies
     try:
-
         print("✅ All optimization dependencies available")
     except ImportError as e:
         print(f"⚠️  Optimization dependency missing: {e}")

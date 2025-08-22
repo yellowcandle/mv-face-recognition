@@ -5,7 +5,7 @@ Workaround for pkg_resources import issue in face_recognition_models
 import os
 import sys
 from importlib.metadata import files
-from importlib.resources import files as resource_files
+
 
 def resource_filename(package, resource):
     """Workaround for pkg_resources.resource_filename"""
@@ -21,12 +21,13 @@ def resource_filename(package, resource):
 
     # Fallback to searching in site-packages
     for site_dir in sys.path:
-        if 'site-packages' in site_dir:
+        if "site-packages" in site_dir:
             potential_path = os.path.join(site_dir, package, resource)
             if os.path.exists(potential_path):
                 return potential_path
 
     raise FileNotFoundError(f"Resource {resource} not found in package {package}")
 
+
 # Add this to the path so face_recognition_models can import it
-sys.modules['pkg_resources'] = sys.modules[__name__]
+sys.modules["pkg_resources"] = sys.modules[__name__]

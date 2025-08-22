@@ -8,18 +8,18 @@ import sys
 import os
 import numpy as np
 import cv2
-from pathlib import Path
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 # Add current directory to Python path for pkg_resources workaround
 sys.path.insert(0, os.path.dirname(__file__))
 
+
 def create_test_video(output_path: str, duration_seconds: int = 5, fps: int = 30):
     """Create a simple test video with moving rectangles"""
     width, height = 640, 480
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     # Create frames with moving rectangles
@@ -36,8 +36,15 @@ def create_test_video(output_path: str, duration_seconds: int = 5, fps: int = 30
         cv2.rectangle(frame, (x, y), (x + 80, y + 100), (255, 255, 255), 2)
 
         # Add frame number
-        cv2.putText(frame, f"Frame {frame_num}", (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(
+            frame,
+            f"Frame {frame_num}",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+        )
 
         out.write(frame)
 
@@ -64,19 +71,16 @@ def test_video_processing_with_real_file():
 
         # Initialize configuration
         config = {
-            "face_recognition": {
-                "tolerance": 0.6,
-                "similarity_threshold": 0.5
-            },
+            "face_recognition": {"tolerance": 0.6, "similarity_threshold": 0.5},
             "contestants": {
                 "photo_dir": "../source/photo",
-                "info_csv": "../source/contestant_info.csv"
+                "info_csv": "../source/contestant_info.csv",
             },
             "face_detection": {
                 "min_confidence": 0.5,
                 "max_faces_per_frame": 5,
-                "enable_hardware_acceleration": False
-            }
+                "enable_hardware_acceleration": False,
+            },
         }
 
         # Initialize engines
@@ -94,7 +98,7 @@ def test_video_processing_with_real_file():
             target_path=output_video_path,
             confidence_threshold=0.5,
             enable_tracking=True,
-            enable_smoothing=True
+            enable_smoothing=True,
         )
 
         # Initialize video processor
@@ -115,12 +119,12 @@ def test_video_processing_with_real_file():
         success = video_processor.process_video()
 
         if success:
-            print(f"\n✅ Video processing completed successfully!")
+            print("\n✅ Video processing completed successfully!")
             print(f"   Output saved to: {output_video_path}")
 
             # Get performance statistics
             stats = video_processor.get_performance_stats()
-            print(f"\n📊 Performance Statistics:")
+            print("\n📊 Performance Statistics:")
             print(f"   • Total frames processed: {stats.get('total_frames', 0)}")
             print(".3f")
             print(".1f")
@@ -138,6 +142,7 @@ def test_video_processing_with_real_file():
     except Exception as e:
         print(f"❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -152,34 +157,29 @@ def test_frame_by_frame_processing():
         from face_recognition_engine import FaceRecognitionEngine
         from face_detection_engine import FaceDetectionEngine
         from video_processing_engine import VideoProcessor, VideoProcessingConfig
-        from face_detection_engine import FaceDetection
 
         # Create sample frame
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
 
         # Initialize engines
         config = {
-            "face_recognition": {
-                "tolerance": 0.6,
-                "similarity_threshold": 0.5
-            },
+            "face_recognition": {"tolerance": 0.6, "similarity_threshold": 0.5},
             "contestants": {
                 "photo_dir": "../source/photo",
-                "info_csv": "../source/contestant_info.csv"
+                "info_csv": "../source/contestant_info.csv",
             },
             "face_detection": {
                 "min_confidence": 0.5,
                 "max_faces_per_frame": 5,
-                "enable_hardware_acceleration": False
-            }
+                "enable_hardware_acceleration": False,
+            },
         }
 
         face_detector = FaceDetectionEngine(config)
         face_recognizer = FaceRecognitionEngine(config)
 
         video_config = VideoProcessingConfig(
-            source_path="dummy.mp4",
-            target_path="dummy_output.mp4"
+            source_path="dummy.mp4", target_path="dummy_output.mp4"
         )
 
         video_processor = VideoProcessor(video_config)

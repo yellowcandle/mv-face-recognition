@@ -5,22 +5,19 @@ Following Context7 best practices for video processing testing
 
 import pytest
 import numpy as np
-import cv2
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import tempfile
+from unittest.mock import Mock, patch
 
 # Import video processing engine
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.video_processing_engine import (
     VideoProcessor,
     BatchVideoProcessor,
-    VideoProcessingConfig
+    VideoProcessingConfig,
 )
-import supervision as sv
 
 
 class TestVideoProcessingConfig:
@@ -35,7 +32,7 @@ class TestVideoProcessingConfig:
             iou_threshold=0.7,
             enable_tracking=True,
             enable_smoothing=True,
-            max_faces_per_frame=5
+            max_faces_per_frame=5,
         )
 
         assert config.source_path == "/path/to/video.mp4"
@@ -49,8 +46,7 @@ class TestVideoProcessingConfig:
     def test_config_defaults(self):
         """Test configuration with default values"""
         config = VideoProcessingConfig(
-            source_path="/path/to/video.mp4",
-            target_path="/path/to/output.mp4"
+            source_path="/path/to/video.mp4", target_path="/path/to/output.mp4"
         )
 
         assert config.confidence_threshold == 0.3
@@ -71,7 +67,7 @@ class TestVideoProcessor:
             target_path="/path/to/output.mp4",
             confidence_threshold=0.5,
             enable_tracking=True,
-            enable_smoothing=True
+            enable_smoothing=True,
         )
 
     @pytest.fixture
@@ -89,7 +85,9 @@ class TestVideoProcessor:
         assert processor.processing_times == []
         assert processor.frame_count == 0
         assert processor.tracker is not None  # ByteTrack should be initialized
-        assert processor.smoother is not None  # DetectionsSmoother should be initialized
+        assert (
+            processor.smoother is not None
+        )  # DetectionsSmoother should be initialized
 
     def test_initialization_no_tracking(self):
         """Test processor initialization without tracking"""
@@ -97,7 +95,7 @@ class TestVideoProcessor:
             source_path="/path/to/video.mp4",
             target_path="/path/to/output.mp4",
             enable_tracking=False,
-            enable_smoothing=False
+            enable_smoothing=False,
         )
 
         processor = VideoProcessor(config)
@@ -123,7 +121,7 @@ class TestVideoProcessor:
 
         assert processor.face_recognizer == mock_recognizer
 
-    @patch('src.video_processing_engine.sv.process_video')
+    @patch("src.video_processing_engine.sv.process_video")
     def test_process_video_success(self, mock_process_video, sample_config):
         """Test successful video processing"""
         mock_process_video.return_value = None
@@ -134,7 +132,7 @@ class TestVideoProcessor:
         assert result is True
         mock_process_video.assert_called_once()
 
-    @patch('src.video_processing_engine.sv.process_video')
+    @patch("src.video_processing_engine.sv.process_video")
     def test_process_video_failure(self, mock_process_video, sample_config):
         """Test video processing failure"""
         mock_process_video.side_effect = Exception("Processing failed")
@@ -215,7 +213,9 @@ class TestVideoProcessor:
         """Test converting empty recognitions list"""
         processor = VideoProcessor(sample_config)
 
-        sv_detections = processor._convert_recognitions_to_sv_detections([], (480, 640, 3))
+        sv_detections = processor._convert_recognitions_to_sv_detections(
+            [], (480, 640, 3)
+        )
 
         assert sv_detections.is_empty()
 
@@ -266,13 +266,11 @@ class TestBatchVideoProcessor:
         """Create sample video processing configurations"""
         return [
             VideoProcessingConfig(
-                source_path="/path/to/video1.mp4",
-                target_path="/path/to/output1.mp4"
+                source_path="/path/to/video1.mp4", target_path="/path/to/output1.mp4"
             ),
             VideoProcessingConfig(
-                source_path="/path/to/video2.mp4",
-                target_path="/path/to/output2.mp4"
-            )
+                source_path="/path/to/video2.mp4", target_path="/path/to/output2.mp4"
+            ),
         ]
 
     def test_initialization(self, sample_configs):
@@ -348,7 +346,7 @@ class TestVideoProcessingIntegration:
             target_path="/path/to/output.mp4",
             confidence_threshold=0.5,
             enable_tracking=True,
-            enable_smoothing=True
+            enable_smoothing=True,
         )
 
     def test_full_pipeline_mock(self, sample_config, sample_frame):

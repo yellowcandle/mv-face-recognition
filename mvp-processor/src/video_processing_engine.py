@@ -3,10 +3,8 @@ Enhanced Video Processing Engine
 Implements Supervision library best practices for video processing pipeline
 """
 
-import cv2
 import numpy as np
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from typing import List, Dict, Any, Tuple
 import logging
 import time
 from dataclasses import dataclass
@@ -18,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VideoProcessingConfig:
     """Configuration for video processing pipeline"""
+
     source_path: str
     target_path: str
     confidence_threshold: float = 0.3
@@ -86,7 +85,7 @@ class VideoProcessor:
             sv.process_video(
                 source_path=self.config.source_path,
                 target_path=self.config.target_path,
-                callback=callback
+                callback=callback,
             )
 
             logger.info(f"Video processing completed: {self.config.target_path}")
@@ -150,40 +149,34 @@ class VideoProcessor:
                 # Create labels with contestant names and confidence
                 labels = []
                 for recognition in recognitions:
-                    label = (
-                        f"{recognition.contestant_nickname} "
-                        ".2f"
-                    )
+                    label = f"{recognition.contestant_nickname} .2f"
                     labels.append(label)
 
                 # Ensure we have the right number of labels for detections
                 if len(labels) == len(sv_detections):
                     # Apply box annotations
                     annotated_frame = self.box_annotator.annotate(
-                        scene=annotated_frame,
-                        detections=sv_detections
+                        scene=annotated_frame, detections=sv_detections
                     )
 
                     # Apply label annotations
                     annotated_frame = self.label_annotator.annotate(
-                        scene=annotated_frame,
-                        detections=sv_detections,
-                        labels=labels
+                        scene=annotated_frame, detections=sv_detections, labels=labels
                     )
 
                     # Apply trace annotations if tracking is enabled
                     if self.tracker:
                         annotated_frame = self.trace_annotator.annotate(
-                            scene=annotated_frame,
-                            detections=sv_detections
+                            scene=annotated_frame, detections=sv_detections
                         )
                 else:
-                    logger.warning(f"Label/detection count mismatch: {len(labels)} labels, {len(sv_detections)} detections")
+                    logger.warning(
+                        f"Label/detection count mismatch: {len(labels)} labels, {len(sv_detections)} detections"
+                    )
             elif not sv_detections.is_empty():
                 # Apply box annotations without labels if there are detections but no recognitions
                 annotated_frame = self.box_annotator.annotate(
-                    scene=annotated_frame,
-                    detections=sv_detections
+                    scene=annotated_frame, detections=sv_detections
                 )
 
             # Track performance
@@ -193,7 +186,9 @@ class VideoProcessor:
 
             if self.frame_count % 100 == 0 and self.processing_times:
                 avg_time = np.mean(self.processing_times[-100:])
-                logger.info(f"Average frame processing time (last 100): {avg_time:.3f}s")
+                logger.info(
+                    f"Average frame processing time (last 100): {avg_time:.3f}s"
+                )
 
             return annotated_frame
 
@@ -241,11 +236,7 @@ class VideoProcessor:
         confidence = np.array(confidence_list, dtype=np.float32)
         class_id = np.array(class_id_list, dtype=int)
 
-        return sv.Detections(
-            xyxy=xyxy,
-            confidence=confidence,
-            class_id=class_id
-        )
+        return sv.Detections(xyxy=xyxy, confidence=confidence, class_id=class_id)
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics"""
@@ -257,14 +248,16 @@ class VideoProcessor:
             "avg_frame_time": np.mean(self.processing_times),
             "min_frame_time": np.min(self.processing_times),
             "max_frame_time": np.max(self.processing_times),
-            "estimated_fps": 1.0 / np.mean(self.processing_times) if self.processing_times else 0,
+            "estimated_fps": 1.0 / np.mean(self.processing_times)
+            if self.processing_times
+            else 0,
         }
 
     def cleanup(self):
         """Clean up resources"""
-        if self.face_detector and hasattr(self.face_detector, 'cleanup'):
+        if self.face_detector and hasattr(self.face_detector, "cleanup"):
             self.face_detector.cleanup()
-        if self.face_recognizer and hasattr(self.face_recognizer, 'cleanup'):
+        if self.face_recognizer and hasattr(self.face_recognizer, "cleanup"):
             self.face_recognizer.cleanup()
 
 
@@ -293,7 +286,9 @@ class BatchVideoProcessor:
         results = []
 
         for i, processor in enumerate(self.processors):
-            logger.info(f"Processing video {i+1}/{len(self.processors)}: {self.configs[i].source_path}")
+            logger.info(
+                f"Processing video {i + 1}/{len(self.processors)}: {self.configs[i].source_path}"
+            )
             result = processor.process_video()
             results.append(result)
 
@@ -308,6 +303,8 @@ class BatchVideoProcessor:
             "videos_processed": len(self.processors),
             "total_frames": total_frames,
             "total_processing_time": total_time,
-            "avg_time_per_video": total_time / len(self.processors) if self.processors else 0,
+            "avg_time_per_video": total_time / len(self.processors)
+            if self.processors
+            else 0,
             "overall_fps": total_frames / total_time if total_time > 0 else 0,
         }

@@ -114,7 +114,8 @@ class FaceTrajectory:
 
                 # Track frame counts for trajectory consensus
                 self.frame_counts_per_contestant[recognition.contestant_id] = (
-                    self.frame_counts_per_contestant.get(recognition.contestant_id, 0) + 1
+                    self.frame_counts_per_contestant.get(recognition.contestant_id, 0)
+                    + 1
                 )
         else:
             self.confidence_scores.append(0.0)
@@ -377,14 +378,17 @@ class FaceTrajectory:
             return 0.0
         return max(self.timestamps) - min(self.timestamps)
 
-    def calculate_trajectory_consensus(self, config: Dict) -> Tuple[Optional[str], float]:
+    def calculate_trajectory_consensus(
+        self, config: Dict
+    ) -> Tuple[Optional[str], float]:
         """Calculate trajectory consensus based on frame counts"""
         if not self.frame_counts_per_contestant:
             return None, 0.0
 
         # Find contestant with most frames
-        winner_id = max(self.frame_counts_per_contestant, 
-                       key=self.frame_counts_per_contestant.get)
+        winner_id = max(
+            self.frame_counts_per_contestant, key=self.frame_counts_per_contestant.get
+        )
         winner_frames = self.frame_counts_per_contestant[winner_id]
         total_frames = sum(self.frame_counts_per_contestant.values())
 
@@ -393,11 +397,11 @@ class FaceTrajectory:
 
         # Calculate confidence based on dominance
         confidence = winner_frames / total_frames
-        
+
         # Apply dominance threshold boost
-        dominance_threshold = config.get('dominance_threshold', 0.3)
-        confidence_boost = config.get('confidence_boost', 0.1)
-        
+        dominance_threshold = config.get("dominance_threshold", 0.3)
+        confidence_boost = config.get("confidence_boost", 0.1)
+
         if confidence >= (0.5 + dominance_threshold):  # Clear dominance
             confidence += confidence_boost
 
@@ -407,16 +411,17 @@ class FaceTrajectory:
         """Finalize trajectory consensus when trajectory completes"""
         if config is None:
             config = {}
-            
-        self.trajectory_consensus_id, self.trajectory_consensus_confidence = \
+
+        self.trajectory_consensus_id, self.trajectory_consensus_confidence = (
             self.calculate_trajectory_consensus(config)
+        )
         self.trajectory_completed = True
 
     def get_consensus_identity(self) -> Tuple[Optional[str], float]:
         """Get consensus identity (current or finalized)"""
         if self.trajectory_completed and self.trajectory_consensus_id:
             return self.trajectory_consensus_id, self.trajectory_consensus_confidence
-        
+
         # Calculate current consensus for active trajectory
         if self.frame_counts_per_contestant:
             winner_id, confidence = self.calculate_trajectory_consensus({})
@@ -425,7 +430,7 @@ class FaceTrajectory:
                 f"(confidence: {confidence:.3f}, frame counts: {self.frame_counts_per_contestant})"
             )
             return winner_id, confidence
-            
+
         return None, 0.0
 
 
@@ -759,12 +764,12 @@ class FaceTracker:
         for trajectory_id in to_expire:
             trajectory = self.active_trajectories.pop(trajectory_id)
             trajectory.is_active = False
-            
+
             # Finalize trajectory consensus with configuration
-            trajectory_config = self.tracking_config.get('trajectory_consensus', {})
-            if trajectory_config.get('finalize_on_completion', True):
+            trajectory_config = self.tracking_config.get("trajectory_consensus", {})
+            if trajectory_config.get("finalize_on_completion", True):
                 trajectory.finalize_trajectory_consensus(trajectory_config)
-            
+
             self.completed_trajectories.append(trajectory)
             logger.debug(
                 f"Expired trajectory {trajectory_id} after {trajectory.get_trajectory_duration():.2f}s"
@@ -775,12 +780,12 @@ class FaceTracker:
         if trajectory_id in self.active_trajectories:
             trajectory = self.active_trajectories.pop(trajectory_id)
             trajectory.is_active = False
-            
+
             # Finalize trajectory consensus with configuration
-            trajectory_config = self.tracking_config.get('trajectory_consensus', {})
-            if trajectory_config.get('finalize_on_completion', True):
+            trajectory_config = self.tracking_config.get("trajectory_consensus", {})
+            if trajectory_config.get("finalize_on_completion", True):
                 trajectory.finalize_trajectory_consensus(trajectory_config)
-            
+
             self.completed_trajectories.append(trajectory)
             logger.debug(f"Manually expired trajectory {trajectory_id}")
 
@@ -839,7 +844,7 @@ class FaceTracker:
                     latest_recognition = recognition
                     break
 
-            # If we can't find a recognition for the consensus contestant, 
+            # If we can't find a recognition for the consensus contestant,
             # use the most recent recognition but update the contestant info
             if latest_recognition is None:
                 for recognition in reversed(trajectory.recognitions):

@@ -186,21 +186,32 @@ class UnifiedEmbeddingSystem:
                         metadata["backend"] = "insightface"
                     else:
                         # Skip InsightFace for poor quality images
-                        raise ValueError("Image quality unsuitable for InsightFace, using fallback")
-                        
+                        raise ValueError(
+                            "Image quality unsuitable for InsightFace, using fallback"
+                        )
+
                 except Exception as e:
                     fallback_reason = str(e)
                     metadata["insightface_failure"] = fallback_reason
-                    
+
                     # Intelligent fallback selection based on failure reason
-                    if "No face detected" in fallback_reason and self.face_recognition_available:
-                        logger.debug(f"InsightFace detection failed: {e}, trying face_recognition")
+                    if (
+                        "No face detected" in fallback_reason
+                        and self.face_recognition_available
+                    ):
+                        logger.debug(
+                            f"InsightFace detection failed: {e}, trying face_recognition"
+                        )
                         try:
-                            embedding = self._generate_face_recognition_embedding(face_image)
+                            embedding = self._generate_face_recognition_embedding(
+                                face_image
+                            )
                             metadata["backend"] = "face_recognition_fallback"
                             method = EmbeddingMethod.FACE_RECOGNITION
                         except Exception as fr_e:
-                            logger.debug(f"face_recognition also failed: {fr_e}, using OpenCV")
+                            logger.debug(
+                                f"face_recognition also failed: {fr_e}, using OpenCV"
+                            )
                             embedding = self._generate_opencv_embedding(face_image)
                             metadata["backend"] = "opencv_double_fallback"
                             method = EmbeddingMethod.OPENCV_CUSTOM
@@ -255,18 +266,20 @@ class UnifiedEmbeddingSystem:
             # Try emergency fallback with different preprocessing
             try:
                 logger.info("Attempting emergency fallback with enhanced preprocessing")
-                
+
                 # Apply more aggressive preprocessing for difficult cases
                 if isinstance(face_image, np.ndarray):
                     processed_image = self._emergency_preprocess_image(face_image)
-                    
+
                     # Try OpenCV method with processed image
                     embedding = self._generate_opencv_embedding(processed_image)
-                    metadata.update({"backend": "opencv_emergency", "preprocessing": "enhanced"})
-                    
+                    metadata.update(
+                        {"backend": "opencv_emergency", "preprocessing": "enhanced"}
+                    )
+
                 else:
                     raise ValueError("Cannot preprocess non-array input")
-                    
+
             except Exception as fallback_error:
                 logger.error(f"Emergency fallback also failed: {fallback_error}")
                 # Last resort: create a pseudo-random but deterministic vector
@@ -277,49 +290,54 @@ class UnifiedEmbeddingSystem:
                         np.mean(face_image),
                         np.std(face_image),
                         np.min(face_image),
-                        np.max(face_image)
+                        np.max(face_image),
                     ]
                     seed = int(sum(img_stats) * 1000) % 2**32
                     np.random.seed(seed)
                 else:
                     np.random.seed(42)  # Fixed seed for file paths
-                    
+
                 embedding = np.random.randn(
                     self.embedding_config.embedding_dimension
                 ).astype(np.float32)
                 embedding = embedding / np.linalg.norm(embedding)
-                metadata.update({"backend": "deterministic_fallback", "error": f"{e} | {fallback_error}"})
-            
+                metadata.update(
+                    {
+                        "backend": "deterministic_fallback",
+                        "error": f"{e} | {fallback_error}",
+                    }
+                )
+
             return embedding, metadata
 
     def generate_batch_embeddings(
-        self, 
-        face_images: List[np.ndarray], 
-        method: Optional[EmbeddingMethod] = None
+        self, face_images: List[np.ndarray], method: Optional[EmbeddingMethod] = None
     ) -> List[Tuple[np.ndarray, Dict]]:
         """
         Generate embeddings for a batch of face images efficiently.
-        
+
         Args:
             face_images: List of RGB face image arrays (cropped to face regions)
             method: Optional specific method to use, defaults to configured method
-            
+
         Returns:
             List of (normalized_embedding, metadata) tuples
         """
         if not face_images:
             return []
-            
+
         if method is None:
             method = self.embedding_config.method
-            
+
         # Try batch processing for supported methods
         if method == EmbeddingMethod.INSIGHTFACE and self.insightface_model is not None:
             try:
                 return self._generate_insightface_batch_embeddings(face_images)
             except Exception as e:
-                logger.warning(f"Batch InsightFace processing failed: {e}, falling back to individual processing")
-                
+                logger.warning(
+                    f"Batch InsightFace processing failed: {e}, falling back to individual processing"
+                )
+
         # Fallback to individual processing for non-batch methods or failures
         results = []
         for face_image in face_images:
@@ -329,32 +347,36 @@ class UnifiedEmbeddingSystem:
             except Exception as e:
                 logger.debug(f"Failed to generate embedding for face in batch: {e}")
                 # Generate a null embedding for failed faces to maintain batch alignment
-                null_embedding = np.zeros(self.embedding_config.embedding_dimension, dtype=np.float32)
+                null_embedding = np.zeros(
+                    self.embedding_config.embedding_dimension, dtype=np.float32
+                )
                 null_metadata = {
                     "method": method.value,
                     "dimension": self.embedding_config.embedding_dimension,
                     "normalized": self.embedding_config.normalize_embeddings,
                     "backend": "failed",
-                    "error": str(e)
+                    "error": str(e),
                 }
                 results.append((null_embedding, null_metadata))
-                
+
         return results
 
-    def _generate_insightface_batch_embeddings(self, face_images: List[np.ndarray]) -> List[Tuple[np.ndarray, Dict]]:
+    def _generate_insightface_batch_embeddings(
+        self, face_images: List[np.ndarray]
+    ) -> List[Tuple[np.ndarray, Dict]]:
         """Generate embeddings for multiple faces using InsightFace batch processing"""
         results = []
-        
+
         # Process in smaller batches to manage memory
         batch_size = min(len(face_images), 8)  # Adjust based on GPU memory
-        
+
         for i in range(0, len(face_images), batch_size):
-            batch = face_images[i:i + batch_size]
-            
+            batch = face_images[i : i + batch_size]
+
             # Pre-process all images in the batch
             processed_images = []
             valid_indices = []
-            
+
             for idx, face_image in enumerate(batch):
                 if self._is_suitable_for_insightface(face_image):
                     # Convert to BGR for InsightFace
@@ -365,7 +387,7 @@ class UnifiedEmbeddingSystem:
                     # Mark invalid images for individual fallback processing
                     processed_images.append(None)
                     valid_indices.append(None)
-            
+
             # Process valid images in batch
             batch_embeddings = []
             if any(img is not None for img in processed_images):
@@ -384,7 +406,7 @@ class UnifiedEmbeddingSystem:
                             else:
                                 # No face detected, create null embedding
                                 batch_embeddings.append(np.zeros(512, dtype=np.float32))
-                        
+
                 except Exception as e:
                     logger.debug(f"Batch InsightFace processing failed: {e}")
                     # Fall back to individual processing for this batch
@@ -401,7 +423,7 @@ class UnifiedEmbeddingSystem:
                                 batch_embeddings.append(np.zeros(512, dtype=np.float32))
                         except:
                             batch_embeddings.append(np.zeros(512, dtype=np.float32))
-            
+
             # Combine results with metadata
             valid_idx = 0
             for idx, original_image in enumerate(batch):
@@ -409,10 +431,12 @@ class UnifiedEmbeddingSystem:
                     "method": EmbeddingMethod.INSIGHTFACE.value,
                     "dimension": 512,
                     "normalized": self.embedding_config.normalize_embeddings,
-                    "backend": "insightface_batch"
+                    "backend": "insightface_batch",
                 }
-                
-                if processed_images[idx] is not None and valid_idx < len(batch_embeddings):
+
+                if processed_images[idx] is not None and valid_idx < len(
+                    batch_embeddings
+                ):
                     # Valid embedding from batch processing
                     embedding = batch_embeddings[valid_idx]
                     valid_idx += 1
@@ -425,11 +449,13 @@ class UnifiedEmbeddingSystem:
                         metadata.update(fallback_metadata)
                         metadata["backend"] = "fallback_from_batch"
                     except:
-                        embedding = np.zeros(self.embedding_config.embedding_dimension, dtype=np.float32)
+                        embedding = np.zeros(
+                            self.embedding_config.embedding_dimension, dtype=np.float32
+                        )
                         metadata["backend"] = "failed_batch"
-                
+
                 results.append((embedding, metadata))
-        
+
         return results
 
     def _emergency_preprocess_image(self, face_image: np.ndarray) -> np.ndarray:
@@ -437,32 +463,34 @@ class UnifiedEmbeddingSystem:
         try:
             # Ensure we have a valid RGB image
             if len(face_image.shape) != 3 or face_image.shape[2] != 3:
-                logger.warning(f"Invalid image shape for preprocessing: {face_image.shape}")
+                logger.warning(
+                    f"Invalid image shape for preprocessing: {face_image.shape}"
+                )
                 return face_image
-                
+
             # Convert to float for processing
             img_float = face_image.astype(np.float32) / 255.0
-            
+
             # Apply gamma correction to enhance contrast
             gamma = 0.8
             img_gamma = np.power(img_float, gamma)
-            
+
             # Apply unsharp masking for edge enhancement
             blur = cv2.GaussianBlur(img_gamma, (5, 5), 1.0)
             unsharp = cv2.addWeighted(img_gamma, 1.5, blur, -0.5, 0)
-            
+
             # Ensure values are in valid range
             unsharp = np.clip(unsharp, 0, 1)
-            
+
             # Convert back to uint8
             enhanced = (unsharp * 255).astype(np.uint8)
-            
+
             # Apply bilateral filter to smooth while preserving edges
             enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
-            
+
             logger.debug("Applied emergency preprocessing to face image")
             return enhanced
-            
+
         except Exception as e:
             logger.debug(f"Emergency preprocessing failed: {e}, using original")
             return face_image
@@ -473,34 +501,36 @@ class UnifiedEmbeddingSystem:
             # Ensure minimum size for InsightFace (112x112 is optimal)
             h, w = face_image.shape[:2]
             min_size = 112
-            
+
             if h < min_size or w < min_size:
                 # Calculate new dimensions to maintain aspect ratio
                 scale = max(min_size / h, min_size / w)
                 new_h, new_w = int(h * scale), int(w * scale)
-                face_image = cv2.resize(face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-            
+                face_image = cv2.resize(
+                    face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC
+                )
+
             # Convert to LAB for better preprocessing
             lab = cv2.cvtColor(face_image, cv2.COLOR_RGB2LAB)
             l_channel, a_channel, b_channel = cv2.split(lab)
-            
+
             # Apply CLAHE to improve contrast for face detection
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             enhanced_l = clahe.apply(l_channel)
-            
+
             # Merge back to RGB
             enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
             enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
-            
+
             # Slight sharpening to help with face detection
-            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
             sharpened = cv2.filter2D(enhanced_rgb, -1, kernel)
-            
+
             # Blend original and sharpened (mild effect)
             result = cv2.addWeighted(enhanced_rgb, 0.7, sharpened, 0.3, 0)
-            
+
             return result.astype(np.uint8)
-            
+
         except Exception as e:
             logger.debug(f"InsightFace enhancement failed: {e}, using original")
             return face_image
@@ -511,47 +541,49 @@ class UnifiedEmbeddingSystem:
             # Resize to at least 224x224 for better detection
             h, w = face_image.shape[:2]
             target_size = 224
-            
+
             if h < target_size or w < target_size:
                 scale = max(target_size / h, target_size / w)
                 new_h, new_w = int(h * scale), int(w * scale)
-                face_image = cv2.resize(face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-            
+                face_image = cv2.resize(
+                    face_image, (new_w, new_h), interpolation=cv2.INTER_CUBIC
+                )
+
             # Normalize brightness
             gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
             mean_brightness = np.mean(gray)
-            
+
             if mean_brightness < 100:
                 # Brighten dark images
                 gamma = 0.7
                 corrected = np.power(face_image / 255.0, gamma) * 255.0
                 face_image = corrected.astype(np.uint8)
             elif mean_brightness > 180:
-                # Darken bright images  
+                # Darken bright images
                 gamma = 1.3
                 corrected = np.power(face_image / 255.0, gamma) * 255.0
                 face_image = corrected.astype(np.uint8)
-            
+
             # Aggressive contrast enhancement
             lab = cv2.cvtColor(face_image, cv2.COLOR_RGB2LAB)
             l_channel, a_channel, b_channel = cv2.split(lab)
-            
+
             # More aggressive CLAHE
             clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
             enhanced_l = clahe.apply(l_channel)
-            
+
             # Merge back
             enhanced_lab = cv2.merge([enhanced_l, a_channel, b_channel])
             enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
-            
+
             # Apply bilateral filter for noise reduction while preserving edges
             filtered = cv2.bilateralFilter(enhanced_rgb, 9, 75, 75)
-            
+
             # Ensure valid range
             result = np.clip(filtered, 0, 255)
-            
+
             return result.astype(np.uint8)
-            
+
         except Exception as e:
             logger.debug(f"Aggressive enhancement failed: {e}, using original")
             return face_image
@@ -563,32 +595,32 @@ class UnifiedEmbeddingSystem:
             h, w = face_image.shape[:2]
             if h < 50 or w < 50:  # Too small for reliable detection
                 return False
-                
+
             # Check image quality metrics
             gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
-            
+
             # Check contrast (standard deviation)
             std_dev = np.std(gray)
             if std_dev < 10:  # Too low contrast
                 return False
-                
+
             # Check brightness range
             mean_brightness = np.mean(gray)
             if mean_brightness < 10 or mean_brightness > 245:  # Too dark or too bright
                 return False
-                
+
             # Check for blur using Laplacian variance
             laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
             if laplacian_var < 50:  # Too blurry
                 return False
-                
+
             # Check aspect ratio
             aspect_ratio = w / h
             if aspect_ratio < 0.3 or aspect_ratio > 3.0:  # Extreme aspect ratios
                 return False
-                
+
             return True
-            
+
         except Exception as e:
             logger.debug(f"Suitability check failed: {e}, assuming suitable")
             return True  # Conservative: assume suitable if check fails
@@ -607,7 +639,7 @@ class UnifiedEmbeddingSystem:
 
         # Enhanced preprocessing for better InsightFace detection
         preprocessed_image = self._enhance_face_for_insightface(face_image)
-        
+
         # Convert RGB to BGR for InsightFace
         bgr_image = cv2.cvtColor(preprocessed_image, cv2.COLOR_RGB2BGR)
 
@@ -618,15 +650,17 @@ class UnifiedEmbeddingSystem:
             # Try with original image if preprocessing failed
             bgr_original = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
             faces = self.insightface_model.get(bgr_original)
-            
+
             if len(faces) == 0:
                 # Try with additional enhancement techniques
                 enhanced_image = self._aggressive_face_enhancement(face_image)
                 bgr_enhanced = cv2.cvtColor(enhanced_image, cv2.COLOR_RGB2BGR)
                 faces = self.insightface_model.get(bgr_enhanced)
-                
+
                 if len(faces) == 0:
-                    raise ValueError("No face detected by InsightFace in provided image")
+                    raise ValueError(
+                        "No face detected by InsightFace in provided image"
+                    )
 
         # Use the first (most confident) face
         face = faces[0]

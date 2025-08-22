@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FaceRecognition:
     """Represents a recognized face with contestant info"""
+
     detection: Any  # FaceDetection object
     contestant_id: str
     contestant_name: str
@@ -85,7 +86,9 @@ class ContestantDatabase:
                 for embedding_path in possible_paths:
                     if embedding_path.exists():
                         encoding = np.load(embedding_path)
-                        logger.debug(f"Loaded embedding for {nickname} (ID: {contestant_id}) from {embedding_path}")
+                        logger.debug(
+                            f"Loaded embedding for {nickname} (ID: {contestant_id}) from {embedding_path}"
+                        )
                         loaded_count += 1
                         break
 
@@ -93,12 +96,16 @@ class ContestantDatabase:
                     self.face_encodings[contestant_id] = encoding
                     self.contestant_names.append(contestant_id)
                 else:
-                    logger.warning(f"No embedding found for {nickname} (ID: {contestant_id})")
+                    logger.warning(
+                        f"No embedding found for {nickname} (ID: {contestant_id})"
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to load embedding for {nickname}: {e}")
 
-        logger.info(f"Loaded {loaded_count} face encodings from {len(self.contestants_info)} contestants")
+        logger.info(
+            f"Loaded {loaded_count} face encodings from {len(self.contestants_info)} contestants"
+        )
 
     def get_contestant_info(self, contestant_id: str) -> Dict:
         """Get contestant information by ID"""
@@ -183,7 +190,10 @@ class FaceRecognitionEngine:
             contestant_ids = []
             encoding_dims = []
 
-            for contestant_id, known_encoding in self.contestant_db.face_encodings.items():
+            for (
+                contestant_id,
+                known_encoding,
+            ) in self.contestant_db.face_encodings.items():
                 if isinstance(known_encoding, np.ndarray):
                     encoding = known_encoding.flatten()
                     known_face_encodings.append(encoding)
@@ -200,13 +210,12 @@ class FaceRecognitionEngine:
                 matches = face_recognition.compare_faces(
                     known_face_encodings,
                     unknown_face_encoding,
-                    tolerance=self.tolerance
+                    tolerance=self.tolerance,
                 )
 
                 # Calculate face distances for confidence scoring
                 face_distances = face_recognition.face_distance(
-                    known_face_encodings,
-                    unknown_face_encoding
+                    known_face_encodings, unknown_face_encoding
                 )
 
                 # Find the best match
@@ -224,19 +233,21 @@ class FaceRecognitionEngine:
 
                     if confidence >= self.similarity_threshold:
                         best_match_id = contestant_ids[best_match_index]
-                        contestant_info = self.contestant_db.get_contestant_info(best_match_id)
+                        contestant_info = self.contestant_db.get_contestant_info(
+                            best_match_id
+                        )
 
                         recognition = FaceRecognition(
                             detection=detection,
                             contestant_id=best_match_id,
                             contestant_name=contestant_info.get("name", "Unknown"),
-                            contestant_nickname=contestant_info.get("nickname", "Unknown"),
+                            contestant_nickname=contestant_info.get(
+                                "nickname", "Unknown"
+                            ),
                             match_confidence=confidence,
                         )
 
-                        logger.info(
-                            ".3f"
-                        )
+                        logger.info(".3f")
                         return recognition
 
             else:
@@ -249,7 +260,8 @@ class FaceRecognitionEngine:
                 for i, known_encoding in enumerate(known_face_encodings):
                     # Calculate cosine similarity
                     similarity = np.dot(unknown_face_encoding, known_encoding) / (
-                        np.linalg.norm(unknown_face_encoding) * np.linalg.norm(known_encoding)
+                        np.linalg.norm(unknown_face_encoding)
+                        * np.linalg.norm(known_encoding)
                     )
 
                     if similarity > best_similarity:
@@ -263,22 +275,26 @@ class FaceRecognitionEngine:
 
                     if confidence >= self.similarity_threshold:
                         best_match_id = contestant_ids[best_match_index]
-                        contestant_info = self.contestant_db.get_contestant_info(best_match_id)
+                        contestant_info = self.contestant_db.get_contestant_info(
+                            best_match_id
+                        )
 
                         recognition = FaceRecognition(
                             detection=detection,
                             contestant_id=best_match_id,
                             contestant_name=contestant_info.get("name", "Unknown"),
-                            contestant_nickname=contestant_info.get("nickname", "Unknown"),
+                            contestant_nickname=contestant_info.get(
+                                "nickname", "Unknown"
+                            ),
                             match_confidence=confidence,
                         )
 
-                        logger.info(
-                            ".3f"
-                        )
+                        logger.info(".3f")
                         return recognition
 
-            logger.debug(f"No matches found within tolerance threshold (dim: {unknown_dim})")
+            logger.debug(
+                f"No matches found within tolerance threshold (dim: {unknown_dim})"
+            )
             return None
 
         except Exception as e:
@@ -286,7 +302,9 @@ class FaceRecognitionEngine:
             return None
 
     def filter_recognitions(
-        self, recognitions: List[FaceRecognition], min_confidence: Optional[float] = None
+        self,
+        recognitions: List[FaceRecognition],
+        min_confidence: Optional[float] = None,
     ) -> List[FaceRecognition]:
         """Filter recognitions by confidence threshold"""
         if min_confidence is None:
@@ -321,7 +339,10 @@ class FaceRecognitionEngine:
 # Legacy compatibility wrapper
 class FaceRecognizer:
     """Legacy compatibility wrapper"""
-    def __init__(self, config: dict, contestant_db: Optional[ContestantDatabase] = None):
+
+    def __init__(
+        self, config: dict, contestant_db: Optional[ContestantDatabase] = None
+    ):
         self.engine = FaceRecognitionEngine(config)
         if contestant_db:
             self.engine.contestant_db = contestant_db
@@ -329,7 +350,11 @@ class FaceRecognizer:
     def recognize_faces(self, detections: List) -> List[FaceRecognition]:
         return self.engine.recognize_faces(detections)
 
-    def filter_recognitions(self, recognitions: List[FaceRecognition], min_confidence: Optional[float] = None) -> List[FaceRecognition]:
+    def filter_recognitions(
+        self,
+        recognitions: List[FaceRecognition],
+        min_confidence: Optional[float] = None,
+    ) -> List[FaceRecognition]:
         return self.engine.filter_recognitions(recognitions, min_confidence)
 
     def get_performance_stats(self):
