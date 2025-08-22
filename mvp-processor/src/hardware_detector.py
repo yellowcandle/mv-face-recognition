@@ -97,7 +97,11 @@ class HardwareDetector:
                         timeout=5,
                     )
                     is_apple_silicon = "Apple" in result.stdout
-                except:
+                except (
+                    subprocess.TimeoutExpired,
+                    subprocess.CalledProcessError,
+                    OSError,
+                ):
                     pass
 
             if not is_apple_silicon:
@@ -120,7 +124,11 @@ class HardwareDetector:
                         timeout=10,
                     )
                     return "Metal" in result.stdout
-                except:
+                except (
+                    subprocess.TimeoutExpired,
+                    subprocess.CalledProcessError,
+                    OSError,
+                ):
                     pass
 
             # Assume Metal is available on Apple Silicon
@@ -141,7 +149,7 @@ class HardwareDetector:
                 # Try nvidia-smi command
                 result = subprocess.run(["nvidia-smi"], capture_output=True, timeout=5)
                 return result.returncode == 0
-            except:
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
                 return False
 
     def _configure_apple_silicon(self) -> HardwareInfo:
@@ -166,14 +174,14 @@ class HardwareDetector:
                 elif "Total Number of Cores" in line:
                     try:
                         compute_units = int(line.split(": ")[-1].strip())
-                    except:
+                    except (ValueError, IndexError):
                         pass
                 elif "Memory" in line:
                     try:
                         memory_str = line.split(": ")[-1].strip()
                         if "GB" in memory_str:
                             memory_gb = float(memory_str.split(" GB")[0])
-                    except:
+                    except (ValueError, IndexError):
                         pass
 
         except Exception as e:
@@ -191,7 +199,7 @@ class HardwareDetector:
                 if "Metal" in line and "Family" in line:
                     metal_version = line.strip()
                     break
-        except:
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
             pass
 
         optimization_flags = {
