@@ -30,10 +30,8 @@ try:
         StreamingVideoProcessorAdapter,
         MemoryManager,
         EmbeddingCache,
-        create_optimized_processor,
     )
     from advanced_embedding_generator import (
-        AdvancedEmbeddingProcessor,
         EmbeddingBackend,
     )
     from embedding_analyzer import EmbeddingAnalyzer

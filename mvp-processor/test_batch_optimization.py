@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).parent / "src"))
 
 from unified_face_detector import UnifiedFaceDetector
 from enhanced_face_detector import AcceleratedFaceDetector
-from gpu_memory_manager import GPUMemoryManager, get_memory_manager
+from gpu_memory_manager import get_memory_manager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -3,19 +3,26 @@
 Simple embedding regeneration using the existing face detection system
 """
 
+# Standard library imports
 import sys
 import os
-from pathlib import Path
 import logging
+from pathlib import Path
 
-# Add mvp-processor src to path
-mvp_processor_path = Path(__file__).parent / "mvp-processor" / "src"
-sys.path.insert(0, str(mvp_processor_path))
-
+# Third-party imports
 import numpy as np
 import yaml
-from face_detector import ContestantDatabase
 
+# Add mvp-processor src to path
+# Correcting path to mvp-processor/src relative to the project root
+project_root = Path(__file__).parent.parent
+mvp_processor_path = project_root / "mvp-processor" / "src"
+sys.path.insert(0, str(mvp_processor_path))
+
+# Local imports (must come after path manipulation)
+from face_detector import ContestantDatabase  # noqa: E402
+
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

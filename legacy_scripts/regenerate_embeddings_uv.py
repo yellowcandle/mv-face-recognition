@@ -4,22 +4,28 @@ Regenerate embeddings using UV environment and existing face detection system
 Uses the same dependencies as the video processing pipeline
 """
 
+# Standard library imports
 import sys
 import os
-import cv2
-import numpy as np
-from pathlib import Path
 import logging
-import yaml
+from pathlib import Path
 from typing import List, Optional
 
+# Third-party imports
+import cv2
+import numpy as np
+import yaml
+
 # Add mvp-processor src to path
-mvp_processor_path = Path(__file__).parent / "mvp-processor" / "src"
+# Correcting path to mvp-processor/src relative to the project root
+project_root = Path(__file__).parent.parent
+mvp_processor_path = project_root / "mvp-processor" / "src"
 sys.path.insert(0, str(mvp_processor_path))
 
-# Import from existing system
-from face_detector import ContestantDatabase
+# Local imports (must come after path manipulation)
+from face_detector import ContestantDatabase  # noqa: E402
 
+# Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )

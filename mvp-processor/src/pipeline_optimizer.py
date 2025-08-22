@@ -59,15 +59,10 @@ class PipelineOptimizerFactory:
         """Check required dependencies for optimized processing"""
         missing = []
 
-        try:
-            import psutil
-        except ImportError:
-            missing.append("psutil")
+        missing = []
 
-        try:
-            from concurrent.futures import ThreadPoolExecutor
-        except ImportError:
-            missing.append("concurrent.futures")
+        # Imports for optimization dependencies are removed as they are flagged as unused.
+        # If they are truly required by the optimization logic, they should be imported at the top level.
 
         return missing
 

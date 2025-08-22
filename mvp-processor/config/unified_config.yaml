@@ -1,0 +1,140 @@
+# Unified Configuration for Streamlined MV Face Recognition System
+# This configuration consolidates all system settings into a single file
+
+# Face Detection Engine Configuration
+face_detection:
+  # Backend selection (opencv, insightface, onnx)
+  model: "opencv"
+  
+  # Detection parameters
+  min_confidence: 0.5
+  max_faces_per_frame: 20
+  
+  # Hardware acceleration
+  enable_hardware_acceleration: false
+  model_path: "models"
+  
+  # OpenCV specific settings
+  scale_factor: 1.05
+  min_neighbors: 3
+  min_size: [20, 20]
+
+# Face Recognition Engine Configuration  
+face_recognition:
+  # Recognition thresholds
+  tolerance: 0.6
+  similarity_threshold: 0.15
+  max_distance: 15.0
+  
+  # Distance calculation method (euclidean, cosine, combined)
+  distance_method: "combined"
+  euclidean_weight: 0.6
+  cosine_weight: 0.4
+
+# Contestant Database Configuration
+contestants:
+  # Data sources
+  info_csv: "source/contestant_info.csv"
+  photo_dir: "source/photo/contestants"
+  embeddings_cache: "cache/embeddings"
+  
+  # Embedding management
+  auto_generate_missing: true
+  embedding_format: "npy"
+  dimension: 512
+
+# Video Processing Configuration
+processing:
+  # Processing mode (standard, optimized, batch)
+  mode: "standard"
+  
+  # Optimization settings
+  enable_optimization: false
+  processing_interval: 5  # Process every Nth frame
+  enable_interpolation: true
+  
+  # Output settings
+  output_dir: "processed_videos"
+  metadata_dir: "metadata"
+  preserve_audio: true
+  output_format: "mp4"
+  
+  # Performance tuning
+  batch_size: 1
+  parallel_processing: false
+  memory_optimization: true
+
+# Annotation Configuration
+annotation:
+  # Annotation backend (opencv, supervision)
+  backend: "opencv"
+  
+  # Visual settings
+  box_thickness: 2
+  text_thickness: 1
+  text_scale: 0.6
+  text_padding: 4
+  
+  # Colors (BGR format)
+  box_color: [0, 255, 0]    # Green
+  text_color: [255, 255, 255]  # White
+  background_color: [0, 255, 0]  # Green
+  
+  # Confidence display
+  show_confidence: true
+  confidence_decimals: 2
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_to_file: true
+  log_file: "processing.log"
+  console_output: true
+  
+  # Performance logging
+  log_performance: true
+  performance_interval: 100  # Log every N frames
+
+# Hardware Configuration
+hardware:
+  # Auto-detection
+  auto_detect: true
+  
+  # Preferred backends
+  preferred_backends:
+    - "apple_silicon_metal"
+    - "cuda" 
+    - "cpu"
+    
+  # Memory management
+  memory_limit_gb: 8
+  gpu_memory_fraction: 0.8
+
+# Cloud Integration (Optional)
+cloud:
+  # Cloudflare settings
+  cloudflare:
+    account_id: null
+    r2_bucket: "mv-face-recognition-videos"
+    kv_namespace: "mv-metadata"
+    
+  # Modal.com settings  
+  modal:
+    enable: false
+    gpu_type: "A100"
+    timeout: 3600
+
+# Development & Testing
+development:
+  # Debug settings
+  enable_debug: false
+  debug_output_dir: "debug"
+  save_intermediate_results: false
+  
+  # Testing
+  test_mode: false
+  mock_recognition: false
+  
+  # Profiling
+  enable_profiling: false
+  profile_output: "profile_results"

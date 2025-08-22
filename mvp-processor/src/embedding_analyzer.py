@@ -27,7 +27,6 @@ from datetime import datetime
 # Optional visualization dependencies
 try:
     import matplotlib.pyplot as plt
-    import seaborn as sns
 
     VISUALIZATION_AVAILABLE = True
 except ImportError:

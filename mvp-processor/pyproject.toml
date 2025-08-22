@@ -1,48 +1,66 @@
 [project]
 name = "mvp-processor"
-version = "0.1.0"
-description = "Video processing pipeline for face recognition"
+version = "0.2.0"
+description = "Streamlined video processing pipeline for face recognition"
 requires-python = ">=3.8"
 dependencies = [
+    # Core dependencies
     "opencv-python>=4.8.0",
     "numpy>=1.24.0",
     "Pillow>=10.0.0",
+    "PyYAML>=6.0",
+    "pandas>=2.0.3",
+    # Video processing
+    "moviepy>=1.0.3",
+    "imageio-ffmpeg>=0.5.1",
+    # Face recognition engines (optional backends)
     "face-recognition>=1.3.0",
     "dlib>=19.24.0",
-    "moviepy>=1.0.3",
-    "requests>=2.31.0",
-    "PyYAML>=6.0",
-    "click>=8.1.0",
-    "tqdm>=4.65.0",
-    "pandas>=2.0.3",
-    "imageio-ffmpeg>=0.5.1",
     "face-recognition-models",
+    # Professional annotation
     "supervision>=0.25.1",
-    "moviepy>=1.0.3",
-    "boto3>=1.37.38",
-    "insightface>=0.7.3",
-    "onnxruntime>=1.20.1",
+    # Rich console output
+    "rich>=13.0.0",
+    # Utilities
+    "tqdm>=4.65.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
-cloud = [
-    "boto3>=1.28.0",
+# Hardware acceleration backends
+acceleration = [
+    "insightface>=0.7.3",
+    "onnxruntime>=1.20.1", 
+    "torch>=1.11.0",
 ]
+
+# Cloud integration
+cloud = [
+    "boto3>=1.37.38",
+    "click>=8.1.0",
+]
+
+# Development and testing
 dev = [
-    # Testing dependencies
+    # Testing framework
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
-    "pytest-mock>=3.11.1",
-    "pytest-asyncio>=0.21.1",
+    "pytest-mock>=3.11.1", 
     "pytest-benchmark>=4.0.0",
-    # Test data and mocking
-    "moto>=5.0.0",
-    "fakeredis>=2.17.0",
+    
+    # Mocking and test data
     "responses>=0.23.1",
-    "httpretty>=1.1.4",
-    # Test utilities
     "factory-boy>=3.3.0",
     "Faker>=19.3.0",
+    
+    # Code quality
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+# Full installation with all features
+all = [
+    "mvp-processor[acceleration,cloud,dev]"
 ]
 
 [tool.pytest.ini_options]

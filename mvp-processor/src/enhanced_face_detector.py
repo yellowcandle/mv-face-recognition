@@ -6,7 +6,7 @@ Provides hardware-accelerated face detection using InsightFace models with fallb
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import logging
 import time
 
