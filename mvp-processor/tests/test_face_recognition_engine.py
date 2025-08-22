@@ -5,20 +5,19 @@ Following Context7 best practices for face recognition testing
 
 import pytest
 import numpy as np
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import tempfile
+from unittest.mock import Mock, patch
 import pandas as pd
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.face_recognition_engine import (
     FaceRecognitionEngine,
     ContestantDatabase,
     FaceRecognition,
-    FaceDetection
+    FaceDetection,
 )
 
 
@@ -31,19 +30,21 @@ class TestContestantDatabase:
         return {
             "contestants": {
                 "photo_dir": "../source/photo/contestants",
-                "info_csv": "../source/contestant_info.csv"
+                "info_csv": "../source/contestant_info.csv",
             }
         }
 
     @pytest.fixture
     def sample_csv_data(self):
         """Create sample CSV data"""
-        return pd.DataFrame({
-            "編號": ["1", "2"],
-            "姓名": ["Test Name 1", "Test Name 2"],
-            "暱稱": ["Nickname1", "Nickname2"],
-            "年齡": ["20", "21"]
-        })
+        return pd.DataFrame(
+            {
+                "編號": ["1", "2"],
+                "姓名": ["Test Name 1", "Test Name 2"],
+                "暱稱": ["Nickname1", "Nickname2"],
+                "年齡": ["20", "21"],
+            }
+        )
 
     def test_initialization(self, sample_config):
         """Test database initialization"""
@@ -53,9 +54,11 @@ class TestContestantDatabase:
         assert db.face_encodings == {}
         assert db.contestant_names == []
 
-    @patch('src.face_recognition_engine.pd.read_csv')
-    @patch('src.face_recognition_engine.Path.exists')
-    def test_load_contestants_info(self, mock_exists, mock_read_csv, sample_config, sample_csv_data):
+    @patch("src.face_recognition_engine.pd.read_csv")
+    @patch("src.face_recognition_engine.Path.exists")
+    def test_load_contestants_info(
+        self, mock_exists, mock_read_csv, sample_config, sample_csv_data
+    ):
         """Test loading contestant information from CSV"""
         mock_exists.return_value = True
         mock_read_csv.return_value = sample_csv_data
@@ -67,8 +70,8 @@ class TestContestantDatabase:
         assert db.contestants_info["1"]["name"] == "Test Name 1"
         assert db.contestants_info["1"]["nickname"] == "Nickname1"
 
-    @patch('src.face_recognition_engine.np.load')
-    @patch('src.face_recognition_engine.Path.exists')
+    @patch("src.face_recognition_engine.np.load")
+    @patch("src.face_recognition_engine.Path.exists")
     def test_build_face_encodings(self, mock_exists, mock_load):
         """Test building face encodings"""
         mock_exists.return_value = True
@@ -79,14 +82,12 @@ class TestContestantDatabase:
         config = {
             "contestants": {
                 "photo_dir": "../source/photo/contestants",
-                "info_csv": "../source/contestant_info.csv"
+                "info_csv": "../source/contestant_info.csv",
             }
         }
 
         db = ContestantDatabase(config)
-        db.contestants_info = {
-            "1": {"id": "1", "name": "Test", "nickname": "Test"}
-        }
+        db.contestants_info = {"1": {"id": "1", "name": "Test", "nickname": "Test"}}
 
         db._build_face_encodings()
 
@@ -102,14 +103,11 @@ class TestFaceRecognitionEngine:
     def sample_config(self):
         """Create a sample configuration"""
         return {
-            "face_recognition": {
-                "tolerance": 0.6,
-                "similarity_threshold": 0.5
-            },
+            "face_recognition": {"tolerance": 0.6, "similarity_threshold": 0.5},
             "contestants": {
                 "photo_dir": "../source/photo/contestants",
-                "info_csv": "../source/contestant_info.csv"
-            }
+                "info_csv": "../source/contestant_info.csv",
+            },
         }
 
     @pytest.fixture
@@ -121,10 +119,10 @@ class TestFaceRecognitionEngine:
             encoding=encoding,
             timestamp=0.0,
             frame_number=0,
-            confidence=0.9
+            confidence=0.9,
         )
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_initialization(self, mock_db_class, sample_config):
         """Test engine initialization"""
         mock_db = Mock()
@@ -139,20 +137,25 @@ class TestFaceRecognitionEngine:
         assert engine.recognition_times == []
         assert engine.recognition_count == 0
 
-    @patch('src.face_recognition_engine.face_recognition.compare_faces')
-    @patch('src.face_recognition_engine.face_recognition.face_distance')
-    @patch('src.face_recognition_engine.ContestantDatabase')
-    def test_recognize_single_face_success(self, mock_db_class, mock_face_distance, mock_compare_faces, sample_config, sample_face_detection):
+    @patch("src.face_recognition_engine.face_recognition.compare_faces")
+    @patch("src.face_recognition_engine.face_recognition.face_distance")
+    @patch("src.face_recognition_engine.ContestantDatabase")
+    def test_recognize_single_face_success(
+        self,
+        mock_db_class,
+        mock_face_distance,
+        mock_compare_faces,
+        sample_config,
+        sample_face_detection,
+    ):
         """Test successful face recognition"""
         # Setup mocks
         mock_db = Mock()
         mock_db_class.return_value = mock_db
-        mock_db.face_encodings = {
-            "1": np.random.rand(128).astype(np.float32)
-        }
+        mock_db.face_encodings = {"1": np.random.rand(128).astype(np.float32)}
         mock_db.get_contestant_info.return_value = {
             "name": "Test Contestant",
-            "nickname": "TestNick"
+            "nickname": "TestNick",
         }
 
         # Mock face_recognition functions
@@ -168,7 +171,7 @@ class TestFaceRecognitionEngine:
         assert result.contestant_name == "Test Contestant"
         assert result.match_confidence > 0.5
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_recognize_single_face_wrong_dimensions(self, mock_db_class, sample_config):
         """Test face recognition with wrong encoding dimensions"""
         mock_db_class.return_value = Mock()
@@ -182,14 +185,16 @@ class TestFaceRecognitionEngine:
             encoding=wrong_encoding,
             timestamp=0.0,
             frame_number=0,
-            confidence=0.9
+            confidence=0.9,
         )
 
         result = engine._recognize_single_face(detection)
         assert result is None
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
-    def test_recognize_single_face_no_encodings(self, mock_db_class, sample_config, sample_face_detection):
+    @patch("src.face_recognition_engine.ContestantDatabase")
+    def test_recognize_single_face_no_encodings(
+        self, mock_db_class, sample_config, sample_face_detection
+    ):
         """Test face recognition with no available encodings"""
         mock_db = Mock()
         mock_db.face_encodings = {}
@@ -200,7 +205,7 @@ class TestFaceRecognitionEngine:
 
         assert result is None
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_filter_recognitions(self, mock_db_class, sample_config):
         """Test filtering recognitions by confidence"""
         mock_db_class.return_value = Mock()
@@ -214,22 +219,22 @@ class TestFaceRecognitionEngine:
                 contestant_id="1",
                 contestant_name="Test1",
                 contestant_nickname="Nick1",
-                match_confidence=0.8
+                match_confidence=0.8,
             ),
             FaceRecognition(
                 detection=Mock(),
                 contestant_id="2",
                 contestant_name="Test2",
                 contestant_nickname="Nick2",
-                match_confidence=0.3
-            )
+                match_confidence=0.3,
+            ),
         ]
 
         filtered = engine.filter_recognitions(recognitions, min_confidence=0.5)
         assert len(filtered) == 1
         assert filtered[0].match_confidence == 0.8
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_get_performance_stats(self, mock_db_class, sample_config):
         """Test performance statistics"""
         mock_db_class.return_value = Mock()
@@ -245,7 +250,7 @@ class TestFaceRecognitionEngine:
         assert stats["min_recognition_time"] == 0.1
         assert stats["max_recognition_time"] == 0.2
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_get_performance_stats_empty(self, mock_db_class, sample_config):
         """Test performance statistics with no data"""
         mock_db_class.return_value = Mock()
@@ -263,30 +268,29 @@ class TestFaceRecognitionIntegration:
     def sample_config(self):
         """Create a sample configuration"""
         return {
-            "face_recognition": {
-                "tolerance": 0.6,
-                "similarity_threshold": 0.5
-            },
+            "face_recognition": {"tolerance": 0.6, "similarity_threshold": 0.5},
             "contestants": {
                 "photo_dir": "../source/photo/contestants",
-                "info_csv": "../source/contestant_info.csv"
-            }
+                "info_csv": "../source/contestant_info.csv",
+            },
         }
 
-    @patch('src.face_recognition_engine.face_recognition.compare_faces')
-    @patch('src.face_recognition_engine.face_recognition.face_distance')
-    @patch('src.face_recognition_engine.ContestantDatabase')
-    def test_recognize_faces_multiple_detections(self, mock_db_class, mock_face_distance, mock_compare_faces, sample_config):
+    @patch("src.face_recognition_engine.face_recognition.compare_faces")
+    @patch("src.face_recognition_engine.face_recognition.face_distance")
+    @patch("src.face_recognition_engine.ContestantDatabase")
+    def test_recognize_faces_multiple_detections(
+        self, mock_db_class, mock_face_distance, mock_compare_faces, sample_config
+    ):
         """Test recognizing multiple face detections"""
         # Setup database mock
         mock_db = Mock()
         mock_db.face_encodings = {
             "1": np.random.rand(128).astype(np.float32),
-            "2": np.random.rand(128).astype(np.float32)
+            "2": np.random.rand(128).astype(np.float32),
         }
         mock_db.get_contestant_info.side_effect = lambda id: {
             "name": f"Contestant {id}",
-            "nickname": f"Nick{id}"
+            "nickname": f"Nick{id}",
         }
         mock_db_class.return_value = mock_db
 
@@ -301,11 +305,11 @@ class TestFaceRecognitionIntegration:
         for i in range(2):
             encoding = np.random.rand(128).astype(np.float32)
             detection = FaceDetection(
-                location=(100 + i*50, 200 + i*50, 150 + i*50, 250 + i*50),
+                location=(100 + i * 50, 200 + i * 50, 150 + i * 50, 250 + i * 50),
                 encoding=encoding,
                 timestamp=float(i),
                 frame_number=i,
-                confidence=0.9
+                confidence=0.9,
             )
             detections.append(detection)
 
@@ -316,7 +320,7 @@ class TestFaceRecognitionIntegration:
         assert engine.recognition_count == 1
         assert len(engine.recognition_times) == 1
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_recognize_faces_empty_detections(self, mock_db_class, sample_config):
         """Test recognizing faces with empty detections list"""
         mock_db_class.return_value = Mock()
@@ -327,7 +331,7 @@ class TestFaceRecognitionIntegration:
         assert results == []
         assert engine.recognition_count == 0
 
-    @patch('src.face_recognition_engine.ContestantDatabase')
+    @patch("src.face_recognition_engine.ContestantDatabase")
     def test_cleanup(self, mock_db_class, sample_config):
         """Test cleanup functionality"""
         mock_db = Mock()

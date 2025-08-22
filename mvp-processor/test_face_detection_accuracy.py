@@ -19,6 +19,7 @@ from dataclasses import dataclass, asdict
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from face_detector import FaceDetector, ContestantDatabase
+
 # import gpu_memory_manager # Import is already commented out and thus handled, as per ruff check.
 from hardware_detector import get_hardware_info
 

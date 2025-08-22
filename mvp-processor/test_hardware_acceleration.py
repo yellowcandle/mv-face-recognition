@@ -201,9 +201,7 @@ def test_vectorized_operations():
 
         # Test Euclidean distance
         euclidean_start = time.time()
-        vectorized_ops.euclidean_distance_batch(
-            query_embeddings, reference_embeddings
-        )
+        vectorized_ops.euclidean_distance_batch(query_embeddings, reference_embeddings)
         euclidean_time = time.time() - euclidean_start
 
         # Test top-k search

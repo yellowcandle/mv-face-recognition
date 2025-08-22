@@ -10,7 +10,8 @@ import numpy as np
 from unittest.mock import Mock
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
 
 def test_face_recognition_engine():
     """Test the enhanced face recognition engine"""
@@ -22,14 +23,11 @@ def test_face_recognition_engine():
 
         # Create sample configuration
         config = {
-            "face_recognition": {
-                "tolerance": 0.6,
-                "similarity_threshold": 0.5
-            },
+            "face_recognition": {"tolerance": 0.6, "similarity_threshold": 0.5},
             "contestants": {
                 "photo_dir": "../source/photo/contestants",
-                "info_csv": "../source/contestant_info.csv"
-            }
+                "info_csv": "../source/contestant_info.csv",
+            },
         }
 
         # Initialize engine
@@ -43,7 +41,7 @@ def test_face_recognition_engine():
             encoding=encoding,
             timestamp=0.0,
             frame_number=0,
-            confidence=0.9
+            confidence=0.9,
         )
 
         # Test face recognition (will use mock data since no real encodings exist)
@@ -78,7 +76,7 @@ def test_video_processing_engine():
             target_path="/path/to/output.mp4",
             confidence_threshold=0.5,
             enable_tracking=True,
-            enable_smoothing=True
+            enable_smoothing=True,
         )
 
         # Initialize processor
@@ -112,7 +110,6 @@ def test_integration():
     print("\nTesting Integration...")
 
     try:
-        from face_recognition_engine import FaceRecognitionEngine
         from face_detection_engine import FaceDetection
         from video_processing_engine import VideoProcessor, VideoProcessingConfig
 
@@ -126,7 +123,7 @@ def test_integration():
             encoding=encoding,
             timestamp=0.0,
             frame_number=0,
-            confidence=0.9
+            confidence=0.9,
         )
 
         # Setup mock engines with coordinated behavior
@@ -145,8 +142,7 @@ def test_integration():
 
         # Create video processor
         config = VideoProcessingConfig(
-            source_path="/path/to/video.mp4",
-            target_path="/path/to/output.mp4"
+            source_path="/path/to/video.mp4", target_path="/path/to/output.mp4"
         )
         processor = VideoProcessor(config)
         processor.set_face_detector(face_detector)
@@ -191,14 +187,20 @@ def main():
     total = len(results)
 
     for i, result in enumerate(results):
-        test_names = ["Face Recognition Engine", "Video Processing Engine", "Integration"]
+        test_names = [
+            "Face Recognition Engine",
+            "Video Processing Engine",
+            "Integration",
+        ]
         status = "✅ PASSED" if result else "❌ FAILED"
         print(f"  {test_names[i]}: {status}")
 
     print(f"\nOverall: {passed}/{total} tests passed")
 
     if passed == total:
-        print("\n🎉 All tests passed! Your Context7-aligned implementation is working correctly.")
+        print(
+            "\n🎉 All tests passed! Your Context7-aligned implementation is working correctly."
+        )
         print("\nKey improvements verified:")
         print("  • Face recognition using face_recognition.compare_faces()")
         print("  • Video processing with Supervision library")

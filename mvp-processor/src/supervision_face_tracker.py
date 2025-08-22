@@ -119,7 +119,8 @@ class SupervisionFaceTrajectory:
 
                 # Track frame counts for trajectory consensus
                 self.frame_counts_per_contestant[recognition.contestant_id] = (
-                    self.frame_counts_per_contestant.get(recognition.contestant_id, 0) + 1
+                    self.frame_counts_per_contestant.get(recognition.contestant_id, 0)
+                    + 1
                 )
                 self.total_recognized_frames += 1
 
@@ -372,68 +373,72 @@ class SupervisionFaceTrajectory:
         self.runner_up_candidate = None
         self.confidence_gap = 0.0
 
-    def calculate_trajectory_consensus(self, config: Optional[dict] = None) -> Tuple[Optional[str], float]:
+    def calculate_trajectory_consensus(
+        self, config: Optional[dict] = None
+    ) -> Tuple[Optional[str], float]:
         """
         Calculate trajectory-based consensus identity using frame count methodology.
-        
+
         This method determines the final identity for the entire trajectory based on
         which contestant appears in the most frames, rather than frame-by-frame voting.
-        
+
         Args:
             config: Configuration parameters for consensus calculation
-            
+
         Returns:
             Tuple of (consensus_contestant_id, consensus_confidence)
         """
         if not self.frame_counts_per_contestant or self.total_recognized_frames == 0:
             return None, 0.0
-            
+
         # Configuration parameters
         min_frames_threshold = 2  # Default minimum frames required for consensus
         dominance_threshold = 0.3  # Default dominance threshold
-        confidence_boost = 0.1     # Default confidence boost
-        
+        confidence_boost = 0.1  # Default confidence boost
+
         if config:
             min_frames_threshold = config.get("min_frames_for_consensus", 2)
             dominance_threshold = config.get("dominance_threshold", 0.3)
             confidence_boost = config.get("confidence_boost", 0.1)
-            
+
         # Check if we have enough recognized frames
         if self.total_recognized_frames < min_frames_threshold:
             return None, 0.0
-            
+
         # Sort contestants by frame count (most frames wins)
         sorted_contestants = sorted(
-            self.frame_counts_per_contestant.items(), 
-            key=lambda x: x[1], 
-            reverse=True
+            self.frame_counts_per_contestant.items(), key=lambda x: x[1], reverse=True
         )
-        
+
         if not sorted_contestants:
             return None, 0.0
-            
+
         winner_id, winner_frames = sorted_contestants[0]
-        
+
         # Calculate consensus confidence based on frame proportion
         consensus_confidence = winner_frames / self.total_recognized_frames
-        
+
         # Enhanced confidence calculation using vote quality
-        if hasattr(self, 'contestant_votes') and winner_id in self.contestant_votes:
+        if hasattr(self, "contestant_votes") and winner_id in self.contestant_votes:
             # Factor in the average confidence of the winning contestant
-            avg_confidence_boost = min(0.2, self.contestant_votes[winner_id] / winner_frames / 5.0)
+            avg_confidence_boost = min(
+                0.2, self.contestant_votes[winner_id] / winner_frames / 5.0
+            )
             consensus_confidence = min(1.0, consensus_confidence + avg_confidence_boost)
-        
+
         # Calculate dominance gap for additional confidence
         if len(sorted_contestants) > 1:
             runner_up_frames = sorted_contestants[1][1]
-            dominance_gap = (winner_frames - runner_up_frames) / self.total_recognized_frames
-            
+            dominance_gap = (
+                winner_frames - runner_up_frames
+            ) / self.total_recognized_frames
+
             # Boost confidence for clear winners (using configured thresholds)
             if dominance_gap > dominance_threshold:
                 consensus_confidence = min(1.0, consensus_confidence + confidence_boost)
-                
+
         return winner_id, consensus_confidence
-        
+
     def finalize_trajectory_consensus(self, config: Optional[dict] = None):
         """
         Finalize the trajectory consensus and lock the identity.
@@ -441,30 +446,30 @@ class SupervisionFaceTrajectory:
         """
         if self.trajectory_completed:
             return  # Already finalized
-            
+
         consensus_id, consensus_confidence = self.calculate_trajectory_consensus(config)
-        
+
         # Store the final consensus results
         self.trajectory_consensus_id = consensus_id
         self.trajectory_consensus_confidence = consensus_confidence
         self.trajectory_completed = True
-        
+
         # Update the recognized identity to match consensus
         if consensus_id:
             self.recognized_contestant_id = consensus_id
             self.recognition_confidence = consensus_confidence
-            
+
         logger.debug(
             f"Trajectory {self.trajectory_id} consensus finalized: "
             f"contestant={consensus_id}, confidence={consensus_confidence:.3f}, "
             f"total_frames={self.total_recognized_frames}, "
             f"frame_counts={dict(self.frame_counts_per_contestant)}"
         )
-        
+
     def get_consensus_identity(self) -> Tuple[Optional[str], float]:
         """
         Get the consensus identity for this trajectory.
-        
+
         Returns:
             Tuple of (contestant_id, confidence) based on trajectory consensus
         """
@@ -842,11 +847,11 @@ class SupervisionFaceTracker:
         if trajectory_id in self.active_trajectories:
             trajectory = self.active_trajectories.pop(trajectory_id)
             trajectory.is_active = False
-            
+
             # Finalize trajectory consensus before completing
             enhanced_config = self._get_enhanced_tracking_config()
             trajectory.finalize_trajectory_consensus(enhanced_config)
-            
+
             self.completed_trajectories.append(trajectory)
 
             # Clean up tracker mapping
@@ -919,7 +924,7 @@ class SupervisionFaceTracker:
                     latest_recognition = recognition
                     break
 
-            # If we can't find a recognition for the consensus contestant, 
+            # If we can't find a recognition for the consensus contestant,
             # use the most recent recognition but update the contestant info
             if latest_recognition is None:
                 for recognition in reversed(trajectory.recognitions):
@@ -993,15 +998,29 @@ class SupervisionFaceTracker:
         )
 
         # Add trajectory consensus parameters
-        trajectory_consensus_config = self.tracking_config.get("trajectory_consensus", {})
+        trajectory_consensus_config = self.tracking_config.get(
+            "trajectory_consensus", {}
+        )
         enhanced_config.update(
             {
-                "trajectory_consensus_enabled": trajectory_consensus_config.get("enable", True),
-                "min_frames_for_consensus": trajectory_consensus_config.get("min_frames_for_consensus", 2),
-                "use_consensus_for_output": trajectory_consensus_config.get("use_consensus_for_output", True),
-                "dominance_threshold": trajectory_consensus_config.get("dominance_threshold", 0.3),
-                "confidence_boost": trajectory_consensus_config.get("confidence_boost", 0.1),
-                "finalize_on_completion": trajectory_consensus_config.get("finalize_on_completion", True),
+                "trajectory_consensus_enabled": trajectory_consensus_config.get(
+                    "enable", True
+                ),
+                "min_frames_for_consensus": trajectory_consensus_config.get(
+                    "min_frames_for_consensus", 2
+                ),
+                "use_consensus_for_output": trajectory_consensus_config.get(
+                    "use_consensus_for_output", True
+                ),
+                "dominance_threshold": trajectory_consensus_config.get(
+                    "dominance_threshold", 0.3
+                ),
+                "confidence_boost": trajectory_consensus_config.get(
+                    "confidence_boost", 0.1
+                ),
+                "finalize_on_completion": trajectory_consensus_config.get(
+                    "finalize_on_completion", True
+                ),
             }
         )
 

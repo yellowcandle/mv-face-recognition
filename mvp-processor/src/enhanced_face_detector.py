@@ -290,49 +290,64 @@ class AcceleratedFaceDetector:
             return []
 
     def detect_faces_batch(
-        self, 
-        frames: List[np.ndarray], 
-        timestamps: List[float], 
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float],
         frame_numbers: List[int],
-        use_gpu_memory_pool: bool = True
+        use_gpu_memory_pool: bool = True,
     ) -> List[List[FaceDetection]]:
         """
         Detect faces in multiple frames simultaneously using hardware-accelerated batch processing
-        
+
         Args:
             frames: List of RGB frame arrays
             timestamps: List of frame timestamps in seconds
             frame_numbers: List of frame numbers
             use_gpu_memory_pool: Whether to use GPU memory pooling for optimization
-            
+
         Returns:
             List of lists, where each inner list contains FaceDetection objects for that frame
         """
-        if not frames or len(frames) != len(timestamps) or len(frames) != len(frame_numbers):
-            logger.error("Invalid input: frames, timestamps, and frame_numbers must have same length")
+        if (
+            not frames
+            or len(frames) != len(timestamps)
+            or len(frames) != len(frame_numbers)
+        ):
+            logger.error(
+                "Invalid input: frames, timestamps, and frame_numbers must have same length"
+            )
             return [[] for _ in frames]
-            
+
         start_time = time.time()
-        
+
         # Initialize GPU memory manager if using memory pooling
         gpu_memory_manager = None
         if use_gpu_memory_pool:
             try:
                 from gpu_memory_manager import get_memory_manager
-                gpu_memory_manager = get_memory_manager({"performance": {"enable_memory_pool": True}})
-                
+
+                gpu_memory_manager = get_memory_manager(
+                    {"performance": {"enable_memory_pool": True}}
+                )
+
                 # Optimize for face detection workload
-                optimal_batch_size = gpu_memory_manager.get_optimal_batch_size("face_detection")
+                optimal_batch_size = gpu_memory_manager.get_optimal_batch_size(
+                    "face_detection"
+                )
                 logger.info(f"Using optimal batch size: {optimal_batch_size}")
-                
+
                 # Pre-allocate memory for this workload
                 gpu_memory_manager.optimize_for_workload("face_detection", len(frames))
             except Exception as e:
                 logger.warning(f"GPU memory manager initialization failed: {e}")
-                
+
         try:
             # Route to appropriate batch backend
-            if self.backend_type in ["insightface_cuda", "insightface_cpu", "pytorch_mps"]:
+            if self.backend_type in [
+                "insightface_cuda",
+                "insightface_cpu",
+                "pytorch_mps",
+            ]:
                 detections_batch = self._detect_batch_with_insightface(
                     frames, timestamps, frame_numbers, gpu_memory_manager
                 )
@@ -345,37 +360,43 @@ class AcceleratedFaceDetector:
                     frames, timestamps, frame_numbers
                 )
             else:
-                logger.error(f"Unknown backend type for batch processing: {self.backend_type}")
+                logger.error(
+                    f"Unknown backend type for batch processing: {self.backend_type}"
+                )
                 # Fallback to individual processing
                 detections_batch = []
-                for frame, timestamp, frame_number in zip(frames, timestamps, frame_numbers):
+                for frame, timestamp, frame_number in zip(
+                    frames, timestamps, frame_numbers
+                ):
                     detections = self.detect_faces(frame, timestamp, frame_number)
                     detections_batch.append(detections)
-                    
+
             # Track batch performance
             batch_time = time.time() - start_time
             total_faces = sum(len(detections) for detections in detections_batch)
             avg_time_per_frame = batch_time / len(frames) if frames else 0
-            
+
             logger.info(
                 f"Batch face detection: {len(frames)} frames, {total_faces} faces, "
                 f"{batch_time:.3f}s total, {avg_time_per_frame:.3f}s/frame ({self.backend_type})"
             )
-            
+
             return detections_batch
-            
+
         except Exception as e:
             logger.error(f"Batch face detection failed: {e}")
             # Fallback to individual processing
             detections_batch = []
-            for frame, timestamp, frame_number in zip(frames, timestamps, frame_numbers):
+            for frame, timestamp, frame_number in zip(
+                frames, timestamps, frame_numbers
+            ):
                 try:
                     detections = self.detect_faces(frame, timestamp, frame_number)
                     detections_batch.append(detections)
                 except:
                     detections_batch.append([])
             return detections_batch
-            
+
         finally:
             # Clean up GPU memory if manager was used
             if gpu_memory_manager:
@@ -607,62 +628,66 @@ class AcceleratedFaceDetector:
             logger.info(f"Final performance stats: {stats}")
 
     def _detect_batch_with_insightface(
-        self, 
-        frames: List[np.ndarray], 
-        timestamps: List[float], 
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float],
         frame_numbers: List[int],
-        gpu_memory_manager = None
+        gpu_memory_manager=None,
     ) -> List[List[FaceDetection]]:
         """Batch face detection using InsightFace backend"""
-        
+
         # Process frames in smaller batches for memory efficiency
         batch_size = 4  # Conservative batch size for InsightFace
         if gpu_memory_manager:
-            batch_size = min(gpu_memory_manager.get_optimal_batch_size("face_detection"), 8)
-            
+            batch_size = min(
+                gpu_memory_manager.get_optimal_batch_size("face_detection"), 8
+            )
+
         all_detections = []
-        
+
         for i in range(0, len(frames), batch_size):
-            batch_frames = frames[i:i + batch_size]
-            batch_timestamps = timestamps[i:i + batch_size]
-            batch_frame_numbers = frame_numbers[i:i + batch_size]
-            
+            batch_frames = frames[i : i + batch_size]
+            batch_timestamps = timestamps[i : i + batch_size]
+            batch_frame_numbers = frame_numbers[i : i + batch_size]
+
             batch_detections = []
-            
+
             # Apply memory optimization for Apple Silicon unified memory
             if (
                 self.hardware_info.backend == HardwareBackend.APPLE_SILICON_METAL
                 and self.hardware_info.supports_unified_memory
             ):
                 batch_frames = [
-                    self._optimize_frame_for_unified_memory(frame) 
+                    self._optimize_frame_for_unified_memory(frame)
                     for frame in batch_frames
                 ]
-            
+
             # Process each frame in the batch
-            for frame, timestamp, frame_number in zip(batch_frames, batch_timestamps, batch_frame_numbers):
+            for frame, timestamp, frame_number in zip(
+                batch_frames, batch_timestamps, batch_frame_numbers
+            ):
                 # Convert RGB to BGR for InsightFace
                 if len(frame.shape) == 3 and frame.shape[2] == 3:
                     bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 else:
                     bgr_frame = frame
-                    
+
                 # Detect faces
                 faces = self.face_detector.get(bgr_frame)
-                
+
                 frame_detections = []
-                for face in faces[:self.max_faces_per_frame]:
+                for face in faces[: self.max_faces_per_frame]:
                     if face.det_score < self.min_confidence:
                         continue
-                        
+
                     # Convert bbox to face_recognition format
                     bbox = face.bbox.astype(int)
                     left, top, right, bottom = bbox
                     location = (top, right, bottom, left)
-                    
+
                     # Use face embedding as encoding
                     encoding = face.embedding
-                    
+
                     detection = FaceDetection(
                         location=location,
                         encoding=encoding,
@@ -671,77 +696,79 @@ class AcceleratedFaceDetector:
                         confidence=face.det_score,
                     )
                     frame_detections.append(detection)
-                    
+
                 batch_detections.append(frame_detections)
-                
+
             all_detections.extend(batch_detections)
-            
+
         return all_detections
-        
+
     def _detect_batch_with_onnx(
-        self, 
-        frames: List[np.ndarray], 
-        timestamps: List[float], 
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float],
         frame_numbers: List[int],
-        gpu_memory_manager = None
+        gpu_memory_manager=None,
     ) -> List[List[FaceDetection]]:
         """Batch face detection using ONNX Runtime backend"""
-        
+
         # ONNX can handle larger batches more efficiently
         batch_size = 8
         if gpu_memory_manager:
             batch_size = gpu_memory_manager.get_optimal_batch_size("face_detection")
-            
+
         all_detections = []
-        
+
         for i in range(0, len(frames), batch_size):
-            batch_frames = frames[i:i + batch_size]
-            batch_timestamps = timestamps[i:i + batch_size]
-            batch_frame_numbers = frame_numbers[i:i + batch_size]
-            
+            batch_frames = frames[i : i + batch_size]
+            batch_timestamps = timestamps[i : i + batch_size]
+            batch_frame_numbers = frame_numbers[i : i + batch_size]
+
             try:
                 # Preprocess batch for ONNX
-                batch_input = np.stack([
-                    self._preprocess_for_onnx(frame) for frame in batch_frames
-                ])
-                
+                batch_input = np.stack(
+                    [self._preprocess_for_onnx(frame) for frame in batch_frames]
+                )
+
                 # Run batch inference
                 input_name = self.face_detector.get_inputs()[0].name
                 batch_outputs = self.face_detector.run(None, {input_name: batch_input})
-                
+
                 # Post-process batch outputs
                 batch_detections = self._postprocess_onnx_batch_outputs(
                     batch_outputs, batch_frames, batch_timestamps, batch_frame_numbers
                 )
-                
+
                 all_detections.extend(batch_detections)
-                
+
             except Exception as e:
                 logger.error(f"ONNX batch processing failed: {e}")
                 # Fallback to individual processing
-                for frame, timestamp, frame_number in zip(batch_frames, batch_timestamps, batch_frame_numbers):
+                for frame, timestamp, frame_number in zip(
+                    batch_frames, batch_timestamps, batch_frame_numbers
+                ):
                     detections = self._detect_with_onnx(frame, timestamp, frame_number)
                     all_detections.append(detections)
-                    
+
         return all_detections
-        
+
     def _detect_batch_with_opencv(
-        self, 
-        frames: List[np.ndarray], 
-        timestamps: List[float], 
-        frame_numbers: List[int]
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float],
+        frame_numbers: List[int],
     ) -> List[List[FaceDetection]]:
         """Batch face detection using OpenCV (CPU-only, limited batch benefits)"""
-        
+
         # OpenCV doesn't benefit much from batching, but we can parallelize
         all_detections = []
-        
+
         for frame, timestamp, frame_number in zip(frames, timestamps, frame_numbers):
             detections = self._detect_with_opencv(frame, timestamp, frame_number)
             all_detections.append(detections)
-            
+
         return all_detections
-        
+
     def _postprocess_onnx_batch_outputs(
         self,
         batch_outputs: List[np.ndarray],
@@ -750,19 +777,23 @@ class AcceleratedFaceDetector:
         frame_numbers: List[int],
     ) -> List[List[FaceDetection]]:
         """Post-process ONNX batch outputs to FaceDetection objects"""
-        
+
         # This is model-specific and would need to be implemented
         # based on the actual ONNX model architecture
         detections_batch = []
-        
-        for i, (frame, timestamp, frame_number) in enumerate(zip(frames, timestamps, frame_numbers)):
+
+        for i, (frame, timestamp, frame_number) in enumerate(
+            zip(frames, timestamps, frame_numbers)
+        ):
             # Placeholder implementation - extract detections for frame i
             frame_detections = []
-            
+
             # This would parse the batch_outputs for frame i
             # and create FaceDetection objects
-            logger.warning(f"ONNX batch output post-processing not implemented for frame {i}")
-            
+            logger.warning(
+                f"ONNX batch output post-processing not implemented for frame {i}"
+            )
+
             detections_batch.append(frame_detections)
-            
+
         return detections_batch

@@ -33,6 +33,7 @@ from enum import Enum
 # Conditional imports with fallbacks
 try:
     import face_recognition  # noqa: F401
+
     FACE_RECOGNITION_AVAILABLE = True
 except ImportError:
     FACE_RECOGNITION_AVAILABLE = False
@@ -533,14 +534,20 @@ class UnifiedEmbeddingGenerator:
                     try:
                         embedding = np.load(embedding_path)
                         # Construct metadata path manually since with_suffix doesn't work with complex suffixes
-                        metadata_path = embedding_path.parent / f"{embedding_path.stem}_metadata.json"
+                        metadata_path = (
+                            embedding_path.parent
+                            / f"{embedding_path.stem}_metadata.json"
+                        )
 
                         if metadata_path.exists():
                             with open(metadata_path, "r") as f:
                                 metadata = json.load(f)
                         else:
                             # Try alternative metadata path for unified system
-                            alt_metadata_path = self.output_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+                            alt_metadata_path = (
+                                self.output_dir
+                                / f"contestant_{contestant_id}_embedding_metadata.json"
+                            )
                             if alt_metadata_path.exists():
                                 with open(alt_metadata_path, "r") as f:
                                     metadata = json.load(f)

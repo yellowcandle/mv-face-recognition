@@ -505,9 +505,7 @@ class OptimizedVideoProcessor:
                     raw_recognitions = face_recognizer.recognize_faces(detections)
 
                 # Update trajectories
-                face_tracker.update_trajectories(
-                    detections, raw_recognitions
-                )
+                face_tracker.update_trajectories(detections, raw_recognitions)
                 frame_recognitions = face_tracker.get_stable_recognitions()
             else:
                 # Direct recognition without tracking

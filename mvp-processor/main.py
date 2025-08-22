@@ -17,7 +17,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 
 # Import consolidated engines
 from src.video_processing_engine import VideoProcessor, VideoProcessingConfig
@@ -27,14 +26,16 @@ from src.face_recognition_engine import FaceRecognitionEngine
 
 def setup_logging(verbose: bool = False):
     """Setup logging configuration"""
-    level = logging.DEBUG if verbose else logging.WARNING  # Changed from INFO to WARNING to reduce console noise
+    level = (
+        logging.DEBUG if verbose else logging.WARNING
+    )  # Changed from INFO to WARNING to reduce console noise
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('processing.log')
-        ]
+            logging.FileHandler("processing.log"),
+        ],
     )
 
 
@@ -42,9 +43,9 @@ def load_config(config_path: Optional[str] = None) -> dict:
     """Load processing configuration"""
     if config_path is None:
         config_path = "config/processing_config.yaml"
-    
+
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
         return config
     except Exception as e:
@@ -59,29 +60,30 @@ def get_default_config() -> dict:
             "model": "opencv",
             "min_confidence": 0.5,
             "max_faces_per_frame": 20,
-            "enable_hardware_acceleration": False
+            "enable_hardware_acceleration": False,
         },
         "face_recognition": {
             "tolerance": 0.6,
             "similarity_threshold": 0.15,
-            "max_distance": 15.0
+            "max_distance": 15.0,
         },
         "contestants": {
             "info_csv": "source/contestant_info.csv",
             "photo_dir": "source/photo/contestants",
-            "embeddings_cache": "cache/embeddings"
+            "embeddings_cache": "cache/embeddings",
         },
         "processing": {
             "mode": "standard",
             "enable_optimization": False,
-            "output_dir": "processed_videos"
-        }
+            "output_dir": "processed_videos",
+        },
     }
 
 
 @dataclass
 class ProcessingResult:
     """Result of video processing"""
+
     success: bool
     video_path: str
     output_path: str = None
@@ -89,7 +91,10 @@ class ProcessingResult:
     processing_stats: dict = None
     error_message: str = None
 
-def process_single_video(video_path: str, output_path: Optional[str] = None, config: Optional[dict] = None) -> ProcessingResult:
+
+def process_single_video(
+    video_path: str, output_path: Optional[str] = None, config: Optional[dict] = None
+) -> ProcessingResult:
     """Process a single video file with beautiful Rich console output"""
     if config is None:
         config = load_config()
@@ -103,14 +108,18 @@ def process_single_video(video_path: str, output_path: Optional[str] = None, con
     if output_path is None:
         output_dir = Path("processed_videos")
         output_dir.mkdir(exist_ok=True)
-        output_path = str(output_dir / f"{Path(video_path).stem}_processed{Path(video_path).suffix}")
+        output_path = str(
+            output_dir / f"{Path(video_path).stem}_processed{Path(video_path).suffix}"
+        )
 
     video_config = VideoProcessingConfig(
         source_path=video_path,
         target_path=output_path,
-        confidence_threshold=config.get("face_detection", {}).get("min_confidence", 0.5),
+        confidence_threshold=config.get("face_detection", {}).get(
+            "min_confidence", 0.5
+        ),
         enable_tracking=config.get("processing", {}).get("enable_tracking", True),
-        enable_smoothing=config.get("processing", {}).get("enable_smoothing", True)
+        enable_smoothing=config.get("processing", {}).get("enable_smoothing", True),
     )
     engine = VideoProcessor(video_config)
 
@@ -121,19 +130,35 @@ def process_single_video(video_path: str, output_path: Optional[str] = None, con
         video_info_table.add_column("Value", style="magenta")
 
         video_info_table.add_row("Input File", Path(video_path).name)
-        video_info_table.add_row("Output File", Path(output_path or f'{Path(video_path).stem}_processed{Path(video_path).suffix}').name)
-        video_info_table.add_row("Output Path", str(Path(output_path or f'{Path(video_path).stem}_processed{Path(video_path).suffix}').parent))
+        video_info_table.add_row(
+            "Output File",
+            Path(
+                output_path
+                or f"{Path(video_path).stem}_processed{Path(video_path).suffix}"
+            ).name,
+        )
+        video_info_table.add_row(
+            "Output Path",
+            str(
+                Path(
+                    output_path
+                    or f"{Path(video_path).stem}_processed{Path(video_path).suffix}"
+                ).parent
+            ),
+        )
 
         info_panel = Panel(
             video_info_table,
             title="[bold green]🚀 Video Processing Started[/bold green]",
             border_style="blue",
-            padding=(1, 2)
+            padding=(1, 2),
         )
         console.print(info_panel)
 
         # Show processing progress with spinner
-        with console.status("[bold green]Processing video...[/bold green]", spinner="dots") as status:
+        with console.status(
+            "[bold green]Processing video...[/bold green]", spinner="dots"
+        ):
             # Process video
             success = engine.process_video()
 
@@ -144,69 +169,65 @@ def process_single_video(video_path: str, output_path: Optional[str] = None, con
         result = ProcessingResult(
             success=success,
             video_path=video_path,
-            output_path=output_path or f"{Path(video_path).stem}_processed{Path(video_path).suffix}",
-            processing_stats=stats
+            output_path=output_path
+            or f"{Path(video_path).stem}_processed{Path(video_path).suffix}",
+            processing_stats=stats,
         )
 
         # Display results
         if success:
             # Create success panel
-            success_text = Text("✅ VIDEO PROCESSING COMPLETED SUCCESSFULLY!", style="bold green")
+            success_text = Text(
+                "✅ VIDEO PROCESSING COMPLETED SUCCESSFULLY!", style="bold green"
+            )
             success_panel = Panel(
                 success_text,
                 title="[bold green]🎉 Success![/bold green]",
                 border_style="green",
-                padding=(1, 2)
+                padding=(1, 2),
             )
             console.print(success_panel)
 
             # Create performance table
             if stats:
-                perf_table = Table(show_header=True, header_style="bold cyan", title="📊 Performance Summary")
+                perf_table = Table(
+                    show_header=True,
+                    header_style="bold cyan",
+                    title="📊 Performance Summary",
+                )
                 perf_table.add_column("Metric", style="cyan", width=20)
                 perf_table.add_column("Value", style="magenta", justify="right")
                 perf_table.add_column("Unit", style="yellow", width=10)
 
                 perf_table.add_row(
-                    "Frames Processed",
-                    f"{stats.get('total_frames', 0):,}",
-                    "frames"
+                    "Frames Processed", f"{stats.get('total_frames', 0):,}", "frames"
                 )
-                perf_table.add_row(
-                    "Average Frame Time",
-                    ".3f",
-                    "seconds"
-                )
-                perf_table.add_row(
-                    "Processing Speed",
-                    ".1f",
-                    "FPS"
-                )
-                perf_table.add_row(
-                    "Total Processing Time",
-                    ".2f",
-                    "seconds"
-                )
+                perf_table.add_row("Average Frame Time", ".3f", "seconds")
+                perf_table.add_row("Processing Speed", ".1f", "FPS")
+                perf_table.add_row("Total Processing Time", ".2f", "seconds")
 
                 console.print(perf_table)
 
             # Final celebration message
-            celebration_text = Text("🎉 Processing finished! Your video is ready.", style="bold yellow")
+            celebration_text = Text(
+                "🎉 Processing finished! Your video is ready.", style="bold yellow"
+            )
             celebration_panel = Panel(
-                celebration_text,
-                border_style="yellow",
-                padding=(1, 2)
+                celebration_text, border_style="yellow", padding=(1, 2)
             )
             console.print(celebration_panel)
 
         else:
             # Error panel
-            error_text = Text("❌ VIDEO PROCESSING FAILED\nPlease check the error messages above for details.", style="bold red")
+            error_text = Text(
+                "❌ VIDEO PROCESSING FAILED\nPlease check the error messages above for details.",
+                style="bold red",
+            )
             error_panel = Panel(
                 error_text,
                 title="[bold red]Error[/bold red]",
                 border_style="red",
-                padding=(1, 2)
+                padding=(1, 2),
             )
             console.print(error_panel)
 
@@ -216,7 +237,9 @@ def process_single_video(video_path: str, output_path: Optional[str] = None, con
         engine.cleanup()
 
 
-def process_batch_videos(video_dir: str, output_dir: Optional[str] = None, config: Optional[dict] = None):
+def process_batch_videos(
+    video_dir: str, output_dir: Optional[str] = None, config: Optional[dict] = None
+):
     """Process multiple videos in a directory with Rich console output"""
     if config is None:
         config = load_config()
@@ -234,14 +257,16 @@ def process_batch_videos(video_dir: str, output_dir: Optional[str] = None, confi
         output_dir_path.mkdir(parents=True, exist_ok=True)
 
     # Find video files
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv']
+    video_extensions = [".mp4", ".avi", ".mov", ".mkv"]
     video_files = []
     for ext in video_extensions:
         video_files.extend(video_dir_path.glob(f"*{ext}"))
 
     if not video_files:
         error_text = Text(f"No video files found in {video_dir}", style="bold red")
-        error_panel = Panel(error_text, title="[bold red]Error[/bold red]", border_style="red")
+        error_panel = Panel(
+            error_text, title="[bold red]Error[/bold red]", border_style="red"
+        )
         console.print(error_panel)
         return
 
@@ -258,15 +283,19 @@ def process_batch_videos(video_dir: str, output_dir: Optional[str] = None, confi
         batch_info_table,
         title="[bold blue]📁 Batch Processing Started[/bold blue]",
         border_style="blue",
-        padding=(1, 2)
+        padding=(1, 2),
     )
     console.print(batch_panel)
 
     results = []
     for i, video_file in enumerate(video_files, 1):
-        console.print(f"\n[bold cyan]🎬 Processing {i}/{len(video_files)}: {video_file.name}[/bold cyan]")
+        console.print(
+            f"\n[bold cyan]🎬 Processing {i}/{len(video_files)}: {video_file.name}[/bold cyan]"
+        )
 
-        output_path = output_dir_path / f"{video_file.stem}_processed{video_file.suffix}"
+        output_path = (
+            output_dir_path / f"{video_file.stem}_processed{video_file.suffix}"
+        )
         result = process_single_video(str(video_file), str(output_path), config)
         results.append(result)
 
@@ -274,13 +303,19 @@ def process_batch_videos(video_dir: str, output_dir: Optional[str] = None, confi
     successful = sum(1 for r in results if r.success)
     failed = len(results) - successful
 
-    summary_table = Table(show_header=True, header_style="bold cyan", title="📊 Batch Processing Summary")
+    summary_table = Table(
+        show_header=True, header_style="bold cyan", title="📊 Batch Processing Summary"
+    )
     summary_table.add_column("Status", style="bold", width=12)
     summary_table.add_column("Count", style="magenta", justify="right")
     summary_table.add_column("Percentage", style="yellow", justify="right")
 
-    summary_table.add_row("✅ Successful", f"{successful}", f"{successful/len(results)*100:.1f}%")
-    summary_table.add_row("❌ Failed", f"{failed}", f"{failed/len(results)*100:.1f}%")
+    summary_table.add_row(
+        "✅ Successful", f"{successful}", f"{successful / len(results) * 100:.1f}%"
+    )
+    summary_table.add_row(
+        "❌ Failed", f"{failed}", f"{failed / len(results) * 100:.1f}%"
+    )
     summary_table.add_row("📊 Total", f"{len(results)}", "100%")
 
     console.print(summary_table)
@@ -299,12 +334,14 @@ def test_engines(config: Optional[dict] = None):
         Text("🧪 Testing all video processing engines...", style="bold blue"),
         title="[bold blue]Engine Testing[/bold blue]",
         border_style="blue",
-        padding=(1, 2)
+        padding=(1, 2),
     )
     console.print(test_panel)
 
     # Test results table
-    results_table = Table(show_header=True, header_style="bold cyan", title="🧪 Engine Test Results")
+    results_table = Table(
+        show_header=True, header_style="bold cyan", title="🧪 Engine Test Results"
+    )
     results_table.add_column("Engine", style="cyan", width=20)
     results_table.add_column("Status", style="bold", width=12)
     results_table.add_column("Details", style="magenta")
@@ -314,7 +351,9 @@ def test_engines(config: Optional[dict] = None):
     try:
         face_detector = FaceDetectionEngine(config)
         stats = face_detector.get_performance_stats()
-        results_table.add_row("Face Detection", "✅ PASS", f"Backend: {stats.get('backend', 'unknown')}")
+        results_table.add_row(
+            "Face Detection", "✅ PASS", f"Backend: {stats.get('backend', 'unknown')}"
+        )
         face_detector.cleanup()
     except Exception as e:
         results_table.add_row("Face Detection", "❌ FAIL", str(e))
@@ -324,7 +363,11 @@ def test_engines(config: Optional[dict] = None):
     try:
         face_recognizer = FaceRecognitionEngine(config)
         stats = face_recognizer.get_performance_stats()
-        results_table.add_row("Face Recognition", "✅ PASS", f"Contestants: {stats.get('contestants_loaded', 0)}")
+        results_table.add_row(
+            "Face Recognition",
+            "✅ PASS",
+            f"Contestants: {stats.get('contestants_loaded', 0)}",
+        )
         face_recognizer.cleanup()
     except Exception as e:
         results_table.add_row("Face Recognition", "❌ FAIL", str(e))
@@ -338,11 +381,13 @@ def test_engines(config: Optional[dict] = None):
             target_path="dummy_output.mp4",
             confidence_threshold=0.5,
             enable_tracking=True,
-            enable_smoothing=True
+            enable_smoothing=True,
         )
         video_processor = VideoProcessor(dummy_config)
         stats = video_processor.get_performance_stats()
-        results_table.add_row("Video Processing", "✅ PASS", "Engine initialized successfully")
+        results_table.add_row(
+            "Video Processing", "✅ PASS", "Engine initialized successfully"
+        )
         video_processor.cleanup()
     except Exception as e:
         results_table.add_row("Video Processing", "❌ FAIL", str(e))
@@ -352,11 +397,7 @@ def test_engines(config: Optional[dict] = None):
 
     # Completion message
     completion_text = Text("🏁 Engine testing complete!", style="bold green")
-    completion_panel = Panel(
-        completion_text,
-        border_style="green",
-        padding=(1, 2)
-    )
+    completion_panel = Panel(completion_text, border_style="green", padding=(1, 2))
     console.print(completion_panel)
 
 
@@ -381,25 +422,29 @@ Examples:
   
   # Use custom config
   python main.py --config custom_config.yaml --input video.mp4
-        """
+        """,
     )
-    
-    parser.add_argument('--input', '-i', help='Input video file')
-    parser.add_argument('--output', '-o', help='Output video file (optional)')
-    parser.add_argument('--batch-dir', help='Process all videos in directory')
-    parser.add_argument('--output-dir', help='Output directory for batch processing')
-    parser.add_argument('--config', '-c', help='Configuration file path')
-    parser.add_argument('--test-engines', action='store_true', help='Test all consolidated engines')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
-    
+
+    parser.add_argument("--input", "-i", help="Input video file")
+    parser.add_argument("--output", "-o", help="Output video file (optional)")
+    parser.add_argument("--batch-dir", help="Process all videos in directory")
+    parser.add_argument("--output-dir", help="Output directory for batch processing")
+    parser.add_argument("--config", "-c", help="Configuration file path")
+    parser.add_argument(
+        "--test-engines", action="store_true", help="Test all consolidated engines"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
+
     args = parser.parse_args()
-    
+
     # Setup logging
     setup_logging(args.verbose)
-    
+
     # Load configuration
     config = load_config(args.config)
-    
+
     try:
         if args.test_engines:
             test_engines(config)
@@ -412,7 +457,7 @@ Examples:
             parser.print_help()
             print("\n❗ Please specify --input, --batch-dir, or --test-engines")
             sys.exit(1)
-            
+
     except KeyboardInterrupt:
         print("\n⚠️  Processing interrupted by user")
         sys.exit(1)
