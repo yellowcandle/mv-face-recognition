@@ -250,7 +250,6 @@ def main():
         test_files = ["test_video.mp4", "output_test_video.mp4"]
         for file in test_files:
             if os.path.exists(file):
-                size = os.path.getsize(file)
                 print(".1f")
         print("\n🎯 Your Context7-aligned implementation is production-ready!")
     else:
