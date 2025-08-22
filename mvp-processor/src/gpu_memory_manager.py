@@ -295,14 +295,14 @@ class GPUMemoryManager:
                 import torch
 
                 torch.cuda.empty_cache()
-            except:
+            except Exception:
                 pass
         elif self.device == "mps":
             try:
                 import torch
 
                 torch.mps.empty_cache()
-            except:
+            except Exception:
                 pass
 
         self.gc_events.append({"timestamp": time.time(), "type": "gentle_cleanup"})

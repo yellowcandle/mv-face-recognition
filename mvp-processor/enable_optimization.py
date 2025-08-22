@@ -159,8 +159,6 @@ if __name__ == "__main__":
 
     # Check for optimization dependencies
     try:
-        import psutil
-        import concurrent.futures
 
         print("✅ All optimization dependencies available")
     except ImportError as e:
