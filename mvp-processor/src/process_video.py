@@ -257,7 +257,8 @@ class VideoProcessingPipeline:
                         )
 
                         logger.info(
-                            f"Optimization stats: {batches} batches, "
+                            f"Optimization stats: {batches} batches, " \
+
                             f"{hit_rate:.1%} cache hit rate, "
                             f"{peak_mb:.1f}MB peak memory"
                         )
