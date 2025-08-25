@@ -9,6 +9,8 @@ import logging
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
+import torch
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ class HardwareInfo:
     supports_unified_memory: bool = False
     metal_version: Optional[str] = None
     cuda_version: Optional[str] = None
-    optimization_flags: Dict[str, Any] = None
+    optimization_flags: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.optimization_flags is None:
@@ -61,18 +63,18 @@ class HardwareDetector:
         # Try Apple Silicon first (highest priority)
         if self._detect_apple_silicon():
             self._cached_info = self._configure_apple_silicon()
-            logger.info(f"Detected Apple Silicon: {self._cached_info.device_name}")
+            logger.info("Detected Apple Silicon: %s", self._cached_info.device_name)
             return self._cached_info
 
         # Try CUDA second
         if self._detect_cuda():
             self._cached_info = self._configure_cuda()
-            logger.info(f"Detected CUDA: {self._cached_info.device_name}")
+            logger.info("Detected CUDA: %s", self._cached_info.device_name)
             return self._cached_info
 
         # Fallback to CPU
         self._cached_info = self._configure_cpu()
-        logger.info(f"Using CPU fallback: {self._cached_info.device_name}")
+        logger.info("Using CPU fallback: %s", self._cached_info.device_name)
         return self._cached_info
 
     def _detect_apple_silicon(self) -> bool:
@@ -109,10 +111,9 @@ class HardwareDetector:
 
             # Check Metal availability
             try:
-                import torch
-
                 return (
-                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                    hasattr(torch.backends, "mps")
+                    and torch.backends.mps.is_available()
                 )
             except ImportError:
                 # Try alternative Metal detection
@@ -134,15 +135,13 @@ class HardwareDetector:
             # Assume Metal is available on Apple Silicon
             return True
 
-        except Exception as e:
-            logger.debug(f"Apple Silicon detection failed: {e}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug("Apple Silicon detection failed: %s", e)
             return False
 
     def _detect_cuda(self) -> bool:
         """Detect NVIDIA CUDA availability"""
         try:
-            import torch
-
             return torch.cuda.is_available()
         except ImportError:
             try:
@@ -184,8 +183,8 @@ class HardwareDetector:
                     except (ValueError, IndexError):
                         pass
 
-        except Exception as e:
-            logger.debug(f"Failed to get detailed Apple Silicon info: {e}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug("Failed to get detailed Apple Silicon info: %s", e)
 
         # Get Metal version if available
         try:
@@ -226,19 +225,17 @@ class HardwareDetector:
         cuda_version = None
 
         try:
-            import torch
-
             if torch.cuda.is_available():
                 device_name = torch.cuda.get_device_name(0)
                 memory_bytes = torch.cuda.get_device_properties(0).total_memory
                 memory_gb = memory_bytes / (1024**3)
-                cuda_version = torch.version.cuda
+                cuda_version = str(torch.version.cuda)
         except ImportError:
             pass
 
         optimization_flags = {
             "use_unified_memory": False,
-            "memory_pressure_relief": False,
+            "memory_pressure_relief": True,
             "batch_size_adaptive": True,
             "prefer_fp16": True,  # Modern CUDA supports fp16
         }
@@ -259,10 +256,9 @@ class HardwareDetector:
         # Get CPU core count
         compute_units = None
         try:
-            import os
-
             compute_units = os.cpu_count()
-        except:
+        except Exception as e:
+            logger.debug("Failed to get CPU core count: %s", e)
             pass
 
         optimization_flags = {
@@ -287,14 +283,16 @@ class HardwareDetector:
 
         if hardware_info.backend == HardwareBackend.APPLE_SILICON_METAL:
             # Apple Silicon benefits from larger batch sizes due to unified memory
-            if hardware_info.memory_gb and hardware_info.memory_gb >= 16:
+            if hardware_info.memory_gb and \
+               hardware_info.memory_gb >= 16:
                 return min(base_batch_size * 2, 64)
             else:
                 return base_batch_size
 
         elif hardware_info.backend == HardwareBackend.CUDA:
             # CUDA scaling depends on available VRAM
-            if hardware_info.memory_gb and hardware_info.memory_gb >= 8:
+            if hardware_info.memory_gb and \
+               hardware_info.memory_gb >= 8:
                 return min(base_batch_size * 2, 128)
             else:
                 return base_batch_size
