@@ -50,6 +50,10 @@ face_recognition:
   enable_interpolation: true  # Disabled to prevent bbox persistence between detections
   confidence_decay: 0.95  # For interpolated frames (not used when interpolation disabled)
   
+  # Automatic embedding generation
+  auto_generate_embeddings: true  # Automatically generate missing embeddings before processing
+  embedding_coverage_threshold: 0.8  # Minimum coverage ratio to skip generation (80%)
+  
   # Trajectory-based recognition thresholds
   trajectory_confidence_threshold: 0.01  # Extremely low aggregate trajectory confidence 
   single_frame_threshold: 0.01          # Extremely low fallback threshold

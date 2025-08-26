@@ -78,6 +78,9 @@ class VideoProcessingPipeline:
         # Resolve relative paths in config based on project root
         self._resolve_config_paths(config_path)
 
+        # Check and generate embeddings if needed (before database initialization)
+        self._ensure_embeddings_exist()
+
         # Initialize face tracker if tracking is enabled (check both old and new config sections)
         self.face_tracker = None
         tracking_enabled = self.config.get("face_tracking", {}).get(
@@ -145,6 +148,235 @@ class VideoProcessingPipeline:
                         config_section[keys[-1]] = absolute_path
 
         # Database already initialized by unified system - no additional initialization needed
+
+    def _ensure_embeddings_exist(self):
+        """Check if embeddings are present and generate them if missing"""
+        
+        # Check if automatic embedding generation is enabled
+        face_recognition_config = self.config.get("face_recognition", {})
+        auto_generate = face_recognition_config.get("auto_generate_embeddings", True)
+        
+        if not auto_generate:
+            logger.info("Automatic embedding generation disabled, skipping validation")
+            return
+            
+        logger.info("Checking embedding availability...")
+        
+        # Get contestant info CSV path
+        contestants_csv_path = self.config.get("contestants", {}).get("info_csv")
+        if not contestants_csv_path or not Path(contestants_csv_path).exists():
+            logger.warning("Contestant info CSV not found, skipping embedding validation")
+            return
+            
+        # Load contestant info to count total expected embeddings
+        try:
+            import pandas as pd
+            contestants_df = pd.read_csv(contestants_csv_path)
+            total_contestants = len(contestants_df)
+            logger.info(f"Found {total_contestants} contestants in database")
+        except Exception as e:
+            logger.error(f"Failed to load contestant info: {e}")
+            return
+            
+        # Get photo directory
+        photo_dir = Path(self.config.get("contestants", {}).get("photo_dir", ""))
+        if not photo_dir.exists():
+            logger.error(f"Photo directory not found: {photo_dir}")
+            return
+            
+        # Count existing unified embeddings
+        existing_embeddings = self._count_existing_embeddings(contestants_df, photo_dir)
+        logger.info(f"Found {existing_embeddings} existing unified embeddings")
+        
+        # Get coverage threshold from config
+        coverage_threshold = face_recognition_config.get("embedding_coverage_threshold", 0.8)
+        required_embeddings = int(total_contestants * coverage_threshold)
+        
+        if existing_embeddings < required_embeddings:
+            logger.warning(
+                f"Only {existing_embeddings}/{total_contestants} embeddings found "
+                f"(need at least {required_embeddings} for {coverage_threshold:.0%} coverage)"
+            )
+            logger.info("Automatically generating missing embeddings...")
+            self._generate_missing_embeddings(contestants_df, photo_dir)
+        else:
+            logger.info(f"Embedding coverage sufficient: {existing_embeddings}/{total_contestants}")
+    
+    def _count_existing_embeddings(self, contestants_df, photo_dir: Path) -> int:
+        """Count how many valid unified embeddings exist"""
+        count = 0
+        
+        for _, row in contestants_df.iterrows():
+            contestant_id = int(row["編號"])
+            
+            # Check ID-based naming (current standard)
+            embedding_path = photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+            metadata_path = photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+            
+            # Fallback to nickname-based naming
+            if not (embedding_path.exists() and metadata_path.exists()):
+                nickname = row["暱稱"]
+                embedding_path = photo_dir / f"{nickname}_unified_embedding.npy"
+                metadata_path = photo_dir / f"{nickname}_embedding_metadata.json"
+            
+            if embedding_path.exists() and metadata_path.exists():
+                try:
+                    # Validate the embedding
+                    embedding = np.load(embedding_path)
+                    with open(metadata_path, "r") as f:
+                        metadata = json.load(f)
+                    
+                    # Check if it's a proper unified embedding
+                    if (len(embedding) == 512 and 
+                        metadata.get("method") in ["insightface", "face_recognition", "opencv_custom"] and
+                        np.isfinite(embedding).all()):
+                        count += 1
+                except Exception as e:
+                    logger.debug(f"Invalid embedding for contestant {contestant_id}: {e}")
+                    continue
+                    
+        return count
+    
+    def _generate_missing_embeddings(self, contestants_df, photo_dir: Path):
+        """Generate missing embeddings using the unified embedding system"""
+        try:
+            # Initialize unified embedding system (reuse existing if available)
+            if self.unified_face_detector:
+                embedding_system = self.unified_face_detector.embedding_system
+            else:
+                # Create new instance for legacy systems
+                from unified_embedding_system import UnifiedEmbeddingSystem
+                embedding_system = UnifiedEmbeddingSystem(self.config)
+            
+            stats = {
+                "total": len(contestants_df),
+                "generated": 0,
+                "skipped": 0,
+                "errors": 0
+            }
+            
+            logger.info(f"Generating embeddings for {stats['total']} contestants...")
+            
+            with tqdm(total=stats['total'], desc="Generating embeddings") as pbar:
+                for _, row in contestants_df.iterrows():
+                    contestant_id = int(row["編號"])
+                    name = row["姓名"]
+                    nickname = row["暱稱"]
+                    
+                    try:
+                        result = self._process_contestant_embedding(
+                            contestant_id, name, nickname, photo_dir, embedding_system
+                        )
+                        
+                        if result == "generated":
+                            stats["generated"] += 1
+                        elif result == "skipped":
+                            stats["skipped"] += 1
+                        elif result == "error":
+                            stats["errors"] += 1
+                            
+                    except Exception as e:
+                        logger.error(f"Failed to process contestant {contestant_id} ({nickname}): {e}")
+                        stats["errors"] += 1
+                    
+                    # Update progress bar with current stats
+                    pbar.set_postfix({
+                        "Generated": stats["generated"],
+                        "Skipped": stats["skipped"],
+                        "Errors": stats["errors"]
+                    })
+                    pbar.update(1)
+            
+            logger.info(
+                f"Embedding generation complete: {stats['generated']} generated, "
+                f"{stats['skipped']} skipped, {stats['errors']} errors"
+            )
+            
+            if stats["errors"] > 0:
+                logger.warning(f"{stats['errors']} contestants could not be processed - check logs for details")
+                
+        except Exception as e:
+            logger.error(f"Failed to generate embeddings: {e}")
+    
+    def _process_contestant_embedding(self, contestant_id: int, name: str, nickname: str, 
+                                    photo_dir: Path, embedding_system) -> str:
+        """Process a single contestant's embedding"""
+        
+        # Output files (using ID-based naming)
+        embedding_path = photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+        metadata_path = photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+        
+        # Check if already exists
+        if embedding_path.exists() and metadata_path.exists():
+            try:
+                # Validate existing embedding
+                embedding = np.load(embedding_path)
+                with open(metadata_path, "r") as f:
+                    metadata = json.load(f)
+                
+                expected_method = embedding_system.embedding_config.method.value
+                if (metadata.get("method") == expected_method and 
+                    len(embedding) == 512 and 
+                    np.isfinite(embedding).all()):
+                    logger.debug(f"Valid embedding exists for contestant {contestant_id} ({nickname})")
+                    return "skipped"
+            except Exception as e:
+                logger.debug(f"Existing embedding invalid for contestant {contestant_id}: {e}")
+        
+        # Find photo files
+        contestant_dir = photo_dir / str(contestant_id)
+        if not contestant_dir.exists():
+            logger.error(f"Photo directory not found for contestant {contestant_id}: {contestant_dir}")
+            return "error"
+        
+        # Look for primary photo ({id}-1.jpg/png)
+        photo_extensions = [".jpg", ".jpeg", ".png"]
+        photo_path = None
+        
+        for ext in photo_extensions:
+            candidate = contestant_dir / f"{contestant_id}-1{ext}"
+            if candidate.exists():
+                photo_path = candidate
+                break
+        
+        if not photo_path:
+            logger.error(f"No primary photo found for contestant {contestant_id} in {contestant_dir}")
+            return "error"
+        
+        try:
+            # Generate embedding
+            logger.debug(f"Generating embedding for contestant {contestant_id} from {photo_path}")
+            embedding, metadata = embedding_system.generate_embedding(str(photo_path))
+            
+            if embedding is None:
+                logger.error(f"Failed to generate embedding for contestant {contestant_id}")
+                return "error"
+            
+            # Save embedding
+            np.save(embedding_path, embedding)
+            
+            # Save metadata with contestant info
+            from datetime import datetime
+            enhanced_metadata = {
+                "contestant_id": contestant_id,
+                "name": name,
+                "nickname": nickname,
+                "method": embedding_system.embedding_config.method.value,
+                "source_photo": str(photo_path),
+                "dimension": len(embedding),
+                "generated_at": datetime.now().isoformat(),
+                **metadata
+            }
+            
+            with open(metadata_path, "w", encoding="utf-8") as f:
+                json.dump(enhanced_metadata, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Generated embedding for contestant {contestant_id} ({nickname})")
+            return "generated"
+            
+        except Exception as e:
+            logger.error(f"Failed to generate embedding for contestant {contestant_id}: {e}")
+            return "error"
 
     def setup_output_dirs(self):
         """Create output directories"""
@@ -574,6 +806,8 @@ class VideoProcessingPipeline:
 )
 @click.option("--no-upload", is_flag=True, help="Skip Cloudflare upload")
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
+@click.option("--generate-embeddings", is_flag=True, help="Force regeneration of all embeddings")
+@click.option("--skip-embedding-check", is_flag=True, help="Skip automatic embedding validation")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
     input_path: str,
@@ -581,6 +815,8 @@ def main(
     output_name: str,
     no_upload: bool,
     rebuild_db: bool,
+    generate_embeddings: bool,
+    skip_embedding_check: bool,
     debug: bool,
 ):
     """Process video through face recognition pipeline"""
@@ -600,20 +836,100 @@ def main(
     logger.debug(f"Current working directory: {os.getcwd()}")
     logger.debug(f"Input video path: {input_path}")
     if not os.path.isabs(input_path):
-        # If we're running from mvp-processor/src, adjust path resolution to project root
+        # Determine project root based on current working directory
         cwd = os.getcwd()
+        project_root = None
+        
         if cwd.endswith("mvp-processor/src"):
-            # Go up 2 levels to project root
+            # Running from mvp-processor/src - go up 2 levels to project root
             project_root = os.path.dirname(os.path.dirname(cwd))
-            input_path = os.path.join(project_root, input_path)
+        elif cwd.endswith("mvp-processor"):
+            # Running from mvp-processor - go up 1 level to project root
+            project_root = os.path.dirname(cwd)
+        elif os.path.basename(cwd) in ["mv-face-recognition", "face-recognition"]:
+            # Running from project root
+            project_root = cwd
         else:
-            # Resolve relative to current working directory
+            # Try to find project root by looking for mvp-processor directory
+            current_dir = cwd
+            while current_dir != os.path.dirname(current_dir):  # Stop at filesystem root
+                if os.path.exists(os.path.join(current_dir, "mvp-processor")):
+                    project_root = current_dir
+                    break
+                current_dir = os.path.dirname(current_dir)
+        
+        if project_root:
+            # Handle relative path resolution from project root
+            if input_path.startswith('../'):
+                # Remove leading '../' and treat as relative to project root
+                clean_path = input_path[3:]  # Remove '../'
+                input_path = os.path.join(project_root, clean_path)
+            else:
+                # Standard relative path resolution
+                input_path = os.path.normpath(os.path.join(project_root, input_path))
+            logger.debug(f"Resolved using project root: {project_root}")
+        else:
+            # Fallback: resolve relative to current working directory
             input_path = os.path.abspath(input_path)
+            logger.warning(f"Could not determine project root, using current directory as base")
+        
         logger.debug(f"Resolved video path: {input_path}")
+    
+    # Validate that the resolved path exists
+    if not os.path.exists(input_path):
+        logger.error(f"Video file not found at resolved path: {input_path}")
+        # Try some common alternative paths as suggestions
+        suggestions = []
+        if not os.path.isabs(input_path):
+            orig_input = input_path
+        else:
+            # Extract relative part for suggestions
+            orig_input = input_path.split("/")[-3:]  # Get last 3 path components
+            if len(orig_input) >= 3:
+                orig_input = "/".join(orig_input[-3:])
+            else:
+                orig_input = os.path.basename(input_path)
+        
+        # Look for video files in common locations
+        cwd = os.getcwd()
+        potential_roots = []
+        if "mvp-processor" in cwd:
+            # Add project root possibilities
+            if cwd.endswith("mvp-processor/src"):
+                potential_roots.append(os.path.dirname(os.path.dirname(cwd)))
+            elif cwd.endswith("mvp-processor"):
+                potential_roots.append(os.path.dirname(cwd))
+        potential_roots.append(cwd)
+        
+        for root in potential_roots:
+            source_videos = os.path.join(root, "source", "videos")
+            if os.path.exists(source_videos):
+                video_files = [f for f in os.listdir(source_videos) if f.endswith(('.mp4', '.avi', '.mov', '.mkv'))]
+                if video_files:
+                    suggestions.extend([os.path.join(source_videos, f) for f in video_files[:3]])
+        
+        if suggestions:
+            logger.error("Suggested video paths:")
+            for suggestion in suggestions[:5]:  # Show max 5 suggestions
+                logger.error(f"  - {suggestion}")
+        
+        raise FileNotFoundError(f"Video file not found: {input_path}")
 
     try:
+        # Override config for command-line flags
+        config_overrides = {}
+        if skip_embedding_check:
+            config_overrides.setdefault("face_recognition", {})["auto_generate_embeddings"] = False
+        
         # Initialize pipeline (database is automatically initialized by unified system)
         pipeline = VideoProcessingPipeline(config, enable_upload=not no_upload)
+        
+        # Apply config overrides after initialization
+        if config_overrides:
+            for section, values in config_overrides.items():
+                if section not in pipeline.config:
+                    pipeline.config[section] = {}
+                pipeline.config[section].update(values)
 
         # Force rebuild database if requested
         if rebuild_db:
@@ -623,6 +939,40 @@ def main(
                 )
             else:
                 pipeline.initialize_database(force_rebuild=True)
+        
+        # Force regenerate embeddings if requested
+        if generate_embeddings:
+            logger.info("Force regenerating all embeddings...")
+            if pipeline.unified_face_detector:
+                # Load contestant data
+                import pandas as pd
+                contestants_csv_path = pipeline.config.get("contestants", {}).get("info_csv")
+                if contestants_csv_path and Path(contestants_csv_path).exists():
+                    contestants_df = pd.read_csv(contestants_csv_path)
+                    photo_dir = Path(pipeline.config.get("contestants", {}).get("photo_dir", ""))
+                    if photo_dir.exists():
+                        # Temporarily set force mode
+                        original_method = pipeline._process_contestant_embedding
+                        
+                        def force_process_contestant_embedding(contestant_id, name, nickname, photo_dir, embedding_system):
+                            # Remove existing files first
+                            embedding_path = photo_dir / f"contestant_{contestant_id}_unified_embedding.npy"
+                            metadata_path = photo_dir / f"contestant_{contestant_id}_embedding_metadata.json"
+                            
+                            if embedding_path.exists():
+                                embedding_path.unlink()
+                            if metadata_path.exists():
+                                metadata_path.unlink()
+                                
+                            return original_method(contestant_id, name, nickname, photo_dir, embedding_system)
+                        
+                        pipeline._process_contestant_embedding = force_process_contestant_embedding
+                        pipeline._generate_missing_embeddings(contestants_df, photo_dir)
+                        pipeline._process_contestant_embedding = original_method
+                else:
+                    logger.error("Cannot regenerate embeddings: contestant CSV not found")
+            else:
+                logger.error("Cannot regenerate embeddings: unified face detector not available")
 
         # Process video
         upload_package = pipeline.process_video(input_path, output_name)
