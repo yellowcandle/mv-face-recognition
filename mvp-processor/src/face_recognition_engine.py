@@ -12,6 +12,10 @@ from dataclasses import dataclass
 import pandas as pd
 import face_recognition
 
+# Import the unified system
+from unified_face_detector import UnifiedContestantDatabase
+from unified_embedding_system import UnifiedEmbeddingSystem
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,10 +30,15 @@ class FaceRecognition:
     match_confidence: float
 
 
-class ContestantDatabase:
-    """Manages contestant photos and face encodings"""
+# Use the unified contestant database instead of the legacy one
+ContestantDatabase = UnifiedContestantDatabase
+
+
+class LegacyContestantDatabase:
+    """Legacy contestant database - DEPRECATED - Use UnifiedContestantDatabase instead"""
 
     def __init__(self, config: dict):
+        logger.warning("LegacyContestantDatabase is deprecated. Use UnifiedContestantDatabase instead.")
         self.config = config
         self.photo_dir = Path(config["contestants"]["photo_dir"])
         self.info_csv = config["contestants"]["info_csv"]
