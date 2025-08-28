@@ -13,8 +13,8 @@ import pandas as pd
 import face_recognition
 
 # Import the unified system
-from unified_face_detector import UnifiedContestantDatabase
-from unified_embedding_system import UnifiedEmbeddingSystem
+from .unified_face_detector import UnifiedContestantDatabase
+from .unified_embedding_system import UnifiedEmbeddingSystem
 
 logger = logging.getLogger(__name__)
 
