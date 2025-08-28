@@ -2,7 +2,7 @@
 name = "mvp-processor"
 version = "0.2.0"
 description = "Streamlined video processing pipeline for face recognition"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     # Core dependencies
     "opencv-python>=4.8.0",
@@ -23,7 +23,11 @@ dependencies = [
     "rich>=13.0.0",
     # Utilities
     "tqdm>=4.65.0",
-    "requests>=2.31.0",
+    "requests>=2.32.4",
+    "cryptography>=44.0.1",
+    "aiohttp>=3.12.14",
+    "tornado>=6.5",
+    "flask>=3.1.1",
 ]
 
 [project.optional-dependencies]
