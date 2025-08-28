@@ -219,3 +219,22 @@ backup_processed_videos/
 processed_videos_backup/
 thumbnails/
 .claude/settings.local.json
+
+# Additional large file patterns to prevent future bloat
+archive/
+temp/
+tmp/
+*.tar.gz
+*.zip
+*.7z
+*.bak
+*.backup
+*_backup/
+*_temp/
+test_output/
+test_results/
+*.dump
+*.sql
+
+# Filter-repo artifacts
+.git/filter-repo/
