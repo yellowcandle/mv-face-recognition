@@ -31,13 +31,29 @@ class VideoProcessor:
     Enhanced video processor using Supervision library best practices
     """
 
-    def __init__(self, config: VideoProcessingConfig):
+    def __init__(self, config: VideoProcessingConfig, full_config: dict = None):
         self.config = config
+        self.full_config = full_config or {}
 
         # Initialize Supervision components
         self.box_annotator = sv.BoxAnnotator()
         self.label_annotator = sv.LabelAnnotator()
-        self.trace_annotator = sv.TraceAnnotator()
+        
+        # Configure TraceAnnotator with visualization settings from config
+        viz_config = self.full_config.get("visualization", {})
+        if viz_config.get("enable_tracking_trails", True):
+            trail_length = viz_config.get("trail_length", 30)
+            trail_thickness = viz_config.get("trail_thickness", 2)
+            
+            self.trace_annotator = sv.TraceAnnotator(
+                thickness=trail_thickness,
+                trace_length=trail_length
+            )
+            logger.info(f"TraceAnnotator configured: trail_length={trail_length}, thickness={trail_thickness}")
+        else:
+            # Create annotator with minimal settings if trails disabled
+            self.trace_annotator = sv.TraceAnnotator(thickness=1, trace_length=1)
+            logger.info("TraceAnnotator disabled via configuration")
 
         # Initialize tracking components
         if config.enable_tracking:
@@ -58,6 +74,11 @@ class VideoProcessor:
         # Face detection and recognition engines
         self.face_detector = None
         self.face_recognizer = None
+        
+        # Trail tracking state
+        self.trail_confidence_threshold = viz_config.get("trail_confidence_threshold", 0.5)
+        self.trail_expiration_frames = viz_config.get("trail_expiration_frames", 10)
+        self.trail_last_seen = {}  # track_id -> frame_number mapping
 
     def set_face_detector(self, detector):
         """Set the face detection engine"""
@@ -165,7 +186,7 @@ class VideoProcessor:
                     )
 
                     # Apply trace annotations if tracking is enabled
-                    if self.tracker:
+                    if self.tracker and self._should_show_trails(sv_detections):
                         annotated_frame = self.trace_annotator.annotate(
                             scene=annotated_frame, detections=sv_detections
                         )
@@ -237,6 +258,46 @@ class VideoProcessor:
         class_id = np.array(class_id_list, dtype=int)
 
         return sv.Detections(xyxy=xyxy, confidence=confidence, class_id=class_id)
+
+    def _should_show_trails(self, detections: sv.Detections) -> bool:
+        """
+        Determine if trails should be shown based on confidence and detection state
+        
+        Args:
+            detections: Current frame detections
+            
+        Returns:
+            bool: True if trails should be shown
+        """
+        viz_config = self.full_config.get("visualization", {})
+        if not viz_config.get("enable_tracking_trails", True):
+            return False
+            
+        # Update trail tracking state
+        current_frame = self.frame_count
+        active_tracks = set()
+        
+        # Check if any detections meet confidence threshold
+        has_confident_detections = False
+        if hasattr(detections, 'tracker_id') and detections.tracker_id is not None:
+            for i, (confidence, track_id) in enumerate(zip(detections.confidence, detections.tracker_id)):
+                active_tracks.add(track_id)
+                self.trail_last_seen[track_id] = current_frame
+                
+                if confidence >= self.trail_confidence_threshold:
+                    has_confident_detections = True
+        
+        # Clean up expired trails
+        expired_tracks = []
+        for track_id, last_seen_frame in self.trail_last_seen.items():
+            if current_frame - last_seen_frame > self.trail_expiration_frames:
+                expired_tracks.append(track_id)
+        
+        for track_id in expired_tracks:
+            del self.trail_last_seen[track_id]
+            logger.debug(f"Expired trail for track {track_id} after {current_frame - self.trail_last_seen.get(track_id, current_frame)} frames")
+        
+        return has_confident_detections and len(active_tracks) > 0
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics"""

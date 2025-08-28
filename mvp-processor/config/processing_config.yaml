@@ -75,9 +75,9 @@ face_tracking:
   # custom: Original custom face tracker (faster, optimized for faces)  
   # supervision: Optimized Supervision ByteTracker (proven algorithms with performance optimizations)
   
-  # Temporal window settings - Extended for stability
+  # Temporal window settings - Optimized for faster cleanup
   tracking_window: 2.0              # Extended duration for better temporal stability (4x longer)
-  max_trajectory_gap: 6             # Extended gap tolerance to maintain continuity
+  max_trajectory_gap: 3             # OPTIMIZED: Reduced for faster cleanup (6 → 3 frames)
   min_trajectory_length: 5          # Higher minimum for more stable trajectories
   
   # Spatial correlation thresholds - Tightened for stability
@@ -85,21 +85,28 @@ face_tracking:
   proximity_boost: 0.95             # Stronger proximity preference for temporal consistency
   location_stability_factor: 0.90   # Much higher stability preference for consistent locations
   
-  # Confidence smoothing and aggregation - Stronger smoothing
+  # Confidence smoothing and aggregation - Optimized for faster cleanup
   confidence_smoothing: 0.95        # Much stronger temporal smoothing (0.85 → 0.95) 
   confidence_threshold: 0.20        # Slightly lower aggregated threshold for stability
   single_frame_fallback: 0.10       # Lower fallback threshold to reduce noise
   min_stable_detections: 5          # Higher minimum for trajectory stability (3 → 5)
+  
+  # Trajectory confidence decay - NEW settings for faster cleanup
+  trajectory_confidence_decay: 0.85  # NEW: Confidence decay per frame without detection
+  low_confidence_decay_boost: 0.70   # NEW: Faster decay for trajectories below 30% confidence
+  confidence_recovery_factor: 1.10   # NEW: Confidence boost when trajectory is re-detected
   
   # Re-identification configuration - Reduced frequency
   re_recognition_interval: 8        # Much less frequent re-ID to prevent switching (3 → 8)
   identity_voting_weight: 1.2       # Slightly higher voting weight for stability
   temporal_consistency_bonus: 0.25  # Higher bonus for consistent recognitions (0.15 → 0.25)
   
-  # Trajectory management
+  # Trajectory management - Optimized for faster cleanup
   max_active_trajectories: 20       # Keep same for performance
-  trajectory_cleanup_interval: 45   # Less frequent cleanup (30 → 45) for stability
+  trajectory_cleanup_interval: 15   # OPTIMIZED: More frequent cleanup (45 → 15) for faster bbox removal
   memory_optimization: true         # Enable memory-efficient trajectory management
+  aggressive_cleanup: true          # NEW: Enable aggressive cleanup of stale trajectories
+  cleanup_confidence_threshold: 0.15 # NEW: Clean up trajectories below 15% confidence
   
   # Performance tuning (aligned with 12 FPS detection)  
   detection_sampling_rate: 12        # Match doubled FPS sampling rate
@@ -138,15 +145,20 @@ processing:
   streaming_batch_size: 8           # Frames per batch (controls memory usage)
   memory_pressure_monitoring: true  # Real-time memory monitoring and relief
 
-# Smart Frame Interpolation - Enhanced Anti-Flickering Display
+# Smart Frame Interpolation - Optimized for Faster Cleanup
 interpolation:
   enable_display_interpolation: true    # Enable smooth bbox display across all video frames
-  max_interpolation_gap: 0.6           # Extended interpolation window (0.4 → 0.6s) for smoother display
-  interpolation_confidence_decay: 0.97  # Much slower confidence decay (0.9 → 0.97) to maintain stability
-  min_interpolation_confidence: 0.15    # Lower minimum threshold (0.25 → 0.15) for extended display
-  max_interpolation_frames: 18          # More interpolation frames (12 → 18) for 25fps * 0.7s
+  max_interpolation_gap: 0.3           # OPTIMIZED: Reduced for faster cleanup (0.6 → 0.3s)
+  interpolation_confidence_decay: 0.90  # OPTIMIZED: Faster decay for quicker cleanup (0.97 → 0.90)
+  min_interpolation_confidence: 0.20    # OPTIMIZED: Higher threshold for faster termination (0.15 → 0.20)
+  max_interpolation_frames: 9           # OPTIMIZED: Fewer frames for faster cleanup (18 → 9 frames at 25fps)
   enable_position_prediction: true      # Use trajectory velocity for position prediction
-  trajectory_termination_strict: false  # Allow brief extension (true → false) for smoother transitions
+  trajectory_termination_strict: true   # OPTIMIZED: Strict termination for faster cleanup (false → true)
+  
+  # Confidence-based trajectory termination
+  confidence_termination_threshold: 0.10  # NEW: Terminate trajectories below 10% confidence
+  rapid_decay_threshold: 0.30            # NEW: Enable rapid decay below 30% confidence
+  rapid_decay_factor: 0.80               # NEW: Fast confidence decay factor for low-confidence trajectories
 
 # AGGRESSIVE ANTI-FLICKERING SYSTEM
 anti_flicker:
@@ -155,10 +167,10 @@ anti_flicker:
   spatial_distance_threshold: 800       # Large spatial tolerance to prevent jumping (was 200px)
   minimum_movement_threshold: 5         # Ignore tiny movements below 5 pixels
   
-  # Visual state locking  
-  visual_state_lock_duration: 1.0       # Lock visual appearance for 1 second minimum
+  # Visual state locking - Optimized for faster cleanup
+  visual_state_lock_duration: 0.5       # OPTIMIZED: Reduced lock duration (1.0 → 0.5s) for faster cleanup
   confidence_hysteresis: 0.15           # Require 0.15 confidence change to update colors
-  minimum_display_frames: 8             # Force minimum 8 frame visibility
+  minimum_display_frames: 4             # OPTIMIZED: Reduced minimum display (8 → 4 frames) for faster cleanup
   
   # Emergency static mode
   enable_static_rendering: false         # EMERGENCY ENABLED: disable all dynamic visual effects
@@ -267,10 +279,12 @@ visualization:
   text_thickness: 1
   text_padding: 5
   
-  # Tracking trail visualization
+  # Tracking trail visualization - Optimized for faster cleanup
   enable_tracking_trails: true
   trail_length: 30  # Number of points in tracking trail
   trail_thickness: 2
+  trail_confidence_threshold: 0.5  # Minimum confidence to show trails
+  trail_expiration_frames: 5   # OPTIMIZED: Faster trail cleanup (10 → 5 frames)
   
   # Color scheme for confidence levels
   color_palette:

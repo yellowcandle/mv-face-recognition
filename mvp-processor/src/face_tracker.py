@@ -53,6 +53,9 @@ class FaceTrajectory:
     # Trajectory state
     is_active: bool = True
     frames_without_detection: int = 0
+    
+    # Confidence-based termination tracking
+    trajectory_confidence: float = 1.0  # Starts at full confidence, decays over time
 
     def add_detection(
         self,
@@ -121,6 +124,11 @@ class FaceTrajectory:
             self.confidence_scores.append(0.0)
 
         self.frames_without_detection = 0
+        
+        # Apply confidence recovery when trajectory is re-detected
+        if tracker_config:
+            confidence_recovery_factor = tracker_config.get("confidence_recovery_factor", 1.10)
+            self.trajectory_confidence = min(1.0, self.trajectory_confidence * confidence_recovery_factor)
 
         # Update aggregated confidence with config parameters
         config_params = {}
@@ -368,9 +376,59 @@ class FaceTrajectory:
             return self.detections[-1].location
         return None
 
+    def should_expire(self, current_frame: int, tracker_config: dict) -> bool:
+        """Check if trajectory should be expired due to inactivity or low confidence"""
+        # Get configuration parameters with defaults
+        max_gap = tracker_config.get("max_trajectory_gap", 10)
+        confidence_termination_threshold = tracker_config.get("confidence_termination_threshold", 0.10)
+        
+        # Check traditional time-based expiration
+        frame_gap = current_frame - self.last_frame
+        if frame_gap > max_gap:
+            return True
+        
+        # Check confidence-based expiration
+        if self.trajectory_confidence < confidence_termination_threshold:
+            return True
+        
+        return False
+    
     def is_expired(self, current_frame: int, max_gap: int = 10) -> bool:
-        """Check if trajectory should be expired due to inactivity"""
+        """Legacy method for backward compatibility"""
         return (current_frame - self.last_frame) > max_gap
+
+    def apply_confidence_decay(self, tracker_config: dict):
+        """Apply confidence decay for trajectories without recent detections"""
+        # Get configuration parameters with defaults
+        trajectory_confidence_decay = tracker_config.get("trajectory_confidence_decay", 0.85)
+        rapid_decay_threshold = tracker_config.get("rapid_decay_threshold", 0.30)
+        rapid_decay_factor = tracker_config.get("rapid_decay_factor", 0.80)
+        
+        # Store original confidence for logging
+        original_confidence = self.trajectory_confidence
+        
+        # Apply standard decay
+        decay_factor = trajectory_confidence_decay
+        
+        # Apply rapid decay if confidence is below threshold
+        using_rapid_decay = self.trajectory_confidence < rapid_decay_threshold
+        if using_rapid_decay:
+            decay_factor = rapid_decay_factor
+        
+        # Apply the decay
+        self.trajectory_confidence *= decay_factor
+        
+        # Ensure confidence doesn't go negative
+        self.trajectory_confidence = max(0.0, self.trajectory_confidence)
+        
+        # Debug logging for significant confidence drops
+        if original_confidence > 0.5 and self.trajectory_confidence < 0.3:
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"Trajectory {self.trajectory_id} confidence dropped significantly: "
+                f"{original_confidence:.3f} → {self.trajectory_confidence:.3f} "
+                f"(using {'rapid' if using_rapid_decay else 'normal'} decay)"
+            )
 
     def get_trajectory_duration(self) -> float:
         """Get total duration of this trajectory in seconds"""
@@ -514,6 +572,27 @@ class FaceTracker:
         self.interpolation_smoothing = self.tracking_config.get(
             "interpolation_smoothing", 0.85
         )
+        
+        # Confidence-based termination parameters (check both tracking and interpolation config)
+        interpolation_config = config.get("interpolation", {})
+        self.trajectory_confidence_decay = self.tracking_config.get(
+            "trajectory_confidence_decay", 0.85
+        )
+        self.confidence_termination_threshold = (
+            self.tracking_config.get("confidence_termination_threshold") or
+            interpolation_config.get("confidence_termination_threshold", 0.10)
+        )
+        self.rapid_decay_threshold = (
+            self.tracking_config.get("rapid_decay_threshold") or
+            interpolation_config.get("rapid_decay_threshold", 0.30)
+        )
+        self.rapid_decay_factor = (
+            self.tracking_config.get("rapid_decay_factor") or
+            interpolation_config.get("rapid_decay_factor", 0.80)
+        )
+        self.confidence_recovery_factor = self.tracking_config.get(
+            "confidence_recovery_factor", 1.10
+        )
 
         # Backward compatibility with legacy processing config
         if not self.tracking_config and self.processing_config:
@@ -537,7 +616,9 @@ class FaceTracker:
         logger.info(
             f"FaceTracker initialized with tracking_window={self.tracking_window}s, "
             f"spatial_threshold={self.spatial_threshold}, "
-            f"confidence_threshold={self.confidence_threshold}"
+            f"confidence_threshold={self.confidence_threshold}, "
+            f"confidence_termination_threshold={self.confidence_termination_threshold}, "
+            f"rapid_decay_threshold={self.rapid_decay_threshold}"
         )
 
     def _validate_config(self):
@@ -567,6 +648,24 @@ class FaceTracker:
         if not (0.0 <= self.confidence_smoothing <= 1.0):
             errors.append(
                 f"confidence_smoothing must be between 0.0 and 1.0, got {self.confidence_smoothing}"
+            )
+        
+        # Validate confidence termination parameters
+        if not (0.0 <= self.confidence_termination_threshold <= 1.0):
+            errors.append(
+                f"confidence_termination_threshold must be between 0.0 and 1.0, got {self.confidence_termination_threshold}"
+            )
+        if not (0.0 <= self.rapid_decay_threshold <= 1.0):
+            errors.append(
+                f"rapid_decay_threshold must be between 0.0 and 1.0, got {self.rapid_decay_threshold}"
+            )
+        if not (0.0 <= self.trajectory_confidence_decay <= 1.0):
+            errors.append(
+                f"trajectory_confidence_decay must be between 0.0 and 1.0, got {self.trajectory_confidence_decay}"
+            )
+        if not (0.0 <= self.rapid_decay_factor <= 1.0):
+            errors.append(
+                f"rapid_decay_factor must be between 0.0 and 1.0, got {self.rapid_decay_factor}"
             )
 
         # Validate trajectory parameters
@@ -674,6 +773,12 @@ class FaceTracker:
     ) -> List[FaceTrajectory]:
         """Update trajectories with new detections and recognitions"""
         if not detections:
+            # Apply confidence decay to all active trajectories when no detections
+            enhanced_config = self._get_enhanced_tracking_config()
+            for trajectory_id, trajectory in self.active_trajectories.items():
+                trajectory.frames_without_detection += 1
+                trajectory.apply_confidence_decay(enhanced_config)
+            
             self._expire_inactive_trajectories()
             return list(self.active_trajectories.values())
 
@@ -734,13 +839,18 @@ class FaceTracker:
                 new_trajectory.add_detection(detection, recognition, enhanced_config)
 
                 self.active_trajectories[self.next_trajectory_id] = new_trajectory
+                matched_trajectories.add(self.next_trajectory_id)  # Mark new trajectory as matched
                 logger.debug(f"Created new trajectory {self.next_trajectory_id}")
                 self.next_trajectory_id += 1
 
-        # Update frame counters for unmatched trajectories
+        # Update frame counters and apply confidence decay for unmatched trajectories
+        enhanced_config = self._get_enhanced_tracking_config()
         for trajectory_id in self.active_trajectories:
             if trajectory_id not in matched_trajectories:
-                self.active_trajectories[trajectory_id].frames_without_detection += 1
+                trajectory = self.active_trajectories[trajectory_id]
+                trajectory.frames_without_detection += 1
+                # Apply confidence decay for trajectories without detection
+                trajectory.apply_confidence_decay(enhanced_config)
 
         # Expire old trajectories and perform cleanup if needed
         self._expire_inactive_trajectories()
@@ -754,11 +864,12 @@ class FaceTracker:
         return list(self.active_trajectories.values())
 
     def _expire_inactive_trajectories(self):
-        """Move inactive trajectories to completed list"""
+        """Move inactive trajectories to completed list based on time and confidence"""
         to_expire = []
+        enhanced_config = self._get_enhanced_tracking_config()
 
         for trajectory_id, trajectory in self.active_trajectories.items():
-            if trajectory.is_expired(self.current_frame, self.max_trajectory_gap):
+            if trajectory.should_expire(self.current_frame, enhanced_config):
                 to_expire.append(trajectory_id)
 
         for trajectory_id in to_expire:
@@ -771,9 +882,23 @@ class FaceTracker:
                 trajectory.finalize_trajectory_consensus(trajectory_config)
 
             self.completed_trajectories.append(trajectory)
-            logger.debug(
-                f"Expired trajectory {trajectory_id} after {trajectory.get_trajectory_duration():.2f}s"
-            )
+            
+            # Log expiration reason
+            frame_gap = self.current_frame - trajectory.last_frame
+            max_gap = enhanced_config.get("max_trajectory_gap", 10)
+            confidence_too_low = trajectory.trajectory_confidence < enhanced_config.get("confidence_termination_threshold", 0.10)
+            
+            if confidence_too_low:
+                logger.debug(
+                    f"Expired trajectory {trajectory_id} due to low confidence "
+                    f"({trajectory.trajectory_confidence:.3f} < {enhanced_config.get('confidence_termination_threshold', 0.10):.3f}) "
+                    f"after {trajectory.get_trajectory_duration():.2f}s"
+                )
+            else:
+                logger.debug(
+                    f"Expired trajectory {trajectory_id} due to time gap "
+                    f"({frame_gap} > {max_gap}) after {trajectory.get_trajectory_duration():.2f}s"
+                )
 
     def _expire_trajectory(self, trajectory_id: int):
         """Move a specific trajectory to completed list"""
@@ -897,7 +1022,7 @@ class FaceTracker:
         logger.info("FaceTracker reset for new video")
 
     def _get_enhanced_tracking_config(self) -> dict:
-        """Get enhanced tracking configuration with majority voting parameters"""
+        """Get enhanced tracking configuration with majority voting and confidence termination parameters"""
         enhanced_config = self.tracking_config.copy()
 
         # Add majority voting parameters from instance
@@ -909,6 +1034,17 @@ class FaceTracker:
                 "confidence_gap_threshold": self.confidence_gap_threshold,
                 "temporal_decay_factor": self.temporal_decay_factor,
                 "stability_requirement": self.stability_requirement,
+            }
+        )
+        
+        # Add confidence-based termination parameters from instance
+        enhanced_config.update(
+            {
+                "trajectory_confidence_decay": self.trajectory_confidence_decay,
+                "confidence_termination_threshold": self.confidence_termination_threshold,
+                "rapid_decay_threshold": self.rapid_decay_threshold,
+                "rapid_decay_factor": self.rapid_decay_factor,
+                "confidence_recovery_factor": self.confidence_recovery_factor,
             }
         )
 

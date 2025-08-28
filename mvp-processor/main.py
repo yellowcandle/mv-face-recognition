@@ -121,7 +121,7 @@ def process_single_video(
         enable_tracking=config.get("processing", {}).get("enable_tracking", True),
         enable_smoothing=config.get("processing", {}).get("enable_smoothing", True),
     )
-    engine = VideoProcessor(video_config)
+    engine = VideoProcessor(video_config, full_config=config)
 
     try:
         # Create processing info panel
@@ -383,7 +383,7 @@ def test_engines(config: Optional[dict] = None):
             enable_tracking=True,
             enable_smoothing=True,
         )
-        video_processor = VideoProcessor(dummy_config)
+        video_processor = VideoProcessor(dummy_config, full_config=config)
         stats = video_processor.get_performance_stats()
         results_table.add_row(
             "Video Processing", "✅ PASS", "Engine initialized successfully"

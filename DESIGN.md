@@ -2739,6 +2739,12 @@ visualization:
   confidence_colors:
     high_threshold: 0.7
     medium_threshold: 0.4
+  # ✅ NEW: TraceAnnotator Configuration (January 2025)
+  enable_tracking_trails: true
+  trail_length: 30                    # Number of points in tracking trail
+  trail_thickness: 2                  # Trail line thickness
+  trail_confidence_threshold: 0.5     # Minimum confidence to show trails
+  trail_expiration_frames: 10         # Frames to keep trails after face disappears
     
 tracking:
   use_supervision_tracker: true
@@ -2774,6 +2780,63 @@ tracking:
 
 **Strategic Value:**
 This Supervision integration transforms the MV Face Recognition system from a custom solution to a **professional computer vision platform** that leverages proven algorithms while maintaining specialized face recognition capabilities. The hybrid approach provides the best of both worlds: advanced tracking performance and face-specific intelligence.
+
+### ✅ TraceAnnotator Configuration Enhancement (January 2025)
+
+**Enhanced Tracking Visualization**: Fixed TraceAnnotator initialization to properly use configuration values instead of hardcoded defaults, implementing confidence-based trail visibility and trail expiration logic.
+
+**Problem Fixed**: TraceAnnotator was initialized with default settings (`sv.TraceAnnotator()`) ignoring the comprehensive trail configuration defined in `processing_config.yaml`, resulting in suboptimal trail visualization.
+
+**Implementation Details:**
+
+**1. Configuration-Driven TraceAnnotator:**
+```python
+# ✅ FIXED: Configure TraceAnnotator with config values
+viz_config = self.full_config.get("visualization", {})
+if viz_config.get("enable_tracking_trails", True):
+    trail_length = viz_config.get("trail_length", 30)
+    trail_thickness = viz_config.get("trail_thickness", 2)
+    
+    self.trace_annotator = sv.TraceAnnotator(
+        thickness=trail_thickness,
+        trace_length=trail_length
+    )
+```
+
+**2. Confidence-Based Trail Visibility:**
+```python
+def _should_show_trails(self, detections: sv.Detections) -> bool:
+    """Show trails only for confident detections"""
+    for confidence, track_id in zip(detections.confidence, detections.tracker_id):
+        if confidence >= self.trail_confidence_threshold:
+            return True
+    return False
+```
+
+**3. Trail Expiration Logic:**
+```python
+# Clean up expired trails after configurable frames without detection
+if current_frame - last_seen_frame > self.trail_expiration_frames:
+    del self.trail_last_seen[track_id]
+```
+
+**Configuration Parameters:**
+- `trail_length: 30` - Number of points in tracking trail (was hardcoded default)
+- `trail_thickness: 2` - Trail line thickness (was hardcoded default)
+- `trail_confidence_threshold: 0.5` - Minimum confidence to show trails (NEW)
+- `trail_expiration_frames: 10` - Frames to keep trails after detection loss (NEW)
+
+**Files Modified:**
+- `mvp-processor/src/video_processing_engine.py`: Enhanced VideoProcessor.__init__ with configuration-driven TraceAnnotator
+- `mvp-processor/src/video_processor.py`: Updated _init_supervision_annotators with proper configuration
+- `mvp-processor/config/processing_config.yaml`: Added trail_confidence_threshold and trail_expiration_frames
+- `mvp-processor/main.py`: Updated VideoProcessor instantiation to pass full_config parameter
+
+**Impact:**
+- **Configurable Trails**: Trail length and thickness now properly use configuration values
+- **Intelligent Visibility**: Trails only appear for detections above confidence threshold
+- **Automatic Cleanup**: Expired trails are removed when faces disappear from frames
+- **Performance**: Reduced visual noise by hiding low-confidence trails
 
 ### ✅ Critical Face Recognition Embedding Scale Fix (July 22, 2025)
 

@@ -991,6 +991,34 @@ class VideoProcessor:
         if not SUPERVISION_AVAILABLE:
             return
 
+        # Configure TraceAnnotator with visualization settings from config
+        viz_config = self.config.get("visualization", {})
+        
+        if viz_config.get("enable_tracking_trails", True):
+            trail_length = viz_config.get("trail_length", 30)
+            trail_thickness = viz_config.get("trail_thickness", 2)
+            
+            # Initialize TraceAnnotator with configuration
+            self.trace_annotator = sv.TraceAnnotator(
+                thickness=trail_thickness,
+                trace_length=trail_length
+            )
+            
+            # Add trail tracking state
+            self.trail_confidence_threshold = viz_config.get("trail_confidence_threshold", 0.5)
+            self.trail_expiration_frames = viz_config.get("trail_expiration_frames", 10)
+            self.trail_last_seen = {}  # track_id -> frame_number mapping
+            
+            logger.info(f"TraceAnnotator configured: trail_length={trail_length}, thickness={trail_thickness}")
+        else:
+            # Create annotator with minimal settings if trails disabled
+            self.trace_annotator = sv.TraceAnnotator(thickness=1, trace_length=1)
+            logger.info("TraceAnnotator disabled via configuration")
+
+        # Initialize other annotators
+        self.box_annotator = sv.BoxAnnotator()
+        self.label_annotator = sv.LabelAnnotator()
+        
         logger.info("Supervision annotators initialized")
 
     def merge_audio_to_video(
