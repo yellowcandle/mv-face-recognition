@@ -53,6 +53,54 @@ def load_config(config_path: Optional[str] = None) -> dict:
         return get_default_config()
 
 
+def check_contestant_embeddings(config: dict) -> tuple[bool, str]:
+    """Check if contestant embeddings are present and valid
+    
+    Returns:
+        tuple[bool, str]: (success, message) where success indicates if embeddings are valid
+    """
+    try:
+        # Get contestant configuration
+        contestants_config = config.get("contestants", {})
+        photo_dir = contestants_config.get("photo_dir", "source/photo/contestants")
+        info_csv = contestants_config.get("info_csv", "source/contestant_info.csv")
+        
+        # Check if contestant info CSV exists
+        csv_path = Path(info_csv)
+        if not csv_path.exists():
+            return False, f"Contestant info CSV not found: {csv_path}"
+        
+        # Check if photo directory exists
+        photo_path = Path(photo_dir)
+        if not photo_path.exists():
+            return False, f"Photo directory not found: {photo_path}"
+        
+        # Load contestant info to get expected count
+        import pandas as pd
+        df = pd.read_csv(csv_path)
+        expected_contestants = len(df)
+        
+        # Check for embeddings
+        embedding_files = list(photo_path.glob("*embedding*.npy"))
+        found_embeddings = len(embedding_files)
+        
+        # Check for unified embeddings specifically
+        unified_embeddings = list(photo_path.glob("contestant_*_unified_embedding.npy"))
+        unified_count = len(unified_embeddings)
+        
+        if found_embeddings == 0:
+            return False, f"No embedding files found in {photo_path}"
+        
+        # Check if we have reasonable coverage
+        if found_embeddings < expected_contestants * 0.5:
+            return False, f"Insufficient embeddings found: {found_embeddings}/{expected_contestants} (minimum 50% required)"
+        
+        return True, f"Found {found_embeddings} embeddings ({unified_count} unified) for {expected_contestants} contestants"
+        
+    except Exception as e:
+        return False, f"Error checking embeddings: {e}"
+
+
 def get_default_config() -> dict:
     """Get default configuration if config file not found"""
     return {
@@ -93,7 +141,7 @@ class ProcessingResult:
 
 
 def process_single_video(
-    video_path: str, output_path: Optional[str] = None, config: Optional[dict] = None
+    video_path: str, output_path: Optional[str] = None, config: Optional[dict] = None, skip_embedding_check: bool = False
 ) -> ProcessingResult:
     """Process a single video file with beautiful Rich console output"""
     if config is None:
@@ -101,6 +149,29 @@ def process_single_video(
 
     # Initialize Rich console
     console = Console()
+    
+    # Check contestant embeddings before processing (unless skipped)
+    if not skip_embedding_check:
+        console.print("[bold blue]🔍 Checking contestant embeddings...[/bold blue]")
+        embeddings_valid, embeddings_message = check_contestant_embeddings(config)
+        if not embeddings_valid:
+            error_text = Text(f"❌ Embedding validation failed: {embeddings_message}", style="bold red")
+            error_panel = Panel(
+                error_text,
+                title="[bold red]Embedding Error[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            return ProcessingResult(
+                success=False,
+                video_path=video_path,
+                error_message=f"Embedding validation failed: {embeddings_message}"
+            )
+        
+        console.print(f"[bold green]✅ {embeddings_message}[/bold green]")
+    else:
+        console.print("[bold yellow]⚠️ Skipping contestant embedding validation[/bold yellow]")
 
     # Initialize consolidated video processing engine
     # Create VideoProcessingConfig from the config dict
@@ -238,7 +309,7 @@ def process_single_video(
 
 
 def process_batch_videos(
-    video_dir: str, output_dir: Optional[str] = None, config: Optional[dict] = None
+    video_dir: str, output_dir: Optional[str] = None, config: Optional[dict] = None, skip_embedding_check: bool = False
 ):
     """Process multiple videos in a directory with Rich console output"""
     if config is None:
@@ -246,6 +317,25 @@ def process_batch_videos(
 
     # Initialize Rich console
     console = Console()
+    
+    # Check contestant embeddings before processing (unless skipped)
+    if not skip_embedding_check:
+        console.print("[bold blue]🔍 Checking contestant embeddings...[/bold blue]")
+        embeddings_valid, embeddings_message = check_contestant_embeddings(config)
+        if not embeddings_valid:
+            error_text = Text(f"❌ Embedding validation failed: {embeddings_message}", style="bold red")
+            error_panel = Panel(
+                error_text,
+                title="[bold red]Embedding Error[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            return
+        
+        console.print(f"[bold green]✅ {embeddings_message}[/bold green]")
+    else:
+        console.print("[bold yellow]⚠️ Skipping contestant embedding validation[/bold yellow]")
 
     video_dir_path = Path(video_dir)
     if output_dir:
@@ -436,6 +526,9 @@ Examples:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
+    parser.add_argument(
+        "--skip-embedding-check", action="store_true", help="Skip contestant embedding validation"
+    )
 
     args = parser.parse_args()
 
@@ -449,9 +542,9 @@ Examples:
         if args.test_engines:
             test_engines(config)
         elif args.batch_dir:
-            process_batch_videos(args.batch_dir, args.output_dir, config)
+            process_batch_videos(args.batch_dir, args.output_dir, config, args.skip_embedding_check)
         elif args.input:
-            result = process_single_video(args.input, args.output, config)
+            result = process_single_video(args.input, args.output, config, args.skip_embedding_check)
             sys.exit(0 if result.success else 1)
         else:
             parser.print_help()
