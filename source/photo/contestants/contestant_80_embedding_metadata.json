@@ -1,13 +1,14 @@
 {
-  "contestant_id": "80",
+  "contestant_id": 80,
   "name": "方芷欣",
   "nickname": "方方",
-  "source_photo": "source/photo/contestants/80/80-1.png",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:13.286484",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/80/80-1.png",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:42.132999",
   "normalized": true,
-  "norm_factor": 19.891483306884766,
+  "insightface_failure": "Image quality unsuitable for InsightFace, using fallback",
+  "backend": "opencv_fallback",
+  "norm_factor": 2164.63623046875,
   "final_norm": 1.0
 }

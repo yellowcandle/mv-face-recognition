@@ -1,13 +1,13 @@
 {
-  "contestant_id": "11",
+  "contestant_id": 11,
   "name": "鍾君珩",
   "nickname": "Dru",
-  "source_photo": "source/photo/contestants/11/11-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:01.726056",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/11/11-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:28.137024",
   "normalized": true,
-  "norm_factor": 21.28297996520996,
-  "final_norm": 0.9999999403953552
+  "backend": "insightface",
+  "norm_factor": 21.72927474975586,
+  "final_norm": 1.0
 }

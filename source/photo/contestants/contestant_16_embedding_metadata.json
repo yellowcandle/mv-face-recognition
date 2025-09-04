@@ -1,13 +1,13 @@
 {
-  "contestant_id": "16",
+  "contestant_id": 16,
   "name": "夏子涓",
   "nickname": "子涓",
-  "source_photo": "source/photo/contestants/16/16-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:02.515986",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/16/16-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:29.162230",
   "normalized": true,
-  "norm_factor": 23.174827575683594,
+  "backend": "insightface",
+  "norm_factor": 22.88861656188965,
   "final_norm": 1.0
 }

@@ -1,13 +1,13 @@
 {
-  "contestant_id": "53",
+  "contestant_id": 53,
   "name": "房婷婷",
   "nickname": "丁丁",
-  "source_photo": "source/photo/contestants/53/53-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:09.001333",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/53/53-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:36.451225",
   "normalized": true,
-  "norm_factor": 19.427722930908203,
+  "backend": "insightface",
+  "norm_factor": 19.463581085205078,
   "final_norm": 0.9999999403953552
 }

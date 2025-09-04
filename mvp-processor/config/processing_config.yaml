@@ -42,9 +42,9 @@ face_detection:
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
-  similarity_threshold: 0.15  # Even lower confidence threshold for more matches
-  tolerance: 0.9  # Much higher = more lenient matching  
-  max_distance: 20.0  # Even higher maximum face distance to allow more recognition
+  similarity_threshold: 0.30  # UPDATED: Based on fresh embedding analysis - max inter-person similarity 0.27
+  tolerance: 0.6  # FIXED: Reasonable tolerance for face_recognition library (was 0.01 - too strict)  
+  max_distance: 8.0  # FIXED: Stricter distance threshold to prevent false matches (was 20.0)
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
   enable_interpolation: true  # Disabled to prevent bbox persistence between detections
@@ -55,8 +55,8 @@ face_recognition:
   embedding_coverage_threshold: 0.8  # Minimum coverage ratio to skip generation (80%)
   
   # Trajectory-based recognition thresholds
-  trajectory_confidence_threshold: 0.01  # Extremely low aggregate trajectory confidence 
-  single_frame_threshold: 0.01          # Extremely low fallback threshold
+  trajectory_confidence_threshold: 0.30  # UPDATED: Based on fresh embedding analysis to match similarity_threshold 
+  single_frame_threshold: 0.25          # UPDATED: Based on fresh embedding analysis for fallback threshold
   temporal_boost_factor: 1.3            # Higher confidence boost for consistent temporal recognition
 
 # Contestant Database (Critical Files)

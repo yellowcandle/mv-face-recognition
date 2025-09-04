@@ -1,13 +1,13 @@
 {
-  "contestant_id": "57",
+  "contestant_id": 57,
   "name": "張瑞芝",
   "nickname": "Ariels",
-  "source_photo": "source/photo/contestants/57/57-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:09.675455",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/57/57-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:37.302023",
   "normalized": true,
-  "norm_factor": 19.973169326782227,
+  "backend": "insightface",
+  "norm_factor": 20.26726722717285,
   "final_norm": 1.0
 }

@@ -1,13 +1,13 @@
 {
-  "contestant_id": "41",
+  "contestant_id": 41,
   "name": "林文思",
   "nickname": "Man C",
-  "source_photo": "source/photo/contestants/41/41-1.png",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:07.113385",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/41/41-1.png",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:34.018228",
   "normalized": true,
-  "norm_factor": 21.385831832885742,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 22.315908432006836,
+  "final_norm": 0.9999999403953552
 }

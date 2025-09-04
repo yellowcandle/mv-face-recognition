@@ -1,13 +1,13 @@
 {
-  "contestant_id": "71",
+  "contestant_id": 71,
   "name": "莫家琪",
   "nickname": "家琪",
-  "source_photo": "source/photo/contestants/71/71-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:11.901208",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/71/71-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:40.090860",
   "normalized": true,
-  "norm_factor": 23.893352508544922,
+  "backend": "insightface",
+  "norm_factor": 23.52991485595703,
   "final_norm": 1.0
 }

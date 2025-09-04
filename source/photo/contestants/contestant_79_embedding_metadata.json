@@ -1,13 +1,13 @@
 {
-  "contestant_id": "79",
+  "contestant_id": 79,
   "name": "陳昭煊",
   "nickname": "超酸",
-  "source_photo": "source/photo/contestants/79/79-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:13.108519",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/79/79-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:42.022019",
   "normalized": true,
-  "norm_factor": 20.8220157623291,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 19.901708602905273,
+  "final_norm": 0.9999999403953552
 }

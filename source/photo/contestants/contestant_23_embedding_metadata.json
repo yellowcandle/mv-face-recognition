@@ -1,13 +1,13 @@
 {
-  "contestant_id": "23",
+  "contestant_id": 23,
   "name": "陳祖兒",
   "nickname": "陳祖",
-  "source_photo": "source/photo/contestants/23/23-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:03.859131",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/23/23-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:30.719497",
   "normalized": true,
-  "norm_factor": 23.043746948242188,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 23.72025489807129,
+  "final_norm": 0.9999999403953552
 }

@@ -1,13 +1,13 @@
 {
-  "contestant_id": "35",
+  "contestant_id": 35,
   "name": "羅安娜",
   "nickname": "Ana",
-  "source_photo": "source/photo/contestants/35/35-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:06.170338",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/35/35-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:32.918102",
   "normalized": true,
-  "norm_factor": 23.014907836914062,
+  "backend": "insightface",
+  "norm_factor": 23.752914428710938,
   "final_norm": 1.0
 }

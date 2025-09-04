@@ -1,13 +1,13 @@
 {
-  "contestant_id": "15",
+  "contestant_id": 15,
   "name": "李晞彤",
   "nickname": "Carina",
-  "source_photo": "source/photo/contestants/15/15-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:02.360097",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/15/15-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:28.956320",
   "normalized": true,
-  "norm_factor": 23.721145629882812,
+  "backend": "insightface",
+  "norm_factor": 24.202272415161133,
   "final_norm": 1.0
 }

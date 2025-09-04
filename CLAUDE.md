@@ -9,7 +9,7 @@
 ## ⚠️ ABSOLUTELY CRITICAL - DO NOT DELETE THESE FILES ⚠️
 
 - **metadata/contestant_info.csv** - ESSENTIAL contestant database mapping (編號,姓名,暱稱,年齡)
-  - **LOCATION: /metadata/contestant_info.csv** 
+  - **LOCATION: /source/contestant_info.csv** 
   - Maps contestant numbers (1-96) to names and nicknames
   - Used by face recognition system to identify contestants
   - Contains 96 contestant records with Chinese names and nicknames

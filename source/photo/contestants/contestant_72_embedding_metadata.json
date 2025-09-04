@@ -1,12 +1,14 @@
 {
-  "contestant_id": "72",
+  "contestant_id": 72,
   "name": "廖芷嘉",
   "nickname": "Ika",
-  "source_photo": "source/photo/contestants/72/72-1.jpg",
-  "backend": "random_fallback",
-  "generated_at": "2025-07-24T08:19:11.994774",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/72/72-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:40.570679",
   "normalized": true,
-  "error": "No face detected by InsightFace in provided image"
+  "insightface_failure": "No face detected by InsightFace in provided image",
+  "backend": "opencv_fallback",
+  "norm_factor": 3769.305419921875,
+  "final_norm": 1.0
 }

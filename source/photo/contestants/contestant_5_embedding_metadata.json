@@ -1,13 +1,13 @@
 {
-  "contestant_id": "5",
+  "contestant_id": 5,
   "name": "坂部佩莎",
   "nickname": "莎莎",
-  "source_photo": "source/photo/contestants/5/5-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:00.788315",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/5/5-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:26.878322",
   "normalized": true,
-  "norm_factor": 20.559350967407227,
-  "final_norm": 1.0000001192092896
+  "backend": "insightface",
+  "norm_factor": 20.20588493347168,
+  "final_norm": 0.9999999403953552
 }

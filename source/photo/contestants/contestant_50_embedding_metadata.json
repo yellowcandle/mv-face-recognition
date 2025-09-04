@@ -1,13 +1,13 @@
 {
-  "contestant_id": "50",
+  "contestant_id": 50,
   "name": "歐卓瑩",
   "nickname": "鐵鐵",
-  "source_photo": "source/photo/contestants/50/50-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:08.541743",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/50/50-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:35.838972",
   "normalized": true,
-  "norm_factor": 22.68069076538086,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 22.921833038330078,
+  "final_norm": 0.9999999403953552
 }

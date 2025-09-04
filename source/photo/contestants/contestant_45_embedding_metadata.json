@@ -1,13 +1,13 @@
 {
-  "contestant_id": "45",
+  "contestant_id": 45,
   "name": "陳景晴",
   "nickname": "Jade Chan",
-  "source_photo": "source/photo/contestants/45/45-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:07.759271",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/45/45-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:34.801047",
   "normalized": true,
-  "norm_factor": 20.526073455810547,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 21.51346206665039,
+  "final_norm": 0.9999999403953552
 }

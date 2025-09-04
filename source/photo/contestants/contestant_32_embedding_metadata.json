@@ -1,13 +1,13 @@
 {
-  "contestant_id": "32",
+  "contestant_id": 32,
   "name": "李凱翹",
   "nickname": "Kay",
-  "source_photo": "source/photo/contestants/32/32-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:05.582301",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/32/32-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:32.396575",
   "normalized": true,
-  "norm_factor": 23.228849411010742,
+  "backend": "insightface",
+  "norm_factor": 23.512128829956055,
   "final_norm": 1.0
 }

@@ -10,8 +10,8 @@ from typing import List, Dict, Tuple, Optional
 import logging
 import json
 
-from .unified_embedding_system import UnifiedEmbeddingSystem
-from .face_detector import FaceDetection, FaceRecognition, ContestantDatabase
+from unified_embedding_system import UnifiedEmbeddingSystem
+from face_detector import FaceDetection, FaceRecognition, ContestantDatabase
 
 logger = logging.getLogger(__name__)
 

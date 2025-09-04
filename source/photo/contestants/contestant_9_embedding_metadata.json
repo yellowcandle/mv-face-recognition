@@ -1,13 +1,13 @@
 {
-  "contestant_id": "9",
+  "contestant_id": 9,
   "name": "羅洛家",
   "nickname": "Carmina",
-  "source_photo": "source/photo/contestants/9/9-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:01.418929",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/9/9-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:27.681306",
   "normalized": true,
-  "norm_factor": 21.296566009521484,
+  "backend": "insightface",
+  "norm_factor": 21.391708374023438,
   "final_norm": 1.0
 }

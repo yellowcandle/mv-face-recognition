@@ -1,13 +1,13 @@
 {
-  "contestant_id": "48",
+  "contestant_id": 48,
   "name": "劉綺婷",
   "nickname": "Yanny",
-  "source_photo": "source/photo/contestants/48/48-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:08.223613",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/48/48-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:35.412274",
   "normalized": true,
-  "norm_factor": 19.662933349609375,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 20.93109893798828,
+  "final_norm": 0.9999999403953552
 }

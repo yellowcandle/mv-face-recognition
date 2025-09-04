@@ -1,13 +1,13 @@
 {
-  "contestant_id": "7",
+  "contestant_id": 7,
   "name": "梁式昕",
   "nickname": "Catrina",
-  "source_photo": "source/photo/contestants/7/7-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:01.119880",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/7/7-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:27.299135",
   "normalized": true,
-  "norm_factor": 19.664899826049805,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 21.03752899169922,
+  "final_norm": 0.9999999403953552
 }

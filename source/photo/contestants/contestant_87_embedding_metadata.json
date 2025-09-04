@@ -1,13 +1,13 @@
 {
-  "contestant_id": "87",
+  "contestant_id": 87,
   "name": "葛綽瑤",
   "nickname": "Yoyo",
-  "source_photo": "source/photo/contestants/87/87-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:14.381171",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/87/87-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:43.627136",
   "normalized": true,
-  "norm_factor": 19.5725154876709,
-  "final_norm": 1.0000001192092896
+  "backend": "insightface",
+  "norm_factor": 19.588788986206055,
+  "final_norm": 0.9999999403953552
 }

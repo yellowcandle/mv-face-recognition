@@ -1,13 +1,13 @@
 {
-  "contestant_id": "13",
+  "contestant_id": 13,
   "name": "曾善婷",
   "nickname": "Ashi",
-  "source_photo": "source/photo/contestants/13/13-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:02.042764",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/13/13-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:28.541199",
   "normalized": true,
-  "norm_factor": 21.17174530029297,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 19.984615325927734,
+  "final_norm": 0.9999999403953552
 }

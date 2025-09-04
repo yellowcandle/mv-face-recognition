@@ -1,13 +1,13 @@
 {
-  "contestant_id": "54",
+  "contestant_id": 54,
   "name": "任佳慧",
   "nickname": "Miko",
-  "source_photo": "source/photo/contestants/54/54-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:09.159149",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/54/54-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:36.650350",
   "normalized": true,
-  "norm_factor": 20.837846755981445,
+  "backend": "insightface",
+  "norm_factor": 19.177047729492188,
   "final_norm": 1.0
 }

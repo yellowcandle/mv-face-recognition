@@ -1,13 +1,13 @@
 {
-  "contestant_id": "78",
+  "contestant_id": 78,
   "name": "馬彩欣",
   "nickname": "馬欣",
-  "source_photo": "source/photo/contestants/78/78-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:12.949229",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/78/78-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:41.816821",
   "normalized": true,
-  "norm_factor": 21.538362503051758,
+  "backend": "insightface",
+  "norm_factor": 20.839271545410156,
   "final_norm": 0.9999999403953552
 }

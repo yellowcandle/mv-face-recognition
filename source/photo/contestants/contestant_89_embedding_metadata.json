@@ -1,13 +1,13 @@
 {
-  "contestant_id": "89",
+  "contestant_id": 89,
   "name": "安希婷",
   "nickname": "安希婷",
-  "source_photo": "source/photo/contestants/89/89-1.png",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:14.733256",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/89/89-1.png",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:44.083082",
   "normalized": true,
-  "norm_factor": 19.721101760864258,
+  "backend": "insightface",
+  "norm_factor": 20.48832893371582,
   "final_norm": 0.9999999403953552
 }

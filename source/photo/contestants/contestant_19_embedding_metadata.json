@@ -1,13 +1,13 @@
 {
-  "contestant_id": "19",
+  "contestant_id": 19,
   "name": "黃筠兒",
   "nickname": "筠兒",
-  "source_photo": "source/photo/contestants/19/19-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:02.986439",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/19/19-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:29.756545",
   "normalized": true,
-  "norm_factor": 22.13474464416504,
-  "final_norm": 0.9999999403953552
+  "backend": "insightface",
+  "norm_factor": 23.581703186035156,
+  "final_norm": 1.0
 }

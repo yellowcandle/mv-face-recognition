@@ -1,13 +1,13 @@
 {
-  "contestant_id": "46",
+  "contestant_id": 46,
   "name": "歐穎芝",
   "nickname": "Chloe Au",
-  "source_photo": "source/photo/contestants/46/46-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:07.915846",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/46/46-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:35.005976",
   "normalized": true,
-  "norm_factor": 20.175537109375,
+  "backend": "insightface",
+  "norm_factor": 19.85761070251465,
   "final_norm": 1.0
 }

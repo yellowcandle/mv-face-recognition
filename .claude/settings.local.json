@@ -144,7 +144,16 @@
       "Bash(uv run python -c \"import face_recognition; print('face_recognition_models available')\")",
       "Bash(git commit -m \"$(cat <<'EOF'\nEnable unified embedding system and fix dependency installation\n\n- Enable unified_system: true in processing_config.yaml\n- Add insightface and onnxruntime dependencies to pyproject.toml\n- Fix MoviePy 2.x API compatibility (set_audio → with_audio)\n- Fix UnboundLocalError in process_video.py (input → input_path)\n- Add unified embedding system architecture files\n- Support seamless fallback between InsightFace/face_recognition/OpenCV\n- Solve critical 300x embedding scale mismatch for consistent recognition\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(npx playwright test:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(uv pip:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_file",
+      "mcp__serena__find_symbol",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__replace_symbol_body",
+      "Bash(PYTHONPATH=/Users/swong/dev/mv-face-recognition/mvp-processor/src python -m process_video -i ../source/videos/test-video-mv2.mp4 --no-upload)"
     ]
   },
   "enableAllProjectMcpServers": true

@@ -23,12 +23,15 @@ from src.video_processing_engine import VideoProcessor, VideoProcessingConfig
 from src.face_detection_engine import FaceDetectionEngine
 from src.face_recognition_engine import FaceRecognitionEngine
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 
 def setup_logging(verbose: bool = False):
     """Setup logging configuration"""
     level = (
-        logging.DEBUG if verbose else logging.WARNING
-    )  # Changed from INFO to WARNING to reduce console noise
+        logging.DEBUG if verbose else logging.ERROR
+    )  # Only show ERROR level logs by default (reduced from WARNING)
     logging.basicConfig(
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -51,6 +54,42 @@ def load_config(config_path: Optional[str] = None) -> dict:
     except Exception as e:
         print(f"Error loading config: {e}")
         return get_default_config()
+
+
+def load_contestant_nicknames(config: dict) -> dict:
+    """Load contestant ID to Traditional Chinese nickname mapping
+    
+    Returns:
+        dict: {contestant_id: nickname} mapping
+    """
+    try:
+        # Get contestant configuration
+        contestants_config = config.get("contestants", {})
+        info_csv = contestants_config.get("info_csv", "source/contestant_info.csv")
+        
+        # Load contestant info CSV
+        csv_path = Path(info_csv)
+        if not csv_path.exists():
+            logger.warning(f"Contestant info CSV not found: {csv_path}")
+            return {}
+        
+        # Load contestant info to get ID to nickname mapping
+        import pandas as pd
+        df = pd.read_csv(csv_path)
+        
+        # Create mapping from ID to Traditional Chinese nickname
+        nickname_mapping = {}
+        for _, row in df.iterrows():
+            contestant_id = str(row["編號"])
+            nickname = row["暱稱"]
+            nickname_mapping[contestant_id] = nickname
+        
+        logger.info(f"Loaded {len(nickname_mapping)} contestant nicknames")
+        return nickname_mapping
+        
+    except Exception as e:
+        logger.error(f"Error loading contestant nicknames: {e}")
+        return {}
 
 
 def check_contestant_embeddings(config: dict) -> tuple[bool, str]:
@@ -137,6 +176,7 @@ class ProcessingResult:
     output_path: str = None
     metadata_path: str = None
     processing_stats: dict = None
+    face_recognition_summary: dict = None
     error_message: str = None
 
 
@@ -193,6 +233,12 @@ def process_single_video(
         enable_smoothing=config.get("processing", {}).get("enable_smoothing", True),
     )
     engine = VideoProcessor(video_config, full_config=config)
+    
+    # Initialize and set face detection and recognition engines
+    face_detector = FaceDetectionEngine(config)
+    face_recognizer = FaceRecognitionEngine(config)
+    engine.set_face_detector(face_detector)
+    engine.set_face_recognizer(face_recognizer)
 
     try:
         # Create processing info panel
@@ -235,6 +281,9 @@ def process_single_video(
 
         # Get performance stats
         stats = engine.get_performance_stats()
+        
+        # Get face recognition summary
+        face_recognition_summary = engine.get_face_recognition_summary()
 
         # Create ProcessingResult
         result = ProcessingResult(
@@ -243,6 +292,7 @@ def process_single_video(
             output_path=output_path
             or f"{Path(video_path).stem}_processed{Path(video_path).suffix}",
             processing_stats=stats,
+            face_recognition_summary=face_recognition_summary,
         )
 
         # Display results
@@ -273,11 +323,158 @@ def process_single_video(
                 perf_table.add_row(
                     "Frames Processed", f"{stats.get('total_frames', 0):,}", "frames"
                 )
-                perf_table.add_row("Average Frame Time", ".3f", "seconds")
-                perf_table.add_row("Processing Speed", ".1f", "FPS")
-                perf_table.add_row("Total Processing Time", ".2f", "seconds")
+                perf_table.add_row(
+                    "Average Frame Time", f"{stats.get('avg_frame_time', 0):.3f}", "seconds"
+                )
+                perf_table.add_row(
+                    "Processing Speed", f"{stats.get('estimated_fps', 0):.1f}", "FPS"
+                )
+                perf_table.add_row(
+                    "Total Processing Time", f"{stats.get('total_frames', 0) * stats.get('avg_frame_time', 0):.2f}", "seconds"
+                )
 
                 console.print(perf_table)
+                
+            # Phase 5: Add Recognition Statistics Dashboard
+            recognition_stats = engine.face_recognizer.get_performance_stats()
+            if recognition_stats.get('recognition_attempts', 0) > 0:
+                # Recognition Analysis Table
+                recog_table = Table(
+                    show_header=True,
+                    header_style="bold blue",
+                    title="🔍 Recognition Analysis Dashboard",
+                )
+                recog_table.add_column("Metric", style="cyan", width=22)
+                recog_table.add_column("Value", style="white", justify="right")
+                recog_table.add_column("Analysis", style="yellow", width=15)
+
+                # Detection and Recognition Stats
+                attempts = recognition_stats.get('recognition_attempts', 0)
+                successful = recognition_stats.get('successful_recognitions', 0)
+                success_rate = recognition_stats.get('success_rate', 0)
+                
+                recog_table.add_row(
+                    "Detection Attempts", f"{attempts:,}", "faces detected"
+                )
+                recog_table.add_row(
+                    "Successful Recognition", f"{successful:,}", f"({success_rate:.1%} success)"
+                )
+                
+                # Quality Control Stats
+                if 'detection_rejections' in recognition_stats:
+                    rejections = recognition_stats['detection_rejections']
+                    total_det = recognition_stats.get('total_detections', attempts + rejections)
+                    quality_rate = recognition_stats.get('detection_quality_rate', 0)
+                    
+                    recog_table.add_row(
+                        "Quality Rejections", f"{rejections:,}", f"({quality_rate:.1%} quality)"
+                    )
+                
+                # Confidence Stats
+                if 'avg_confidence' in recognition_stats:
+                    avg_conf = recognition_stats['avg_confidence']
+                    conf_p95 = recognition_stats.get('confidence_p95', 0)
+                    
+                    recog_table.add_row(
+                        "Average Confidence", f"{avg_conf:.3f}", f"(95%: {conf_p95:.3f})"
+                    )
+                
+                # Current Thresholds
+                current_threshold = recognition_stats.get('current_similarity_threshold', 0.45)
+                recog_table.add_row(
+                    "Similarity Threshold", f"{current_threshold:.2f}", "current setting"
+                )
+                
+                console.print("\n", recog_table)
+                
+                # Threshold Recommendations
+                if recognition_stats.get('threshold_analysis') != 'needs_data':
+                    analysis = recognition_stats.get('threshold_analysis', '')
+                    recommended = recognition_stats.get('recommended_threshold', current_threshold)
+                    reason = recognition_stats.get('reason', '')
+                    
+                    if analysis in ['too_restrictive', 'restrictive']:
+                        recommendation_style = "bold yellow"
+                        icon = "⚠️"
+                    elif analysis == 'optimal_range':
+                        recommendation_style = "bold green"
+                        icon = "✅"
+                    else:
+                        recommendation_style = "bold cyan"
+                        icon = "💡"
+                    
+                    console.print(f"\n{icon} ", style=recommendation_style, end="")
+                    console.print("Threshold Recommendation: ", style=f"{recommendation_style}", end="")
+                    
+                    if recommended != current_threshold:
+                        console.print(f"Consider adjusting similarity_threshold from {current_threshold:.2f} to {recommended:.2f}", style="white")
+                        console.print(f"   Reason: {reason}", style="dim white")
+                    else:
+                        console.print(f"Current threshold ({current_threshold:.2f}) appears optimal", style="white")
+                        console.print(f"   {reason}", style="dim white")
+                    
+                    # Add confidence note if available
+                    if 'confidence_note' in recognition_stats:
+                        console.print(f"   💡 {recognition_stats['confidence_note']}", style="dim cyan")
+
+            # Create face recognition summary table with enhanced stats
+            if result.face_recognition_summary and len(result.face_recognition_summary) > 0:
+                # Load contestant nicknames for Traditional Chinese display
+                nickname_mapping = load_contestant_nicknames(config)
+                
+                # Sort by recognition count (descending) and take top 15
+                sorted_recognitions = sorted(
+                    result.face_recognition_summary.items(),
+                    key=lambda x: x[1]["count"],
+                    reverse=True
+                )[:15]
+                
+                total_recognitions = sum(data["count"] for _, data in result.face_recognition_summary.items())
+                unique_faces = len(result.face_recognition_summary)
+                
+                if sorted_recognitions:
+                    face_table = Table(
+                        show_header=True,
+                        header_style="bold magenta",
+                        title=f"👥 已識別人臉 (Recognized Faces) - {unique_faces} 位參賽者，共 {total_recognitions:,} 次識別",
+                    )
+                    face_table.add_column("編號", style="cyan", justify="center", width=6)
+                    face_table.add_column("暱稱", style="green", justify="left", width=12)
+                    face_table.add_column("識別次數", style="yellow", justify="right", width=8)
+                    face_table.add_column("平均置信度", style="magenta", justify="right", width=10)
+                    face_table.add_column("佔比", style="blue", justify="right", width=8)
+                    
+                    for contestant_id, data in sorted_recognitions:
+                        nickname = nickname_mapping.get(contestant_id, f"參賽者{contestant_id}")
+                        percentage = (data["count"] / total_recognitions) * 100
+                        face_table.add_row(
+                            contestant_id,
+                            nickname,
+                            f"{data['count']:,}",
+                            f"{data['avg_confidence']:.3f}",
+                            f"{percentage:.1f}%"
+                        )
+                    
+                    console.print("\n", face_table)
+                    
+                    # Add summary statistics
+                    summary_text = Text()
+                    summary_text.append("📊 識別統計: ", style="bold cyan")
+                    summary_text.append(f"總識別次數 {total_recognitions:,} • ", style="white")
+                    summary_text.append(f"不同參賽者 {unique_faces} 位 • ", style="white")
+                    if total_recognitions > 0:
+                        avg_per_contestant = total_recognitions / unique_faces
+                        summary_text.append(f"平均每人 {avg_per_contestant:.1f} 次", style="white")
+                    
+                    console.print(summary_text)
+                    
+                    # Show rejection stats if available
+                    if hasattr(engine.face_recognizer, '_detection_rejection_count'):
+                        rejection_count = engine.face_recognizer._detection_rejection_count
+                        if rejection_count > 0:
+                            console.print(f"🔍 品質控制: 已過濾 {rejection_count:,} 個低品質偵測", style="dim white")
+            else:
+                console.print("\n⚠️  未識別到任何參賽者人臉", style="bold yellow")
 
             # Final celebration message
             celebration_text = Text(

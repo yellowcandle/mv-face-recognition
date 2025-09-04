@@ -1,13 +1,13 @@
 {
-  "contestant_id": "65",
+  "contestant_id": 65,
   "name": "余施熲",
   "nickname": "阿 Wing",
-  "source_photo": "source/photo/contestants/65/65-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:10.950148",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/65/65-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:38.899418",
   "normalized": true,
-  "norm_factor": 21.62261962890625,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 22.36276626586914,
+  "final_norm": 0.9999999403953552
 }

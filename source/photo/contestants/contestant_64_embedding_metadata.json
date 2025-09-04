@@ -1,13 +1,13 @@
 {
-  "contestant_id": "64",
+  "contestant_id": 64,
   "name": "林泳怡",
   "nickname": "Vicky",
-  "source_photo": "source/photo/contestants/64/64-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:10.803515",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/64/64-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:38.715748",
   "normalized": true,
-  "norm_factor": 21.138395309448242,
+  "backend": "insightface",
+  "norm_factor": 20.91408348083496,
   "final_norm": 1.0
 }

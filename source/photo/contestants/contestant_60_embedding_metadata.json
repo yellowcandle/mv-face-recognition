@@ -1,13 +1,13 @@
 {
-  "contestant_id": "60",
+  "contestant_id": 60,
   "name": "楊安妮",
   "nickname": "Win Win",
-  "source_photo": "source/photo/contestants/60/60-1.png",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:10.168128",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/60/60-1.png",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:37.916609",
   "normalized": true,
-  "norm_factor": 20.756011962890625,
+  "backend": "insightface",
+  "norm_factor": 21.595508575439453,
   "final_norm": 1.0
 }

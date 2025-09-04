@@ -1,13 +1,13 @@
 {
-  "contestant_id": "69",
+  "contestant_id": 69,
   "name": "黃鉦貽",
   "nickname": "鉦貽",
-  "source_photo": "source/photo/contestants/69/69-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:11.577945",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/69/69-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:39.682913",
   "normalized": true,
-  "norm_factor": 21.68227195739746,
-  "final_norm": 0.9999999403953552
+  "backend": "insightface",
+  "norm_factor": 22.6553955078125,
+  "final_norm": 1.0
 }

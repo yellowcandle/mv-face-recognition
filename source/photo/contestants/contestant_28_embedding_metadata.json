@@ -1,13 +1,14 @@
 {
-  "contestant_id": "28",
+  "contestant_id": 28,
   "name": "王家晴",
   "nickname": "Candy",
-  "source_photo": "source/photo/contestants/28/28-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:04.933257",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/28/28-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:31.589132",
   "normalized": true,
-  "norm_factor": 20.184526443481445,
+  "insightface_failure": "Image quality unsuitable for InsightFace, using fallback",
+  "backend": "opencv_fallback",
+  "norm_factor": 2553.70068359375,
   "final_norm": 0.9999999403953552
 }

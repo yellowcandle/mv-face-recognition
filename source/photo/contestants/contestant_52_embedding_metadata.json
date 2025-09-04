@@ -1,13 +1,13 @@
 {
-  "contestant_id": "52",
+  "contestant_id": 52,
   "name": "吳倩怡",
   "nickname": "Sinnie",
-  "source_photo": "source/photo/contestants/52/52-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:08.841364",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/52/52-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:36.240238",
   "normalized": true,
-  "norm_factor": 17.776613235473633,
-  "final_norm": 1.0
+  "backend": "insightface",
+  "norm_factor": 18.318822860717773,
+  "final_norm": 0.9999999403953552
 }

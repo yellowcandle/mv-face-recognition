@@ -1,13 +1,13 @@
 {
-  "contestant_id": "6",
+  "contestant_id": 6,
   "name": "陳玉幸",
   "nickname": "Hannah",
-  "source_photo": "source/photo/contestants/6/6-1.jpg",
-  "backend": "insightface",
-  "generated_at": "2025-07-24T08:19:00.961826",
   "method": "insightface",
+  "source_photo": "../source/photo/contestants/6/6-1.jpg",
   "dimension": 512,
+  "generated_at": "2025-08-29T17:02:27.098228",
   "normalized": true,
-  "norm_factor": 19.63212013244629,
-  "final_norm": 1.0000001192092896
+  "backend": "insightface",
+  "norm_factor": 18.012758255004883,
+  "final_norm": 1.0
 }
