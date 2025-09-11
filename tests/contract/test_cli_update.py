@@ -29,10 +29,12 @@ def test_cli_update_contestant_photos():
     )
     # Should complete successfully or fail gracefully if no photos found
     assert result.returncode in [0, 1]
-    
+
     output = (result.stdout + result.stderr).lower()
     # Should mention update process
-    assert any(word in output for word in ["update", "contestant", "embedding", "photo"])
+    assert any(
+        word in output for word in ["update", "contestant", "embedding", "photo"]
+    )
 
 
 def test_cli_update_database():
@@ -45,7 +47,7 @@ def test_cli_update_database():
     )
     # Should complete successfully
     assert result.returncode == 0
-    
+
     output = (result.stdout + result.stderr).lower()
     # Should mention database update
     assert any(word in output for word in ["database", "chromadb", "update", "refresh"])
@@ -61,10 +63,12 @@ def test_cli_update_models():
     )
     # Should complete successfully or fail gracefully
     assert result.returncode in [0, 1]
-    
+
     output = (result.stdout + result.stderr).lower()
     # Should mention model update
-    assert any(word in output for word in ["model", "insightface", "update", "download"])
+    assert any(
+        word in output for word in ["model", "insightface", "update", "download"]
+    )
 
 
 def test_cli_update_force_flag():
@@ -90,7 +94,7 @@ def test_cli_update_shows_progress():
     )
     # Should complete or fail gracefully
     assert result.returncode in [0, 1]
-    
+
     if result.returncode == 0:
         # Should show some progress indication
         output = result.stdout.lower()

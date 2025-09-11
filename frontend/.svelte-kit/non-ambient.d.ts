@@ -23,3 +23,24 @@ declare module "svelte/elements" {
 }
 
 export {};
+
+
+declare module "$app/types" {
+	export interface AppTypes {
+		RouteId(): "/" | "/analytics" | "/face-recognition" | "/settings" | "/video-player" | "/video-processing";
+		RouteParams(): {
+			
+		};
+		LayoutParams(): {
+			"/": Record<string, never>;
+			"/analytics": Record<string, never>;
+			"/face-recognition": Record<string, never>;
+			"/settings": Record<string, never>;
+			"/video-player": Record<string, never>;
+			"/video-processing": Record<string, never>
+		};
+		Pathname(): "/" | "/analytics" | "/analytics/" | "/face-recognition" | "/face-recognition/" | "/settings" | "/settings/" | "/video-player" | "/video-player/" | "/video-processing" | "/video-processing/";
+		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
+		Asset(): "/favicon.ico" | string & {};
+	}
+}

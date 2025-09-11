@@ -32,7 +32,9 @@ def load_embeddings():
     """Load embeddings from the gallery directory."""
     logger.info(f"Loading embeddings from: {os.path.abspath(EMBEDDING_DIR)}")
 
-    embedding_files = [f for f in os.listdir(EMBEDDING_DIR) if f.endswith("_embedding.npy")]
+    embedding_files = [
+        f for f in os.listdir(EMBEDDING_DIR) if f.endswith("_embedding.npy")
+    ]
     logger.info(f"Found {len(embedding_files)} embedding files")
 
     gallery_nicknames = []
@@ -73,7 +75,11 @@ def overlay_faces(image, faces, matches, font_path=None):
 
     # Load font or use default if the font file is not available
     try:
-        font = ImageFont.truetype(font_path, FONT_SIZE) if font_path else ImageFont.load_default()
+        font = (
+            ImageFont.truetype(font_path, FONT_SIZE)
+            if font_path
+            else ImageFont.load_default()
+        )
     except Exception as e:
         logger.warning(f"Could not load font: {e}")
         font = ImageFont.load_default()
@@ -124,7 +130,7 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
 
     # Load gallery embeddings
     gallery_embeddings, gallery_nicknames = load_embeddings()
-    gallery_embeddings_np = np.stack(gallery_embeddings)
+    np.stack(gallery_embeddings)
 
     # Initialize detectors and recognizers
     detector = FaceDetector(
@@ -133,7 +139,9 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
 
     # Create two face recognizers with different configurations
     recognizer_original = FaceRecognizer(
-        face_detector=detector, similarity_threshold=threshold_original, use_arcface=True
+        face_detector=detector,
+        similarity_threshold=threshold_original,
+        use_arcface=True,
     )
 
     # The fixed recognizer uses our improved settings from face_recognizer.py
@@ -170,7 +178,11 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
         sorted_sims = sorted(similarities, key=lambda x: x[1], reverse=True)
 
         # Return top N matches above threshold
-        return [(name, sim, idx) for name, sim, idx in sorted_sims[:top_n] if sim >= threshold]
+        return [
+            (name, sim, idx)
+            for name, sim, idx in sorted_sims[:top_n]
+            if sim >= threshold
+        ]
 
     # Detect faces once
     detected_faces = detector.detect_faces(image_rgb)
@@ -240,7 +252,7 @@ def compare_recognition(image_path, threshold_original=0.35, threshold_fixed=0.6
     )
 
     # Create a figure with two subplots for comparison
-    fig = plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(20, 10))
     gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1])
 
     ax0 = plt.subplot(gs[0])
@@ -263,5 +275,7 @@ if __name__ == "__main__":
     compare_recognition(TEST_IMAGE_PATH)
     logger.info("\nKey improvements in face recognition:")
     logger.info("1. Updated normalization values for SFace model to [0.5, 0.5, 0.5]")
-    logger.info("2. Increased similarity threshold from 0.35 to 0.6 for better precision")
+    logger.info(
+        "2. Increased similarity threshold from 0.35 to 0.6 for better precision"
+    )
     logger.info("3. Fixed model-specific parameters based on detected model type")

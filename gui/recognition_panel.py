@@ -297,7 +297,7 @@ class RecognitionPanel(QWidget):
 
         # Calculate final statistics
         processing_time = (datetime.now() - self.processing_start_time).total_seconds()
-        avg_fps = (
+        (
             self.total_frames_processed / processing_time if processing_time > 0 else 0
         )
 

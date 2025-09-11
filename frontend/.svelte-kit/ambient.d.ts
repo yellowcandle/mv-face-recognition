@@ -21,79 +21,78 @@
  * 
  * You can override `.env` values from the command line like so:
  * 
- * ```bash
+ * ```sh
  * MY_FEATURE_FLAG="enabled" npm run dev
  * ```
  */
 declare module '$env/static/private' {
 	export const OP_PLUGIN_ALIASES_SOURCED: string;
-	export const TERM_PROGRAM: string;
+	export const VSCODE_CRASH_REPORTER_PROCESS_TYPE: string;
 	export const NODE: string;
 	export const INIT_CWD: string;
 	export const PYENV_ROOT: string;
-	export const TERM: string;
 	export const SHELL: string;
+	export const VSCODE_PROCESS_TITLE: string;
 	export const HOMEBREW_REPOSITORY: string;
 	export const TMPDIR: string;
 	export const npm_config_global_prefix: string;
-	export const TERM_PROGRAM_VERSION: string;
-	export const ZDOTDIR: string;
 	export const CURSOR_TRACE_ID: string;
-	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
 	export const MallocNanoZone: string;
+	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
+	export const APPLICATIONINSIGHTS_CONFIGURATION_CONTENT: string;
 	export const COLOR: string;
 	export const npm_config_noproxy: string;
 	export const npm_config_local_prefix: string;
-	export const ENABLE_IDE_INTEGRATION: string;
+	export const LC_ALL: string;
 	export const USER: string;
 	export const COMMAND_MODE: string;
 	export const npm_config_globalconfig: string;
-	export const CLAUDE_CODE_SSE_PORT: string;
 	export const SSH_AUTH_SOCK: string;
 	export const __CF_USER_TEXT_ENCODING: string;
 	export const npm_execpath: string;
 	export const GOOGLE_CLOUD_PROJECT: string;
-	export const PYDEVD_DISABLE_FILE_VALIDATION: string;
+	export const POSTHOG_API_KEY: string;
+	export const ELECTRON_RUN_AS_NODE: string;
 	export const PATH: string;
 	export const npm_package_json: string;
 	export const _: string;
 	export const npm_config_userconfig: string;
 	export const npm_config_init_module: string;
-	export const USER_ZDOTDIR: string;
 	export const __CFBundleIdentifier: string;
 	export const npm_command: string;
 	export const PWD: string;
+	export const VSCODE_HANDLES_UNCAUGHT_ERRORS: string;
 	export const npm_lifecycle_event: string;
 	export const EDITOR: string;
+	export const VSCODE_ESM_ENTRYPOINT: string;
 	export const npm_package_name: string;
 	export const LANG: string;
-	export const BUNDLED_DEBUGPY_PATH: string;
 	export const npm_config_npm_version: string;
-	export const VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 	export const XPC_FLAGS: string;
 	export const npm_config_node_gyp: string;
 	export const npm_package_version: string;
 	export const XPC_SERVICE_NAME: string;
-	export const VSCODE_INJECTION: string;
-	export const VSCODE_DEBUGPY_ADAPTER_ENDPOINTS: string;
+	export const HOME: string;
 	export const PYENV_SHELL: string;
 	export const SHLVL: string;
-	export const HOME: string;
-	export const VSCODE_GIT_ASKPASS_MAIN: string;
+	export const APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL: string;
+	export const VSCODE_NLS_CONFIG: string;
 	export const HOMEBREW_PREFIX: string;
 	export const npm_config_cache: string;
 	export const LOGNAME: string;
 	export const npm_lifecycle_script: string;
-	export const VSCODE_GIT_IPC_HANDLE: string;
+	export const VSCODE_CODE_CACHE_PATH: string;
+	export const VSCODE_IPC_HOOK: string;
 	export const BUN_INSTALL: string;
 	export const npm_config_user_agent: string;
-	export const VSCODE_GIT_ASKPASS_NODE: string;
-	export const GIT_ASKPASS: string;
-	export const INFOPATH: string;
+	export const VSCODE_PID: string;
+	export const KILOCODE_POSTHOG_API_KEY: string;
 	export const HOMEBREW_CELLAR: string;
+	export const INFOPATH: string;
+	export const VSCODE_CWD: string;
+	export const VSCODE_L10N_BUNDLE_LOCATION: string;
 	export const npm_node_execpath: string;
 	export const npm_config_prefix: string;
-	export const COLORTERM: string;
 	export const NODE_ENV: string;
 }
 
@@ -115,85 +114,82 @@ declare module '$env/static/public' {
  * 
  * This module cannot be imported into client-side code.
  * 
- * Dynamic environment variables cannot be used during prerendering.
- * 
  * ```ts
  * import { env } from '$env/dynamic/private';
  * console.log(env.DEPLOYMENT_SPECIFIC_VARIABLE);
  * ```
  * 
- * > In `dev`, `$env/dynamic` always includes environment variables from `.env`. In `prod`, this behavior will depend on your adapter.
+ * > [!NOTE] In `dev`, `$env/dynamic` always includes environment variables from `.env`. In `prod`, this behavior will depend on your adapter.
  */
 declare module '$env/dynamic/private' {
 	export const env: {
 		OP_PLUGIN_ALIASES_SOURCED: string;
-		TERM_PROGRAM: string;
+		VSCODE_CRASH_REPORTER_PROCESS_TYPE: string;
 		NODE: string;
 		INIT_CWD: string;
 		PYENV_ROOT: string;
-		TERM: string;
 		SHELL: string;
+		VSCODE_PROCESS_TITLE: string;
 		HOMEBREW_REPOSITORY: string;
 		TMPDIR: string;
 		npm_config_global_prefix: string;
-		TERM_PROGRAM_VERSION: string;
-		ZDOTDIR: string;
 		CURSOR_TRACE_ID: string;
-		ORIGINAL_XDG_CURRENT_DESKTOP: string;
 		MallocNanoZone: string;
+		ORIGINAL_XDG_CURRENT_DESKTOP: string;
+		APPLICATIONINSIGHTS_CONFIGURATION_CONTENT: string;
 		COLOR: string;
 		npm_config_noproxy: string;
 		npm_config_local_prefix: string;
-		ENABLE_IDE_INTEGRATION: string;
+		LC_ALL: string;
 		USER: string;
 		COMMAND_MODE: string;
 		npm_config_globalconfig: string;
-		CLAUDE_CODE_SSE_PORT: string;
 		SSH_AUTH_SOCK: string;
 		__CF_USER_TEXT_ENCODING: string;
 		npm_execpath: string;
 		GOOGLE_CLOUD_PROJECT: string;
-		PYDEVD_DISABLE_FILE_VALIDATION: string;
+		POSTHOG_API_KEY: string;
+		ELECTRON_RUN_AS_NODE: string;
 		PATH: string;
 		npm_package_json: string;
 		_: string;
 		npm_config_userconfig: string;
 		npm_config_init_module: string;
-		USER_ZDOTDIR: string;
 		__CFBundleIdentifier: string;
 		npm_command: string;
 		PWD: string;
+		VSCODE_HANDLES_UNCAUGHT_ERRORS: string;
 		npm_lifecycle_event: string;
 		EDITOR: string;
+		VSCODE_ESM_ENTRYPOINT: string;
 		npm_package_name: string;
 		LANG: string;
-		BUNDLED_DEBUGPY_PATH: string;
 		npm_config_npm_version: string;
-		VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 		XPC_FLAGS: string;
 		npm_config_node_gyp: string;
 		npm_package_version: string;
 		XPC_SERVICE_NAME: string;
-		VSCODE_INJECTION: string;
-		VSCODE_DEBUGPY_ADAPTER_ENDPOINTS: string;
+		HOME: string;
 		PYENV_SHELL: string;
 		SHLVL: string;
-		HOME: string;
-		VSCODE_GIT_ASKPASS_MAIN: string;
+		APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL: string;
+		VSCODE_NLS_CONFIG: string;
 		HOMEBREW_PREFIX: string;
 		npm_config_cache: string;
 		LOGNAME: string;
 		npm_lifecycle_script: string;
-		VSCODE_GIT_IPC_HANDLE: string;
+		VSCODE_CODE_CACHE_PATH: string;
+		VSCODE_IPC_HOOK: string;
 		BUN_INSTALL: string;
 		npm_config_user_agent: string;
-		VSCODE_GIT_ASKPASS_NODE: string;
-		GIT_ASKPASS: string;
-		INFOPATH: string;
+		VSCODE_PID: string;
+		KILOCODE_POSTHOG_API_KEY: string;
 		HOMEBREW_CELLAR: string;
+		INFOPATH: string;
+		VSCODE_CWD: string;
+		VSCODE_L10N_BUNDLE_LOCATION: string;
 		npm_node_execpath: string;
 		npm_config_prefix: string;
-		COLORTERM: string;
 		NODE_ENV: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
@@ -204,8 +200,6 @@ declare module '$env/dynamic/private' {
  * Similar to [`$env/dynamic/private`](https://svelte.dev/docs/kit/$env-dynamic-private), but only includes variables that begin with [`config.kit.env.publicPrefix`](https://svelte.dev/docs/kit/configuration#env) (which defaults to `PUBLIC_`), and can therefore safely be exposed to client-side code.
  * 
  * Note that public dynamic environment variables must all be sent from the server to the client, causing larger network requests — when possible, use `$env/static/public` instead.
- * 
- * Dynamic environment variables cannot be used during prerendering.
  * 
  * ```ts
  * import { env } from '$env/dynamic/public';

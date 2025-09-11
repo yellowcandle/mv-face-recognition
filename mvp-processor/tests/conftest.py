@@ -15,9 +15,13 @@ from unittest.mock import Mock, patch
 try:
     import boto3  # type: ignore
 except Exception:
+
     class _DummyClient:
-        def __init__(self, *args, **kwargs): pass
-        def create_bucket(self, Bucket=None, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def create_bucket(self, Bucket=None, *args, **kwargs):
+            pass
 
     class _DummyBoto3:
         def client(self, service_name, *args, **kwargs):

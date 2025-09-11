@@ -10,7 +10,9 @@ import tqdm
 from src.core.detector import FaceDetector  # Import the centralized detector
 
 # Suppress the specific FutureWarning from numpy.linalg.lstsq
-warnings.filterwarnings("ignore", category=FutureWarning, module="insightface.utils.transform")
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, module="insightface.utils.transform"
+)
 
 # Get the absolute path of the current script
 current_script_path = os.path.abspath(__file__)
@@ -41,7 +43,8 @@ def face_exists(img_path):
         detected_faces = [
             face
             for face in raw_detected_faces
-            if hasattr(face, "det_score") and face.det_score >= DETECTION_SCORE_THRESHOLD
+            if hasattr(face, "det_score")
+            and face.det_score >= DETECTION_SCORE_THRESHOLD
         ]
         return len(detected_faces) > 0
     except Exception as e:
@@ -95,12 +98,14 @@ def verify_faces_in_folder(folder_path):
         detected_faces1 = [
             face
             for face in raw_detected_faces1
-            if hasattr(face, "det_score") and face.det_score >= DETECTION_SCORE_THRESHOLD
+            if hasattr(face, "det_score")
+            and face.det_score >= DETECTION_SCORE_THRESHOLD
         ]
         detected_faces2 = [
             face
             for face in raw_detected_faces2
-            if hasattr(face, "det_score") and face.det_score >= DETECTION_SCORE_THRESHOLD
+            if hasattr(face, "det_score")
+            and face.det_score >= DETECTION_SCORE_THRESHOLD
         ]
 
         face1_exists = len(detected_faces1) > 0
@@ -145,7 +150,9 @@ def main():
     for folder_num in tqdm.tqdm(range(1, 97), desc="Processing folders"):
         folder_path = os.path.join(base_dir, str(folder_num))
         if os.path.exists(folder_path):
-            is_same_person, face1_exists, face2_exists, error = verify_faces_in_folder(folder_path)
+            is_same_person, face1_exists, face2_exists, error = verify_faces_in_folder(
+                folder_path
+            )
 
             if error:
                 print(f"Folder {folder_num}: Error - {error}")

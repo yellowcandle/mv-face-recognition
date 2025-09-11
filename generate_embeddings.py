@@ -25,9 +25,7 @@ def find_contestant_photos(contestants_dir, contestant_id):
             found_photos = glob.glob(photo_pattern)
             if found_photos:
                 photos.extend(found_photos)
-    if (
-        not photos
-    ):  # Fallback: if no photos found with <ID>-<index>.jpg, try <ID>.jpg directly in subdirs
+    if not photos:  # Fallback: if no photos found with <ID>-<index>.jpg, try <ID>.jpg directly in subdirs
         for dir_path in glob.glob(os.path.join(contestants_dir, "*")):
             if os.path.isdir(dir_path):
                 photo_path = os.path.join(dir_path, f"{contestant_id}.jpg")
@@ -71,7 +69,9 @@ def main():
     )
 
     # Define the central directory for saving all embeddings
-    embeddings_save_dir = os.path.join(project_root, "source", "photo", "contestants", "embeddings")
+    embeddings_save_dir = os.path.join(
+        project_root, "source", "photo", "contestants", "embeddings"
+    )
     os.makedirs(embeddings_save_dir, exist_ok=True)
     print(f"[INFO] Embeddings will be saved to: {embeddings_save_dir}")
 
@@ -113,14 +113,20 @@ def main():
                 elif hasattr(first_face_data, "bbox"):  # InsightFaceObject
                     bbox_to_extract = first_face_data.bbox.astype(int).tolist()
                 else:
-                    print(f"Unknown face detection result type for {nickname} in {photo_path}")
+                    print(
+                        f"Unknown face detection result type for {nickname} in {photo_path}"
+                    )
                     continue  # Skip this photo if face data is not understandable
 
                 if bbox_to_extract is None:
-                    print(f"Could not determine bounding box for {nickname} from {photo_path}")
+                    print(
+                        f"Could not determine bounding box for {nickname} from {photo_path}"
+                    )
                     continue
 
-                face_img = face_detector.extract_face(image, bbox_to_extract, padding=0.1)
+                face_img = face_detector.extract_face(
+                    image, bbox_to_extract, padding=0.1
+                )
 
                 if face_img is not None:
                     # Always use the face_recognizer's _get_embedding method to ensure consistency
@@ -138,7 +144,9 @@ def main():
                 if current_embedding is not None and current_embedding.size > 0:
                     embeddings.append(current_embedding)
                 else:
-                    print(f"Failed to compute embedding for {nickname} from {photo_path}")
+                    print(
+                        f"Failed to compute embedding for {nickname} from {photo_path}"
+                    )
 
             except Exception as e:
                 print(f"Error processing photo {photo_path} for {nickname}: {str(e)}")

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Global service instances
 # face_recognition_service: FaceRecognitionService = None
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
@@ -28,12 +29,13 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down backend services...")
 
+
 # Create FastAPI app
 app = FastAPI(
     title="MV Face Recognition API",
     description="Backend API for MV Face Recognition system",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -43,7 +45,7 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Include API routes
@@ -52,6 +54,7 @@ from app.api.routes import videos, health
 # Include API routes
 app.include_router(videos.router, prefix="/api")
 app.include_router(health.router)
+
 
 # Basic system status endpoint
 @app.get("/api/system/status/")
@@ -63,10 +66,11 @@ async def get_system_status():
         "services_running": True,
         "video_count": 10,
         "contestant_count": 95,
-        "processing_jobs": 0
+        "processing_jobs": 0,
     }
 
-# Basic videos endpoint  
+
+# Basic videos endpoint
 @app.get("/api/videos/")
 async def get_videos():
     """Get list of videos."""
@@ -83,10 +87,10 @@ async def get_videos():
             "width": 1920,
             "height": 1080,
             "frame_count": 6300,
-            "created_at": "2024-06-20T10:00:00Z"
+            "created_at": "2024-06-20T10:00:00Z",
         },
         {
-            "id": "2", 
+            "id": "2",
             "name": "《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅",
             "filename": "2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅.mp4",
             "path": "/source/videos/2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅.mp4",
@@ -96,9 +100,10 @@ async def get_videos():
             "width": 1920,
             "height": 1080,
             "frame_count": 5850,
-            "created_at": "2024-06-20T11:00:00Z"
-        }
+            "created_at": "2024-06-20T11:00:00Z",
+        },
     ]
+
 
 # Basic contestants endpoint
 @app.get("/api/contestants/")
@@ -111,20 +116,22 @@ async def get_contestants():
             "embedding_available": True,
             "face_count": 15,
             "created_at": "2024-06-20T10:00:00Z",
-            "updated_at": "2024-06-20T12:00:00Z"
+            "updated_at": "2024-06-20T12:00:00Z",
         },
         {
-            "id": "002", 
+            "id": "002",
             "name": "參賽者002",
             "embedding_available": True,
             "face_count": 12,
             "created_at": "2024-06-20T10:00:00Z",
-            "updated_at": "2024-06-20T12:00:00Z"
-        }
+            "updated_at": "2024-06-20T12:00:00Z",
+        },
     ]
+
 
 # Serve static files (for video downloads, etc.)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 async def root():
@@ -132,8 +139,9 @@ async def root():
     return {
         "message": "MV Face Recognition API",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
     }
+
 
 @app.get("/health")
 async def health_check():
@@ -144,15 +152,10 @@ async def health_check():
         "services": {
             "database": True,
             "face_detection": True,
-            "video_processing": True
-        }
+            "video_processing": True,
+        },
     }
 
+
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

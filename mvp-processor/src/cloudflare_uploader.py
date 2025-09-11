@@ -127,7 +127,7 @@ class CloudflareUploader:
 
     def _upload_thumbnail(self, thumbnail_path: str, video_info: Dict):
         """Upload video thumbnail to R2"""
-        thumbnail_file = Path(thumbnail_path)
+        Path(thumbnail_path)
         video_name = video_info["processed_name"]
         s3_key = f"videos/thumbnails/{video_name}_thumbnail.jpg"
 

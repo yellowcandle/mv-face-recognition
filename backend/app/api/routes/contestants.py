@@ -18,20 +18,22 @@ def get_contestant_service():
 
 @router.get("/contestants/", response_model=List[Contestant])
 async def list_contestants(
-    contestant_service: ContestantService = Depends(get_contestant_service)
+    contestant_service: ContestantService = Depends(get_contestant_service),
 ):
     """Get list of all contestants."""
     try:
         contestants = await contestant_service.get_all_contestants()
         return contestants
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list contestants: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list contestants: {str(e)}"
+        )
 
 
 @router.get("/contestants/{contestant_id}/", response_model=Contestant)
 async def get_contestant(
     contestant_id: str,
-    contestant_service: ContestantService = Depends(get_contestant_service)
+    contestant_service: ContestantService = Depends(get_contestant_service),
 ):
     """Get detailed information about a specific contestant."""
     try:
@@ -42,13 +44,15 @@ async def get_contestant(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get contestant: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get contestant: {str(e)}"
+        )
 
 
 @router.get("/contestants/{contestant_id}/photos/")
 async def get_contestant_photos(
     contestant_id: str,
-    contestant_service: ContestantService = Depends(get_contestant_service)
+    contestant_service: ContestantService = Depends(get_contestant_service),
 ):
     """Get contestant photo URLs."""
     try:
@@ -64,7 +68,7 @@ async def get_contestant_photos(
 
 @router.post("/contestants/refresh-embeddings/")
 async def refresh_embeddings(
-    contestant_service: ContestantService = Depends(get_contestant_service)
+    contestant_service: ContestantService = Depends(get_contestant_service),
 ):
     """Refresh face embeddings for all contestants."""
     try:
@@ -72,15 +76,17 @@ async def refresh_embeddings(
         return {
             "message": "Embeddings refreshed successfully",
             "processed_contestants": result["processed"],
-            "errors": result["errors"]
+            "errors": result["errors"],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to refresh embeddings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to refresh embeddings: {str(e)}"
+        )
 
 
 @router.get("/contestants/stats/")
 async def get_contestant_stats(
-    contestant_service: ContestantService = Depends(get_contestant_service)
+    contestant_service: ContestantService = Depends(get_contestant_service),
 ):
     """Get overall contestant statistics."""
     try:

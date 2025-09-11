@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 class VideoProcessingPipeline:
     """Main video processing pipeline"""
 
-    def __init__(self, config_path: str, enable_upload: bool = True, local_only: bool = False):
+    def __init__(
+        self, config_path: str, enable_upload: bool = True, local_only: bool = False
+    ):
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
@@ -59,34 +61,34 @@ class VideoProcessingPipeline:
     def setup_output_dirs(self):
         """Create output directories"""
         output_config = self.config["output"]
-        
+
         if self.local_only or output_config.get("local_mode", {}).get("enabled", False):
             # Use local-only directories
             local_config = output_config["local_mode"]
-            
+
             # Create base output directory
             base_dir = Path(local_config["base_output_dir"])
             base_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Create all local output directories
             local_dirs = [
                 "processed_videos_dir",
-                "thumbnails_dir", 
+                "thumbnails_dir",
                 "metadata_dir",
                 "galleries_dir",
-                "clips_dir"
+                "clips_dir",
             ]
-            
+
             for dir_key in local_dirs:
                 if dir_key in local_config:
                     Path(local_config[dir_key]).mkdir(parents=True, exist_ok=True)
-            
+
             # Update config to use local directories
             output_config["processed_dir"] = local_config["processed_videos_dir"]
             output_config["thumbnails_dir"] = local_config["thumbnails_dir"]
             output_config["metadata_dir"] = local_config["metadata_dir"]
             output_config["galleries_dir"] = local_config["galleries_dir"]
-            
+
             logger.info(f"Local-only mode: Using output directory {base_dir}")
         else:
             # Use standard directories
@@ -107,7 +109,9 @@ class VideoProcessingPipeline:
             f"Database ready with {len(self.contestant_db.face_encodings)} contestants"
         )
 
-    def process_video(self, video_path: Path, output_name: Optional[str] = None) -> Dict:
+    def process_video(
+        self, video_path: Path, output_name: Optional[str] = None
+    ) -> Dict:
         """
         Process a single video through the complete pipeline
 
@@ -258,10 +262,10 @@ class VideoProcessingPipeline:
         """Save gallery data to local file"""
         galleries_dir = Path(self.config["output"]["galleries_dir"])
         gallery_path = galleries_dir / f"{output_name}_gallery.json"
-        
+
         with open(gallery_path, "w", encoding="utf-8") as f:
             json.dump(gallery_data, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Gallery data saved to: {gallery_path}")
 
     def upload_to_cloudflare(self, upload_package: Dict, upload_videos: bool = True):
@@ -282,7 +286,11 @@ class VideoProcessingPipeline:
     "--output-name", "-o", help="Custom output name (default: video filename)"
 )
 @click.option("--no-upload", is_flag=True, help="Skip Cloudflare upload")
-@click.option("--local-only", is_flag=True, help="Run in local-only mode without any cloud dependencies")
+@click.option(
+    "--local-only",
+    is_flag=True,
+    help="Run in local-only mode without any cloud dependencies",
+)
 @click.option("--output-dir", help="Custom base output directory for local-only mode")
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
@@ -306,38 +314,51 @@ def main(
         video_path = Path(input)
         if not video_path.exists():
             raise FileNotFoundError(f"Video file not found: {input}")
-        if video_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
+        if video_path.suffix.lower() not in [".mp4", ".avi", ".mov", ".mkv"]:
             raise ValueError(f"Unsupported video format: {video_path.suffix}")
 
         # Load and modify configuration if custom output directory is specified
         temp_config_path = None
-        original_config = config
-        
+
         if output_dir and local_only:
             with open(config, "r") as f:
                 config_data = yaml.safe_load(f)
-            
+
             # Update local mode configuration with custom output directory
             base_output_dir = Path(output_dir).resolve()
-            config_data["output"]["local_mode"]["base_output_dir"] = str(base_output_dir)
-            config_data["output"]["local_mode"]["processed_videos_dir"] = str(base_output_dir / "processed_videos")
-            config_data["output"]["local_mode"]["thumbnails_dir"] = str(base_output_dir / "thumbnails")
-            config_data["output"]["local_mode"]["metadata_dir"] = str(base_output_dir / "metadata")
-            config_data["output"]["local_mode"]["galleries_dir"] = str(base_output_dir / "galleries")
-            config_data["output"]["local_mode"]["clips_dir"] = str(base_output_dir / "clips")
-            
+            config_data["output"]["local_mode"]["base_output_dir"] = str(
+                base_output_dir
+            )
+            config_data["output"]["local_mode"]["processed_videos_dir"] = str(
+                base_output_dir / "processed_videos"
+            )
+            config_data["output"]["local_mode"]["thumbnails_dir"] = str(
+                base_output_dir / "thumbnails"
+            )
+            config_data["output"]["local_mode"]["metadata_dir"] = str(
+                base_output_dir / "metadata"
+            )
+            config_data["output"]["local_mode"]["galleries_dir"] = str(
+                base_output_dir / "galleries"
+            )
+            config_data["output"]["local_mode"]["clips_dir"] = str(
+                base_output_dir / "clips"
+            )
+
             # Write temporary config file
             temp_config_path = Path(config).parent / "temp_processing_config.yaml"
             with open(temp_config_path, "w") as f:
                 yaml.dump(config_data, f, default_flow_style=False)
             config = str(temp_config_path)
-            
+
             logger.info(f"Using custom output directory: {base_output_dir}")
 
         try:
             # Initialize pipeline
             enable_upload = not (no_upload or local_only)
-            pipeline = VideoProcessingPipeline(config, enable_upload=enable_upload, local_only=local_only)
+            pipeline = VideoProcessingPipeline(
+                config, enable_upload=enable_upload, local_only=local_only
+            )
 
             # Initialize contestant database
             pipeline.initialize_database(force_rebuild=rebuild_db)
@@ -370,8 +391,12 @@ def main(
             # Output location information
             if local_only:
                 local_config = pipeline.config["output"]["local_mode"]
-                print(f"   📁  Local output saved to: {local_config['base_output_dir']}")
-                print(f"   📹  Processed videos: {local_config['processed_videos_dir']}")
+                print(
+                    f"   📁  Local output saved to: {local_config['base_output_dir']}"
+                )
+                print(
+                    f"   📹  Processed videos: {local_config['processed_videos_dir']}"
+                )
                 print(f"   🖼️  Thumbnails: {local_config['thumbnails_dir']}")
                 print(f"   📄  Metadata: {local_config['metadata_dir']}")
                 print(f"   🎭  Galleries: {local_config['galleries_dir']}")

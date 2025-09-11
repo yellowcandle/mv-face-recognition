@@ -11,13 +11,19 @@ fixed_results_path = "source/images/test/result_fixed_1_arcface_True_thresh_0.6.
 
 # Load the images
 expected_img = (
-    np.array(Image.open(original_image_path)) if os.path.exists(original_image_path) else None
+    np.array(Image.open(original_image_path))
+    if os.path.exists(original_image_path)
+    else None
 )
 original_result = (
-    np.array(Image.open(original_results_path)) if os.path.exists(original_results_path) else None
+    np.array(Image.open(original_results_path))
+    if os.path.exists(original_results_path)
+    else None
 )
 fixed_result = (
-    np.array(Image.open(fixed_results_path)) if os.path.exists(fixed_results_path) else None
+    np.array(Image.open(fixed_results_path))
+    if os.path.exists(fixed_results_path)
+    else None
 )
 
 # Create the comparison visualization
@@ -70,7 +76,9 @@ print("\nTo improve face recognition for this application:")
 print(
     "1. Update the normalization values in FaceRecognizer._get_embedding() to use [0.5, 0.5, 0.5] for SFace"
 )
-print("2. Increase the similarity_threshold parameter to 0.6 when initializing FaceRecognizer")
+print(
+    "2. Increase the similarity_threshold parameter to 0.6 when initializing FaceRecognizer"
+)
 print(
     "3. Consider re-computing the embeddings for the contestant gallery with the corrected normalization"
 )

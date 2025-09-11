@@ -50,7 +50,9 @@ def generate_mp4s():
         print(f"Processing frames for video: {video_dir}")
 
         # Get all frame paths for the current video
-        frame_paths = sorted(glob.glob(os.path.join(output_frames_dir, video_dir, "*.jpg")))
+        frame_paths = sorted(
+            glob.glob(os.path.join(output_frames_dir, video_dir, "*.jpg"))
+        )
 
         if frame_paths:
             # Create MP4 for this video

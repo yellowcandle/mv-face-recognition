@@ -28,9 +28,17 @@ class ChromaDBManager:
                 self.config = json.load(f)
 
         # Handle different config key structures
-        self.chroma_path = self.config.get("database", {}).get("chromadb_path", self.config.get("paths", {}).get("chroma_db_path", ".chroma_db"))
-        self.contestants_dir = self.config.get("paths", {}).get("contestant_photos", "source/photos/contestants")
-        self.similarity_threshold = self.config.get("face_recognition", {}).get("similarity_threshold", self.config.get("face_matching", {}).get("similarity_threshold", 0.6))
+        self.chroma_path = self.config.get("database", {}).get(
+            "chromadb_path",
+            self.config.get("paths", {}).get("chroma_db_path", ".chroma_db"),
+        )
+        self.contestants_dir = self.config.get("paths", {}).get(
+            "contestant_photos", "source/photos/contestants"
+        )
+        self.similarity_threshold = self.config.get("face_recognition", {}).get(
+            "similarity_threshold",
+            self.config.get("face_matching", {}).get("similarity_threshold", 0.6),
+        )
 
         # Ensure ChromaDB directory exists
         os.makedirs(self.chroma_path, exist_ok=True)

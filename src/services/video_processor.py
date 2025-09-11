@@ -4,7 +4,7 @@ Video processing service for face recognition in MV videos.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 
 
 class VideoProcessor:
@@ -27,6 +27,7 @@ class VideoProcessor:
         """
         return video_input
 
+
 def load_model(model_name: str = "default") -> str:
     """
     Placeholder loader for the video processor model.
@@ -34,5 +35,6 @@ def load_model(model_name: str = "default") -> str:
     Returns the model name as a stand-in for a loaded model handle.
     """
     return model_name
+
 
 __all__ = ["VideoProcessor", "load_model"]

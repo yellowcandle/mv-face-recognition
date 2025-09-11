@@ -9,6 +9,7 @@ from src.ui.shared_components import show_final_summary
 
 logger = logging.getLogger(__name__)
 
+
 def video_processing_page():
     """Video processing interface."""
     st.header("Video Processing")
@@ -45,7 +46,9 @@ def video_processing_page():
             with st.expander("Video Information", expanded=True):
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Duration", video_info.get("duration_formatted", "Unknown"))
+                    st.metric(
+                        "Duration", video_info.get("duration_formatted", "Unknown")
+                    )
                     st.metric("FPS", f"{video_info.get('fps', 0):.1f}")
                 with col2:
                     st.metric(
@@ -54,7 +57,9 @@ def video_processing_page():
                     )
                     st.metric("Total Frames", f"{video_info.get('frame_count', 0):,}")
                 with col3:
-                    st.metric("File Size", f"{video_info.get('file_size_mb', 0):.1f} MB")
+                    st.metric(
+                        "File Size", f"{video_info.get('file_size_mb', 0):.1f} MB"
+                    )
 
             # Processing options
             st.subheader("Processing Range")
@@ -203,7 +208,7 @@ def process_video_realtime(
     with preview_col:
         st.markdown("**Live Preview**")
         frame_placeholder = st.empty()
-        progress_placeholder = st.empty()
+        st.empty()
 
     with stats_col:
         st.markdown("**Live Statistics**")

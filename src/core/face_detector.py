@@ -7,11 +7,11 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Any
 
-import numpy as np
 
 # Attempt to import InsightFace; provide a safe mock fallback if unavailable
 try:
     from insightface.app import FaceAnalysis  # type: ignore
+
     INSIGHTFACE_AVAILABLE = True
 except Exception:
     FaceAnalysis = None  # type: ignore
@@ -26,8 +26,10 @@ logger = logging.getLogger(__name__)
 # Backend abstractions
 # --------------------------------------------------------------------------------------------
 
+
 class DetectorBackend:
     """Abstract detector backend interface."""
+
     def __init__(self, model_name: str = "default"):
         self.model_name = model_name
 
@@ -39,8 +41,10 @@ class DetectorBackend:
         """Detect faces in an image. Subclasses provide concrete implementations."""
         return []
 
+
 class InsightFaceBackend(DetectorBackend):
     """Detector backend backed by InsightFace (if available)."""
+
     def __init__(self, model_name: str = "default"):
         super().__init__(model_name)
         self._analysis: Optional[object] = None
@@ -95,28 +99,38 @@ class InsightFaceBackend(DetectorBackend):
                 bbox_data = r.get("bbox")
 
             if isinstance(bbox_data, (list, tuple)) and len(bbox_data) >= 4:
-                bb = BoundingBox(int(bbox_data[0]), int(bbox_data[1]),
-                                 int(bbox_data[2]), int(bbox_data[3]))
+                bb = BoundingBox(
+                    int(bbox_data[0]),
+                    int(bbox_data[1]),
+                    int(bbox_data[2]),
+                    int(bbox_data[3]),
+                )
             else:
                 bb = BoundingBox(0, 0, 1, 1, 0.0)
 
             conf = float(r.get("score", 0.0)) if isinstance(r, dict) else 0.0
             embedding = r.get("embedding") if isinstance(r, dict) else None
 
-            faces_out.append(DetectedFace(bbox=bb, embedding=embedding, match_confidence=conf))
+            faces_out.append(
+                DetectedFace(bbox=bb, embedding=embedding, match_confidence=conf)
+            )
 
         return faces_out
 
+
 class MockBackend(DetectorBackend):
     """Deterministic mock backend used when a real detector is unavailable."""
+
     def detect(self, image: Any) -> List[DetectedFace]:
         bb = BoundingBox(0, 0, 1, 1, 0.99)
         df = DetectedFace(bbox=bb, embedding=None, confidence=0.99)
         return [df]
 
+
 # --------------------------------------------------------------------------------------------
 # Public face detector
 # --------------------------------------------------------------------------------------------
+
 
 class FaceDetector:
     """
@@ -125,6 +139,7 @@ class FaceDetector:
     If InsightFace is available, a real detector path is used; otherwise a deterministic mock
     is returned to keep the pipeline functional for tests and integration.
     """
+
     def __init__(self, model_name: str = "default"):
         self.model_name = model_name
         self._backend: Optional[DetectorBackend] = None
@@ -144,6 +159,7 @@ class FaceDetector:
             self._ensure_backend()
         return self._backend.detect(image)
 
+
 def load_model(model_name: str = "default") -> str:
     """
     Placeholder loader for the detector model.
@@ -152,4 +168,11 @@ def load_model(model_name: str = "default") -> str:
     """
     return model_name
 
-__all__ = ["FaceDetector", "load_model", "DetectorBackend", "InsightFaceBackend", "MockBackend"]
+
+__all__ = [
+    "FaceDetector",
+    "load_model",
+    "DetectorBackend",
+    "InsightFaceBackend",
+    "MockBackend",
+]

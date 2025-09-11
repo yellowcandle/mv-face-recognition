@@ -39,7 +39,7 @@ def test_cli_process_validates_input_format():
     """Test that process command validates video format (MP4 required)."""
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp_file:
         tmp_path = Path(tmp_file.name)
-    
+
     try:
         result = subprocess.run(
             [sys.executable, "-m", "src.cli.main", "process", str(tmp_path)],

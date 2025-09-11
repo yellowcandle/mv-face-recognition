@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from pathlib import Path
 from enum import Enum
 
@@ -27,7 +27,7 @@ class TaskPriority(Enum):
 
 class Task:
     """Individual task representation"""
-    
+
     def __init__(
         self,
         task_id: str,
@@ -36,7 +36,7 @@ class Task:
         priority: TaskPriority = TaskPriority.MEDIUM,
         status: TaskStatus = TaskStatus.PENDING,
         dependencies: List[str] = None,
-        metadata: Dict[str, Any] = None
+        metadata: Dict[str, Any] = None,
     ):
         self.task_id = task_id
         self.name = name
@@ -59,7 +59,9 @@ class Task:
             logger.info(f"Task '{self.name}' (ID: {self.task_id}) activated")
             return True
         else:
-            logger.warning(f"Cannot activate task '{self.name}' - current status: {self.status.value}")
+            logger.warning(
+                f"Cannot activate task '{self.name}' - current status: {self.status.value}"
+            )
             return False
 
     def complete(self, result: Dict[str, Any] = None):
@@ -73,7 +75,9 @@ class Task:
             logger.info(f"Task '{self.name}' (ID: {self.task_id}) completed")
             return True
         else:
-            logger.warning(f"Cannot complete task '{self.name}' - current status: {self.status.value}")
+            logger.warning(
+                f"Cannot complete task '{self.name}' - current status: {self.status.value}"
+            )
             return False
 
     def fail(self, error: str = ""):
@@ -104,12 +108,16 @@ class Task:
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "activated_at": self.activated_at.isoformat() if self.activated_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None
+            "activated_at": self.activated_at.isoformat()
+            if self.activated_at
+            else None,
+            "completed_at": self.completed_at.isoformat()
+            if self.completed_at
+            else None,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Task':
+    def from_dict(cls, data: Dict[str, Any]) -> "Task":
         """Create task from dictionary"""
         task = cls(
             task_id=data["task_id"],
@@ -118,7 +126,7 @@ class Task:
             priority=TaskPriority(data["priority"]),
             status=TaskStatus(data["status"]),
             dependencies=data["dependencies"],
-            metadata=data["metadata"]
+            metadata=data["metadata"],
         )
         task.created_at = datetime.fromisoformat(data["created_at"])
         task.updated_at = datetime.fromisoformat(data["updated_at"])
@@ -131,7 +139,7 @@ class Task:
 
 class TaskManager:
     """Task management system"""
-    
+
     def __init__(self, storage_path: str = ".serena/tasks.json"):
         self.storage_path = Path(storage_path)
         self.tasks: Dict[str, Task] = {}
@@ -142,7 +150,7 @@ class TaskManager:
         """Load tasks from storage"""
         if self.storage_path.exists():
             try:
-                with open(self.storage_path, 'r') as f:
+                with open(self.storage_path, "r") as f:
                     data = json.load(f)
                     for task_data in data.get("tasks", []):
                         task = Task.from_dict(task_data)
@@ -159,9 +167,9 @@ class TaskManager:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "tasks": [task.to_dict() for task in self.tasks.values()],
-                "saved_at": datetime.now().isoformat()
+                "saved_at": datetime.now().isoformat(),
             }
-            with open(self.storage_path, 'w') as f:
+            with open(self.storage_path, "w") as f:
                 json.dump(data, f, indent=2)
             logger.debug(f"Saved {len(self.tasks)} tasks to storage")
         except Exception as e:
@@ -173,7 +181,7 @@ class TaskManager:
         description: str = "",
         priority: TaskPriority = TaskPriority.MEDIUM,
         dependencies: List[str] = None,
-        metadata: Dict[str, Any] = None
+        metadata: Dict[str, Any] = None,
     ) -> str:
         """Create a new task"""
         task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.tasks)}"
@@ -183,7 +191,7 @@ class TaskManager:
             description=description,
             priority=priority,
             dependencies=dependencies or [],
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
         self.tasks[task_id] = task
         self.save_tasks()
@@ -195,27 +203,31 @@ class TaskManager:
         if task_id not in self.tasks:
             logger.error(f"Task ID '{task_id}' not found")
             return False
-        
+
         task = self.tasks[task_id]
-        
+
         # Check dependencies
         for dep_id in task.dependencies:
             if dep_id in self.tasks:
                 dep_task = self.tasks[dep_id]
                 if dep_task.status != TaskStatus.COMPLETED:
-                    logger.warning(f"Cannot activate task '{task.name}' - dependency '{dep_task.name}' not completed")
+                    logger.warning(
+                        f"Cannot activate task '{task.name}' - dependency '{dep_task.name}' not completed"
+                    )
                     return False
-        
+
         if task.activate():
             self.active_tasks[task_id] = task
             self.save_tasks()
             return True
         return False
 
-    def activate_tasks(self, task_ids: List[str] = None, filters: Dict[str, Any] = None) -> List[str]:
+    def activate_tasks(
+        self, task_ids: List[str] = None, filters: Dict[str, Any] = None
+    ) -> List[str]:
         """Activate multiple tasks"""
         activated = []
-        
+
         if task_ids:
             # Activate specific tasks
             for task_id in task_ids:
@@ -233,7 +245,7 @@ class TaskManager:
                 if task.status == TaskStatus.PENDING and not task.dependencies:
                     if self.activate_task(task.task_id):
                         activated.append(task.task_id)
-        
+
         logger.info(f"Activated {len(activated)} tasks")
         return activated
 
@@ -242,7 +254,7 @@ class TaskManager:
         if task_id not in self.tasks:
             logger.error(f"Task ID '{task_id}' not found")
             return False
-        
+
         task = self.tasks[task_id]
         if task.complete(result):
             if task_id in self.active_tasks:
@@ -255,7 +267,9 @@ class TaskManager:
         """Get all active tasks"""
         return list(self.active_tasks.values())
 
-    def get_tasks(self, status: TaskStatus = None, priority: TaskPriority = None) -> List[Task]:
+    def get_tasks(
+        self, status: TaskStatus = None, priority: TaskPriority = None
+    ) -> List[Task]:
         """Get tasks with optional filtering"""
         tasks = list(self.tasks.values())
         if status:

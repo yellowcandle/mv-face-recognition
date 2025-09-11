@@ -3,6 +3,7 @@ import json
 from src.services.video_processor import VideoProcessor
 from src.database.chroma_setup import ChromaDBManager
 
+
 def configuration_page():
     """Configuration management."""
     st.header("Configuration")

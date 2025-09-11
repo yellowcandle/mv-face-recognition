@@ -24,10 +24,14 @@ class FaceMatcher:
             with open(config_path, "r") as f:
                 self.config = json.load(f)
 
-        self.similarity_threshold = self.config.get("face_matching", {}).get("similarity_threshold",
-                                   self.config.get("face_recognition", {}).get("similarity_threshold", 0.6))
-        self.max_results = self.config.get("face_matching", {}).get("max_results",
-                          self.config.get("face_recognition", {}).get("max_faces_per_frame", 50))
+        self.similarity_threshold = self.config.get("face_matching", {}).get(
+            "similarity_threshold",
+            self.config.get("face_recognition", {}).get("similarity_threshold", 0.6),
+        )
+        self.max_results = self.config.get("face_matching", {}).get(
+            "max_results",
+            self.config.get("face_recognition", {}).get("max_faces_per_frame", 50),
+        )
 
         # Initialize ChromaDB manager
         if config is not None:

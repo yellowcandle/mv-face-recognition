@@ -1,6 +1,7 @@
 import streamlit as st
 from pathlib import Path
 
+
 def database_status_page():
     """Database status and management."""
     st.header("Database Status")

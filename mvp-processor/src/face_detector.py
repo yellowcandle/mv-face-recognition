@@ -4,7 +4,6 @@ Handles face detection, encoding, and recognition against contestant database
 """
 
 import face_recognition
-import cv2
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple
@@ -84,7 +83,9 @@ class ContestantDatabase:
                         face_encodings = face_recognition.face_encodings(image)
                         if face_encodings:
                             encodings.append(face_encodings[0])
-                            logger.debug(f"Encoded {photo_path} for contestant {contestant_id}")
+                            logger.debug(
+                                f"Encoded {photo_path} for contestant {contestant_id}"
+                            )
 
                     if encodings:
                         # Average multiple encodings if available
@@ -126,7 +127,9 @@ class FaceDetector:
             face_encodings = face_recognition.face_encodings(frame, face_locations)
 
             detections = []
-            for (top, right, bottom, left), encoding in zip(face_locations, face_encodings):
+            for (top, right, bottom, left), encoding in zip(
+                face_locations, face_encodings
+            ):
                 detection = FaceDetection(
                     location=(top, right, bottom, left),
                     encoding=encoding,
@@ -176,12 +179,16 @@ class FaceRecognizer:
 
         for detection in detections:
             try:
-                matches = face_recognition.face_distance(known_encodings, detection.encoding)
+                matches = face_recognition.face_distance(
+                    known_encodings, detection.encoding
+                )
                 min_distance = min(matches)
                 if min_distance < self.tolerance:
                     matched_index = np.argmin(matches)
                     contestant_id = known_names[matched_index]
-                    contestant_info = self.contestant_db.get_contestant_info(contestant_id)
+                    contestant_info = self.contestant_db.get_contestant_info(
+                        contestant_id
+                    )
 
                     # Convert distance to confidence (lower distance = higher confidence)
                     confidence = 1 - (min_distance / self.tolerance)

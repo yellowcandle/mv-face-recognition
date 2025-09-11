@@ -31,27 +31,27 @@ VOL_MOUNT_PATH = Path("/data")
 def upload_config_to_volume():
     """Upload config.json to the Modal volume."""
     import os
-    
+
     # Read the local config.json file (it's mounted as part of the function)
     local_config_path = "/root/config.json"
     volume_config_path = VOL_MOUNT_PATH / "config.json"
-    
+
     if os.path.exists(local_config_path):
-        with open(local_config_path, 'r') as f:
+        with open(local_config_path, "r") as f:
             config = json.load(f)
-        
+
         # Write to volume
-        with open(volume_config_path, 'w') as f:
+        with open(volume_config_path, "w") as f:
             json.dump(config, f, indent=2)
-        
+
         print(f"✅ Successfully uploaded config.json to volume at {volume_config_path}")
         print("📋 Config contents:")
         print(json.dumps(config, indent=2))
-        
+
         # Commit the volume changes
         volume.commit()
         print("💾 Volume changes committed")
-        
+
         return {"status": "success", "config": config}
     else:
         print(f"❌ Could not find config.json at {local_config_path}")
@@ -62,10 +62,10 @@ def upload_config_to_volume():
 def main():
     """Upload config.json to Modal volume."""
     print("🚀 Uploading config.json to Modal volume...")
-    
+
     # Upload config
     result = upload_config_to_volume.remote()
-    
+
     if result["status"] == "success":
         print("✅ Config upload completed successfully!")
     else:

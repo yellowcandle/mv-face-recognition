@@ -15,9 +15,10 @@ from tqdm import tqdm
 
 # Add src to path - handle both running from project root and scripts directory
 import os
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)  # Go up one level from scripts/
-src_path = os.path.join(project_root, 'src')
+src_path = os.path.join(project_root, "src")
 if os.path.exists(src_path) and src_path not in sys.path:
     sys.path.insert(0, src_path)
 # Also add project root to path
@@ -29,49 +30,46 @@ from src.services.enhanced_video_processor import EnhancedVideoProcessor
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler('batch_processing.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+        logging.FileHandler("batch_processing.log"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 logger = logging.getLogger(__name__)
 
 
 def main():
     """Main batch processing function."""
-    parser = argparse.ArgumentParser(description='Batch process MV videos for face recognition')
-    parser.add_argument(
-        '--config',
-        type=str,
-        default='config.json',
-        help='Path to configuration file'
+    parser = argparse.ArgumentParser(
+        description="Batch process MV videos for face recognition"
     )
     parser.add_argument(
-        '--force-reprocess',
-        action='store_true',
-        help='Reprocess videos even if already processed'
+        "--config", type=str, default="config.json", help="Path to configuration file"
     )
     parser.add_argument(
-        '--videos-only',
-        action='store_true',
-        help='Only process videos (skip clips extraction)'
+        "--force-reprocess",
+        action="store_true",
+        help="Reprocess videos even if already processed",
     )
     parser.add_argument(
-        '--single-video',
-        type=str,
-        help='Process only a specific video file'
+        "--videos-only",
+        action="store_true",
+        help="Only process videos (skip clips extraction)",
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be processed without actually processing'
+        "--single-video", type=str, help="Process only a specific video file"
     )
     parser.add_argument(
-        '--similarity-threshold',
+        "--dry-run",
+        action="store_true",
+        help="Show what would be processed without actually processing",
+    )
+    parser.add_argument(
+        "--similarity-threshold",
         type=float,
         default=0.25,
-        help='Face similarity threshold for recognition (default: 0.25, range: 0.0-1.0)'
+        help="Face similarity threshold for recognition (default: 0.25, range: 0.0-1.0)",
     )
 
     args = parser.parse_args()
@@ -113,13 +111,17 @@ def main():
 
         # Start batch processing
         start_time = time.time()
-        logger.info("="*60)
+        logger.info("=" * 60)
         logger.info("STARTING BATCH PROCESSING")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
-        def overall_progress_callback(video_idx, total_videos, video_name, step, total_steps, step_desc):
+        def overall_progress_callback(
+            video_idx, total_videos, video_name, step, total_steps, step_desc
+        ):
             """Callback for overall batch progress updates."""
-            tqdm.write(f"[{video_idx+1}/{total_videos}] {video_name}: {step_desc} ({step}/{total_steps})")
+            tqdm.write(
+                f"[{video_idx+1}/{total_videos}] {video_name}: {step_desc} ({step}/{total_steps})"
+            )
 
         if args.single_video:
             # Process single video with progress tracking
@@ -128,8 +130,12 @@ def main():
             results = {args.single_video: result}
         else:
             # Process all videos with enhanced progress tracking
-            print(f"\n🎬 Starting batch processing of {len(processor.get_available_videos())} videos")
-            results = processor.batch_process_all_videos(args.force_reprocess, overall_progress_callback)
+            print(
+                f"\n🎬 Starting batch processing of {len(processor.get_available_videos())} videos"
+            )
+            results = processor.batch_process_all_videos(
+                args.force_reprocess, overall_progress_callback
+            )
 
         # Calculate total processing time
         total_time = time.time() - start_time
@@ -140,9 +146,9 @@ def main():
         # Generate final report
         generate_processing_report(results, total_time)
 
-        logger.info("="*60)
+        logger.info("=" * 60)
         logger.info("BATCH PROCESSING COMPLETE")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         return 0
 
@@ -156,25 +162,31 @@ def main():
 
 def print_dry_run_info(processor, videos, force_reprocess):
     """Print information about what would be processed."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DRY RUN - NO ACTUAL PROCESSING")
-    print("="*60)
+    print("=" * 60)
 
     for video in videos:
         print(f"\nVideo: {video}")
 
         # Check if already processed
         metadata_file = processor.metadata_dir / f"{Path(video).stem}_metadata.json"
-        annotated_video_file = processor.processed_videos_dir / f"{Path(video).stem}_annotated.mp4"
+        annotated_video_file = (
+            processor.processed_videos_dir / f"{Path(video).stem}_annotated.mp4"
+        )
 
-        if metadata_file.exists() and annotated_video_file.exists() and not force_reprocess:
+        if (
+            metadata_file.exists()
+            and annotated_video_file.exists()
+            and not force_reprocess
+        ):
             print("  Status: ✓ Already processed (would skip)")
         else:
             print("  Status: → Would process")
 
         # Get video info
         info = processor.get_video_info(video)
-        if 'duration_seconds' in info:
+        if "duration_seconds" in info:
             print(f"  Duration: {info['duration_seconds']:.1f}s")
             print(f"  Size: {info.get('file_size_mb', 0):.1f} MB")
 
@@ -184,7 +196,7 @@ def print_dry_run_info(processor, videos, force_reprocess):
     total_size_mb = 0
     for video in videos:
         info = processor.get_video_info(video)
-        total_size_mb += info.get('file_size_mb', 0)
+        total_size_mb += info.get("file_size_mb", 0)
 
     estimated_output_size = total_size_mb * 1.5  # Estimate 1.5x for annotated videos
     print("Estimated output size: {:.1f} MB".format(estimated_output_size))
@@ -197,9 +209,9 @@ def print_dry_run_info(processor, videos, force_reprocess):
 
 def print_processing_summary(results, total_time):
     """Print a summary of processing results."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🎬 PROCESSING SUMMARY")
-    print("="*60)
+    print("=" * 60)
 
     successful = [video for video, result in results.items() if "error" not in result]
     failed = [video for video, result in results.items() if "error" in result]
@@ -218,13 +230,13 @@ def print_processing_summary(results, total_time):
 
         for video in successful:
             result = results[video]
-            stats = result.get('stats', {})
+            stats = result.get("stats", {})
 
             # Try to get frame skip statistics from metadata
-            frames_processed = stats.get('total_frames_processed', 0)
-            frames_skipped = stats.get('total_frames_skipped', 0)
-            faces_detected = stats.get('total_faces_detected', 0)
-            faces_recognized = stats.get('total_faces_recognized', 0)
+            frames_processed = stats.get("total_frames_processed", 0)
+            frames_skipped = stats.get("total_frames_skipped", 0)
+            faces_detected = stats.get("total_faces_detected", 0)
+            faces_recognized = stats.get("total_faces_recognized", 0)
 
             total_frames_processed += frames_processed
             total_frames_skipped += frames_skipped
@@ -237,8 +249,12 @@ def print_processing_summary(results, total_time):
             print(f"    🎭 Unique contestants: {stats.get('unique_contestants', 0)}")
             print(f"    🎬 Clips generated: {len(result.get('clips_info', []))}")
             if frames_skipped > 0:
-                skip_rate = (frames_skipped / max(frames_processed + frames_skipped, 1)) * 100
-                print(f"    ⏩ Frames skipped: {frames_skipped} ({skip_rate:.1f}% - no faces)")
+                skip_rate = (
+                    frames_skipped / max(frames_processed + frames_skipped, 1)
+                ) * 100
+                print(
+                    f"    ⏩ Frames skipped: {frames_skipped} ({skip_rate:.1f}% - no faces)"
+                )
             print(f"    ⏱️  Processing time: {result.get('processing_time', 0):.1f}s")
 
         # Overall efficiency statistics
@@ -253,22 +269,21 @@ def print_processing_summary(results, total_time):
     if failed:
         print("\n✗ Failed to process:")
         for video in failed:
-            error = results[video].get('error', 'Unknown error')
+            error = results[video].get("error", "Unknown error")
             print(f"  {video}: {error}")
 
     # Calculate statistics
     if successful:
         total_faces_detected = sum(
-            results[video].get('stats', {}).get('total_faces_detected', 0)
+            results[video].get("stats", {}).get("total_faces_detected", 0)
             for video in successful
         )
         total_faces_recognized = sum(
-            results[video].get('stats', {}).get('total_faces_recognized', 0)
+            results[video].get("stats", {}).get("total_faces_recognized", 0)
             for video in successful
         )
         total_clips = sum(
-            len(results[video].get('clips_info', []))
-            for video in successful
+            len(results[video].get("clips_info", [])) for video in successful
         )
 
         recognition_rate = (total_faces_recognized / max(total_faces_detected, 1)) * 100
@@ -292,7 +307,7 @@ def generate_processing_report(results, total_time):
             "successful": len([r for r in results.values() if "error" not in r]),
             "failed": len([r for r in results.values() if "error" in r]),
         },
-        "detailed_results": results
+        "detailed_results": results,
     }
 
     # Calculate overall statistics
@@ -300,27 +315,28 @@ def generate_processing_report(results, total_time):
     if successful_results:
         report["overall_stats"] = {
             "total_faces_detected": sum(
-                r.get('stats', {}).get('total_faces_detected', 0)
+                r.get("stats", {}).get("total_faces_detected", 0)
                 for r in successful_results
             ),
             "total_faces_recognized": sum(
-                r.get('stats', {}).get('total_faces_recognized', 0)
+                r.get("stats", {}).get("total_faces_recognized", 0)
                 for r in successful_results
             ),
             "total_clips_generated": sum(
-                len(r.get('clips_info', []))
-                for r in successful_results
+                len(r.get("clips_info", [])) for r in successful_results
             ),
-            "unique_contestants_found": len(set(
-                contestant
-                for r in successful_results
-                for clip in r.get('clips_info', [])
-                for contestant in [clip.get('contestant')]
-                if contestant
-            ))
+            "unique_contestants_found": len(
+                set(
+                    contestant
+                    for r in successful_results
+                    for clip in r.get("clips_info", [])
+                    for contestant in [clip.get("contestant")]
+                    if contestant
+                )
+            ),
         }
 
-    with open(report_file, 'w', encoding='utf-8') as f:
+    with open(report_file, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, default=str)
 
     logger.info("Detailed report saved to: %s", report_file)
@@ -338,7 +354,7 @@ def check_prerequisites():
 
     # Check if source directory exists
     try:
-        with open(config_file, encoding='utf-8') as f:
+        with open(config_file, encoding="utf-8") as f:
             config = json.load(f)
         videos_dir = Path(config["paths"]["videos_dir"])
         if not videos_dir.exists():
@@ -374,4 +390,3 @@ if __name__ == "__main__":
     # Run main processing
     exit_code = main()
     sys.exit(exit_code)
-

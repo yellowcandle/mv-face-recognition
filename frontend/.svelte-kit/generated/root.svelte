@@ -43,13 +43,13 @@
 </script>
 
 {#if constructors[1]}
-	<svelte:component this={constructors[0]} bind:this={components[0]} data={data_0}>
-						<svelte:component this={constructors[1]} bind:this={components[1]} data={data_1} {form} />
+	<svelte:component this={constructors[0]} bind:this={components[0]} data={data_0} params={page.params}>
+						<svelte:component this={constructors[1]} bind:this={components[1]} data={data_1} {form} params={page.params} />
 					</svelte:component>
-	
+
 {:else}
-	<svelte:component this={constructors[0]} bind:this={components[0]} data={data_0} {form} />
-	
+	<svelte:component this={constructors[0]} bind:this={components[0]} data={data_0} {form} params={page.params} />
+
 {/if}
 
 {#if mounted}

@@ -24,7 +24,9 @@ npy_files_glob = glob.glob(glob_pattern)
 print(f"[INFO] .npy files found by glob.glob: {npy_files_glob}")
 
 if not npy_files_glob:
-    print("[ERROR] No embedding files found by glob.glob. Please check the path and pattern.")
+    print(
+        "[ERROR] No embedding files found by glob.glob. Please check the path and pattern."
+    )
     if npy_files_os_listdir:
         print(
             "[INFO] os.listdir found .npy files, so the issue might be with glob pattern or special characters."
@@ -49,7 +51,9 @@ try:
     print(f"  Flattened shape: {flat_data.shape}")
     print(f"  First 5 values of flattened data: {flat_data[:5]}")
     if flat_data.shape == (512,):
-        print("  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script.")
+        print(
+            "  [CONFIRMATION] Flattened data shape is (512,), as expected by the main script."
+        )
     else:
         print(
             f"  [WARNING] Flattened data shape is {flat_data.shape}, NOT (512,). This will be skipped by the main script."
@@ -60,7 +64,9 @@ except Exception as e:
     print("  Attempting with allow_pickle=True...")
     try:
         data = np.load(file_path, allow_pickle=True)
-        print(f"[SUCCESS] Data loaded successfully from {file_path} with allow_pickle=True")
+        print(
+            f"[SUCCESS] Data loaded successfully from {file_path} with allow_pickle=True"
+        )
         print(f"  Object type: {type(data)}")
         if isinstance(data, np.ndarray):
             print(f"  Shape: {data.shape}")
@@ -82,6 +88,8 @@ except Exception as e:
             print(f"  Content: {data}")
 
     except Exception as e2:
-        print(f"[ERROR] Error loading file {file_path} with np.load (allow_pickle=True): {e2}")
+        print(
+            f"[ERROR] Error loading file {file_path} with np.load (allow_pickle=True): {e2}"
+        )
 
 print("\n[INFO] Script finished.")

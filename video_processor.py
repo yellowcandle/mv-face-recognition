@@ -4,11 +4,13 @@ Compatibility wrapper for MVP VideoProcessor
 This module exposes VideoProcessor (and FrameProcessor when available)
 by dynamically loading the real implementation from the MVP package.
 """
+
 from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
 from typing import Optional
+
 
 def _load_real_video_processor():
     # Assume this file sits at repo root: /Users/.../mv-face-recognition/video_processor.py
@@ -36,6 +38,7 @@ def _load_real_video_processor():
     spec.loader.exec_module(module)  # type: ignore
     return module
 
+
 _real = _load_real_video_processor()
 
 # Expose the real classes if they exist in the MVP module
@@ -43,8 +46,10 @@ VideoProcessor = getattr(_real, "VideoProcessor", None)
 FrameProcessor = getattr(_real, "FrameProcessor", None)
 
 if VideoProcessor is None:
+
     class _NoVideoProcessor:  # pragma: no cover
         pass
+
     VideoProcessor = _NoVideoProcessor  # type: ignore
 
 __all__ = ["VideoProcessor"]

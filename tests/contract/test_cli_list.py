@@ -30,7 +30,7 @@ def test_cli_list_contestants():
     # Should complete successfully or fail gracefully
     # (might fail if database not initialized, but should not crash)
     assert result.returncode in [0, 1]
-    
+
     if result.returncode == 0:
         # If successful, should show contestant info
         output = result.stdout.lower()
@@ -47,7 +47,7 @@ def test_cli_list_processed_videos():
     )
     # Should complete successfully or fail gracefully
     assert result.returncode in [0, 1]
-    
+
     if result.returncode == 0:
         # If successful, should show video info or "no videos found"
         output = result.stdout.lower()
@@ -64,7 +64,7 @@ def test_cli_list_embeddings():
     )
     # Should complete successfully or fail gracefully
     assert result.returncode in [0, 1]
-    
+
     if result.returncode == 0:
         # If successful, should show embedding info
         output = result.stdout.lower()

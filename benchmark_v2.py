@@ -92,7 +92,9 @@ def setup_components():
     return detector, recognizer, chroma_recognizer
 
 
-def load_embeddings(contestants_dir, contestant_info, selected_contestants, recognizer, detector):
+def load_embeddings(
+    contestants_dir, contestant_info, selected_contestants, recognizer, detector
+):
     """Load face embeddings for standard dictionary approach."""
     known_embeddings = {}
 
@@ -112,7 +114,9 @@ def load_embeddings(contestants_dir, contestant_info, selected_contestants, reco
 
             contestant_path = os.path.join(contestants_dir, str(contestant_number))
             if not os.path.isdir(contestant_path):
-                print(f"Directory not found for contestant {contestant}: {contestant_path}")
+                print(
+                    f"Directory not found for contestant {contestant}: {contestant_path}"
+                )
                 continue
 
             # Get image paths
@@ -185,7 +189,9 @@ def load_chromadb_embeddings(
     if missing_contestants:
         print(f"Computing embeddings for {len(missing_contestants)} contestants...")
 
-        for contestant in tqdm(missing_contestants, desc="Computing missing embeddings"):
+        for contestant in tqdm(
+            missing_contestants, desc="Computing missing embeddings"
+        ):
             try:
                 contestant_number = contestant_info.loc[
                     contestant_info["暱稱"] == contestant, "編號"
@@ -193,7 +199,9 @@ def load_chromadb_embeddings(
 
                 contestant_path = os.path.join(contestants_dir, str(contestant_number))
                 if not os.path.isdir(contestant_path):
-                    print(f"Directory not found for contestant {contestant}: {contestant_path}")
+                    print(
+                        f"Directory not found for contestant {contestant}: {contestant_path}"
+                    )
                     continue
 
                 # Get images
@@ -238,7 +246,9 @@ def load_chromadb_embeddings(
             except Exception as e:
                 print(f"Error processing contestant {contestant}: {str(e)}")
 
-    collection_count = chroma_recognizer.collection.count() if chroma_recognizer.collection else 0
+    collection_count = (
+        chroma_recognizer.collection.count() if chroma_recognizer.collection else 0
+    )
     print(f"ChromaDB contains {collection_count} embeddings")
     return chroma_recognizer
 
@@ -294,7 +304,9 @@ def benchmark_video_processing(
             # Process with ChromaDB if available
             if has_chromadb:
                 start_time = time.time()
-                chroma_results = chroma_recognizer.identify_faces(frame, detector, std_recognizer)
+                chroma_results = chroma_recognizer.identify_faces(
+                    frame, detector, std_recognizer
+                )
                 chroma_time = time.time() - start_time
                 chroma_times.append(chroma_time)
                 chroma_matches.append(len(chroma_results))
@@ -308,7 +320,9 @@ def benchmark_video_processing(
                 print(f"\nFrame {frame_count}:")
                 print(f"  Standard: {std_time:.4f}s, {len(std_results)} matches")
                 if has_chromadb:
-                    print(f"  ChromaDB: {chroma_time:.4f}s, {len(chroma_results)} matches")
+                    print(
+                        f"  ChromaDB: {chroma_time:.4f}s, {len(chroma_results)} matches"
+                    )
 
     # Clean up
     cap.release()
@@ -401,7 +415,7 @@ def main():
         )
 
     # Run benchmark (100 frames)
-    results = benchmark_video_processing(
+    benchmark_video_processing(
         video_path,
         std_embeddings,
         chroma_recognizer,
@@ -437,7 +451,9 @@ def main():
                 )
 
                 # Add subset of embeddings
-                subset_dict = {k: std_embeddings[k] for k in subset if k in std_embeddings}
+                subset_dict = {
+                    k: std_embeddings[k] for k in subset if k in std_embeddings
+                }
                 test_chroma.add_embeddings_batch(subset_dict)
 
                 # Test on 10 frames
@@ -452,7 +468,8 @@ def main():
 
                 if test_results and test_results["chromadb"]:
                     speedup = (
-                        test_results["standard"]["avg_time"] / test_results["chromadb"]["avg_time"]
+                        test_results["standard"]["avg_time"]
+                        / test_results["chromadb"]["avg_time"]
                     )
                     print(f"  {count} embeddings: Speedup = {speedup:.2f}x")
 

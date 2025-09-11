@@ -67,7 +67,7 @@ allowing you to leverage powerful GPUs on-demand.
     modal volume get mv-face-recognition-data /processed_videos ./output/
     modal volume get mv-face-recognition-data /metadata ./output/
     modal volume get mv-face-recognition-data /clips ./output/
-    """
+"""
 
 import sys
 import time
@@ -97,24 +97,26 @@ VOL_MOUNT_PATH = Path("/data")
 
 # --- Main Processing Logic ---
 
+
 @stub.cls(
     image=modal_image,
     volumes={str(VOL_MOUNT_PATH): volume},
     gpu=gpu.T4(),  # Request a T4 GPU. Can be changed to A10G for more power.
     timeout=7200,  # Set a 2-hour timeout for the job
-    container_idle_timeout=300, # Keep container warm for 5 mins
+    container_idle_timeout=300,  # Keep container warm for 5 mins
 )
 class ModalProcessor:
     """
     A Modal class that encapsulates the video processing logic and runs it remotely.
     """
+
     def __enter__(self):
         """
         Load models and initialize the processor when the container starts.
         This runs once per container, making subsequent calls faster.
         """
         # Add src to path inside the container
-        sys.path.append('/src')
+        sys.path.append("/src")
         from src.services.enhanced_video_processor import EnhancedVideoProcessor
         from src.core.hardware_acceleration import HardwareAccelerator
 
@@ -124,12 +126,16 @@ class ModalProcessor:
         config_path = str(VOL_MOUNT_PATH / "config.json")
 
         # IMPORTANT: We must update the paths in the config to point to the volume
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
 
         config["paths"]["videos_dir"] = str(VOL_MOUNT_PATH / "source/videos")
-        config["paths"]["contestants_photos_dir"] = str(VOL_MOUNT_PATH / "source/photo/contestants")
-        config["paths"]["processed_videos_dir"] = str(VOL_MOUNT_PATH / "processed_videos")
+        config["paths"]["contestants_photos_dir"] = str(
+            VOL_MOUNT_PATH / "source/photo/contestants"
+        )
+        config["paths"]["processed_videos_dir"] = str(
+            VOL_MOUNT_PATH / "processed_videos"
+        )
         config["paths"]["metadata_dir"] = str(VOL_MOUNT_PATH / "metadata")
         config["paths"]["clips_dir"] = str(VOL_MOUNT_PATH / "clips")
         config["paths"]["db_dir"] = str(VOL_MOUNT_PATH / ".chroma_db")
@@ -140,7 +146,6 @@ class ModalProcessor:
         # Verify hardware acceleration on the remote GPU
         accelerator = HardwareAccelerator()
         print(f"✅ Modal container running with: {accelerator.get_device_info()}")
-
 
     @method()
     def run_batch_processing(
@@ -154,12 +159,12 @@ class ModalProcessor:
         """
         from tqdm import tqdm
 
-        print("="*60)
+        print("=" * 60)
         print("STARTING MODAL BATCH PROCESSING")
         print(f"Force reprocess: {force_reprocess}")
         print(f"Single video: {single_video}")
         print(f"Similarity threshold: {similarity_threshold}")
-        print("="*60)
+        print("=" * 60)
 
         start_time = time.time()
 
@@ -183,17 +188,25 @@ class ModalProcessor:
             else:
                 videos_to_process = videos
 
-            def overall_progress_callback(video_idx, total_videos, video_name, step, total_steps, step_desc):
+            def overall_progress_callback(
+                video_idx, total_videos, video_name, step, total_steps, step_desc
+            ):
                 """Callback for overall batch progress updates."""
-                tqdm.write(f"[{video_idx+1}/{total_videos}] {video_name}: {step_desc} ({step}/{total_steps})")
+                tqdm.write(
+                    f"[{video_idx+1}/{total_videos}] {video_name}: {step_desc} ({step}/{total_steps})"
+                )
 
             if single_video:
                 print(f"\n🎬 Processing single video: {single_video}")
                 result = self.processor.process_video_comprehensive(single_video)
                 results = {single_video: result}
             else:
-                print(f"\n🎬 Starting batch processing of {len(videos_to_process)} videos")
-                results = self.processor.batch_process_all_videos(force_reprocess, overall_progress_callback)
+                print(
+                    f"\n🎬 Starting batch processing of {len(videos_to_process)} videos"
+                )
+                results = self.processor.batch_process_all_videos(
+                    force_reprocess, overall_progress_callback
+                )
 
             total_time = time.time() - start_time
             print_processing_summary(results, total_time)
@@ -201,36 +214,44 @@ class ModalProcessor:
             # The report is saved to the persistent volume
             generate_processing_report(self.processor, results, total_time)
 
-            print("="*60)
+            print("=" * 60)
             print("✅ MODAL BATCH PROCESSING COMPLETE")
-            print("="*60)
+            print("=" * 60)
 
         except Exception as e:
             print(f"❌ Error during batch processing: {e}")
             import traceback
+
             traceback.print_exc()
 
 
 # --- Local Entrypoint ---
+
 
 @stub.local_entrypoint()
 def main(
     force_reprocess: bool = False,
     single_video: str = None,
     similarity_threshold: float = 0.25,
-    dry_run: bool = False, # Dry run is not supported in Modal version
+    dry_run: bool = False,  # Dry run is not supported in Modal version
 ):
     """
     This is the function that runs on your local machine.
     It takes your command-line arguments and calls the remote Modal class.
     """
     if dry_run:
-        print("Note: --dry-run is not applicable for Modal execution and will be ignored.")
-        print("The script will connect to Modal but not run the job if you wish to proceed.")
+        print(
+            "Note: --dry-run is not applicable for Modal execution and will be ignored."
+        )
+        print(
+            "The script will connect to Modal but not run the job if you wish to proceed."
+        )
 
     # Validate similarity threshold locally
     if not 0.0 <= similarity_threshold <= 1.0:
-        print("Error: Similarity threshold must be between 0.0 and 1.0", file=sys.stderr)
+        print(
+            "Error: Similarity threshold must be between 0.0 and 1.0", file=sys.stderr
+        )
         sys.exit(1)
 
     # Instantiate the remote class
@@ -248,11 +269,12 @@ def main(
 # These functions are used to print the summary after the job is done.
 # They are included here to avoid circular dependencies and keep the script self-contained.
 
+
 def print_processing_summary(results, total_time):
     """Print a summary of processing results."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🎬 PROCESSING SUMMARY")
-    print("="*60)
+    print("=" * 60)
 
     successful = [video for video, result in results.items() if "error" not in result]
     failed = [video for video, result in results.items() if "error" in result]
@@ -266,7 +288,7 @@ def print_processing_summary(results, total_time):
         print("\n✓ Successfully processed:")
         for video in successful:
             result = results[video]
-            stats = result.get('stats', {})
+            stats = result.get("stats", {})
             print(f"  📹 {video}")
             print(f"    👥 Faces detected: {stats.get('total_faces_detected', 0)}")
             print(f"    ✅ Faces recognized: {stats.get('total_faces_recognized', 0)}")
@@ -275,12 +297,14 @@ def print_processing_summary(results, total_time):
     if failed:
         print("\n✗ Failed to process:")
         for video in failed:
-            error = results[video].get('error', 'Unknown error')
+            error = results[video].get("error", "Unknown error")
             print(f"  {video}: {error}")
+
 
 def generate_processing_report(processor, results, total_time):
     """Generate a detailed processing report on the persistent volume."""
     from datetime import datetime
+
     report_file = VOL_MOUNT_PATH / "batch_processing_report.json"
     print(f"Generating detailed report to: {report_file}")
 
@@ -292,8 +316,8 @@ def generate_processing_report(processor, results, total_time):
             "successful": len([r for r in results.values() if "error" not in r]),
             "failed": len([r for r in results.values() if "error" in r]),
         },
-        "detailed_results": results
+        "detailed_results": results,
     }
-    with open(report_file, 'w', encoding='utf-8') as f:
+    with open(report_file, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, default=str)
     print("✅ Report saved successfully.")

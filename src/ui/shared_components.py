@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+
 def show_final_summary(results):
     """Show final processing summary with charts."""
     st.subheader("📊 Final Results Summary")

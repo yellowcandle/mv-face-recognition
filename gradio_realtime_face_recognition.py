@@ -43,8 +43,8 @@ FONT_SIZE = 60
 CONTESTANT_INFO_PATH = "contestant_info.csv"
 EMBEDDING_DIR = "source/photo/contestants/embeddings"
 VIDEO_DIR = "source/videos"
-RECOGNITION_THRESHOLD = 0.4 # Reverting to a general threshold for SFace
-DETECTION_SCORE_THRESHOLD = 0.2 # Reverting to a general threshold
+RECOGNITION_THRESHOLD = 0.4  # Reverting to a general threshold for SFace
+DETECTION_SCORE_THRESHOLD = 0.2  # Reverting to a general threshold
 
 # =============================================================================
 # Face Recognition Module
@@ -64,7 +64,9 @@ def load_contestant_info():
             contestant_info_df["姓名"].values, index=contestant_info_df["暱稱"]
         ).to_dict()
         # Create nickname to display name mapping (format: "FullName (Nickname)")
-        nickname_to_display = {nick: f"{name} ({nick})" for nick, name in nickname_to_name.items()}
+        nickname_to_display = {
+            nick: f"{name} ({nick})" for nick, name in nickname_to_name.items()
+        }
 
         return contestant_info_df, nickname_to_name, nickname_to_display
     except Exception as e:
@@ -112,11 +114,13 @@ def load_gallery_embeddings(expected_embedding_size: int):
 
                 # L2 Normalize the embedding
                 norm = np.linalg.norm(arr)
-                if norm > 1e-9: # Avoid division by zero
+                if norm > 1e-9:  # Avoid division by zero
                     arr = arr / norm
                 else:
-                    logger.warning(f"Embedding for {os.path.basename(f)} has zero norm. Skipping.")
-                    continue # Skip this embedding if norm is zero
+                    logger.warning(
+                        f"Embedding for {os.path.basename(f)} has zero norm. Skipping."
+                    )
+                    continue  # Skip this embedding if norm is zero
 
                 nickname = os.path.basename(f).replace("_embedding.npy", "")
                 gallery_nicknames.append(nickname)
@@ -185,7 +189,9 @@ def get_top_matches(
         if norm_face_embedding.shape[0] > gallery_embeddings.shape[1]:
             norm_face_embedding = norm_face_embedding[: gallery_embeddings.shape[1]]
         else:
-            padding = np.zeros(gallery_embeddings.shape[1] - norm_face_embedding.shape[0])
+            padding = np.zeros(
+                gallery_embeddings.shape[1] - norm_face_embedding.shape[0]
+            )
             norm_face_embedding = np.concatenate([norm_face_embedding, padding])
 
     sims = np.dot(gallery_embeddings, norm_face_embedding)
@@ -207,7 +213,14 @@ def get_top_matches(
 def plot_bar(all_top_matches_details: List[Tuple[str, float]]):
     if not all_top_matches_details:
         fig, ax = plt.subplots(figsize=(4, 3))
-        ax.text(0.5, 0.5, "No recognized matches to display", ha="center", va="center", fontsize=8)
+        ax.text(
+            0.5,
+            0.5,
+            "No recognized matches to display",
+            ha="center",
+            va="center",
+            fontsize=8,
+        )
         ax.set_xticks([])
         ax.set_yticks([])
         plt.tight_layout()
@@ -260,7 +273,9 @@ def plot_embedding_scatter(
             gallery_embeddings_global.shape[1]
             if num_gallery > 0
             else (
-                detected_face_embeddings_list[0].shape[0] if detected_face_embeddings_list else 128
+                detected_face_embeddings_list[0].shape[0]
+                if detected_face_embeddings_list
+                else 128
             )
         )
 
@@ -335,7 +350,10 @@ def plot_embedding_scatter(
     if num_gallery > 0:
         gallery_2d = embedding_2d[:num_gallery]
         for i in range(num_gallery):
-            if not any(i in nearest_list for nearest_list in nearest_gallery_indices_for_detected):
+            if not any(
+                i in nearest_list
+                for nearest_list in nearest_gallery_indices_for_detected
+            ):
                 ax.scatter(
                     gallery_2d[i, 0],
                     gallery_2d[i, 1],
@@ -365,7 +383,13 @@ def plot_embedding_scatter(
                 edgecolors="black" if ptype == "detected_recognized" else None,
                 marker="o" if ptype == "detected_recognized" else "X",
             )
-            ax.text(detected_point[0], detected_point[1] + 0.05, plabel, fontsize=9, ha="center")
+            ax.text(
+                detected_point[0],
+                detected_point[1] + 0.05,
+                plabel,
+                fontsize=9,
+                ha="center",
+            )
             for gallery_idx in nearest_gallery_indices_for_detected[i]:
                 if 0 <= gallery_idx < num_gallery:
                     gallery_match_point = embedding_2d[gallery_idx]
@@ -378,7 +402,8 @@ def plot_embedding_scatter(
                         edgecolors="black",
                         marker="s",
                         label="Nearest Gallery Match"
-                        if "Nearest Gallery Match" not in plt.gca().get_legend_handles_labels()[1]
+                        if "Nearest Gallery Match"
+                        not in plt.gca().get_legend_handles_labels()[1]
                         else "",
                     )
                     ax.plot(
@@ -401,7 +426,9 @@ def plot_embedding_scatter(
 
 
 def overlay_faces(
-    frame: np.ndarray, faces: List[InsightFaceObject], matches: List[List[Tuple[str, float]]]
+    frame: np.ndarray,
+    faces: List[InsightFaceObject],
+    matches: List[List[Tuple[str, float]]],
 ) -> np.ndarray:
     frame_pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(frame_pil)
@@ -413,9 +440,15 @@ def overlay_faces(
 
     for face, match_list in zip(faces, matches, strict=False):
         box = face.bbox.astype(int)
-        label = f"{match_list[0][0]} ({match_list[0][1]:.2f})" if match_list else "Unknown (0.00)"
+        label = (
+            f"{match_list[0][0]} ({match_list[0][1]:.2f})"
+            if match_list
+            else "Unknown (0.00)"
+        )
         current_frame_np = np.array(frame_pil)
-        cv2.rectangle(current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        cv2.rectangle(
+            current_frame_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2
+        )
         frame_pil = Image.fromarray(current_frame_np)
         draw = ImageDraw.Draw(frame_pil)  # Re-initialize draw object
         draw.text((box[0], box[1] - FONT_SIZE - 2), label, font=font, fill=(0, 255, 0))
@@ -493,7 +526,9 @@ def process_frame(
             matches.append([])
         all_sims.append(sims_for_this_face)
 
-    matches_for_overlay = [[(name, score) for name, score, _ in mlist] for mlist in matches]
+    matches_for_overlay = [
+        [(name, score) for name, score, _ in mlist] for mlist in matches
+    ]
     processed_frame = overlay_faces(frame, detected_faces, matches_for_overlay)
 
     if not any(matches):
@@ -566,9 +601,12 @@ def get_frame_by_index(
 # Gradio UI Module
 # =============================================================================
 
-def process_static_image(image: np.ndarray, vis_type: str = "bar") -> Tuple[np.ndarray, plt.Figure]:
+
+def process_static_image(
+    image: np.ndarray, vis_type: str = "bar"
+) -> Tuple[np.ndarray, plt.Figure]:
     logger.debug(f"Processing static image with visualization type: {vis_type}")
-    
+
     # Re-initialize detector and recognizer for this function call to ensure latest settings
     # This is a simplified approach; in a real app, these might be global or passed
     core_detector = FaceDetector(
@@ -578,10 +616,12 @@ def process_static_image(image: np.ndarray, vis_type: str = "bar") -> Tuple[np.n
     face_recognizer_instance = FaceRecognizer(
         face_detector=core_detector,
         similarity_threshold=RECOGNITION_THRESHOLD,
-        model_path=sface_model_path
+        model_path=sface_model_path,
     )
-    
-    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings(face_recognizer_instance.embedding_size)
+
+    gallery_embeddings, gallery_nicknames, gallery_display_names = (
+        load_gallery_embeddings(face_recognizer_instance.embedding_size)
+    )
 
     # Use the existing process_frame logic
     return process_frame(
@@ -605,22 +645,28 @@ def build_gradio_interface():
     sface_model_path = os.path.join("models", "face_recognition_sface.onnx")
     face_recognizer_instance = FaceRecognizer(
         face_detector=core_detector,
-        similarity_threshold=RECOGNITION_THRESHOLD, # Use the updated constant
-        model_path=sface_model_path # Explicitly use the sface model path
+        similarity_threshold=RECOGNITION_THRESHOLD,  # Use the updated constant
+        model_path=sface_model_path,  # Explicitly use the sface model path
     )
     logger.info(
         f"Initialized FaceRecognizer for Gradio with model: {face_recognizer_instance.model_path}, embedding size: {face_recognizer_instance.embedding_size}"
     )
     # SFace model is expected to be 128-dim.
 
-    gallery_embeddings, gallery_nicknames, gallery_display_names = load_gallery_embeddings(face_recognizer_instance.embedding_size)
+    gallery_embeddings, gallery_nicknames, gallery_display_names = (
+        load_gallery_embeddings(face_recognizer_instance.embedding_size)
+    )
     video_files = [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith(".mp4")]
     video_paths = {f: os.path.join(VIDEO_DIR, f) for f in video_files}
 
     def update_slider_on_video(selected_video):
         video_path = video_paths[selected_video]
         total = get_total_frames(video_path)
-        return gr.update(maximum=total - 1, value=0), {"playing": False, "frame": 0, "total": total}
+        return gr.update(maximum=total - 1, value=0), {
+            "playing": False,
+            "frame": 0,
+            "total": total,
+        }
 
     def update_frame(selected_video, frame_idx, vis_type):
         video_path = video_paths[selected_video]
@@ -639,7 +685,9 @@ def build_gradio_interface():
         out_frame, fig = result
         return out_frame, fig
 
-    def play_loop(selected_video, vis_type, state_in):  # Renamed state to state_in for clarity
+    def play_loop(
+        selected_video, vis_type, state_in
+    ):  # Renamed state to state_in for clarity
         video_path = video_paths[selected_video]
         current_frame_idx = state_in["frame"]
         total_frames = state_in["total"]
@@ -668,7 +716,11 @@ def build_gradio_interface():
                         out_frame,
                         fig,
                         current_frame_idx,
-                        {"playing": True, "frame": current_frame_idx + 1, "total": total_frames},
+                        {
+                            "playing": True,
+                            "frame": current_frame_idx + 1,
+                            "total": total_frames,
+                        },
                     )
                     return  # End this iteration, Gradio calls again with new state if playing is True
                 else:  # Failed to get the first frame
@@ -676,7 +728,11 @@ def build_gradio_interface():
                         gr.update(),
                         gr.update(),
                         current_frame_idx,
-                        {"playing": False, "frame": current_frame_idx, "total": total_frames},
+                        {
+                            "playing": False,
+                            "frame": current_frame_idx,
+                            "total": total_frames,
+                        },
                     )
                     return
             else:  # Already at the end when play was clicked
@@ -684,7 +740,11 @@ def build_gradio_interface():
                     gr.update(),
                     gr.update(),
                     current_frame_idx,
-                    {"playing": False, "frame": current_frame_idx, "total": total_frames},
+                    {
+                        "playing": False,
+                        "frame": current_frame_idx,
+                        "total": total_frames,
+                    },
                 )
                 return
 
@@ -709,7 +769,11 @@ def build_gradio_interface():
                         out_frame,
                         fig,
                         current_frame_idx,
-                        {"playing": True, "frame": current_frame_idx + 1, "total": total_frames},
+                        {
+                            "playing": True,
+                            "frame": current_frame_idx + 1,
+                            "total": total_frames,
+                        },
                     )
                     return
                 else:  # Failed to get a subsequent frame
@@ -717,7 +781,11 @@ def build_gradio_interface():
                         gr.update(),
                         gr.update(),
                         current_frame_idx,
-                        {"playing": False, "frame": current_frame_idx, "total": total_frames},
+                        {
+                            "playing": False,
+                            "frame": current_frame_idx,
+                            "total": total_frames,
+                        },
                     )
                     return
             else:  # Reached end of video while playing
@@ -725,7 +793,11 @@ def build_gradio_interface():
                     gr.update(),
                     gr.update(),
                     current_frame_idx,
-                    {"playing": False, "frame": current_frame_idx, "total": total_frames},
+                    {
+                        "playing": False,
+                        "frame": current_frame_idx,
+                        "total": total_frames,
+                    },
                 )
                 return
 
@@ -740,7 +812,7 @@ def build_gradio_interface():
 
     with gr.Blocks(title="Face Recognition System", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# Real-Time Face Recognition & Embedding Visualization")
-        
+
         with gr.Tab("Video Processing"):
             with gr.Row():
                 with gr.Column(scale=3):
@@ -752,12 +824,20 @@ def build_gradio_interface():
                     )
                 with gr.Column(scale=2):
                     vis_type_video = gr.Radio(
-                        ["bar", "scatter"], value="bar", label="Visualization Type", interactive=True
+                        ["bar", "scatter"],
+                        value="bar",
+                        label="Visualization Type",
+                        interactive=True,
                     )
             with gr.Row():
                 with gr.Column(scale=4):
                     frame_slider = gr.Slider(
-                        minimum=0, maximum=1, value=0, step=1, label="Frame Timeline", interactive=True
+                        minimum=0,
+                        maximum=1,
+                        value=0,
+                        step=1,
+                        label="Frame Timeline",
+                        interactive=True,
                     )
                 with gr.Column(scale=1):
                     with gr.Row():
@@ -768,10 +848,12 @@ def build_gradio_interface():
                     output_video = gr.Image(label="Video Frame with Recognized Faces")
                 with gr.Column(scale=2):
                     output_plot_video = gr.Plot(label="Similarity Visualization")
-            
+
             state = gr.State({"playing": False, "frame": 0, "total": 1})
             video_dropdown.change(
-                fn=update_slider_on_video, inputs=[video_dropdown], outputs=[frame_slider, state]
+                fn=update_slider_on_video,
+                inputs=[video_dropdown],
+                outputs=[frame_slider, state],
             )
             frame_slider.change(
                 fn=update_frame,
@@ -790,7 +872,11 @@ def build_gradio_interface():
                 api_name=False,
             )
             pause_btn.click(
-                fn=lambda s: {"playing": False, "frame": s["frame"], "total": s["total"]},
+                fn=lambda s: {
+                    "playing": False,
+                    "frame": s["frame"],
+                    "total": s["total"],
+                },
                 inputs=[state],
                 outputs=[state],
                 api_name=False,
@@ -799,19 +885,26 @@ def build_gradio_interface():
         with gr.Tab("Static Image Processing"):
             with gr.Row():
                 with gr.Column(scale=3):
-                    static_image_input = gr.Image(type="numpy", label="Upload Image for Recognition")
+                    static_image_input = gr.Image(
+                        type="numpy", label="Upload Image for Recognition"
+                    )
                 with gr.Column(scale=2):
                     vis_type_static = gr.Radio(
-                        ["bar", "scatter"], value="bar", label="Visualization Type", interactive=True
+                        ["bar", "scatter"],
+                        value="bar",
+                        label="Visualization Type",
+                        interactive=True,
                     )
             with gr.Row():
                 process_image_btn = gr.Button("Process Image", variant="primary")
             with gr.Row():
                 with gr.Column(scale=3):
-                    output_static_image = gr.Image(label="Processed Image with Recognized Faces")
+                    output_static_image = gr.Image(
+                        label="Processed Image with Recognized Faces"
+                    )
                 with gr.Column(scale=2):
                     output_plot_static = gr.Plot(label="Similarity Visualization")
-            
+
             process_image_btn.click(
                 fn=process_static_image,
                 inputs=[static_image_input, vis_type_static],

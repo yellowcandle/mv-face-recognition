@@ -47,7 +47,7 @@
 							<!-- svelte-ignore binding_property_non_reactive -->
 							<Pyramid_0 bind:this={components[0]} data={data_0} {form} params={page.params}>
 								<!-- svelte-ignore binding_property_non_reactive -->
-										<Pyramid_1 bind:this={components[1]} data={data_1} {form} />
+										<Pyramid_1 bind:this={components[1]} data={data_1} {form} params={page.params} />
 							</Pyramid_0>
 
 {:else}
