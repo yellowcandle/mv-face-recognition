@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-07-16T03:46:41.369Z",
+  "agent": "backend",
+  "status": "failed",
+  "totalTests": 6,
+  "passedTests": 2,
+  "failedTests": 4,
+  "averageResponseTime": 2.6666666666666665,
+  "errors": 1,
+  "logFile": "/Users/swong/dev/mv-face-recognition/logs/test-results/backend-1752637601374.json"
+}

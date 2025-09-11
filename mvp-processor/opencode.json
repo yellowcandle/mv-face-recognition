@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md", "CLAUDE.md"],
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    "Figma Dev Mode MCP": {
+      "type": "remote",  
+      "url": "http://127.0.0.1:3845/sse",
+      "enabled": true
+    },
+    "serena": {
+      "type": "local",
+      "command": "/Users/yellowcandle/.pyenv/shims/uvx",
+      "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"],
+      "enabled": true
+    },
+    "deepwiki": {
+      "type": "remote",
+      "url": "https://mcp.deepwiki.com/sse",
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,20 @@
+database:
+  chromadb_path: .chroma_db
+  collection_name: contestant_embeddings
+face_detection:
+  confidence_threshold: 0.3
+  device: auto
+  model_name: buffalo_l
+face_recognition:
+  max_faces_per_frame: 50
+  similarity_threshold: 0.6
+paths:
+  contestant_csv: contestant_info.csv
+  contestant_photos: source/photo/contestants
+  videos_dir: source/videos
+  output_dir: output
+video_processing:
+  frame_skip: 1
+  max_resolution: null
+  output_format: mp4
+  preserve_audio: true

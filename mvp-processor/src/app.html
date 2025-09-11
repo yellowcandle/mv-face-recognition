@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="description" content="MV Face Recognition - AI-powered video face detection and recognition system" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Face Recognition Dashboard</title>
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    %sveltekit.head%
+    <style>
+        :root {
+            /* Color Palette */
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --success-color: #22c55e;
+            --warning-color: #eab308;
+            --error-color: #ef4444;
+            --info-color: #3b82f6;
+
+            /* Surface Colors */
+            --bg-color: #ffffff;
+            --surface-color: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-color: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+
+            /* Dark mode */
+            --dark-bg-color: #0f172a;
+            --dark-surface-color: #1e293b;
+            --dark-border-color: #334155;
+            --dark-text-color: #f1f5f9;
+            --dark-text-secondary: #94a3b8;
+
+            /* Shadows */
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+            /* Transitions */
+            --transition: all 0.2s ease;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: var(--dark-bg-color);
+            --surface-color: var(--dark-surface-color);
+            --border-color: var(--dark-border-color);
+            --text-color: var(--dark-text-color);
+            --text-secondary: var(--dark-text-secondary);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        /* Face Recognition Dashboard Specific Styles */
+        .dashboard-layout {
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-bar {
+            height: 60px;
+            background-color: #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid #444;
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .status-indicator {
+            background-color: #22c55e;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            min-height: calc(100vh - 260px);
+        }
+
+        .video-panel {
+            width: 60%;
+            background-color: #000000;
+            position: relative;
+            border-right: 1px solid #444;
+        }
+
+        .face-panel {
+            width: 40%;
+            background-color: #1e293b;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .similarity-panel {
+            height: 200px;
+            background-color: #374151;
+            padding: 20px;
+            border-top: 1px solid #444;
+        }
+    </style>
+</head>
+<body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+</body>
+</html>

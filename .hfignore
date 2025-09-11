@@ -1,0 +1,33 @@
+# HF Spaces ignore file - exclude large files to stay under 1GB limit
+
+# Large video files - will use smaller samples or external hosting
+source/videos/
+output_frames/
+output_mp4s/
+comparison_results/
+debug_masks/
+
+# Cache and temporary files
+cache/embeddings/
+cache/chromadb/
+cache/chromadb_backup*/
+
+# Model files if they exist locally
+models/
+*.onnx
+
+# Large data files
+recognized_frames/
+source/videos/*.mp4
+# source/videos_optimized/
+source/videos_hf_clean/
+source/videos_hf_optimized/
+*.avi
+*.mov
+*.mkv
+
+# Keep only essential files for dashboard:
+# - source/photo/contestants/ (for embeddings)
+# - source/videos_hf_clean/ (small optimized videos)
+# - Dashboard code
+# - Configuration files

@@ -1,0 +1,112 @@
+# MV Face Recognition MVP Configuration - Integrated with Deployment Architecture
+video:
+  # Dense frame processing for 6x improvement  
+  fps_sample_rate: 6  # Extract 6 frames per second (aligned with video_processor.py)
+  max_frames: 0  # 0 = process entire video
+  resize_width: 1920  # Maximum width for processing
+  preserve_audio: true  # Use FFmpeg to maintain original audio tracks
+  
+  # Output video settings aligned with deployment
+  output_formats:
+    - format: "mp4"
+      quality: "high"
+      resolution: "1080p"
+      codec: "h264"
+    - format: "mp4" 
+      quality: "medium"
+      resolution: "720p"
+      codec: "h264"
+
+# Enhanced Face Detection with Hardware Acceleration
+face_detection:
+  model: "insightface"  # Use InsightFace buffalo_l model
+  model_path: "../models/buffalo_l"
+  min_confidence: 0.6
+  max_faces_per_frame: 10
+  enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
+  
+# Face Recognition with ChromaDB Integration
+face_recognition:
+  similarity_threshold: 0.7  # Confidence threshold
+  tolerance: 0.6  # Lower = more strict matching
+  max_distance: 0.6  # Maximum face distance for recognition
+  use_existing_embeddings: true
+  embeddings_path: "../source/photo/contestants"
+  enable_interpolation: true  # Linear interpolation between detections
+  confidence_decay: 0.95  # For interpolated frames
+
+# Contestant Database (Critical Files)
+contestants:
+  photo_dir: "../source/photo/contestants"  # 95 contestant photos and embeddings
+  embeddings_cache: "data/embeddings_cache.pkl"
+  info_csv: "../source/contestant_info.csv"  # Essential contestant mapping
+  chroma_db_path: "../database/chroma_db"
+
+# Processing Settings for Dense Metadata
+processing:
+  enable_tracking: true
+  smoothing_window: 5
+  batch_size: 32
+  parallel_processing: true
+  generate_dense_metadata: true  # Frame-level granularity
+  enable_interpolation: true
+
+# Output Settings Aligned with Deployment Scripts
+output:
+  processed_dir: "../processed_videos"  # For upload-to-r2.js
+  thumbnails_dir: "../thumbnails"
+  metadata_dir: "../metadata"  # For upload-metadata.js
+  galleries_dir: "data/galleries"
+  
+  # Local-only mode configuration
+  local_mode:
+    enabled: true  # Set to true to enable local-only processing
+    base_output_dir: "../local_output"  # Base directory for all local outputs
+    processed_videos_dir: "../local_output/processed_videos"
+    thumbnails_dir: "../local_output/thumbnails"
+    metadata_dir: "../local_output/metadata"
+    galleries_dir: "../local_output/galleries"
+    clips_dir: "../local_output/clips"  # For future clip extraction
+    create_subdirs: true  # Create subdirectories per video
+
+# Thumbnail Generation Settings
+thumbnails:
+  interval: 60.0  # Generate thumbnail every 60 seconds
+  max_count: 20   # Maximum number of thumbnails per video
+  width: 320      # Thumbnail width in pixels
+  quality: 85     # JPEG quality (0-100)
+
+# Cloudflare Integration with Environment Variables
+cloudflare:
+  account_id: "${CLOUDFLARE_ACCOUNT_ID}"
+  api_token: "${CLOUDFLARE_API_TOKEN}"
+  r2_access_key: "${CLOUDFLARE_R2_ACCESS_KEY_ID}"
+  r2_secret_key: "${CLOUDFLARE_R2_SECRET_ACCESS_KEY}"
+  r2_bucket: "mv-face-recognition-videos"
+  r2_endpoint: "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+  worker_url: "https://mv-face-recognition-api.herballemon.workers.dev"
+
+# Integration with Deployment Scripts
+integration:
+  upload_to_cloudflare: false
+  use_external_scripts: true  # Use Node.js upload scripts
+  scripts_dir: "../scripts"
+  auto_deploy_worker: false  # Manual deployment step
+
+# Audio Preservation (FFmpeg Integration)
+audio:
+  preserve_audio: true
+  ffmpeg_path: "ffmpeg"
+  merge_strategy: "copy"  # Copy streams without re-encoding
+
+# Performance Optimization
+performance:
+  hardware_acceleration: "auto"  # auto, apple_silicon, cuda, cpu
+  processing_threads: 4
+  memory_limit_gb: 8
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/processing.log"

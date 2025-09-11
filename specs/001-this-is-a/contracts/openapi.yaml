@@ -1,0 +1,45 @@
+openapi: 3.0.0
+info:
+  title: Face Recognition API
+  version: 1.0.0
+
+paths:
+  /process-video:
+    post:
+      summary: Process video for face recognition
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video: {type: string, format: binary}
+                mode: {type: string, enum: [frames, video]}
+      responses:
+        '200':
+          description: Processing results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output_path: {type: string}
+                  detections: {type: array, items: {type: object, properties: {contestant_id: integer, confidence: number}}}
+
+  /embeddings:
+    post:
+      summary: Generate/update contestant embeddings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  contestant_id: integer
+                  photo_path: string
+      responses:
+        '200':
+          description: Embeddings stored
