@@ -22,21 +22,14 @@ onnxruntime-gpu>=1.16.0
 chromadb>=0.4.0
 numpy>=1.24.0
 pandas>=2.0.0
-Pillow>=10.0.0
+Pillow>=10.3.0
 
 # Video Processing & Media
 ffmpeg-python>=0.2.0
 moviepy>=1.0.3
 
 # Core Python Libraries
-tqdm>=4.65.0
-python-dateutil>=2.8.0
-
-# Additional dependencies for face recognition
-onnx>=1.15.0
-protobuf>=3.20.0
-scikit-learn>=1.3.0
-scipy>=1.11.0
+tqdm>=4.66.3
 
 # For enhanced processing (optional)
 matplotlib>=3.7.0
