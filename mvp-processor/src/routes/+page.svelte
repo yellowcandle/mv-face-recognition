@@ -20,7 +20,6 @@
     { id: '6', name: 'Alex Chen', confidence: 97, x: 55, y: 15, width: 80, height: 100 }
   ];
   
-  let selectedVideo = 'Live Stream';
   let frameRate = 30;
   let resolution = '1920x1080';
   let isProcessing = true;
