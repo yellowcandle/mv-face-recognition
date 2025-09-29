@@ -112,7 +112,7 @@ class InsightFaceBackend(DetectorBackend):
             embedding = r.get("embedding") if isinstance(r, dict) else None
 
             faces_out.append(
-                DetectedFace(bbox=bb, embedding=embedding, match_confidence=conf)
+                DetectedFace(bbox=bb, confidence=conf, embedding=embedding)
             )
 
         return faces_out
@@ -123,7 +123,7 @@ class MockBackend(DetectorBackend):
 
     def detect(self, image: Any) -> List[DetectedFace]:
         bb = BoundingBox(0, 0, 1, 1, 0.99)
-        df = DetectedFace(bbox=bb, embedding=None, confidence=0.99)
+        df = DetectedFace(bbox=bb, confidence=0.99, embedding=None)
         return [df]
 
 
@@ -140,8 +140,9 @@ class FaceDetector:
     is returned to keep the pipeline functional for tests and integration.
     """
 
-    def __init__(self, model_name: str = "default"):
+    def __init__(self, model_name: str = "default", confidence_threshold: float = 0.5):
         self.model_name = model_name
+        self.confidence_threshold = confidence_threshold
         self._backend: Optional[DetectorBackend] = None
         self._ensure_backend()
 
@@ -154,10 +155,12 @@ class FaceDetector:
         else:
             self._backend = MockBackend(self.model_name)
 
-    def detect(self, image: Any) -> List[DetectedFace]:
+    def detect(self, image: Any, confidence: Optional[float] = None) -> List[DetectedFace]:
         if self._backend is None:
             self._ensure_backend()
-        return self._backend.detect(image)
+        result = self._backend.detect(image)
+        threshold = confidence if confidence is not None else self.confidence_threshold
+        return [f for f in result if f.confidence >= threshold]
 
 
 def load_model(model_name: str = "default") -> str:

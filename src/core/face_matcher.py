@@ -105,7 +105,7 @@ class FaceMatcher:
         return results
 
     def get_top_matches(
-        self, embedding: np.ndarray, n_results: int = None
+        self, embedding: np.ndarray, n_results: Optional[int] = None
     ) -> List[Tuple[str, float]]:
         """
         Get top N matches for a face embedding.
