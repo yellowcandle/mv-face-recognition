@@ -26,6 +26,19 @@ def get_video_service():
     return VideoService()
 
 
+async def require_auth():
+    """Simple auth dependency - placeholder for now."""
+    # Placeholder: in production, this would verify JWT token from headers
+    # For now, allow all requests
+    return {"user_id": "anonymous", "roles": ["user"]}
+
+
+async def require_admin():
+    """Admin auth dependency."""
+    # Placeholder: check for admin role
+    return {"user_id": "admin", "roles": ["admin"]}
+
+
 @router.get("/videos/", response_model=List[VideoInfo])
 async def list_videos(video_service: VideoService = Depends(get_video_service)):
     """Get list of available videos."""
@@ -58,6 +71,7 @@ async def get_video_info(
 async def upload_video(
     file: UploadFile = File(...),
     video_service: VideoService = Depends(get_video_service),
+    user: dict = Depends(require_auth),
 ):
     """Upload a new video file."""
     settings = get_settings()
@@ -126,7 +140,9 @@ async def download_video(
 
 @router.delete("/videos/{video_id}/")
 async def delete_video(
-    video_id: str, video_service: VideoService = Depends(get_video_service)
+    video_id: str,
+    video_service: VideoService = Depends(get_video_service),
+    user: dict = Depends(require_admin),
 ):
     """Delete a video and its associated data."""
     try:

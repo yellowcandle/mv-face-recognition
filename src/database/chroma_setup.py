@@ -6,7 +6,7 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import numpy as np
 import chromadb
 from chromadb.config import Settings
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ChromaDBManager:
     """Manages ChromaDB for face embeddings storage and similarity search."""
 
-    def __init__(self, config_path: str = "config.json", config: dict = None):
+    def __init__(self, config_path: str = "config.json", config: Optional[dict] = None):
         """Initialize ChromaDB manager with configuration dict or file path."""
         if config is not None:
             # Use provided config dict
@@ -141,7 +141,7 @@ class ChromaDBManager:
         return len(embeddings)
 
     def search_similar_faces(
-        self, query_embedding: np.ndarray, n_results: int = None
+        self, query_embedding: np.ndarray, n_results: Optional[int] = None
     ) -> List[Tuple[str, float]]:
         """Search for similar faces in the database."""
         if n_results is None:
