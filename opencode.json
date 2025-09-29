@@ -9,7 +9,7 @@
     },
     "serena": {
       "type": "local",
-      "command": ["/Users/yellowcandle/.pyenv/shims/uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"],
+      "command": ["/Users/swong/.local/bin/uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"],
       "enabled": true
     },
     "deepwiki": {
