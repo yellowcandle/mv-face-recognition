@@ -18,7 +18,18 @@ dependencies = [
     "pandas>=2.0.3",
     "imageio-ffmpeg>=0.5.1",
     "face-recognition-models",
+    "ultralytics>=8.3.203",
+    "onnx>=1.17.0",
+    "onnxslim>=0.1.70",
+    "onnxruntime>=1.20.1",
 ]
 
 [tool.uv.sources]
 face-recognition-models = { git = "https://github.com/ageitgey/face_recognition_models" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
