@@ -10,7 +10,7 @@ from collections import defaultdict
 import logging
 from datetime import datetime
 
-from src.face_detector import FaceRecognition
+from face_detector import FaceRecognition
 
 logger = logging.getLogger(__name__)
 
