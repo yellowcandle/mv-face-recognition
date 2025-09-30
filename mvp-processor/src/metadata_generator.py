@@ -10,7 +10,7 @@ from collections import defaultdict
 import logging
 from datetime import datetime
 
-from face_detector import FaceRecognition
+from src.face_detector import FaceRecognition
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ class MetadataGenerator:
         frame_data: List[Dict],
         output_name: str,
         thumbnail_paths: List[str],
+        segmentation_config: Dict = None,
+        face_parsing_config: Dict = None,
     ) -> Dict:
         """
         Generate comprehensive metadata for a processed video
@@ -37,6 +39,9 @@ class MetadataGenerator:
             recognitions: List of face recognitions
             frame_data: Per-frame processing data
             output_name: Output video name
+            thumbnail_paths: List of thumbnail file paths
+            segmentation_config: Optional segmentation configuration
+            face_parsing_config: Optional face parsing configuration
 
         Returns:
             Structured metadata dictionary
@@ -66,10 +71,28 @@ class MetadataGenerator:
             "thumbnails": thumbnail_paths,
             "recognition_config": {
                 "tolerance": self.config["face_recognition"]["tolerance"],
-                "min_confidence": 0.5,  # Used in filtering
+                "min_confidence": 0.5,
                 "detection_model": self.config["face_detection"]["model"],
             },
         }
+
+        if segmentation_config:
+            metadata["segmentation_config"] = {
+                "enabled": segmentation_config.get("enable_person_gating", False),
+                "interval": segmentation_config.get("interval", 15),
+                "min_person_area": segmentation_config.get("min_person_area", 5000),
+                "expand_ratio": segmentation_config.get("expand_ratio", 1.2),
+                "max_rois_per_frame": segmentation_config.get("max_rois_per_frame", 20),
+            }
+
+        if face_parsing_config:
+            metadata["face_parsing_config"] = {
+                "enabled": face_parsing_config.get("enable_on_low_conf", False),
+                "low_conf_threshold": face_parsing_config.get(
+                    "low_conf_threshold", 0.5
+                ),
+                "min_skin_ratio": face_parsing_config.get("min_skin_ratio", 0.3),
+            }
 
         return metadata
 
@@ -89,13 +112,23 @@ class MetadataGenerator:
         for recognition in recognitions:
             contestant_id = recognition.contestant_id
 
-            # Add appearance
+            # Add appearance with optional segmentation fields
             appearance = {
                 "timestamp": float(recognition.detection.timestamp),
                 "frame_number": int(recognition.detection.frame_number),
                 "confidence": float(recognition.match_confidence),
                 "face_location": [int(x) for x in recognition.detection.location],
             }
+
+            if hasattr(recognition.detection, "roi_gated"):
+                appearance["roi_gated"] = recognition.detection.roi_gated
+
+            if hasattr(recognition.detection, "parsing_validated"):
+                appearance["parsing_validated"] = recognition.detection.parsing_validated
+
+            if hasattr(recognition.detection, "skin_ratio"):
+                appearance["skin_ratio"] = float(recognition.detection.skin_ratio)
+
             timeline[contestant_id]["appearances"].append(appearance)
 
             # Update contestant info
