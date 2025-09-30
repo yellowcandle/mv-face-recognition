@@ -1,0 +1,24 @@
+{
+  "video": {
+    "fps_sample_rate": 2,
+    "max_frames": 1000,
+    "resize_width": 640
+  },
+  "face_detection": {
+    "model": "hog",
+    "min_confidence": 0.5
+  },
+  "segmentation": {
+    "enable_person_gating": true,
+    "model_path": "models/yolov8n-seg.onnx",
+    "interval": 15,
+    "min_person_area": 5000,
+    "expand_ratio": 1.2,
+    "max_rois_per_frame": 20
+  },
+  "face_parsing": {
+    "enable_on_low_conf": true,
+    "low_conf_threshold": 0.5,
+    "min_skin_ratio": 0.3
+  }
+}
