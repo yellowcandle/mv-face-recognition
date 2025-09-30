@@ -21,6 +21,112 @@ class VideoProcessor:
         self.max_frames = config["video"]["max_frames"]
         self.resize_width = config["video"]["resize_width"]
 
+        self.segmentation_config = None
+        self.person_segmenter = None
+        self.roi_cache = None
+        self.face_parsing_config = None
+        self.face_parser = None
+        self.metrics = None
+
+        if "segmentation" in config:
+            from src.config import SegmentationConfig
+            from src.person_segmenter import PersonSegmenter
+            from src.roi_cache import ROICache
+
+            self.segmentation_config = SegmentationConfig.load_from_dict(
+                config["segmentation"]
+            )
+
+            if self.segmentation_config.enable_person_gating:
+                self.person_segmenter = PersonSegmenter(
+                    model_path=self.segmentation_config.model_path,
+                    min_person_area=self.segmentation_config.min_person_area,
+                    expand_ratio=self.segmentation_config.expand_ratio,
+                    max_rois_per_frame=self.segmentation_config.max_rois_per_frame,
+                )
+                self.roi_cache = ROICache(ttl_multiplier=2)
+                logger.info(
+                    f"Person segmentation enabled with interval={self.segmentation_config.interval}"
+                )
+
+        if "face_parsing" in config:
+            from src.config import FaceParsingConfig
+            from src.face_parser import FaceParser
+
+            self.face_parsing_config = FaceParsingConfig.load_from_dict(
+                config["face_parsing"]
+            )
+
+            if self.face_parsing_config.enable_on_low_conf:
+                self.face_parser = FaceParser(self.face_parsing_config)
+                logger.info(
+                    f"Face parsing validation enabled with threshold={self.face_parsing_config.low_conf_threshold}"
+                )
+
+    def log_segmentation_stats(self):
+        """
+        Log segmentation and face parsing performance statistics
+
+        Should be called after video processing completes
+        """
+        if self.roi_cache:
+            stats = self.roi_cache.get_stats()
+            logger.info(
+                f"Segmentation stats: ROI cache hit rate={stats['hit_rate']:.1%}, "
+                f"hits={stats['total_hits']}, misses={stats['total_misses']}"
+            )
+
+        if self.person_segmenter:
+            logger.info(
+                f"Segmentation config: interval={self.segmentation_config.interval}, "
+                f"min_area={self.segmentation_config.min_person_area}, "
+                f"expand_ratio={self.segmentation_config.expand_ratio}"
+            )
+        
+        if self.face_parser:
+            self.face_parser.log_validation_summary()
+
+    def init_metrics(self, video_id: str):
+        """
+        Initialize metrics collection for a video
+        
+        Args:
+            video_id: Unique identifier for the video being processed
+        """
+        from src.segmentation_metrics import SegmentationMetrics
+        self.metrics = SegmentationMetrics(video_id=video_id)
+    
+    def finalize_metrics(self, output_path: str = None) -> dict:
+        """
+        Finalize and export metrics collection
+        
+        Args:
+            output_path: Optional path to export metrics JSON
+        
+        Returns:
+            Dictionary containing metrics summary
+        """
+        if not self.metrics:
+            return {}
+        
+        if self.roi_cache:
+            stats = self.roi_cache.get_stats()
+            self.metrics.cache_hits = stats['total_hits']
+            self.metrics.cache_misses = stats['total_misses']
+        
+        if self.face_parser:
+            parsing_stats = self.face_parser.get_validation_stats()
+            self.metrics.faces_parsed = parsing_stats['total_validated']
+            self.metrics.faces_rejected = parsing_stats['rejected']
+        
+        summary = self.metrics.get_summary()
+        
+        if output_path:
+            self.metrics.export_json(output_path)
+            logger.info(f"Exported segmentation metrics to {output_path}")
+        
+        return summary
+
     def extract_frames(
         self, video_path: str
     ) -> Generator[Tuple[np.ndarray, float], None, None]:
@@ -68,6 +174,162 @@ class VideoProcessor:
 
         cap.release()
         logger.info(f"Extracted {extracted_count} frames from {video_path}")
+
+    def process_frame(
+        self,
+        frame: np.ndarray,
+        frame_idx: int,
+        face_detector=None,
+        timestamp: float = 0.0,
+    ) -> Tuple[np.ndarray, List, List]:
+        """
+        Process a single frame with optional segmentation gating and face parsing validation
+
+        Args:
+            frame: Input frame
+            frame_idx: Frame index
+            face_detector: Optional FaceDetector instance for ROI-gated detection
+            timestamp: Frame timestamp for face detection
+
+        Returns:
+            Tuple of (preprocessed_frame, rois_for_detection, face_detections)
+            - preprocessed_frame: Frame ready for face detection
+            - rois_for_detection: List of ROI objects if segmentation enabled, empty list for full-frame
+            - face_detections: List of validated FaceDetection objects (if face_detector provided)
+        """
+        rois = []
+        face_detections = []
+        
+        if self.metrics:
+            self.metrics.total_frames += 1
+
+        if (
+            self.segmentation_config
+            and self.segmentation_config.enable_person_gating
+            and self.person_segmenter
+            and self.roi_cache
+        ):
+            interval = self.segmentation_config.interval
+
+            if frame_idx % interval == 0:
+                rois = self.person_segmenter.segment(frame)
+                self.roi_cache.update(frame_idx, rois)
+                logger.debug(
+                    f"Segmentation: {len(rois)} ROIs found at frame {frame_idx}"
+                )
+                
+                if self.metrics:
+                    self.metrics.record_segmentation(len(rois))
+            else:
+                cached_frame_idx = (frame_idx // interval) * interval
+                rois = self.roi_cache.get(cached_frame_idx, interval, frame_idx)
+
+                if rois is None:
+                    logger.debug(
+                        f"Cache miss at frame {frame_idx}, fallback to full-frame"
+                    )
+                    rois = []
+                    
+                    if self.metrics:
+                        self.metrics.record_cache_miss()
+                else:
+                    logger.debug(
+                        f"Cache hit at frame {frame_idx}: reusing {len(rois)} ROIs from frame {cached_frame_idx}"
+                    )
+                    
+                    if self.metrics:
+                        self.metrics.record_cache_hit()
+
+        if face_detector:
+            if rois:
+                for roi in rois:
+                    roi_detections = self.detect_faces_in_roi(
+                        frame, roi, face_detector, timestamp, frame_idx
+                    )
+                    face_detections.extend(roi_detections)
+                logger.debug(
+                    f"ROI-gated detection: {len(face_detections)} total faces from {len(rois)} ROIs"
+                )
+            else:
+                face_detections = face_detector.detect_faces(frame, timestamp, frame_idx)
+                logger.debug(
+                    f"Fallback to full-frame detection: {len(face_detections)} faces at frame {frame_idx}"
+                )
+            
+            if self.metrics:
+                self.metrics.record_faces_detected(len(face_detections))
+
+            if self.face_parser and self.face_parsing_config.enable_on_low_conf:
+                original_count = len(face_detections)
+                validated_detections = []
+
+                for detection in face_detections:
+                    if self.face_parser.validate_face(frame, detection):
+                        validated_detections.append(detection)
+
+                face_detections = validated_detections
+                rejected_count = original_count - len(validated_detections)
+
+                if rejected_count > 0:
+                    logger.debug(
+                        f"Face parsing: rejected {rejected_count}/{original_count} faces at frame {frame_idx}"
+                    )
+
+        return frame, rois, face_detections
+
+    def detect_faces_in_roi(
+        self,
+        frame: np.ndarray,
+        roi,
+        face_detector,
+        timestamp: float,
+        frame_number: int,
+    ) -> List:
+        """
+        Detect faces within a specific ROI region
+
+        Args:
+            frame: Full frame image
+            roi: ROI object with x1, y1, x2, y2 coordinates
+            face_detector: FaceDetector instance
+            timestamp: Frame timestamp
+            frame_number: Frame number
+
+        Returns:
+            List of FaceDetection objects with full-frame coordinates
+        """
+        from src.face_detector import FaceDetection
+
+        roi_region = frame[roi.y1 : roi.y2, roi.x1 : roi.x2]
+
+        if roi_region.size == 0:
+            return []
+
+        detections = face_detector.detect_faces(roi_region, timestamp, frame_number)
+
+        adjusted_detections = []
+        for detection in detections:
+            top, right, bottom, left = detection.location
+
+            full_top = top + roi.y1
+            full_right = right + roi.x1
+            full_bottom = bottom + roi.y1
+            full_left = left + roi.x1
+
+            adjusted_detection = FaceDetection(
+                location=(full_top, full_right, full_bottom, full_left),
+                encoding=detection.encoding,
+                timestamp=detection.timestamp,
+                frame_number=detection.frame_number,
+                confidence=detection.confidence,
+            )
+            adjusted_detections.append(adjusted_detection)
+
+        logger.debug(
+            f"ROI detection: {len(adjusted_detections)} faces in ROI ({roi.x1},{roi.y1})-({roi.x2},{roi.y2})"
+        )
+
+        return adjusted_detections
 
     def get_video_info(self, video_path: str) -> dict:
         """Get video metadata"""
