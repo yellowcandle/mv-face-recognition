@@ -29,9 +29,9 @@ class VideoProcessor:
         self.metrics = None
 
         if "segmentation" in config:
-            from src.config import SegmentationConfig
-            from src.person_segmenter import PersonSegmenter
-            from src.roi_cache import ROICache
+            from config import SegmentationConfig
+            from person_segmenter import PersonSegmenter
+            from roi_cache import ROICache
 
             self.segmentation_config = SegmentationConfig.load_from_dict(
                 config["segmentation"]
@@ -50,8 +50,8 @@ class VideoProcessor:
                 )
 
         if "face_parsing" in config:
-            from src.config import FaceParsingConfig
-            from src.face_parser import FaceParser
+            from config import FaceParsingConfig
+            from face_parser import FaceParser
 
             self.face_parsing_config = FaceParsingConfig.load_from_dict(
                 config["face_parsing"]
@@ -93,7 +93,7 @@ class VideoProcessor:
         Args:
             video_id: Unique identifier for the video being processed
         """
-        from src.segmentation_metrics import SegmentationMetrics
+        from segmentation_metrics import SegmentationMetrics
         self.metrics = SegmentationMetrics(video_id=video_id)
     
     def finalize_metrics(self, output_path: str = None) -> dict:
@@ -298,7 +298,7 @@ class VideoProcessor:
         Returns:
             List of FaceDetection objects with full-frame coordinates
         """
-        from src.face_detector import FaceDetection
+        from face_detector import FaceDetection
 
         roi_region = frame[roi.y1 : roi.y2, roi.x1 : roi.x2]
 

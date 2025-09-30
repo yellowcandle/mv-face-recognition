@@ -3,7 +3,7 @@ import cv2
 from typing import Any, Dict
 import logging
 
-from src.config import FaceParsingConfig
+from config import FaceParsingConfig
 
 logger = logging.getLogger(__name__)
 
