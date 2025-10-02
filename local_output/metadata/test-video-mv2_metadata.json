@@ -1,0 +1,1377 @@
+{
+  "video_info": {
+    "filename": "test-video-mv2.mp4",
+    "fps": 25.03267973856209,
+    "frame_count": 766,
+    "width": 3840,
+    "height": 1600,
+    "duration": 30.6,
+    "processed_name": "test-video-mv2",
+    "processing_date": "2025-10-02T07:53:46.149313"
+  },
+  "processing_summary": {
+    "frames_processed": 38,
+    "total_faces_detected": 47,
+    "total_recognitions": 24,
+    "unique_contestants": 11,
+    "recognition_rate": 0.5106382978723404,
+    "confidence_stats": {
+      "average": 0.3901651089330003,
+      "minimum": 0.3041002929973303,
+      "maximum": 0.48829905087944436
+    },
+    "processing_timestamp": "2025-10-02T07:53:46.148876"
+  },
+  "contestant_timeline": {
+    "33": {
+      "appearances": [
+        {
+          "timestamp": 0.0,
+          "frame_number": 0,
+          "confidence": 0.37716085270547695,
+          "face_location": [
+            53,
+            397,
+            182,
+            268
+          ]
+        },
+        {
+          "timestamp": 0.4793733681462141,
+          "frame_number": 1,
+          "confidence": 0.3041002929973303,
+          "face_location": [
+            47,
+            459,
+            202,
+            304
+          ]
+        },
+        {
+          "timestamp": 18.216187989556136,
+          "frame_number": 38,
+          "confidence": 0.36033007599808986,
+          "face_location": [
+            44,
+            462,
+            152,
+            354
+          ]
+        }
+      ],
+      "total_appearances": 3,
+      "average_confidence": 0.347197073900299,
+      "first_appearance": 0.0,
+      "last_appearance": 18.216187989556136,
+      "contestant_info": {
+        "id": "33",
+        "name": "黃敏蕎",
+        "nickname": "阿妹"
+      }
+    },
+    "83": {
+      "appearances": [
+        {
+          "timestamp": 7.190600522193211,
+          "frame_number": 15,
+          "confidence": 0.4379569032628756,
+          "face_location": [
+            47,
+            486,
+            121,
+            411
+          ]
+        },
+        {
+          "timestamp": 7.669973890339426,
+          "frame_number": 16,
+          "confidence": 0.4115727481233662,
+          "face_location": [
+            61,
+            504,
+            113,
+            452
+          ]
+        },
+        {
+          "timestamp": 9.108093994778068,
+          "frame_number": 19,
+          "confidence": 0.3850340167370637,
+          "face_location": [
+            32,
+            577,
+            94,
+            515
+          ]
+        },
+        {
+          "timestamp": 18.69556135770235,
+          "frame_number": 39,
+          "confidence": 0.3388541479997641,
+          "face_location": [
+            53,
+            405,
+            115,
+            342
+          ]
+        }
+      ],
+      "total_appearances": 4,
+      "average_confidence": 0.3933544540307674,
+      "first_appearance": 7.190600522193211,
+      "last_appearance": 18.69556135770235,
+      "contestant_info": {
+        "id": "83",
+        "name": "何佩婷",
+        "nickname": "何佩"
+      }
+    },
+    "73": {
+      "appearances": [
+        {
+          "timestamp": 7.669973890339426,
+          "frame_number": 16,
+          "confidence": 0.34744309027233944,
+          "face_location": [
+            106,
+            225,
+            196,
+            135
+          ]
+        }
+      ],
+      "total_appearances": 1,
+      "average_confidence": 0.34744309027233944,
+      "first_appearance": 7.669973890339426,
+      "last_appearance": 7.669973890339426,
+      "contestant_info": {
+        "id": "73",
+        "name": "陳紀澄",
+        "nickname": "Tania"
+      }
+    },
+    "10": {
+      "appearances": [
+        {
+          "timestamp": 12.94308093994778,
+          "frame_number": 27,
+          "confidence": 0.3383674144321678,
+          "face_location": [
+            32,
+            418,
+            94,
+            356
+          ]
+        },
+        {
+          "timestamp": 13.422454308093995,
+          "frame_number": 28,
+          "confidence": 0.47907088365282535,
+          "face_location": [
+            46,
+            322,
+            108,
+            259
+          ]
+        }
+      ],
+      "total_appearances": 2,
+      "average_confidence": 0.40871914904249657,
+      "first_appearance": 12.94308093994778,
+      "last_appearance": 13.422454308093995,
+      "contestant_info": {
+        "id": "10",
+        "name": "余潔瀅",
+        "nickname": "Zoe"
+      }
+    },
+    "28": {
+      "appearances": [
+        {
+          "timestamp": 14.860574412532637,
+          "frame_number": 31,
+          "confidence": 0.4164420630424528,
+          "face_location": [
+            22,
+            312,
+            96,
+            237
+          ]
+        }
+      ],
+      "total_appearances": 1,
+      "average_confidence": 0.4164420630424528,
+      "first_appearance": 14.860574412532637,
+      "last_appearance": 14.860574412532637,
+      "contestant_info": {
+        "id": "28",
+        "name": "王家晴",
+        "nickname": "Candy"
+      }
+    },
+    "87": {
+      "appearances": [
+        {
+          "timestamp": 15.339947780678852,
+          "frame_number": 32,
+          "confidence": 0.48829905087944436,
+          "face_location": [
+            67,
+            397,
+            196,
+            268
+          ]
+        },
+        {
+          "timestamp": 15.819321148825065,
+          "frame_number": 33,
+          "confidence": 0.39684300626815194,
+          "face_location": [
+            53,
+            397,
+            182,
+            268
+          ]
+        },
+        {
+          "timestamp": 23.489295039164492,
+          "frame_number": 49,
+          "confidence": 0.4178111612431673,
+          "face_location": [
+            39,
+            339,
+            168,
+            210
+          ]
+        },
+        {
+          "timestamp": 23.968668407310705,
+          "frame_number": 50,
+          "confidence": 0.46602216172084676,
+          "face_location": [
+            24,
+            296,
+            153,
+            167
+          ]
+        }
+      ],
+      "total_appearances": 4,
+      "average_confidence": 0.4422438450279026,
+      "first_appearance": 15.339947780678852,
+      "last_appearance": 23.968668407310705,
+      "contestant_info": {
+        "id": "87",
+        "name": "葛綽瑤",
+        "nickname": "Yoyo"
+      }
+    },
+    "81": {
+      "appearances": [
+        {
+          "timestamp": 15.339947780678852,
+          "frame_number": 32,
+          "confidence": 0.41915269943363953,
+          "face_location": [
+            153,
+            583,
+            266,
+            454
+          ]
+        },
+        {
+          "timestamp": 15.819321148825065,
+          "frame_number": 33,
+          "confidence": 0.32894463234711524,
+          "face_location": [
+            110,
+            597,
+            239,
+            468
+          ]
+        },
+        {
+          "timestamp": 23.489295039164492,
+          "frame_number": 49,
+          "confidence": 0.3727475599736112,
+          "face_location": [
+            98,
+            640,
+            253,
+            511
+          ]
+        },
+        {
+          "timestamp": 23.968668407310705,
+          "frame_number": 50,
+          "confidence": 0.40801740896976957,
+          "face_location": [
+            139,
+            569,
+            266,
+            440
+          ]
+        }
+      ],
+      "total_appearances": 4,
+      "average_confidence": 0.3822155751810339,
+      "first_appearance": 15.339947780678852,
+      "last_appearance": 23.968668407310705,
+      "contestant_info": {
+        "id": "81",
+        "name": "鍾卓穎",
+        "nickname": "Ash"
+      }
+    },
+    "17": {
+      "appearances": [
+        {
+          "timestamp": 16.29869451697128,
+          "frame_number": 34,
+          "confidence": 0.4189696971063843,
+          "face_location": [
+            53,
+            501,
+            115,
+            439
+          ]
+        },
+        {
+          "timestamp": 16.778067885117494,
+          "frame_number": 35,
+          "confidence": 0.41752617002020453,
+          "face_location": [
+            32,
+            501,
+            94,
+            439
+          ]
+        }
+      ],
+      "total_appearances": 2,
+      "average_confidence": 0.4182479335632944,
+      "first_appearance": 16.29869451697128,
+      "last_appearance": 16.778067885117494,
+      "contestant_info": {
+        "id": "17",
+        "name": "黃詠霖",
+        "nickname": "阿蛋"
+      }
+    },
+    "91": {
+      "appearances": [
+        {
+          "timestamp": 17.257441253263707,
+          "frame_number": 36,
+          "confidence": 0.3080958892628082,
+          "face_location": [
+            95,
+            325,
+            147,
+            273
+          ]
+        }
+      ],
+      "total_appearances": 1,
+      "average_confidence": 0.3080958892628082,
+      "first_appearance": 17.257441253263707,
+      "last_appearance": 17.257441253263707,
+      "contestant_info": {
+        "id": "91",
+        "name": "許軼",
+        "nickname": "Day"
+      }
+    },
+    "8": {
+      "appearances": [
+        {
+          "timestamp": 19.65430809399478,
+          "frame_number": 41,
+          "confidence": 0.3583548587207933,
+          "face_location": [
+            54,
+            361,
+            90,
+            325
+          ]
+        }
+      ],
+      "total_appearances": 1,
+      "average_confidence": 0.3583548587207933,
+      "first_appearance": 19.65430809399478,
+      "last_appearance": 19.65430809399478,
+      "contestant_info": {
+        "id": "8",
+        "name": "陳玥伶",
+        "nickname": "小砂"
+      }
+    },
+    "1": {
+      "appearances": [
+        {
+          "timestamp": 29.721148825065274,
+          "frame_number": 62,
+          "confidence": 0.36684582922232223,
+          "face_location": [
+            8,
+            462,
+            116,
+            354
+          ]
+        }
+      ],
+      "total_appearances": 1,
+      "average_confidence": 0.36684582922232223,
+      "first_appearance": 29.721148825065274,
+      "last_appearance": 29.721148825065274,
+      "contestant_info": {
+        "id": "1",
+        "name": "蘇雅琳",
+        "nickname": "Ivy So"
+      }
+    }
+  },
+  "timeline_markers": [
+    {
+      "start_time": 0.0,
+      "end_time": 5.0,
+      "contestants": [
+        "33"
+      ],
+      "recognition_count": 2,
+      "average_confidence": 0.34063057285140363
+    },
+    {
+      "start_time": 5.0,
+      "end_time": 10.0,
+      "contestants": [
+        "83",
+        "73"
+      ],
+      "recognition_count": 4,
+      "average_confidence": 0.3955016895989113
+    },
+    {
+      "start_time": 10.0,
+      "end_time": 15.0,
+      "contestants": [
+        "28",
+        "10"
+      ],
+      "recognition_count": 3,
+      "average_confidence": 0.4112934537091486
+    },
+    {
+      "start_time": 15.0,
+      "end_time": 20.0,
+      "contestants": [
+        "83",
+        "17",
+        "8",
+        "87",
+        "91",
+        "81",
+        "33"
+      ],
+      "recognition_count": 10,
+      "average_confidence": 0.38353702280363955
+    },
+    {
+      "start_time": 20.0,
+      "end_time": 25.0,
+      "contestants": [
+        "81",
+        "87"
+      ],
+      "recognition_count": 4,
+      "average_confidence": 0.41614957297684874
+    },
+    {
+      "start_time": 25.0,
+      "end_time": 30.0,
+      "contestants": [
+        "1"
+      ],
+      "recognition_count": 1,
+      "average_confidence": 0.36684582922232223
+    }
+  ],
+  "frame_data": [
+    {
+      "frame_number": 0,
+      "timestamp": 0.0,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "33",
+          "contestant_name": "黃敏蕎",
+          "contestant_nickname": "阿妹",
+          "confidence": 0.37716085270547695,
+          "face_location": [
+            53,
+            397,
+            182,
+            268
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 1,
+      "timestamp": 0.4793733681462141,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "33",
+          "contestant_name": "黃敏蕎",
+          "contestant_nickname": "阿妹",
+          "confidence": 0.3041002929973303,
+          "face_location": [
+            47,
+            459,
+            202,
+            304
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 2,
+      "timestamp": 0.9587467362924282,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "50",
+          "contestant_name": "歐卓瑩",
+          "contestant_nickname": "鐵鐵",
+          "confidence": 0.14158402554932192,
+          "face_location": [
+            72,
+            386,
+            146,
+            312
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 3,
+      "timestamp": 1.4381201044386422,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "53",
+          "contestant_name": "房婷婷",
+          "contestant_nickname": "丁丁",
+          "confidence": 0.12939463118680306,
+          "face_location": [
+            80,
+            353,
+            155,
+            278
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 4,
+      "timestamp": 1.9174934725848565,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "4",
+          "contestant_name": "穎蕎",
+          "contestant_nickname": "穎蕎",
+          "confidence": 0.16181097553925383,
+          "face_location": [
+            88,
+            320,
+            163,
+            245
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 6,
+      "timestamp": 2.8762402088772845,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "48",
+          "contestant_name": "劉綺婷",
+          "contestant_nickname": "Yanny",
+          "confidence": 0.2939784703489162,
+          "face_location": [
+            0,
+            533,
+            104,
+            426
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 15,
+      "timestamp": 7.190600522193211,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "83",
+          "contestant_name": "何佩婷",
+          "contestant_nickname": "何佩",
+          "confidence": 0.4379569032628756,
+          "face_location": [
+            47,
+            486,
+            121,
+            411
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 16,
+      "timestamp": 7.669973890339426,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "73",
+          "contestant_name": "陳紀澄",
+          "contestant_nickname": "Tania",
+          "confidence": 0.34744309027233944,
+          "face_location": [
+            106,
+            225,
+            196,
+            135
+          ]
+        },
+        {
+          "contestant_id": "83",
+          "contestant_name": "何佩婷",
+          "contestant_nickname": "何佩",
+          "confidence": 0.4115727481233662,
+          "face_location": [
+            61,
+            504,
+            113,
+            452
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 17,
+      "timestamp": 8.14934725848564,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "22",
+          "contestant_name": "林暐翹",
+          "contestant_nickname": "暐翹",
+          "confidence": 0.1318766840574046,
+          "face_location": [
+            218,
+            246,
+            266,
+            183
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 19,
+      "timestamp": 9.108093994778068,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "83",
+          "contestant_name": "何佩婷",
+          "contestant_nickname": "何佩",
+          "confidence": 0.3850340167370637,
+          "face_location": [
+            32,
+            577,
+            94,
+            515
+          ]
+        },
+        {
+          "contestant_id": "53",
+          "contestant_name": "房婷婷",
+          "contestant_nickname": "丁丁",
+          "confidence": 0.15903516146791086,
+          "face_location": [
+            198,
+            308,
+            260,
+            246
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 20,
+      "timestamp": 9.587467362924283,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "37",
+          "contestant_name": "利佩佩",
+          "contestant_nickname": "Puipui",
+          "confidence": 0.20635081725126914,
+          "face_location": [
+            5,
+            594,
+            80,
+            519
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 27,
+      "timestamp": 12.94308093994778,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "10",
+          "contestant_name": "余潔瀅",
+          "contestant_nickname": "Zoe",
+          "confidence": 0.3383674144321678,
+          "face_location": [
+            32,
+            418,
+            94,
+            356
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 28,
+      "timestamp": 13.422454308093995,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "10",
+          "contestant_name": "余潔瀅",
+          "contestant_nickname": "Zoe",
+          "confidence": 0.47907088365282535,
+          "face_location": [
+            46,
+            322,
+            108,
+            259
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 29,
+      "timestamp": 13.90182767624021,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "5",
+          "contestant_name": "坂部佩莎",
+          "contestant_nickname": "莎莎",
+          "confidence": 0.2745045595105198,
+          "face_location": [
+            88,
+            229,
+            163,
+            154
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 30,
+      "timestamp": 14.381201044386422,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "56",
+          "contestant_name": "鍾心悅",
+          "contestant_nickname": "米線",
+          "confidence": 0.19258071915439823,
+          "face_location": [
+            96,
+            254,
+            171,
+            179
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 31,
+      "timestamp": 14.860574412532637,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "28",
+          "contestant_name": "王家晴",
+          "contestant_nickname": "Candy",
+          "confidence": 0.4164420630424528,
+          "face_location": [
+            22,
+            312,
+            96,
+            237
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 32,
+      "timestamp": 15.339947780678852,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "87",
+          "contestant_name": "葛綽瑤",
+          "contestant_nickname": "Yoyo",
+          "confidence": 0.48829905087944436,
+          "face_location": [
+            67,
+            397,
+            196,
+            268
+          ]
+        },
+        {
+          "contestant_id": "81",
+          "contestant_name": "鍾卓穎",
+          "contestant_nickname": "Ash",
+          "confidence": 0.41915269943363953,
+          "face_location": [
+            153,
+            583,
+            266,
+            454
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 33,
+      "timestamp": 15.819321148825065,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "87",
+          "contestant_name": "葛綽瑤",
+          "contestant_nickname": "Yoyo",
+          "confidence": 0.39684300626815194,
+          "face_location": [
+            53,
+            397,
+            182,
+            268
+          ]
+        },
+        {
+          "contestant_id": "81",
+          "contestant_name": "鍾卓穎",
+          "contestant_nickname": "Ash",
+          "confidence": 0.32894463234711524,
+          "face_location": [
+            110,
+            597,
+            239,
+            468
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 34,
+      "timestamp": 16.29869451697128,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "17",
+          "contestant_name": "黃詠霖",
+          "contestant_nickname": "阿蛋",
+          "confidence": 0.4189696971063843,
+          "face_location": [
+            53,
+            501,
+            115,
+            439
+          ]
+        },
+        {
+          "contestant_id": "76",
+          "contestant_name": "羅詠琪",
+          "contestant_nickname": "Winkie",
+          "confidence": 0.28347531230746714,
+          "face_location": [
+            80,
+            301,
+            142,
+            239
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 35,
+      "timestamp": 16.778067885117494,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "65",
+          "contestant_name": "余施熲",
+          "contestant_nickname": "阿 Wing",
+          "confidence": 0.10157681107908434,
+          "face_location": [
+            55,
+            303,
+            130,
+            229
+          ]
+        },
+        {
+          "contestant_id": "17",
+          "contestant_name": "黃詠霖",
+          "contestant_nickname": "阿蛋",
+          "confidence": 0.41752617002020453,
+          "face_location": [
+            32,
+            501,
+            94,
+            439
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 36,
+      "timestamp": 17.257441253263707,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "91",
+          "contestant_name": "許軼",
+          "contestant_nickname": "Day",
+          "confidence": 0.3080958892628082,
+          "face_location": [
+            95,
+            325,
+            147,
+            273
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 38,
+      "timestamp": 18.216187989556136,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "33",
+          "contestant_name": "黃敏蕎",
+          "contestant_nickname": "阿妹",
+          "confidence": 0.36033007599808986,
+          "face_location": [
+            44,
+            462,
+            152,
+            354
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 39,
+      "timestamp": 18.69556135770235,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "83",
+          "contestant_name": "何佩婷",
+          "contestant_nickname": "何佩",
+          "confidence": 0.3388541479997641,
+          "face_location": [
+            53,
+            405,
+            115,
+            342
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 41,
+      "timestamp": 19.65430809399478,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "8",
+          "contestant_name": "陳玥伶",
+          "contestant_nickname": "小砂",
+          "confidence": 0.3583548587207933,
+          "face_location": [
+            54,
+            361,
+            90,
+            325
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 44,
+      "timestamp": 21.09242819843342,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "51",
+          "contestant_name": "歐陽巧霖",
+          "contestant_nickname": "Bubu",
+          "confidence": 0.040115272292251536,
+          "face_location": [
+            61,
+            314,
+            113,
+            262
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 46,
+      "timestamp": 22.05117493472585,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "77",
+          "contestant_name": "吳秀明",
+          "contestant_nickname": "TABI",
+          "confidence": 0.17325660533517784,
+          "face_location": [
+            66,
+            354,
+            156,
+            265
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 47,
+      "timestamp": 22.530548302872063,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "48",
+          "contestant_name": "劉綺婷",
+          "contestant_nickname": "Yanny",
+          "confidence": 0.2740859318549195,
+          "face_location": [
+            96,
+            315,
+            186,
+            225
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 48,
+      "timestamp": 23.009921671018276,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "48",
+          "contestant_name": "劉綺婷",
+          "contestant_nickname": "Yanny",
+          "confidence": 0.21661114502574652,
+          "face_location": [
+            86,
+            275,
+            176,
+            185
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 49,
+      "timestamp": 23.489295039164492,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "81",
+          "contestant_name": "鍾卓穎",
+          "contestant_nickname": "Ash",
+          "confidence": 0.3727475599736112,
+          "face_location": [
+            98,
+            640,
+            253,
+            511
+          ]
+        },
+        {
+          "contestant_id": "87",
+          "contestant_name": "葛綽瑤",
+          "contestant_nickname": "Yoyo",
+          "confidence": 0.4178111612431673,
+          "face_location": [
+            39,
+            339,
+            168,
+            210
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 50,
+      "timestamp": 23.968668407310705,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "87",
+          "contestant_name": "葛綽瑤",
+          "contestant_nickname": "Yoyo",
+          "confidence": 0.46602216172084676,
+          "face_location": [
+            24,
+            296,
+            153,
+            167
+          ]
+        },
+        {
+          "contestant_id": "81",
+          "contestant_name": "鍾卓穎",
+          "contestant_nickname": "Ash",
+          "confidence": 0.40801740896976957,
+          "face_location": [
+            139,
+            569,
+            266,
+            440
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 52,
+      "timestamp": 24.927415143603135,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "72",
+          "contestant_name": "廖芷嘉",
+          "contestant_nickname": "Ika",
+          "confidence": 0.14050180161415549,
+          "face_location": [
+            78,
+            357,
+            114,
+            321
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 53,
+      "timestamp": 25.406788511749347,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "36",
+          "contestant_name": "陳曉藍",
+          "contestant_nickname": "精靈",
+          "confidence": 0.052836230070599455,
+          "face_location": [
+            38,
+            328,
+            113,
+            254
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 54,
+      "timestamp": 25.88616187989556,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "35",
+          "contestant_name": "羅安娜",
+          "contestant_nickname": "Ana",
+          "confidence": 0.1289145705841125,
+          "face_location": [
+            46,
+            474,
+            108,
+            411
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 55,
+      "timestamp": 26.365535248041777,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "65",
+          "contestant_name": "余施熲",
+          "contestant_nickname": "阿 Wing",
+          "confidence": 0.04146976779486555,
+          "face_location": [
+            66,
+            246,
+            129,
+            183
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 56,
+      "timestamp": 26.84490861618799,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "77",
+          "contestant_name": "吳秀明",
+          "contestant_nickname": "TABI",
+          "confidence": 0.08343452323702738,
+          "face_location": [
+            25,
+            522,
+            87,
+            460
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 57,
+      "timestamp": 27.324281984334203,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "65",
+          "contestant_name": "余施熲",
+          "contestant_nickname": "阿 Wing",
+          "confidence": 0.1376634151012618,
+          "face_location": [
+            122,
+            204,
+            184,
+            142
+          ]
+        },
+        {
+          "contestant_id": "35",
+          "contestant_name": "羅安娜",
+          "contestant_nickname": "Ana",
+          "confidence": 0.05128137682142231,
+          "face_location": [
+            110,
+            453,
+            146,
+            417
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 58,
+      "timestamp": 27.80365535248042,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "65",
+          "contestant_name": "余施熲",
+          "contestant_nickname": "阿 Wing",
+          "confidence": 0.0796163184702644,
+          "face_location": [
+            106,
+            369,
+            142,
+            333
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 62,
+      "timestamp": 29.721148825065274,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "1",
+          "contestant_name": "蘇雅琳",
+          "contestant_nickname": "Ivy So",
+          "confidence": 0.36684582922232223,
+          "face_location": [
+            8,
+            462,
+            116,
+            354
+          ]
+        }
+      ]
+    }
+  ],
+  "thumbnails": [
+    "../local_output/thumbnails/test-video-mv2_thumb_000.jpg"
+  ],
+  "recognition_config": {
+    "tolerance": 0.6,
+    "min_confidence": 0.5,
+    "detection_model": "hog"
+  }
+}

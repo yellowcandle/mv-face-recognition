@@ -202,6 +202,7 @@ class FaceRecognizer:
                     known_encodings, detection.encoding
                 )
                 min_distance = min(matches)
+                
                 if min_distance < self.tolerance:
                     matched_index = np.argmin(matches)
                     contestant_id = known_names[matched_index]

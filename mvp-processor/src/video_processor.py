@@ -10,6 +10,7 @@ from typing import Tuple, Generator, List
 
 # from moviepy.editor import VideoFileClip  # Temporarily disabled
 import logging
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
 
@@ -513,12 +514,12 @@ class FrameProcessor:
         confidence: float = 0.0,
     ) -> np.ndarray:
         """
-        Draw bounding box and label on frame
+        Draw bounding box and label on frame with Unicode support for CJKV characters
 
         Args:
             frame: Input frame
             face_location: (top, right, bottom, left) coordinates
-            label: Text label to display
+            label: Text label to display (supports Chinese/Japanese/Korean characters)
             confidence: Confidence score
 
         Returns:
@@ -526,20 +527,59 @@ class FrameProcessor:
         """
         top, right, bottom, left = face_location
 
-        # Draw rectangle
+        # Draw rectangle using OpenCV
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
 
-        # Draw label
+        # Draw label using PIL for Unicode support
         if label:
             label_text = f"{label} ({confidence:.2f})" if confidence > 0 else label
-            cv2.putText(
-                frame,
-                label_text,
-                (left, top - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
+
+            # Convert BGR to RGB for PIL
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(frame_rgb)
+            draw = ImageDraw.Draw(pil_image)
+
+            # Try to load a font that supports Unicode, fallback to default
+            try:
+                # Try common system fonts that support CJK characters
+                font_paths = [
+                    "/System/Library/Fonts/PingFang.ttc",  # macOS Chinese
+                    "/System/Library/Fonts/Hiragino Sans GB.ttc",  # macOS Chinese
+                    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",  # Linux
+                    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Linux
+                    "C:\\Windows\\Fonts\\msyh.ttc",  # Windows Chinese
+                ]
+
+                font = None
+                for font_path in font_paths:
+                    try:
+                        font = ImageFont.truetype(font_path, 20)
+                        break
+                    except:
+                        continue
+
+                if font is None:
+                    font = ImageFont.load_default()
+            except:
+                font = ImageFont.load_default()
+
+            # Draw text with black outline for better visibility
+            text_position = (left, max(0, top - 30))
+
+            # Draw outline (shadow effect)
+            for adj_x in range(-1, 2):
+                for adj_y in range(-1, 2):
+                    draw.text(
+                        (text_position[0] + adj_x, text_position[1] + adj_y),
+                        label_text,
+                        font=font,
+                        fill=(0, 0, 0)
+                    )
+
+            # Draw main text in green
+            draw.text(text_position, label_text, font=font, fill=(0, 255, 0))
+
+            # Convert back to BGR for OpenCV
+            frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
         return frame
