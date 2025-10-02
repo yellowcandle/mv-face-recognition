@@ -309,8 +309,14 @@ class VideoProcessingPipeline:
         # Get video properties
         video_info = self.video_processor.get_video_info(str(input_path))
         fps = video_info["fps"]
-        width = video_info["width"]
-        height = video_info["height"]
+        
+        # Use processed frame dimensions instead of original video dimensions
+        # This ensures annotations are properly positioned
+        if annotated_frames:
+            height, width = annotated_frames[0].shape[:2]
+        else:
+            width = video_info["width"]
+            height = video_info["height"]
 
         logger.info(f"Creating annotated video: {output_path}")
         logger.info(f"Video properties: {width}x{height} @ {fps} fps, {len(annotated_frames)} frames")
@@ -337,8 +343,10 @@ class VideoProcessingPipeline:
 
                 # Write all frames
                 for idx, frame in enumerate(annotated_frames):
-                    # Ensure frame is in BGR format and correct size
+                    # Frames should already be the correct size from processing
+                    # Only resize if there's a mismatch (shouldn't happen with the fix above)
                     if frame.shape[1] != width or frame.shape[0] != height:
+                        logger.warning(f"Frame {idx} size mismatch: {frame.shape[1]}x{frame.shape[0]} vs {width}x{height}")
                         frame = cv2.resize(frame, (width, height))
                     out.write(frame)
 

@@ -79,6 +79,160 @@ python -m src.main --use-tracking
 python -m src.main --in-memory-db
 ```
 
+## User Guide
+
+### Getting Started
+
+This face recognition system is designed to identify people in videos by comparing faces against a database of known contestants. Here's how to use it:
+
+#### 1. Prepare Your Data
+
+**Contestant Photos**: Place photos of people you want to recognize in `source/photo/contestants/`
+- Use clear, front-facing photos
+- One person per photo
+- Supported formats: JPG, PNG, JPEG
+- Recommended size: 200x200 pixels or larger
+
+**Input Videos**: Place videos to analyze in `source/videos/`
+- Supported formats: MP4, AVI, MOV, MKV
+- The system will process each video frame by frame
+
+#### 2. First Run Setup
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Download required models (first time only)
+python download_models.py
+
+# Generate face embeddings for contestants
+python generate_embeddings.py
+```
+
+#### 3. Running Face Recognition
+
+**Basic Usage**:
+```bash
+# Process all videos with all contestants
+python -m src.main --all-videos --all-contestants
+
+# Interactive mode - choose videos and contestants
+python -m src.main --interactive
+
+# Process specific contestants only
+python -m src.main --specific-contestants "John Doe,Jane Smith" --all-videos
+```
+
+**With Output**:
+```bash
+# Save annotated video with bounding boxes
+python -m src.main --save-video --all-videos --all-contestants
+
+# Save individual annotated frames
+python -m src.main --save-frames --all-videos --all-contestants
+```
+
+#### 4. Understanding the Output
+
+The system provides real-time feedback showing:
+- **Detection Rate**: Percentage of faces detected in each frame
+- **Recognition Rate**: Percentage of detected faces successfully matched
+- **Processing Speed**: Frames per second being processed
+- **Memory Usage**: Current RAM consumption
+
+**Output Files** (when using `--save-video` or `--save-frames`):
+- `output_mp4s/`: Annotated videos with bounding boxes and labels
+- `output_frames/`: Individual annotated frames
+- `logs/`: Processing logs and performance metrics
+
+#### 5. Performance Optimization
+
+**For Faster Processing**:
+```bash
+# Skip frames (process every 10th frame)
+python -m src.main --frame-skip 10 --all-videos --all-contestants
+
+# Use face tracking to reduce redundant detections
+python -m src.main --use-tracking --all-videos --all-contestants
+
+# Increase worker threads
+python -m src.main --max-workers 8 --all-videos --all-contestants
+```
+
+**For Higher Accuracy**:
+```bash
+# Process every frame (slower but more accurate)
+python -m src.main --frame-skip 0 --all-videos --all-contestants
+
+# Use stricter similarity threshold
+python -m src.main --distance-threshold 0.6 --all-videos --all-contestants
+```
+
+#### 6. Troubleshooting Common Issues
+
+**No faces detected**:
+- Check if contestant photos are clear and front-facing
+- Ensure videos contain visible faces
+- Try lowering the distance threshold: `--distance-threshold 0.3`
+
+**Low recognition accuracy**:
+- Use higher quality contestant photos
+- Increase the distance threshold: `--distance-threshold 0.5`
+- Process every frame: `--frame-skip 0`
+
+**Slow processing**:
+- Increase frame skip: `--frame-skip 15`
+- Use fewer workers: `--max-workers 2`
+- Enable tracking: `--use-tracking`
+
+**Memory issues**:
+- Reduce max workers: `--max-workers 2`
+- Use in-memory database: `--in-memory-db`
+- Process videos one at a time instead of using `--all-videos`
+
+#### 7. Advanced Features
+
+**Batch Processing**:
+```bash
+# Process multiple videos with specific settings
+python batch_process_videos.py --input-dir source/videos --output-dir processed_videos
+```
+
+**Custom Configuration**:
+```bash
+# Use custom config file
+python -m src.main --config custom_config.json
+```
+
+**Debug Mode**:
+```bash
+# Enable detailed logging
+python -m src.main --debug --all-videos --all-contestants
+```
+
+#### 8. File Organization
+
+After processing, your directory structure should look like:
+```
+mv-face-recognition/
+├── source/
+│   ├── photo/contestants/     # Your contestant photos
+│   └── videos/                # Your input videos
+├── output_mp4s/              # Annotated videos (if --save-video)
+├── output_frames/            # Annotated frames (if --save-frames)
+├── cache/chromadb/           # Face recognition database
+└── logs/                     # Processing logs
+```
+
+#### 9. Tips for Best Results
+
+1. **Photo Quality**: Use high-quality, well-lit photos of contestants
+2. **Face Orientation**: Front-facing photos work best
+3. **Consistency**: Use similar lighting conditions in photos and videos
+4. **Testing**: Start with a small subset of videos to test settings
+5. **Performance**: Balance speed vs accuracy based on your needs
+
 ## Architecture
 
 The system uses a specialized architecture with separate components for:
