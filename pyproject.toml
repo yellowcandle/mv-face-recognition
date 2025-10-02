@@ -43,6 +43,7 @@ dependencies = [
     "aiohttp>=3.12.14",
     "pyyaml>=6.0",
     "click>=8.2.1",
+    "ruff>=0.13.2",
 ]
 
 [project.scripts]

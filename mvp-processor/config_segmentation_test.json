@@ -2,7 +2,21 @@
   "video": {
     "fps_sample_rate": 2,
     "max_frames": 1000,
-    "resize_width": 640
+    "resize_width": 640,
+    "output_formats": [
+      {
+        "format": "mp4",
+        "quality": "high",
+        "resolution": "1080p",
+        "codec": "h264"
+      },
+      {
+        "format": "mp4",
+        "quality": "medium",
+        "resolution": "720p",
+        "codec": "h264"
+      }
+    ]
   },
   "face_detection": {
     "model": "hog",
@@ -20,5 +34,45 @@
     "enable_on_low_conf": true,
     "low_conf_threshold": 0.5,
     "min_skin_ratio": 0.3
+  },
+  "contestants": {
+    "photo_dir": "../source/photo/contestants",
+    "embeddings_cache": "data/embeddings_cache.pkl",
+    "info_csv": "../source/contestant_info.csv",
+    "chroma_db_path": "../database/chroma_db"
+  },
+  "face_recognition": {
+    "tolerance": 0.6,
+    "max_distance": 0.6,
+    "similarity_threshold": 0.7,
+    "use_existing_embeddings": true,
+    "embeddings_path": "../source/photo/contestants",
+    "enable_interpolation": true,
+    "confidence_decay": 0.95
+  },
+  "cloudflare": {
+    "account_id": "${CLOUDFLARE_ACCOUNT_ID}",
+    "api_token": "${CLOUDFLARE_API_TOKEN}",
+    "r2_access_key": "${CLOUDFLARE_R2_ACCESS_KEY_ID}",
+    "r2_secret_key": "${CLOUDFLARE_R2_SECRET_ACCESS_KEY}",
+    "r2_bucket": "mv-face-recognition-videos",
+    "r2_endpoint": "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com",
+    "worker_url": "https://mv-face-recognition-api.herballemon.workers.dev"
+  },
+  "output": {
+    "processed_dir": "../processed_videos",
+    "thumbnails_dir": "../thumbnails",
+    "metadata_dir": "../metadata",
+    "galleries_dir": "data/galleries",
+    "local_mode": {
+      "enabled": true,
+      "base_output_dir": "../local_output",
+      "processed_videos_dir": "../local_output/processed_videos",
+      "thumbnails_dir": "../local_output/thumbnails",
+      "metadata_dir": "../local_output/metadata",
+      "galleries_dir": "../local_output/galleries",
+      "clips_dir": "../local_output/clips",
+      "create_subdirs": true
+    }
   }
 }

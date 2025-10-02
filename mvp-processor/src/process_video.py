@@ -7,6 +7,8 @@ import click
 import yaml
 import json
 import logging
+import cv2
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional
 from tqdm import tqdm
@@ -35,7 +37,8 @@ class VideoProcessingPipeline:
         # Set local-only mode
         self.local_only = local_only
         if local_only:
-            self.config["output"]["local_mode"]["enabled"] = True
+            # Ensure output section exists with default structure before accessing
+            self.config.setdefault("output", {}).setdefault("local_mode", {})["enabled"] = True
             enable_upload = False  # Force disable upload in local-only mode
 
         # Initialize components
@@ -147,6 +150,7 @@ class VideoProcessingPipeline:
         # Process frames
         all_recognitions = []
         frame_data = []
+        annotated_frames = []  # Store frames with annotations
 
         frames_generator = self.video_processor.extract_frames(str(video_path))
         frames_list = list(frames_generator)  # Convert to list for progress bar
@@ -164,10 +168,22 @@ class VideoProcessingPipeline:
                 rgb_frame, timestamp, frame_idx
             )
 
+            # Create annotated frame (copy to preserve original)
+            annotated_frame = frame.copy()
+
             if detections:
                 # Recognize faces
                 recognitions = self.face_recognizer.recognize_faces(detections)
                 all_recognitions.extend(recognitions)
+
+                # Draw annotations on frame
+                for recognition in recognitions:
+                    FrameProcessor.draw_face_box(
+                        annotated_frame,
+                        recognition.detection.location,
+                        recognition.contestant_nickname,
+                        recognition.match_confidence,
+                    )
 
                 # Store frame data
                 frame_data.append(
@@ -188,10 +204,13 @@ class VideoProcessingPipeline:
                         ],
                     }
                 )
+            
+            # Store annotated frame
+            annotated_frames.append(annotated_frame)
 
         # Filter low-confidence recognitions
         filtered_recognitions = self.face_recognizer.filter_recognitions(
-            all_recognitions, min_confidence=0.5
+            all_recognitions, min_confidence=0.3
         )
 
         logger.info(
@@ -222,6 +241,11 @@ class VideoProcessingPipeline:
         # Save gallery data locally
         self.save_gallery_data(gallery_data, output_name)
 
+        # Create annotated video
+        annotated_video_path = self.create_annotated_video(
+            video_path, annotated_frames, output_name
+        )
+
         # Convert video formats
         processed_videos = self.convert_video_formats(video_path, output_name)
 
@@ -231,6 +255,7 @@ class VideoProcessingPipeline:
             "metadata": metadata,
             "gallery_data": gallery_data,
             "processed_videos": processed_videos,
+            "annotated_video": annotated_video_path,
             "thumbnails": thumbnail_paths,
             "metadata_file": str(metadata_path),
         }
@@ -267,6 +292,78 @@ class VideoProcessingPipeline:
             json.dump(gallery_data, f, indent=2, ensure_ascii=False)
 
         logger.info(f"Gallery data saved to: {gallery_path}")
+
+    def create_annotated_video(
+        self, input_path: Path, annotated_frames: List[np.ndarray], output_name: str
+    ) -> str:
+        """Create annotated video with face recognition labels"""
+        import cv2
+
+        output_dir = Path(self.config["output"]["processed_dir"])
+        output_path = output_dir / f"{output_name}_annotated.mp4"
+
+        if not annotated_frames:
+            logger.warning("No frames to annotate")
+            return ""
+
+        # Get video properties
+        video_info = self.video_processor.get_video_info(str(input_path))
+        fps = video_info["fps"]
+        width = video_info["width"]
+        height = video_info["height"]
+
+        logger.info(f"Creating annotated video: {output_path}")
+        logger.info(f"Video properties: {width}x{height} @ {fps} fps, {len(annotated_frames)} frames")
+
+        # Try different codecs in order of preference
+        codecs_to_try = [
+            ("avc1", ".mp4"),
+            ("H264", ".mp4"),
+            ("mp4v", ".mp4"),
+            ("XVID", ".avi"),
+        ]
+
+        for codec_name, ext in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec_name)
+                output_path_with_ext = output_dir / f"{output_name}_annotated{ext}"
+                out = cv2.VideoWriter(
+                    str(output_path_with_ext), fourcc, fps, (width, height)
+                )
+
+                if not out.isOpened():
+                    logger.warning(f"Failed to open video writer with codec {codec_name}")
+                    continue
+
+                # Write all frames
+                for idx, frame in enumerate(annotated_frames):
+                    # Ensure frame is in BGR format and correct size
+                    if frame.shape[1] != width or frame.shape[0] != height:
+                        frame = cv2.resize(frame, (width, height))
+                    out.write(frame)
+
+                out.release()
+
+                # Verify file was created and has reasonable size
+                if output_path_with_ext.exists() and output_path_with_ext.stat().st_size > 1000:
+                    logger.info(
+                        f"Annotated video saved: {output_path_with_ext} "
+                        f"({output_path_with_ext.stat().st_size / 1024 / 1024:.2f} MB)"
+                    )
+                    return str(output_path_with_ext)
+                else:
+                    logger.warning(
+                        f"Video file created but is too small with codec {codec_name}"
+                    )
+                    if output_path_with_ext.exists():
+                        output_path_with_ext.unlink()
+
+            except Exception as e:
+                logger.warning(f"Failed to create video with codec {codec_name}: {e}")
+                continue
+
+        logger.error("Failed to create annotated video with any codec")
+        return ""
 
     def upload_to_cloudflare(self, upload_package: Dict, upload_videos: bool = True):
         """Upload processed content to Cloudflare"""
@@ -397,6 +494,8 @@ def main(
                 print(
                     f"   📹  Processed videos: {local_config['processed_videos_dir']}"
                 )
+                if upload_package.get("annotated_video"):
+                    print(f"   🎬  Annotated video: {upload_package['annotated_video']}")
                 print(f"   🖼️  Thumbnails: {local_config['thumbnails_dir']}")
                 print(f"   📄  Metadata: {local_config['metadata_dir']}")
                 print(f"   🎭  Galleries: {local_config['galleries_dir']}")
