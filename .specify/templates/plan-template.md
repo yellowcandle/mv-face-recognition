@@ -47,15 +47,7 @@
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-**I. Accuracy-First**: Plan must prioritize accuracy over speed. Face detection/recognition must achieve 95%+ accuracy. Optimizations must maintain accuracy.
-
-**II. Performance Optimization**: Must leverage hardware acceleration (Apple Silicon, CUDA) and implement multi-level caching. Video processing must achieve real-time performance.
-
-**III. Data Privacy & Security**: Contestant data must be handled securely. No external transmission without consent. All processing local or controlled cloud.
-
-**IV. Testing & Quality Assurance**: Comprehensive test suite required (80%+ coverage). Face recognition validated against ground truth. All deployments require passing tests.
-
-**V. Scalability & Reliability**: Must handle large datasets (1000+ videos) with cloud GPU acceleration. Architecture must support horizontal scaling. 99% uptime required.
+[Gates determined based on constitution file]
 
 ## Project Structure
 
@@ -224,4 +216,4 @@ directories captured above]
 - [ ] Complexity deviations documented
 
 ---
-*Based on Constitution v1.0.0 - See `.specify/memory/constitution.md`*
+*Based on Constitution v2.1.1 - See `/memory/constitution.md`*

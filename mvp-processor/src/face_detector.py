@@ -10,6 +10,7 @@ from typing import List, Dict, Tuple
 import logging
 from dataclasses import dataclass
 import pandas as pd
+from PIL import UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +80,26 @@ class ContestantDatabase:
                 if contestant_id in self.contestants_info:
                     encodings = []
                     for photo_path in contestant_dir.glob("*.jpg"):
-                        image = face_recognition.load_image_file(str(photo_path))
-                        face_encodings = face_recognition.face_encodings(image)
-                        if face_encodings:
-                            encodings.append(face_encodings[0])
-                            logger.debug(
-                                f"Encoded {photo_path} for contestant {contestant_id}"
+                        try:
+                            image = face_recognition.load_image_file(str(photo_path))
+                            face_encodings = face_recognition.face_encodings(image)
+                            if face_encodings:
+                                encodings.append(face_encodings[0])
+                                logger.debug(
+                                    f"Encoded {photo_path} for contestant {contestant_id}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"No face detected in {photo_path} for contestant {contestant_id}"
+                                )
+                        except UnidentifiedImageError:
+                            logger.warning(
+                                f"Skipping {photo_path}: Git LFS pointer file or corrupted image "
+                                f"(file size: {photo_path.stat().st_size} bytes)"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to process {photo_path} for contestant {contestant_id}: {e}"
                             )
 
                     if encodings:
@@ -92,6 +107,10 @@ class ContestantDatabase:
                         avg_encoding = np.mean(encodings, axis=0)
                         self.face_encodings[contestant_id] = avg_encoding
                         self.contestant_names.append(contestant_id)
+                    else:
+                        logger.warning(
+                            f"No valid face encodings found for contestant {contestant_id}"
+                        )
 
         logger.info(f"Built {len(self.face_encodings)} face encodings")
 
@@ -183,6 +202,7 @@ class FaceRecognizer:
                     known_encodings, detection.encoding
                 )
                 min_distance = min(matches)
+                
                 if min_distance < self.tolerance:
                     matched_index = np.argmin(matches)
                     contestant_id = known_names[matched_index]
