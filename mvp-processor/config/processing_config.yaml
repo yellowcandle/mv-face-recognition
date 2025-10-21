@@ -23,17 +23,21 @@ face_detection:
   model_path: "../models/buffalo_l"
   min_confidence: 0.6
   max_faces_per_frame: 10
+  min_face_size: 20  # Minimum face size in pixels (optimization)
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
+  enable_frame_similarity_skip: false  # Skip detection on very similar frames (experimental)
   
 # Face Recognition with ChromaDB Integration
 face_recognition:
   similarity_threshold: 0.7  # Confidence threshold
   tolerance: 0.6  # Lower = more strict matching
   max_distance: 0.6  # Maximum face distance for recognition
+  high_confidence_threshold: 0.85  # Early termination threshold (optimization)
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"
   enable_interpolation: true  # Linear interpolation between detections
   confidence_decay: 0.95  # For interpolated frames
+  enable_batch_processing: true  # Batch process multiple frames (optimization)
 
 # Contestant Database (Critical Files)
 contestants:
@@ -50,6 +54,10 @@ processing:
   parallel_processing: true
   generate_dense_metadata: true  # Frame-level granularity
   enable_interpolation: true
+
+  # Batch processing optimizations
+  segmentation_batch_size: 4  # Process N frames in batch for person segmentation
+  recognition_batch_size: 8  # Process N frames in batch for face recognition
 
 # Output Settings Aligned with Deployment Scripts
 output:
