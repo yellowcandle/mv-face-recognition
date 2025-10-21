@@ -49,10 +49,16 @@ class ChromaDBManager:
             settings=Settings(anonymized_telemetry=False, allow_reset=True),
         )
 
-        # Get or create collection
+        # Get or create collection with optimized HNSW parameters
         self.collection = self.client.get_or_create_collection(
             name="contestants_faces",
-            metadata={"description": "Face embeddings for contestants"},
+            metadata={
+                "description": "Face embeddings for contestants",
+                "hnsw:space": "cosine",  # Use cosine distance for face similarity
+                "hnsw:construction_ef": 200,  # Higher quality index (default: 100)
+                "hnsw:search_ef": 100,  # Balance between speed and accuracy (default: 10)
+                "hnsw:M": 16,  # Number of connections (default: 16, good balance)
+            },
         )
 
     def load_embeddings_from_npy(self) -> Dict[str, np.ndarray]:
@@ -112,7 +118,13 @@ class ChromaDBManager:
             self.client.delete_collection("contestants_faces")
             self.collection = self.client.create_collection(
                 name="contestants_faces",
-                metadata={"description": "Face embeddings for contestants"},
+                metadata={
+                    "description": "Face embeddings for contestants",
+                    "hnsw:space": "cosine",  # Use cosine distance for face similarity
+                    "hnsw:construction_ef": 200,  # Higher quality index
+                    "hnsw:search_ef": 100,  # Balance between speed and accuracy
+                    "hnsw:M": 16,  # Number of connections
+                },
             )
 
         # Load embeddings from .npy files
@@ -199,7 +211,13 @@ class ChromaDBManager:
         self.client.delete_collection("contestants_faces")
         self.collection = self.client.create_collection(
             name="contestants_faces",
-            metadata={"description": "Face embeddings for contestants"},
+            metadata={
+                "description": "Face embeddings for contestants",
+                "hnsw:space": "cosine",
+                "hnsw:construction_ef": 200,
+                "hnsw:search_ef": 100,
+                "hnsw:M": 16,
+            },
         )
         logger.info("Database reset successfully")
 
