@@ -40,6 +40,15 @@ class PersonSegmenter:
             self.session = None
 
     def segment(self, frame: np.ndarray) -> List[ROI]:
+        """
+        Segment a single frame to detect person regions
+
+        Args:
+            frame: Input frame (RGB format)
+
+        Returns:
+            List of ROI objects representing detected person regions
+        """
         if self.session is None:
             return []
 
@@ -73,6 +82,82 @@ class PersonSegmenter:
         except Exception as e:
             logger.warning(f"Segmentation failed: {e}")
             return []
+
+    def segment_batch(self, frames: List[np.ndarray]) -> List[List[ROI]]:
+        """
+        Batch segment multiple frames to detect person regions (optimized for performance)
+
+        Args:
+            frames: List of input frames (RGB format)
+
+        Returns:
+            List of ROI lists, one for each input frame
+        """
+        if self.session is None or not frames:
+            return [[] for _ in frames]
+
+        results = []
+        valid_frames = []
+        valid_indices = []
+        frame_dims = []
+
+        # Filter valid frames and collect dimensions
+        for idx, frame in enumerate(frames):
+            if frame is None or frame.size == 0:
+                results.append([])
+                continue
+
+            if len(frame.shape) != 3 or frame.shape[2] != 3:
+                results.append([])
+                continue
+
+            valid_frames.append(frame)
+            valid_indices.append(idx)
+            frame_dims.append((frame.shape[1], frame.shape[0]))  # (width, height)
+            results.append(None)  # Placeholder
+
+        if not valid_frames:
+            return results
+
+        try:
+            # Preprocess all frames into a batch
+            batch_blobs = np.concatenate([self._preprocess(frame) for frame in valid_frames], axis=0)
+
+            # Run batch inference
+            batch_outputs = self.session.run(None, {self.session.get_inputs()[0].name: batch_blobs})
+
+            # Process each frame's results
+            for batch_idx, (original_idx, (frame_width, frame_height)) in enumerate(zip(valid_indices, frame_dims)):
+                # Extract outputs for this frame
+                frame_outputs = [output[batch_idx:batch_idx+1] for output in batch_outputs]
+
+                # Postprocess
+                rois = self._postprocess(frame_outputs, frame_width, frame_height)
+
+                # Filter and sort
+                rois = [roi for roi in rois if roi.area >= self.min_person_area]
+                rois = sorted(rois, key=lambda r: r.confidence, reverse=True)
+                rois = rois[:self.max_rois_per_frame]
+
+                # Expand ROIs
+                expanded_rois = [
+                    roi.expand(self.expand_ratio, frame_width, frame_height) for roi in rois
+                ]
+
+                results[original_idx] = expanded_rois
+
+            # Fill in empty lists for invalid frames
+            for idx in range(len(results)):
+                if results[idx] is None:
+                    results[idx] = []
+
+            logger.debug(f"Batch segmentation: processed {len(valid_frames)} frames")
+            return results
+
+        except Exception as e:
+            logger.warning(f"Batch segmentation failed: {e}, falling back to single-frame processing")
+            # Fallback to single-frame processing
+            return [self.segment(frame) for frame in frames]
 
     def _preprocess(self, frame: np.ndarray) -> np.ndarray:
         resized = self._letterbox_resize(frame, self.input_shape)
