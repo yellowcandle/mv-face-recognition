@@ -2,7 +2,7 @@
 # Security: Updated to address CVE-2025-54121 and other vulnerabilities
 fastapi>=0.115.0  # Updated for security fixes
 uvicorn[standard]>=0.34.0  # Updated for security fixes
-starlette>=0.41.3  # Explicitly pin to fix CVE-2025-54121 (DoS via Range header)
+starlette>=0.47.2  # Explicitly pin to fix CVE-2025-54121 (DoS via Range header)
 python-multipart>=0.0.20  # Updated for security fixes
 pydantic>=2.10.0  # Updated for security fixes
 pydantic-settings>=2.7.0  # Updated for compatibility
@@ -34,4 +34,4 @@ onnxruntime-gpu>=1.20.0  # Updated for security fixes
 # Video and utility libraries
 ffmpeg-python>=0.2.0
 tqdm>=4.67.0  # Updated for security fixes
-psutil>=7.0.0  # Updated for security fixes
+psutil>=6.1.1  # Updated for security fixes
