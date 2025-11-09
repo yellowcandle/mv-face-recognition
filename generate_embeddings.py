@@ -163,19 +163,34 @@ def main():
             avg_embedding = avg_embedding / norm
         else:  # Handle case where average embedding is close to zero (e.g., if all inputs were problematic)
             print(
-                f"Warning: Averaged embedding for {nickname} has near-zero norm. Using as is or consider fallback."
+                f"[ERROR] Averaged embedding for {nickname} has near-zero norm ({norm:.2e}). Skipping to avoid invalid data."
             )
-            # Optionally, could set to a default non-zero vector or skip saving.
-            # For now, save it as is, but it might cause issues in similarity computation.
+            # Skip saving invalid embeddings - they would cause match failures
+            continue
+
+        # Sanitize nickname to prevent path traversal attacks
+        import re
+        import hashlib
+        safe_nickname = re.sub(r'[^\w\-]', '_', nickname)
 
         # Save the averaged embedding
         embedding_path = os.path.join(
-            embeddings_save_dir, f"{nickname}_embedding.npy"
+            embeddings_save_dir, f"{safe_nickname}_embedding.npy"
         )  # Use centralized save directory
         print(
             f"[DEBUG] generate_embeddings: Saving avg_embedding for {nickname} with shape: {avg_embedding.shape} to {embedding_path}"
         )
         np.save(embedding_path, avg_embedding)
+
+        # Save integrity hash for verification
+        hash_path = embedding_path + ".sha256"
+        embedding_hash = hashlib.sha256(avg_embedding.tobytes()).hexdigest()
+        with open(hash_path, 'w') as f:
+            f.write(embedding_hash)
+        print(
+            f"[DEBUG] Saved embedding hash: {embedding_hash[:16]}..."
+        )
+
         print(
             f"Generated and saved averaged embedding for {nickname} (ID: {contestant_id}) from {len(embeddings)} photos to {embedding_path}"
         )
