@@ -62,7 +62,9 @@ class ChromaDBManager:
         )
 
     def load_embeddings_from_npy(self) -> Dict[str, np.ndarray]:
-        """Load all .npy embedding files from contestants directory."""
+        """Load all .npy embedding files from contestants directory with integrity verification."""
+        import hashlib
+
         embeddings = {}
         contestants_path = Path(self.contestants_dir)
 
@@ -78,6 +80,26 @@ class ChromaDBManager:
 
                 # Load embedding
                 embedding = np.load(npy_file)
+
+                # Verify integrity hash if available
+                hash_path = Path(str(npy_file) + ".sha256")
+                if hash_path.exists():
+                    with open(hash_path, 'r') as f:
+                        expected_hash = f.read().strip()
+
+                    actual_hash = hashlib.sha256(embedding.tobytes()).hexdigest()
+
+                    if expected_hash != actual_hash:
+                        logger.error(
+                            f"Integrity check failed for {name}: hash mismatch. "
+                            f"Expected {expected_hash[:16]}..., got {actual_hash[:16]}..."
+                        )
+                        logger.warning(f"Skipping {name} due to integrity failure")
+                        continue
+                    else:
+                        logger.debug(f"Integrity verified for {name}")
+                else:
+                    logger.debug(f"No integrity hash found for {name}, skipping verification")
 
                 # Validate and reshape embedding
                 if embedding.ndim == 2 and embedding.shape == (1, 512):
@@ -100,7 +122,7 @@ class ChromaDBManager:
             except Exception as e:
                 logger.error(f"Error loading {npy_file}: {e}")
 
-        logger.info(f"Successfully loaded {len(embeddings)} embeddings")
+        logger.info(f"Successfully loaded {len(embeddings)} embeddings with integrity verification")
         return embeddings
 
     def populate_database(self, force_refresh: bool = False) -> int:
@@ -177,7 +199,9 @@ class ChromaDBManager:
                 zip(results["ids"][0], results["distances"][0])
             ):
                 # Convert distance to similarity (ChromaDB uses cosine distance)
-                similarity = 1.0 - distance
+                # Cosine distance for normalized vectors: [0, 1]
+                # Clamp to ensure valid similarity scores
+                similarity = max(0.0, min(1.0, 1.0 - distance))
 
                 # Only include if above threshold
                 if similarity >= self.similarity_threshold:
