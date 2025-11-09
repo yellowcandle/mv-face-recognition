@@ -1020,44 +1020,68 @@ class EnhancedVideoProcessor:
 
                     # Match each detected face
                     for face in faces:
-                        if face["embedding"] is not None:
-                            match = self.face_matcher.match_face(face["embedding"])
+                        embedding = face.get("embedding")
 
-                            face_result = {
-                                "bbox": face["bbox"],
-                                "detection_confidence": face["confidence"],
-                                "contestant_name": None,
-                                "recognition_confidence": 0.0,
-                                "matched": False,
-                            }
+                        # Validate embedding before matching
+                        if embedding is None:
+                            logger.debug(f"Skipping face at frame {frame_num}: no embedding")
+                            continue
 
-                            if match:
-                                name, similarity = match
-                                face_result.update(
-                                    {
-                                        "contestant_name": name,
-                                        "recognition_confidence": similarity,
-                                        "matched": True,
-                                    }
-                                )
+                        if not isinstance(embedding, np.ndarray):
+                            logger.warning(f"Invalid embedding type at frame {frame_num}: {type(embedding)}")
+                            continue
 
-                                # Update contestant appearances
-                                if name not in results["contestant_appearances"]:
-                                    results["contestant_appearances"][name] = {
-                                        "total_appearances": 0,
-                                        "first_appearance": frame_num,
-                                        "last_appearance": frame_num,
-                                        "confidence_scores": [],
-                                    }
+                        # Validate embedding shape (expected: 512-dimensional vector)
+                        expected_dim = 512  # Standard for InsightFace ArcFace
+                        if embedding.ndim != 1 or embedding.shape[0] != expected_dim:
+                            logger.warning(
+                                f"Invalid embedding shape at frame {frame_num}: {embedding.shape}, "
+                                f"expected ({expected_dim},)"
+                            )
+                            continue
 
-                                appearances = results["contestant_appearances"][name]
-                                appearances["total_appearances"] += 1
-                                appearances["last_appearance"] = frame_num
-                                appearances["confidence_scores"].append(similarity)
+                        # Validate embedding values (should be normalized)
+                        if not np.isfinite(embedding).all():
+                            logger.warning(f"Embedding contains invalid values at frame {frame_num}")
+                            continue
 
-                                results["total_faces_recognized"] += 1
+                        match = self.face_matcher.match_face(embedding)
 
-                            frame_result["faces"].append(face_result)
+                        face_result = {
+                            "bbox": face["bbox"],
+                            "detection_confidence": face["confidence"],
+                            "contestant_name": None,
+                            "recognition_confidence": 0.0,
+                            "matched": False,
+                        }
+
+                        if match:
+                            name, similarity = match
+                            face_result.update(
+                                {
+                                    "contestant_name": name,
+                                    "recognition_confidence": similarity,
+                                    "matched": True,
+                                }
+                            )
+
+                            # Update contestant appearances
+                            if name not in results["contestant_appearances"]:
+                                results["contestant_appearances"][name] = {
+                                    "total_appearances": 0,
+                                    "first_appearance": frame_num,
+                                    "last_appearance": frame_num,
+                                    "confidence_scores": [],
+                                }
+
+                            appearances = results["contestant_appearances"][name]
+                            appearances["total_appearances"] += 1
+                            appearances["last_appearance"] = frame_num
+                            appearances["confidence_scores"].append(similarity)
+
+                            results["total_faces_recognized"] += 1
+
+                        frame_result["faces"].append(face_result)
 
                     results["frame_results"].append(frame_result)
                     results["total_frames_processed"] += 1
@@ -1162,14 +1186,21 @@ class EnhancedVideoProcessor:
 
         try:
             while frame_num < end_frame:
+                # Optimize: Skip frame decoding for frames that won't be processed
+                if processed_frames % self.frame_skip != 0:
+                    # Move to next frame without decoding
+                    frame_num += 1
+                    processed_frames += 1
+                    cap.grab()  # Grab frame without decoding (faster than read())
+                    continue
+
+                # Only decode frames we'll actually process
                 ret, frame = cap.read()
 
                 if not ret:
                     break
 
-                # Apply frame skipping
-                if processed_frames % self.frame_skip == 0:
-                    yield frame_num, frame
+                yield frame_num, frame
 
                 frame_num += 1
                 processed_frames += 1
