@@ -2,6 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import { offlineMode } from './main';
 import { apiFetch } from '$lib/utils/api';
 import type { RecognitionResult } from '$lib/types/api';
+import { logger } from '$lib/utils/logger';
 
 // API calls now use environment-aware utility functions
 
@@ -78,7 +79,7 @@ export const videoProcessingStore = {
 			const videoList = data.videos || data;
 			videos.set(videoList);
 		} catch (err) {
-			console.warn('Failed to load videos from API, checking offline mode:', err);
+			logger.warn('Failed to load videos from API, checking offline mode', { error: err.message });
 			
 			// Check if in offline mode as fallback
 			if (get(offlineMode)) {
@@ -170,7 +171,7 @@ export const videoProcessingStore = {
 				const results = data.results || data;
 				recognitionResults.set(Array.isArray(results) ? results : []);
 			} catch (err) {
-				console.warn('Failed to load recognition results from API, using mock data:', err);
+				logger.warn('Failed to load recognition results from API, using mock data', { error: err.message });
 				
 				// Provide mock recognition results
 				const mockResults: RecognitionResult[] = [

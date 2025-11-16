@@ -87,7 +87,7 @@ export async function initializeApp() {
 		await fetchSystemStatus();
 		apiConnected.set(true);
 		offlineMode.set(false);
-		console.log('✅ API connected successfully - application running in online mode');
+		console.info('API connected successfully - application running in online mode');
 	} catch (err) {
 		console.warn('API connection failed, details:', err);
 		
@@ -97,7 +97,7 @@ export async function initializeApp() {
 			// Try direct test of the API
 			const testResponse = await fetch('/api/system/status');
 			if (testResponse.ok) {
-				console.log('✅ Direct API test successful - forcing online mode');
+				console.info('Direct API test successful - forcing online mode');
 				apiConnected.set(true);
 				offlineMode.set(false);
 				

@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 // Note: MessagePack functionality disabled for demo mode
 // import { decode as unpack } from '@msgpack/msgpack';
+import { logger } from '$lib/utils/logger';
 
 // WebSocket connection state
 export const websocketStore = writable({
@@ -132,7 +133,7 @@ class WebSocketManager {
         break;
 
       default:
-        console.log('Unknown message type:', data.type);
+        logger.warn('Unknown message type received', { type: data.type });
     }
   }
 

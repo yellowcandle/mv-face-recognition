@@ -2,6 +2,7 @@
  * API utility for environment-aware URL generation
  * Handles development vs production API endpoint routing
  */
+import { logger } from './logger';
 
 const PRODUCTION_API_BASE = 'https://mv-face-recognition-api.herballemon.workers.dev';
 
@@ -53,7 +54,7 @@ export async function apiFetch(endpoint: string, options?: RequestInit): Promise
 
     return await response.json();
   } catch (error) {
-    console.error(`API call failed for ${url}:`, error);
+    logger.error('API call failed', { url, error: error.message });
     throw error;
   }
 }

@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('./lib/logger');
 
 function readDirectoryRecursively(dir, baseDir = '') {
   const assets = {};
@@ -24,9 +25,9 @@ function readDirectoryRecursively(dir, baseDir = '') {
       try {
         const content = fs.readFileSync(itemPath, 'utf8');
         assets[relativePath] = content;
-        console.log(`✅ Added ${relativePath}`);
+        logger.debug(`Added asset file`, { file: relativePath });
       } catch (err) {
-        console.warn(`⚠️ Could not read ${relativePath} as text:`, err.message);
+        logger.warn(`Could not read asset file as text`, { file: relativePath, error: err.message });
       }
     }
   }
@@ -35,14 +36,14 @@ function readDirectoryRecursively(dir, baseDir = '') {
 }
 
 function main() {
-  console.log('🔄 Updating worker embedded assets...');
+  logger.info('Updating worker embedded assets');
 
   const buildDir = path.join(__dirname, '../frontend/build');
   const workerDir = path.join(__dirname, '../worker');
   const embeddedAssetsFile = path.join(workerDir, 'embedded-assets.js');
 
   if (!fs.existsSync(buildDir)) {
-    console.error('❌ Frontend build directory not found. Please run "npm run build" in the frontend directory first.');
+    logger.error('Frontend build directory not found', { buildDir });
     process.exit(1);
   }
 
@@ -52,14 +53,14 @@ function main() {
   const indexHtmlPath = path.join(buildDir, 'index.html');
   if (fs.existsSync(indexHtmlPath)) {
     assets['index.html'] = fs.readFileSync(indexHtmlPath, 'utf8');
-    console.log('✅ Added index.html');
+    logger.debug('Added index.html');
   }
 
   // Read favicon
   const faviconPath = path.join(buildDir, 'favicon.ico');
   if (fs.existsSync(faviconPath)) {
     // For favicon, we'll skip it as it's binary and we can serve it separately
-    console.log('ℹ️ Skipping favicon.ico (binary file)');
+    logger.info('Skipping favicon.ico (binary file)');
   }
 
   // Read _app directory (SvelteKit structure)
@@ -80,10 +81,11 @@ function main() {
   const embeddedAssetsContent = `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};`;
   
   fs.writeFileSync(embeddedAssetsFile, embeddedAssetsContent, 'utf8');
-  
-  console.log('🎉 Embedded assets updated successfully!');
-  console.log(`📄 Generated ${Object.keys(assets).length} embedded assets`);
-  console.log(`📁 Saved to: ${embeddedAssetsFile}`);
+
+  logger.info('Embedded assets updated successfully', {
+    assetCount: Object.keys(assets).length,
+    outputFile: embeddedAssetsFile
+  });
 }
 
 if (require.main === module) {
