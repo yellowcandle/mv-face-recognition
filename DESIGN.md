@@ -1869,3 +1869,1485 @@ The MV Face Recognition WebUI has reached production-ready excellence with a mod
 - **Error Resilience**: Graceful degradation with offline mode and fallback data
 
 The WebUI represents a production-quality interface that effectively showcases the face recognition capabilities while providing an excellent user experience across all device types and use cases. The modern SvelteKit architecture ensures maintainability and extensibility for future enhancements.
+
+---
+
+## 🔧 REFACTORING PLAN (January 2025)
+
+> **Status**: Planned
+> **Created**: January 2025
+> **Based on**: Code Review findings
+> **Target Completion**: Q1 2025
+
+### Executive Summary
+
+Following a comprehensive code review, this refactoring plan addresses technical debt, improves code quality, and enhances system reliability. The codebase is currently **production-ready with a grade of A (92/100)**, but strategic improvements will elevate it to **A+ (98/100)** status.
+
+**Key Findings**:
+- ✅ Excellent security posture (27 vulnerabilities fixed)
+- ✅ Strong architecture and testing infrastructure
+- ⚠️ 1 critical issue: Git merge conflict in .gitignore
+- ⚠️ 5 medium priority issues: logging, demo data, error handling
+- ⚠️ 3 minor issues: TODOs, type hints, consistency
+
+**Expected Outcomes**:
+- **Security**: Maintain A+ rating (0 critical/high vulnerabilities)
+- **Code Quality**: Increase from A to A+ (95%+ code coverage)
+- **Performance**: 10-15% improvement in video processing speed
+- **Maintainability**: Reduce technical debt by 80%
+- **Developer Experience**: Faster onboarding and debugging
+
+---
+
+### Refactoring Objectives
+
+#### Primary Objectives (Must Have)
+1. **Eliminate Critical Issues**: Fix git conflicts and production logging
+2. **Connect Real API**: Replace demo data with live API integration
+3. **Improve Error Handling**: Implement comprehensive error handling strategy
+4. **Enhance Type Safety**: Add TypeScript to Worker API
+
+#### Secondary Objectives (Should Have)
+5. **Standardize Logging**: Implement structured logging across all components
+6. **Optimize Security**: Replace manual SQL sanitization with parameterized queries
+7. **Clean Technical Debt**: Remove deprecated TODOs and outdated code
+8. **Improve Testing**: Increase integration test coverage to 90%+
+
+#### Tertiary Objectives (Nice to Have)
+9. **Add Monitoring**: Integrate observability tools (Sentry, metrics)
+10. **Performance Profiling**: Identify and optimize bottlenecks
+11. **Documentation**: Add API documentation (OpenAPI/Swagger)
+12. **Developer Tools**: Add pre-commit hooks and linting automation
+
+---
+
+### Phase 1: Critical Fixes (Week 1) 🔴
+
+**Duration**: 3-5 days
+**Risk**: Low
+**Dependencies**: None
+
+#### 1.1 Fix Git Merge Conflict (.gitignore)
+**File**: `.gitignore:216-231`
+
+**Current State**:
+```gitignore
+<<<<<<< HEAD
+.DS_Store
+.aider*
+=======
+.aider*
+>>>>>>> origin/dev-gradio
+```
+
+**Action**:
+```bash
+# Resolve conflict by merging both branches
+git checkout claude/code-ewv-014ePKAgEjPiQyXCGJBtwGgD
+# Edit .gitignore to remove conflict markers
+# Commit resolution
+git add .gitignore
+git commit -m "fix: Resolve .gitignore merge conflict"
+```
+
+**Success Criteria**:
+- ✅ No merge conflict markers in .gitignore
+- ✅ All intended files properly ignored
+- ✅ git status shows clean working tree
+
+**Effort**: 30 minutes
+
+---
+
+#### 1.2 Replace Console.log with Structured Logging
+**Files**: `worker/index.js`, `worker/embedded-assets.js`, 15+ script files
+
+**Current Issue**:
+- Production code contains 50+ console.log statements
+- No log levels or filtering capability
+- Performance overhead and information disclosure risk
+
+**Action Plan**:
+
+**Step 1**: Create logging utility (`worker/lib/logger.js`)
+```javascript
+// worker/lib/logger.js
+export const LogLevel = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3
+};
+
+export class Logger {
+  constructor(level = LogLevel.INFO) {
+    this.level = level;
+  }
+
+  debug(message, meta = {}) {
+    if (this.level <= LogLevel.DEBUG) {
+      console.log(`[DEBUG] ${message}`, meta);
+    }
+  }
+
+  info(message, meta = {}) {
+    if (this.level <= LogLevel.INFO) {
+      console.log(`[INFO] ${message}`, meta);
+    }
+  }
+
+  warn(message, meta = {}) {
+    if (this.level <= LogLevel.WARN) {
+      console.warn(`[WARN] ${message}`, meta);
+    }
+  }
+
+  error(message, error = null, meta = {}) {
+    if (this.level <= LogLevel.ERROR) {
+      console.error(`[ERROR] ${message}`, { error, ...meta });
+    }
+  }
+}
+
+// Create singleton instance
+export const logger = new Logger(
+  process.env.LOG_LEVEL || LogLevel.INFO
+);
+```
+
+**Step 2**: Replace console.log in worker/index.js
+```javascript
+// Before
+console.log(`[${new Date().toISOString()}] ${request.method} ${pathname}`);
+
+// After
+import { logger } from './lib/logger.js';
+logger.info(`Request: ${request.method} ${pathname}`, {
+  userAgent: request.headers.get('User-Agent')?.substring(0, 50),
+  timestamp: new Date().toISOString()
+});
+```
+
+**Step 3**: Add Python structured logging (`mvp-processor/src/utils/logger.py`)
+```python
+import logging
+import json
+from datetime import datetime
+
+class StructuredLogger:
+    def __init__(self, name: str, level: str = "INFO"):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(getattr(logging, level))
+
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def info(self, message: str, **kwargs):
+        self.logger.info(f"{message} | {json.dumps(kwargs)}")
+
+    def error(self, message: str, error: Exception = None, **kwargs):
+        error_data = {"error": str(error)} if error else {}
+        self.logger.error(f"{message} | {json.dumps({**error_data, **kwargs})}")
+```
+
+**Files to Update**:
+1. `worker/index.js` (~20 console.log statements)
+2. `worker/embedded-assets.js` (~5 statements)
+3. `scripts/*.js` (~30 statements across 10 files)
+4. `mvp-processor/src/*.py` (standardize logging)
+
+**Success Criteria**:
+- ✅ Zero console.log in production code
+- ✅ All logs have proper levels (DEBUG/INFO/WARN/ERROR)
+- ✅ Logs include structured metadata (timestamp, context)
+- ✅ Log level configurable via environment variable
+- ✅ Performance impact < 5ms per request
+
+**Effort**: 2-3 days (1 day infrastructure, 2 days migration)
+
+---
+
+#### 1.3 Connect Frontend to Real API
+**File**: `mvp-processor/src/routes/+page.svelte:14-21`
+
+**Current Issue**:
+- Hardcoded demo data with fake names
+- Not connected to actual video processing API
+- WebSocket simulation instead of real updates
+
+**Action Plan**:
+
+**Step 1**: Create API client (`mvp-processor/src/lib/api/client.ts`)
+```typescript
+// mvp-processor/src/lib/api/client.ts
+export interface DetectedFace {
+  id: string;
+  name: string;
+  nickname: string;
+  confidence: number;
+  bbox: [number, number, number, number]; // [x, y, width, height]
+  timestamp: number;
+  frame_number: number;
+}
+
+export class FaceRecognitionAPI {
+  private baseUrl: string;
+
+  constructor(baseUrl = '/api') {
+    this.baseUrl = baseUrl;
+  }
+
+  async getVideoFaces(videoId: string): Promise<DetectedFace[]> {
+    const response = await fetch(`${this.baseUrl}/videos/${videoId}/faces`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch faces: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async getRealtimeUpdates(videoId: string): Promise<WebSocket> {
+    const ws = new WebSocket(`wss://${window.location.host}/ws/realtime-processing`);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: 'start_processing',
+        video_name: videoId
+      }));
+    };
+
+    return ws;
+  }
+}
+```
+
+**Step 2**: Update page component
+```typescript
+// mvp-processor/src/routes/+page.svelte
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { FaceRecognitionAPI, type DetectedFace } from '$lib/api/client';
+
+  let detectedFaces: DetectedFace[] = [];
+  let isProcessing = false;
+  let error: string | null = null;
+
+  const api = new FaceRecognitionAPI();
+  let ws: WebSocket | null = null;
+
+  onMount(async () => {
+    try {
+      isProcessing = true;
+
+      // Load initial faces from API
+      detectedFaces = await api.getVideoFaces('current');
+
+      // Connect to real-time updates
+      ws = await api.getRealtimeUpdates('current');
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'frame_update') {
+          detectedFaces = data.data.faces;
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        error = 'Real-time updates unavailable';
+      };
+
+    } catch (err) {
+      error = `Failed to load face recognition: ${err.message}`;
+      // Fallback to demo data
+      detectedFaces = getDemoData();
+    } finally {
+      isProcessing = false;
+    }
+  });
+
+  onDestroy(() => {
+    ws?.close();
+  });
+
+  function getDemoData(): DetectedFace[] {
+    // Keep demo data as fallback for offline mode
+    return [/* existing demo data */];
+  }
+</script>
+
+{#if error}
+  <div class="error-banner">
+    {error}
+    <button on:click={() => location.reload()}>Retry</button>
+  </div>
+{/if}
+
+<!-- Rest of component -->
+```
+
+**Step 3**: Implement Worker API endpoints
+```javascript
+// worker/index.js - Add missing endpoints
+case '/api/videos/current/faces':
+  const faces = await env.KV_NAMESPACE.get('current_video_faces', 'json');
+  return new Response(JSON.stringify(faces || []), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+```
+
+**Success Criteria**:
+- ✅ Frontend loads real data from `/api/videos/{id}/faces`
+- ✅ WebSocket connects to real processing updates
+- ✅ Graceful fallback to demo data when API unavailable
+- ✅ Error messages displayed to user
+- ✅ Loading states during API calls
+
+**Effort**: 2 days (1 day API client, 1 day integration)
+
+---
+
+### Phase 2: Error Handling & Robustness (Week 2) 🟡
+
+**Duration**: 5-7 days
+**Risk**: Medium
+**Dependencies**: Phase 1 completion
+
+#### 2.1 Implement Custom Exception Classes
+**File**: `mvp-processor/src/exceptions.py` (new file)
+
+**Action**:
+```python
+# mvp-processor/src/exceptions.py
+"""Custom exceptions for face recognition system."""
+
+class FaceRecognitionError(Exception):
+    """Base exception for face recognition errors."""
+    pass
+
+class VideoProcessingError(FaceRecognitionError):
+    """Raised when video processing fails."""
+
+    def __init__(self, message: str, video_path: str = None, cause: Exception = None):
+        self.video_path = video_path
+        self.cause = cause
+        super().__init__(message)
+
+class CorruptedVideoError(VideoProcessingError):
+    """Raised when video file is corrupted."""
+    pass
+
+class UnsupportedFormatError(VideoProcessingError):
+    """Raised when video format is not supported."""
+    pass
+
+class FaceDetectionError(FaceRecognitionError):
+    """Raised when face detection fails."""
+    pass
+
+class EmbeddingGenerationError(FaceRecognitionError):
+    """Raised when embedding generation fails."""
+    pass
+
+class DatabaseError(FaceRecognitionError):
+    """Raised when database operations fail."""
+
+    def __init__(self, message: str, operation: str = None):
+        self.operation = operation
+        super().__init__(message)
+```
+
+**Step 2**: Update VideoProcessor with better error handling
+```python
+# mvp-processor/src/video_processor.py
+from src.exceptions import (
+    VideoProcessingError,
+    CorruptedVideoError,
+    UnsupportedFormatError
+)
+
+class VideoProcessor:
+    def extract_frames(self, video_path: str) -> Generator:
+        """Extract frames with robust error handling."""
+
+        # Validate file exists
+        if not Path(video_path).exists():
+            raise VideoProcessingError(
+                f"Video file not found: {video_path}",
+                video_path=video_path
+            )
+
+        # Attempt to open video with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                cap = cv2.VideoCapture(video_path)
+
+                if not cap.isOpened():
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Failed to open video (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(1)
+                        continue
+                    else:
+                        raise VideoProcessingError(
+                            f"Cannot open video after {max_retries} attempts",
+                            video_path=video_path
+                        )
+
+                # Validate video properties
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+                if fps <= 0 or frame_count <= 0:
+                    raise CorruptedVideoError(
+                        f"Corrupted video: invalid fps={fps}, frames={frame_count}",
+                        video_path=video_path
+                    )
+
+                break
+
+            except cv2.error as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"OpenCV error (attempt {attempt + 1}): {e}")
+                    time.sleep(1)
+                    continue
+                else:
+                    raise CorruptedVideoError(
+                        f"OpenCV error: {str(e)}",
+                        video_path=video_path,
+                        cause=e
+                    )
+
+        # Extract frames with error handling
+        try:
+            frame_count = 0
+            extracted_count = 0
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                if frame is None:
+                    logger.warning(f"Null frame at position {frame_count}")
+                    frame_count += 1
+                    continue
+
+                # Process frame...
+                yield frame, timestamp
+                extracted_count += 1
+
+        except Exception as e:
+            logger.error(f"Frame extraction error: {e}")
+            raise VideoProcessingError(
+                f"Failed to extract frames",
+                video_path=video_path,
+                cause=e
+            )
+        finally:
+            cap.release()
+```
+
+**Files to Update**:
+1. `mvp-processor/src/video_processor.py` - Add retry logic and validation
+2. `mvp-processor/src/face_detector.py` - Handle detection failures
+3. `backend/app/api/routes/videos.py` - Catch and return proper HTTP errors
+
+**Success Criteria**:
+- ✅ Custom exceptions for all error categories
+- ✅ Retry logic for transient failures (3 attempts)
+- ✅ Proper error context (file path, cause)
+- ✅ Graceful degradation (skip corrupted frames)
+- ✅ All exceptions logged with full context
+- ✅ HTTP API returns proper status codes (400/500)
+
+**Effort**: 3 days
+
+---
+
+#### 2.2 Replace Manual SQL Sanitization
+**Files**: `src/validation.py:140-156`, `src/middleware/security.py:196-219`
+
+**Current Issue**:
+```python
+# DANGEROUS: Manual SQL sanitization
+def sanitize_sql_input(self, input_str: str) -> str:
+    sanitized = input_str.replace("'", "''")
+    sanitized = re.sub(r'[;\-\-]', '', sanitized)
+    return sanitized
+```
+
+**Action**:
+
+**Step 1**: Audit all SQL queries
+```bash
+# Find all SQL queries in codebase
+grep -r "execute\|query\|SELECT\|INSERT\|UPDATE" --include="*.py" | grep -v "test_"
+```
+
+**Step 2**: Replace with parameterized queries
+```python
+# Before (DANGEROUS)
+cursor.execute(f"SELECT * FROM contestants WHERE name = '{sanitize_sql_input(name)}'")
+
+# After (SAFE)
+cursor.execute("SELECT * FROM contestants WHERE name = ?", (name,))
+
+# For PostgreSQL
+cursor.execute("SELECT * FROM contestants WHERE name = %s", (name,))
+```
+
+**Step 3**: Update validation.py
+```python
+# src/validation.py
+class InputValidator:
+    @staticmethod
+    def validate_sql_identifier(identifier: str) -> bool:
+        """
+        Validate SQL identifiers (table/column names).
+
+        Note: Use parameterized queries for values, not this method!
+        """
+        # Allow only alphanumeric and underscore
+        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', identifier))
+
+    @staticmethod
+    @deprecated("Use parameterized queries instead")
+    def sanitize_sql_input(self, input_str: str) -> str:
+        """DEPRECATED: Use parameterized queries with placeholders."""
+        raise NotImplementedError(
+            "Manual SQL sanitization is unsafe. Use parameterized queries: "
+            "cursor.execute('SELECT * FROM table WHERE id = ?', (id,))"
+        )
+```
+
+**Step 4**: Add pre-commit hook to prevent SQL injection
+```python
+# .pre-commit-hooks/check-sql.py
+import re
+import sys
+
+def check_file(filepath):
+    with open(filepath) as f:
+        content = f.read()
+
+    # Find dangerous SQL patterns
+    dangerous_patterns = [
+        r'execute\([^)]*\%.*\)',  # String formatting in execute
+        r'execute\([^)]*\.format',  # .format() in execute
+        r'execute\([^)]*f["\']',  # f-strings in execute
+    ]
+
+    for pattern in dangerous_patterns:
+        if re.search(pattern, content):
+            print(f"❌ Potential SQL injection in {filepath}")
+            print(f"   Use parameterized queries: cursor.execute('...?...', (value,))")
+            return False
+
+    return True
+```
+
+**Success Criteria**:
+- ✅ All SQL queries use parameterized placeholders
+- ✅ Zero string concatenation in SQL queries
+- ✅ Pre-commit hook prevents SQL injection
+- ✅ Documentation updated with safe query examples
+- ✅ Manual sanitization methods deprecated/removed
+
+**Effort**: 2 days
+
+---
+
+### Phase 3: Type Safety & Code Quality (Week 3) 🟢
+
+**Duration**: 5-7 days
+**Risk**: Low
+**Dependencies**: Phase 1 and 2 completion
+
+#### 3.1 Migrate Worker to TypeScript
+**Files**: `worker/index.js` → `worker/index.ts`
+
+**Action Plan**:
+
+**Step 1**: Setup TypeScript configuration
+```json
+// worker/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+**Step 2**: Define types
+```typescript
+// worker/src/types.ts
+export interface CloudflareEnv {
+  BUCKET: R2Bucket;
+  KV_NAMESPACE: KVNamespace;
+  LOG_LEVEL?: string;
+}
+
+export interface VideoMetadata {
+  id: string;
+  title: string;
+  duration: number;
+  processed: boolean;
+  thumbnail_url?: string;
+}
+
+export interface FaceDetection {
+  id: string;
+  contestant_id: string;
+  confidence: number;
+  bbox: [number, number, number, number];
+  timestamp: number;
+  frame_number: number;
+}
+
+export interface APIResponse<T = unknown> {
+  data?: T;
+  error?: string;
+  status: number;
+}
+```
+
+**Step 3**: Convert index.js to TypeScript
+```typescript
+// worker/src/index.ts
+import { CloudflareEnv, APIResponse, VideoMetadata } from './types';
+import { logger } from './lib/logger';
+
+export default {
+  async fetch(
+    request: Request,
+    env: CloudflareEnv,
+    ctx: ExecutionContext
+  ): Promise<Response> {
+    const url = new URL(request.url);
+    const { pathname } = url;
+
+    logger.info('Request received', {
+      method: request.method,
+      pathname,
+      userAgent: request.headers.get('User-Agent')?.substring(0, 50)
+    });
+
+    // Type-safe route handling
+    try {
+      if (pathname.startsWith('/api/')) {
+        return await handleApiRequest(pathname, request, env);
+      }
+
+      if (pathname.startsWith('/videos/')) {
+        return await handleVideoRequest(pathname, request, env);
+      }
+
+      return await handleStaticRequest(pathname, request, env);
+
+    } catch (error) {
+      logger.error('Worker error', error as Error);
+      return jsonResponse<APIResponse>({
+        error: 'Internal server error',
+        status: 500
+      }, 500);
+    }
+  }
+};
+
+async function handleApiRequest(
+  pathname: string,
+  request: Request,
+  env: CloudflareEnv
+): Promise<Response> {
+  // Type-safe API handling
+  const path = pathname.replace('/api', '');
+
+  switch (path) {
+    case '/videos':
+    case '/videos/':
+      const videos = await env.KV_NAMESPACE.get<VideoMetadata[]>(
+        'videos',
+        'json'
+      );
+      return jsonResponse<VideoMetadata[]>(videos || [], 200);
+
+    // ... other cases with proper typing
+
+    default:
+      return jsonResponse<APIResponse>({
+        error: 'API endpoint not found',
+        status: 404
+      }, 404);
+  }
+}
+
+function jsonResponse<T>(data: T, status: number = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
+}
+```
+
+**Step 4**: Update build process
+```json
+// worker/package.json
+{
+  "scripts": {
+    "build": "tsc && wrangler deploy",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240117.0",
+    "typescript": "^5.3.3"
+  }
+}
+```
+
+**Files to Migrate**:
+1. `worker/index.js` → `worker/src/index.ts`
+2. `worker/embedded-assets.js` → `worker/src/embedded-assets.ts`
+3. Create `worker/src/types.ts` for interfaces
+4. Create `worker/src/lib/logger.ts` (type-safe logger)
+
+**Success Criteria**:
+- ✅ All Worker code in TypeScript with strict mode
+- ✅ Zero `any` types (use proper interfaces)
+- ✅ Type checking passes with no errors
+- ✅ Build process generates valid JavaScript
+- ✅ Deployment still works to Cloudflare Workers
+
+**Effort**: 3 days
+
+---
+
+#### 3.2 Clean Technical Debt
+**Files**: Multiple
+
+**Actions**:
+
+1. **Remove Deprecated TODOs**
+```bash
+# Audit TODOs
+grep -r "TODO\|FIXME" --include="*.py" --include="*.js" --include="*.ts"
+
+# Remove or implement
+# gui/main_window.py:424 - TODO: Implement video export → Create issue #XX
+# gui/main_window.py:431 - TODO: Implement CSV export → Create issue #XX
+```
+
+2. **Remove Debug Code**
+```bash
+# Find debug print statements
+grep -r "print.*DEBUG\|console.log" --include="*.py" --include="*.js"
+
+# Remove or convert to proper logging
+```
+
+3. **Standardize Imports**
+```python
+# Bad: Wildcard imports
+from module import *
+
+# Good: Explicit imports
+from module import SpecificClass, specific_function
+```
+
+4. **Remove Unused Code**
+```bash
+# Find unused imports
+vulture . --min-confidence 80
+
+# Find dead code
+coverage run -m pytest
+coverage report --show-missing
+```
+
+**Success Criteria**:
+- ✅ Zero TODO/FIXME in production code (moved to GitHub issues)
+- ✅ Zero debug print statements
+- ✅ All imports explicit and used
+- ✅ Dead code identified and removed
+- ✅ Code coverage maintained or improved
+
+**Effort**: 2 days
+
+---
+
+### Phase 4: Testing & Quality Assurance (Week 4) 🟢
+
+**Duration**: 5-7 days
+**Risk**: Low
+**Dependencies**: Phase 1-3 completion
+
+#### 4.1 Increase Integration Test Coverage
+**Target**: 90%+ coverage on critical paths
+
+**Action Plan**:
+
+**Step 1**: Create integration test suite
+```python
+# mvp-processor/tests/integration/test_full_pipeline.py
+import pytest
+from pathlib import Path
+from src.video_processor import VideoProcessor
+from src.face_detector import FaceDetector
+from src.config import load_config
+
+@pytest.fixture
+def sample_video():
+    """Provide sample video for testing."""
+    return Path("tests/fixtures/sample_video.mp4")
+
+@pytest.fixture
+def config():
+    """Load test configuration."""
+    return load_config("config/test_config.yaml")
+
+class TestFullPipeline:
+    """Integration tests for complete video processing pipeline."""
+
+    def test_end_to_end_processing(self, sample_video, config):
+        """Test complete pipeline from video to recognition results."""
+        # Initialize components
+        processor = VideoProcessor(config)
+        detector = FaceDetector(config)
+
+        # Process video
+        frames = list(processor.extract_frames(str(sample_video)))
+        assert len(frames) > 0, "Should extract frames"
+
+        # Detect faces
+        all_detections = []
+        for frame, timestamp in frames:
+            processed_frame, rois, detections = processor.process_frame(
+                frame, 0, detector, timestamp
+            )
+            all_detections.extend(detections)
+
+        # Verify results
+        assert len(all_detections) > 0, "Should detect faces"
+        assert all(d.confidence > 0 for d in all_detections), "All detections should have confidence"
+
+    def test_error_recovery(self, config):
+        """Test pipeline handles errors gracefully."""
+        processor = VideoProcessor(config)
+
+        # Test with non-existent file
+        with pytest.raises(VideoProcessingError):
+            list(processor.extract_frames("nonexistent.mp4"))
+
+        # Test with corrupted file
+        with pytest.raises(CorruptedVideoError):
+            list(processor.extract_frames("tests/fixtures/corrupted.mp4"))
+
+    def test_performance_benchmarks(self, sample_video, config):
+        """Ensure processing meets performance targets."""
+        import time
+
+        processor = VideoProcessor(config)
+        detector = FaceDetector(config)
+
+        start_time = time.time()
+
+        # Process first 100 frames
+        frame_count = 0
+        for frame, timestamp in processor.extract_frames(str(sample_video)):
+            processor.process_frame(frame, frame_count, detector, timestamp)
+            frame_count += 1
+            if frame_count >= 100:
+                break
+
+        elapsed = time.time() - start_time
+        fps = frame_count / elapsed
+
+        # Should process at least 10 FPS
+        assert fps >= 10, f"Processing too slow: {fps:.2f} FPS"
+```
+
+**Step 2**: Add Worker API integration tests
+```typescript
+// worker/tests/integration/api.test.ts
+import { env, createExecutionContext } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
+import worker from '../src/index';
+
+describe('Worker API Integration', () => {
+  it('returns video list from KV', async () => {
+    const request = new Request('http://localhost/api/videos');
+    const ctx = createExecutionContext();
+
+    // Mock KV data
+    await env.KV_NAMESPACE.put('videos', JSON.stringify([
+      { id: '1', title: 'Test Video', duration: 120 }
+    ]));
+
+    const response = await worker.fetch(request, env, ctx);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    expect(data).toHaveLength(1);
+    expect(data[0].title).toBe('Test Video');
+  });
+
+  it('handles video streaming with range requests', async () => {
+    const request = new Request('http://localhost/videos/test.mp4', {
+      headers: { 'Range': 'bytes=0-1023' }
+    });
+    const ctx = createExecutionContext();
+
+    const response = await worker.fetch(request, env, ctx);
+    expect(response.status).toBe(206); // Partial Content
+    expect(response.headers.get('Content-Range')).toBeTruthy();
+  });
+});
+```
+
+**Success Criteria**:
+- ✅ Integration test coverage ≥ 90%
+- ✅ All critical paths tested end-to-end
+- ✅ Performance regression tests in place
+- ✅ Error scenarios covered
+- ✅ Tests run in CI/CD pipeline
+
+**Effort**: 3-4 days
+
+---
+
+#### 4.2 Add Pre-commit Hooks
+**File**: `.pre-commit-config.yaml` (new)
+
+**Action**:
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.11
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--max-line-length=100', '--ignore=E203,W503']
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-all]
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.56.0
+    hooks:
+      - id: eslint
+        files: \.(js|ts|svelte)$
+        args: ['--fix']
+
+  - repo: local
+    hooks:
+      - id: check-sql-injection
+        name: Check SQL Injection
+        entry: python .pre-commit-hooks/check-sql.py
+        language: python
+        files: \.py$
+
+      - id: check-console-log
+        name: Check console.log
+        entry: grep -n "console\\.log"
+        language: system
+        files: \.(js|ts)$
+        exclude: (test|spec)\.(js|ts)$
+```
+
+**Setup**:
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
+```
+
+**Success Criteria**:
+- ✅ Pre-commit hooks installed and active
+- ✅ All commits pass linting and formatting
+- ✅ Custom hooks prevent SQL injection and console.log
+- ✅ Team follows consistent code style
+- ✅ CI/CD runs same checks
+
+**Effort**: 1 day
+
+---
+
+### Phase 5: Monitoring & Observability (Week 5-6) 🔵
+
+**Duration**: 7-10 days
+**Risk**: Medium
+**Dependencies**: Phase 1-4 completion
+
+#### 5.1 Integrate Error Tracking (Sentry)
+**Goal**: Catch production errors before users report them
+
+**Action Plan**:
+
+**Step 1**: Setup Sentry for Python
+```python
+# mvp-processor/src/utils/sentry.py
+import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
+import os
+
+def init_sentry():
+    """Initialize Sentry error tracking."""
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("ENVIRONMENT", "development"),
+        traces_sample_rate=0.1,  # 10% of transactions
+        profiles_sample_rate=0.1,  # 10% of profiling
+        integrations=[
+            LoggingIntegration(
+                level=logging.INFO,
+                event_level=logging.ERROR
+            )
+        ],
+        before_send=filter_sensitive_data,
+    )
+
+def filter_sensitive_data(event, hint):
+    """Remove sensitive data before sending to Sentry."""
+    # Remove sensitive headers
+    if 'request' in event:
+        headers = event['request'].get('headers', {})
+        headers.pop('Authorization', None)
+        headers.pop('Cookie', None)
+
+    return event
+```
+
+**Step 2**: Setup Sentry for Worker
+```typescript
+// worker/src/lib/sentry.ts
+import { Toucan } from 'toucan-js';
+
+export function initSentry(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
+  return new Toucan({
+    dsn: env.SENTRY_DSN,
+    environment: env.ENVIRONMENT || 'production',
+    context: ctx,
+    request,
+    requestDataOptions: {
+      allowedHeaders: ['user-agent', 'accept', 'content-type'],
+      allowedSearchParams: /(.*)/,
+    },
+  });
+}
+
+// worker/src/index.ts
+export default {
+  async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
+    const sentry = initSentry(request, env, ctx);
+
+    try {
+      // ... existing code
+    } catch (error) {
+      sentry.captureException(error);
+      throw error;
+    }
+  }
+};
+```
+
+**Step 3**: Add custom error context
+```python
+# Track video processing errors with context
+with sentry_sdk.configure_scope() as scope:
+    scope.set_tag("video_id", video_id)
+    scope.set_tag("processing_stage", "face_detection")
+    scope.set_context("video", {
+        "path": video_path,
+        "duration": duration,
+        "fps": fps
+    })
+
+    # Process video...
+```
+
+**Success Criteria**:
+- ✅ Sentry captures all unhandled exceptions
+- ✅ Error grouping by type and context
+- ✅ Sensitive data filtered (passwords, tokens)
+- ✅ Performance monitoring enabled
+- ✅ Alerts configured for critical errors
+
+**Effort**: 2 days
+
+---
+
+#### 5.2 Add Performance Monitoring
+**Goal**: Track and optimize system performance
+
+**Action Plan**:
+
+**Step 1**: Add performance metrics collection
+```python
+# mvp-processor/src/utils/metrics.py
+import time
+from dataclasses import dataclass
+from typing import Dict, List
+import json
+
+@dataclass
+class PerformanceMetric:
+    name: str
+    duration_ms: float
+    timestamp: float
+    metadata: Dict
+
+class MetricsCollector:
+    def __init__(self):
+        self.metrics: List[PerformanceMetric] = []
+
+    def track(self, name: str, **metadata):
+        """Context manager for tracking operation duration."""
+        class Timer:
+            def __enter__(inner_self):
+                inner_self.start = time.time()
+                return inner_self
+
+            def __exit__(inner_self, *args):
+                duration_ms = (time.time() - inner_self.start) * 1000
+                self.metrics.append(PerformanceMetric(
+                    name=name,
+                    duration_ms=duration_ms,
+                    timestamp=time.time(),
+                    metadata=metadata
+                ))
+
+        return Timer()
+
+    def get_summary(self) -> Dict:
+        """Get performance summary statistics."""
+        if not self.metrics:
+            return {}
+
+        by_name = {}
+        for metric in self.metrics:
+            if metric.name not in by_name:
+                by_name[metric.name] = []
+            by_name[metric.name].append(metric.duration_ms)
+
+        summary = {}
+        for name, durations in by_name.items():
+            summary[name] = {
+                "count": len(durations),
+                "total_ms": sum(durations),
+                "avg_ms": sum(durations) / len(durations),
+                "min_ms": min(durations),
+                "max_ms": max(durations)
+            }
+
+        return summary
+
+    def export_json(self, filepath: str):
+        """Export metrics to JSON file."""
+        with open(filepath, 'w') as f:
+            json.dump({
+                "metrics": [m.__dict__ for m in self.metrics],
+                "summary": self.get_summary()
+            }, f, indent=2)
+
+# Usage in video processor
+metrics = MetricsCollector()
+
+with metrics.track("video_loading", video_id=video_id):
+    cap = cv2.VideoCapture(video_path)
+
+with metrics.track("frame_extraction", frame_count=100):
+    for frame, timestamp in processor.extract_frames(video_path):
+        # Process frame
+
+with metrics.track("face_detection", frame_count=100):
+    for frame in frames:
+        detections = detector.detect_faces(frame)
+
+print(metrics.get_summary())
+```
+
+**Step 2**: Add Worker performance headers
+```typescript
+// worker/src/index.ts
+export default {
+  async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
+    const startTime = Date.now();
+
+    try {
+      const response = await handleRequest(request, env);
+
+      // Add performance headers
+      const duration = Date.now() - startTime;
+      response.headers.set('Server-Timing', `total;dur=${duration}`);
+      response.headers.set('X-Response-Time', `${duration}ms`);
+
+      return response;
+    } catch (error) {
+      // Track error timing
+      const duration = Date.now() - startTime;
+      logger.error('Request failed', error, { duration_ms: duration });
+      throw error;
+    }
+  }
+};
+```
+
+**Success Criteria**:
+- ✅ All critical operations tracked (video load, detection, recognition)
+- ✅ Performance metrics exported with each processing job
+- ✅ API response times tracked in headers
+- ✅ Baseline metrics established for regression detection
+- ✅ Automated alerts for performance degradation
+
+**Effort**: 2-3 days
+
+---
+
+### Success Metrics & KPIs
+
+#### Code Quality Metrics
+| Metric | Current | Target | Measurement |
+|--------|---------|--------|-------------|
+| Overall Grade | A (92/100) | A+ (98/100) | Code review score |
+| Test Coverage | 75-85% | 90%+ | pytest/vitest coverage |
+| Security Score | A+ (0 critical) | A+ (0 critical) | Safety/npm audit |
+| Type Safety | 60% (Python only) | 95% (Python + TS) | mypy + tsc |
+| Technical Debt | Medium | Low | SonarQube debt ratio |
+
+#### Performance Metrics
+| Metric | Current | Target | Measurement |
+|--------|---------|--------|-------------|
+| Video Processing Speed | 10-15 FPS | 15-20 FPS | Benchmark suite |
+| API Response Time | <300ms | <200ms | Server-Timing header |
+| Error Rate | <1% | <0.1% | Sentry error tracking |
+| Build Time | 2-3 min | <2 min | CI/CD pipeline |
+
+#### Developer Experience Metrics
+| Metric | Current | Target | Measurement |
+|--------|---------|--------|-------------|
+| Onboarding Time | 2-3 days | 1 day | New dev feedback |
+| PR Review Time | 1-2 days | <1 day | GitHub metrics |
+| Deploy Frequency | Weekly | Daily | CI/CD metrics |
+| Mean Time to Recovery | 2-4 hours | <1 hour | Incident tracking |
+
+---
+
+### Risk Assessment & Mitigation
+
+#### High Risk Items 🔴
+| Risk | Probability | Impact | Mitigation |
+|------|------------|--------|------------|
+| Breaking changes in TypeScript migration | Medium | High | Comprehensive testing, gradual migration |
+| Performance regression | Low | High | Benchmark suite, rollback plan |
+| Database migration issues | Low | Critical | Backup before changes, test on staging |
+
+#### Medium Risk Items 🟡
+| Risk | Probability | Impact | Mitigation |
+|------|------------|--------|------------|
+| Integration test failures | Medium | Medium | Fix incrementally, maintain coverage |
+| Third-party API changes (Sentry) | Low | Medium | Version pinning, monitoring |
+| Team adoption resistance | Medium | Low | Documentation, training sessions |
+
+#### Low Risk Items 🟢
+| Risk | Probability | Impact | Mitigation |
+|------|------------|--------|------------|
+| Logging overhead | Low | Low | Performance testing, optimization |
+| Pre-commit hook conflicts | Low | Low | Customizable config, documentation |
+
+---
+
+### Timeline & Resource Allocation
+
+#### Overall Timeline: 5-6 Weeks
+
+```
+Week 1: Critical Fixes (Phase 1)
+├── Day 1: Fix .gitignore conflict
+├── Day 2-3: Structured logging implementation
+└── Day 4-5: Connect frontend to real API
+
+Week 2: Error Handling & Robustness (Phase 2)
+├── Day 1-3: Custom exceptions and retry logic
+└── Day 4-5: Replace SQL sanitization
+
+Week 3: Type Safety & Code Quality (Phase 3)
+├── Day 1-3: TypeScript migration for Worker
+└── Day 4-5: Clean technical debt
+
+Week 4: Testing & QA (Phase 4)
+├── Day 1-4: Integration test suite
+└── Day 5: Pre-commit hooks setup
+
+Week 5-6: Monitoring & Observability (Phase 5)
+├── Week 5: Sentry integration and error tracking
+└── Week 6: Performance monitoring and optimization
+```
+
+#### Resource Requirements
+- **1 Senior Developer**: Lead TypeScript migration and architecture
+- **1-2 Developers**: Testing, error handling, cleanup
+- **DevOps Support**: CI/CD updates, monitoring setup (10-20 hours)
+- **Code Review**: 2-3 hours per week for quality assurance
+
+---
+
+### Rollback Strategy
+
+Each phase includes a rollback plan:
+
+1. **Git Branching Strategy**:
+   - Main branch: `claude/code-ewv-014ePKAgEjPiQyXCGJBtwGgD`
+   - Feature branches: `refactor/phase-1-critical-fixes`, etc.
+   - Tag before each merge: `pre-refactor-phase-1`
+
+2. **Database Backups**:
+   - Backup before any schema changes
+   - Export KV namespace before updates
+   - R2 bucket snapshots
+
+3. **Deployment Strategy**:
+   - Blue-green deployment for Worker
+   - Canary releases (10% → 50% → 100%)
+   - Automated rollback on error rate spike
+
+4. **Monitoring Triggers**:
+   - Error rate > 1% → Auto-rollback
+   - Response time > 500ms → Alert + manual review
+   - Test coverage drop → Block merge
+
+---
+
+### Post-Refactoring Actions
+
+After completing all phases:
+
+1. **Documentation Updates**:
+   - Update README.md with new setup instructions
+   - Document new logging and monitoring systems
+   - Create API documentation with OpenAPI spec
+   - Update DESIGN.md with architecture changes
+
+2. **Team Training**:
+   - TypeScript best practices workshop
+   - Structured logging training
+   - Error handling patterns review
+   - Monitoring dashboard walkthrough
+
+3. **Performance Baseline**:
+   - Run full benchmark suite
+   - Document new performance baselines
+   - Set up automated regression detection
+   - Create performance SLOs
+
+4. **Security Audit**:
+   - Final security scan (Safety + npm audit)
+   - Penetration testing (if applicable)
+   - Update security documentation
+   - Review and update SECURITY_FIXES.md
+
+---
+
+### Maintenance Plan
+
+**Weekly**:
+- Review Sentry errors and triage
+- Check performance metrics for regressions
+- Run security scans (automated)
+- Update dependencies (automated PRs)
+
+**Monthly**:
+- Code quality review (SonarQube)
+- Performance optimization sprint
+- Security vulnerability review
+- Documentation updates
+
+**Quarterly**:
+- Major dependency upgrades
+- Architecture review
+- Load testing and capacity planning
+- Team retrospective and process improvements
+
+---
+
+## Conclusion
+
+This refactoring plan transforms an already production-ready codebase (A grade, 92/100) into an exemplary system (A+ grade, 98/100) with:
+
+- **Enhanced Security**: Maintains A+ security rating with zero critical vulnerabilities
+- **Improved Reliability**: Comprehensive error handling and monitoring
+- **Better Developer Experience**: TypeScript, pre-commit hooks, structured logging
+- **Increased Test Coverage**: 90%+ coverage with integration and performance tests
+- **Production Observability**: Sentry error tracking and performance monitoring
+
+**Expected ROI**:
+- **-50% debugging time**: Structured logging and Sentry
+- **-30% onboarding time**: Better documentation and type safety
+- **-80% technical debt**: Systematic cleanup and automation
+- **+15% performance**: Optimization and monitoring
+- **+20% developer velocity**: Better tooling and confidence
+
+The phased approach allows for incremental improvements with minimal risk, and each phase delivers tangible value independently.
+
+---
+
+**Next Steps**:
+1. Review and approve this refactoring plan
+2. Create GitHub issues for each phase
+3. Allocate resources and set sprint dates
+4. Begin Phase 1: Critical Fixes
+
+**Questions or Concerns?**
+- Reach out to the development team for clarification
+- Adjust timeline based on resource availability
+- Prioritize phases based on business needs
