@@ -1,20 +1,70 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md", "CLAUDE.md"],
+  "instructions": [
+    "CONTRIBUTING.md",
+    "docs/guidelines.md",
+    ".cursor/rules/*.md",
+    "CLAUDE.md"
+  ],
   "mcp": {
     "context7": {
       "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "agno-docs": {
+      "type": "remote",
+      "url": "https://docs.agno.com/mcp"
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
       "enabled": true
     },
     "serena": {
       "type": "local",
-      "command": ["/Users/swong/.local/bin/uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"],
+      "command": [
+        "uvx",
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ],
       "enabled": true
     },
-    "deepwiki": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "chrome-devtools-mcp@latest"],
+      "enabled": true
+    },
+    "figma-desktop": {
       "type": "remote",
-      "url": "https://mcp.deepwiki.com/sse",
+      "url": "http://127.0.0.1:3845/mcp",
+      "enabled": true
+    },
+    "zen": {
+      "type": "local",
+      "command": [
+        "/Users/swong/dev/zen-mcp-server/.zen_venv/bin/python",
+        "/Users/swong/dev/zen-mcp-server/server.py"
+      ],
+      "enabled": true,
+      "environment": {
+        "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com/",
+        "DEFAULT_MODEL": "auto",
+        "DEFAULT_THINKING_MODE_THINKDEEP": "high",
+        "CONVERSATION_TIMEOUT_HOURS": "24",
+        "MAX_CONVERSATION_TURNS": "40",
+        "LOG_LEVEL": "DEBUG",
+        "DISABLED_TOOLS": "analyze,refactor,testgen,secaudit,docgen,tracer",
+        "ZEN_MCP_FORCE_ENV_OVERRIDE": "false",
+        "COMPOSE_PROJECT_NAME": "zen-mcp",
+        "TZ": "UTC",
+        "LOG_MAX_SIZE": "10MB"
+      }
+    },
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
       "enabled": true
     }
   }

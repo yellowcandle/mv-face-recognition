@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { videoProcessingStore, processingJobs, loading, error, type ProcessingJob } from '$lib/stores/videoProcessing';
 	import { contestantsStore, contestants } from '$lib/stores/contestants';
+	import { logger } from '$lib/utils/logger';
 	
 	let fileInput: HTMLInputElement;
 	let selectedFile: File | null = null;
@@ -127,31 +128,31 @@
 	}
 	
 	onMount(async () => {
-		console.log('Video Processing page initializing...');
-		
+		logger.info('Video Processing page initializing');
+
 		// Set loading state
 		isPageLoading = true;
 		initializationError = null;
-		
+
 		try {
 			// Initialize stores with empty arrays to prevent undefined errors
-			console.log('Setting initial store values...');
+			logger.debug('Setting initial store values');
 			processingJobs.set([]);
 			contestants.set([]);
-			
-			console.log('Loading data from stores...');
+
+			logger.debug('Loading data from stores');
 			await Promise.all([
 				videoProcessingStore.getProcessingJobs().catch((err) => {
-					console.warn('Failed to load processing jobs:', err);
+					logger.warn('Failed to load processing jobs', { error: err.message });
 					return [];
 				}),
 				contestantsStore.loadContestants().catch((err) => {
-					console.warn('Failed to load contestants:', err);
+					logger.warn('Failed to load contestants', { error: err.message });
 					return [];
 				})
 			]);
-			
-			console.log('Video Processing page initialized successfully');
+
+			logger.info('Video Processing page initialized successfully');
 		} catch (err) {
 			console.error('Failed to initialize video processing page:', err);
 			initializationError = 'Failed to load page data. Please try refreshing the page.';

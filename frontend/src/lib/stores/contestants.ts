@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { offlineMode } from './main';
 import { apiFetch } from '$lib/utils/api';
+import { logger } from '$lib/utils/logger';
 
 // API calls now use environment-aware utility functions
 
@@ -84,7 +85,7 @@ export const contestantsStore = {
 			const data = await apiFetch('/api/contestants');
 			contestants.set(data);
 		} catch (err) {
-			console.warn('Failed to load from API, checking offline mode:', err);
+			logger.warn('Failed to load contestants from API, checking offline mode', { error: err.message });
 			
 			// Check if in offline mode
 			if (get(offlineMode)) {

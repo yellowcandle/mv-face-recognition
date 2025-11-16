@@ -213,7 +213,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 git-filter-repo.py
-<<<<<<< HEAD
 .DS_Store
 .aider*
 # Large output directories for HF Spaces optimization
@@ -226,6 +225,3 @@ cache/
 *.log
 node_modules/
 dist/
-=======
-.aider*
->>>>>>> origin/dev-gradio

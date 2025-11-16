@@ -3,13 +3,17 @@
  * Serves static frontend and provides API for metadata/videos
  */
 import { EMBEDDED_ASSETS } from './embedded-assets.js';
+import { logger } from './lib/logger.js';
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const { pathname } = url;
 
-    console.log(`[${new Date().toISOString()}] ${request.method} ${pathname} - User-Agent: ${request.headers.get('User-Agent')?.substring(0, 50)}...`);
+    logger.info(`${request.method} ${pathname}`, {
+      userAgent: request.headers.get('User-Agent')?.substring(0, 50),
+      timestamp: new Date().toISOString()
+    });
 
     // CORS headers for all responses
     const corsHeaders = {
@@ -20,35 +24,35 @@ export default {
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      console.log(`CORS preflight for ${pathname}`);
+      logger.debug(`CORS preflight for ${pathname}`);
       return new Response(null, { headers: corsHeaders });
     }
 
     // Handle WebSocket upgrade requests
     if (pathname.startsWith('/ws/')) {
-      console.log(`WebSocket upgrade request: ${pathname}`);
+      logger.info(`WebSocket upgrade request: ${pathname}`);
       return await handleWebSocketRequest(pathname, request, env);
     }
 
     try {
       // API routes
       if (pathname.startsWith('/api/')) {
-        console.log(`Routing to API handler: ${pathname}`);
+        logger.debug(`Routing to API handler: ${pathname}`);
         return await handleApiRequest(pathname, request, env, corsHeaders);
       }
 
       // Video files from R2
       if (pathname.startsWith('/videos/')) {
-        console.log(`Routing to video handler: ${pathname}`);
+        logger.debug(`Routing to video handler: ${pathname}`);
         return await handleVideoRequest(pathname, request, env, corsHeaders);
       }
 
       // Static frontend files
-      console.log(`Routing to static handler: ${pathname}`);
+      logger.debug(`Routing to static handler: ${pathname}`);
       return await handleStaticRequest(pathname, request, env, corsHeaders);
       
     } catch (error) {
-      console.error('Worker error:', error);
+      logger.error('Worker error', { error: error.message, stack: error.stack });
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -82,7 +86,7 @@ async function handleWebSocketRequest(pathname, request, env) {
       server.addEventListener('message', async (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('WebSocket message received:', data);
+          logger.debug('WebSocket message received', { type: data.type });
 
           // Handle different message types
           switch (data.type) {
@@ -146,7 +150,7 @@ async function handleWebSocketRequest(pathname, request, env) {
               }));
           }
         } catch (error) {
-          console.error('WebSocket message processing error:', error);
+          logger.error('WebSocket message processing error', { error: error.message });
           server.send(JSON.stringify({
             type: 'error',
             message: 'Failed to process message'
@@ -155,7 +159,7 @@ async function handleWebSocketRequest(pathname, request, env) {
       });
 
       server.addEventListener('close', () => {
-        console.log('WebSocket connection closed');
+        logger.info('WebSocket connection closed');
       });
 
       // Send initial connection confirmation
@@ -309,7 +313,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       const optimizedVideosList = await env.METADATA_KV?.get('videos_list_optimized');
       
       if (optimizedVideosList) {
-        console.log('Using optimized video list from KV storage');
+        logger.debug('Using optimized video list from KV storage');
         return new Response(optimizedVideosList, {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -319,7 +323,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       const videoMetadataCollection = await env.METADATA_KV?.get('video_metadata_collection');
       
       if (videoMetadataCollection) {
-        console.log('Creating optimized response from full metadata collection');
+        logger.debug('Creating optimized response from full metadata collection');
         const parsedData = JSON.parse(videoMetadataCollection);
         
         // Extract only basic info, exclude detailed contestant timelines
@@ -412,8 +416,8 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           "created_at": "2024-01-01T00:00:00Z"
         }
       ];
-      
-      console.log('Using fallback video data');
+
+      logger.info('Using fallback video data');
       const response = { videos: allVideos };
       return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -670,7 +674,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           metadataKey = numericMatch[1];
         }
         
-        console.log(`Looking for dense metadata with key: metadata_dense_${metadataKey} (from videoId: ${videoId})`);
+        logger.debug(`Looking for dense metadata`, { key: `metadata_dense_${metadataKey}`, videoId });
         
         // Try to get from KV storage first using the correct key
         const storedDenseMetadata = await env.METADATA_KV?.get(`metadata_dense_${metadataKey}`);
@@ -744,7 +748,7 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           metadataKey = numericMatch[1];
         }
         
-        console.log(`Looking for metadata with key: metadata_${metadataKey} (from videoId: ${videoId})`);
+        logger.debug(`Looking for metadata`, { key: `metadata_${metadataKey}`, videoId });
         
         // Try to get from KV storage first using the correct key
         const storedVideoMetadata = await env.METADATA_KV?.get(`metadata_${metadataKey}`);
@@ -858,7 +862,7 @@ async function handleVideoRequest(pathname, request, env, corsHeaders) {
  * Handle static frontend files
  */
 async function handleStaticRequest(pathname, request, env, corsHeaders) {
-  console.log(`Static request for: ${pathname}`);
+  logger.debug(`Static request for: ${pathname}`);
   
   // Handle root path
   if (pathname === '/') {
@@ -870,7 +874,7 @@ async function handleStaticRequest(pathname, request, env, corsHeaders) {
   
   // Check if we have the asset in our embedded assets
   if (EMBEDDED_ASSETS[assetKey]) {
-    console.log(`Successfully serving embedded asset: ${assetKey}`);
+    logger.debug(`Successfully serving embedded asset: ${assetKey}`);
     
     const contentType = getContentType(pathname);
     const cacheControl = pathname.includes('assets/') ? 'public, max-age=31536000' : 'public, max-age=3600';
@@ -889,7 +893,7 @@ async function handleStaticRequest(pathname, request, env, corsHeaders) {
   if (!/\.[^/]+$/.test(pathname)) {
     const pageKey = `${assetKey}.html`;
     if (EMBEDDED_ASSETS[pageKey]) {
-      console.log(`SPA route, serving specific page: ${pageKey}`);
+      logger.debug(`SPA route, serving specific page: ${pageKey}`);
       return new Response(EMBEDDED_ASSETS[pageKey], {
         headers: {
           ...corsHeaders,
@@ -898,8 +902,8 @@ async function handleStaticRequest(pathname, request, env, corsHeaders) {
         }
       });
     }
-    
-    console.log(`SPA route detected, serving index.html for: ${pathname}`);
+
+    logger.debug(`SPA route detected, serving index.html for: ${pathname}`);
     return new Response(EMBEDDED_ASSETS['index.html'], {
       headers: {
         ...corsHeaders,

@@ -94,14 +94,14 @@ export const videoPlayerActions = {
 			const metadataAvailable = await isMetadataAvailable();
 			
 			if (metadataAvailable) {
-				console.log('Loading videos from local metadata...');
+				console.info('Loading videos from local metadata');
 				const videos = await loadVideoList();
 				availableVideos.set(videos);
 				return;
 			}
-			
+
 			// Fallback to live API
-			console.log('Loading videos from API...');
+			console.info('Loading videos from API');
 			const videos = await apiFetch('/api/videos/processed/list');
 			availableVideos.set(videos);
 		} catch (err) {
@@ -158,14 +158,14 @@ export const videoPlayerActions = {
 			const metadataAvailable = await isMetadataAvailable();
 			
 			if (metadataAvailable) {
-				console.log('Loading contestants from local metadata...');
+				console.info('Loading contestants from local metadata');
 				const contestants = await loadContestantInfo();
 				allContestants.set(contestants);
 				return;
 			}
-			
+
 			// Fallback to live API
-			console.log('Loading contestants from API...');
+			console.info('Loading contestants from API');
 			const contestants = await apiFetch('/api/contestants/');
 			// Add photo URLs if available
 			const contestantsWithPhotos = contestants.map((contestant) => ({
@@ -223,10 +223,10 @@ export const videoPlayerActions = {
             const metadata = await (async () => {
                 const metadataAvailable = await isMetadataAvailable();
                 if (metadataAvailable) {
-                    console.log(`Loading metadata for video ${video.id} from local files...`);
+                    console.info(`Loading metadata for video ${video.id} from local files`);
                     return await loadVideoMetadata(video.id, false);
                 }
-                console.log(`Loading metadata for video ${video.id} from API...`);
+                console.info(`Loading metadata for video ${video.id} from API`);
                 return await apiFetch(`/api/videos/metadata/${video.id}`);
             })();
 
@@ -302,7 +302,7 @@ export const videoPlayerActions = {
 			const metadataAvailable = await isMetadataAvailable();
 			
 			if (metadataAvailable) {
-				console.log(`Loading dense face data for video ${videoId} from local files...`);
+				console.info(`Loading dense face data for video ${videoId} from local files`);
 				const faceData = await loadVideoMetadata(videoId, true);
 				
 				// If timestamp is provided, filter the data for that timestamp
@@ -316,7 +316,7 @@ export const videoPlayerActions = {
 				
 				return faceData;
 			} else {
-				console.log(`Loading dense face data for video ${videoId} from API...`);
+				console.info(`Loading dense face data for video ${videoId} from API`);
 				const url = timestamp !== undefined 
 					? `/api/videos/metadata/dense/${videoId}?timestamp=${timestamp}`
 					: `/api/videos/metadata/dense/${videoId}`;
@@ -337,10 +337,10 @@ export const videoPlayerActions = {
 			let metadata;
 			
 			if (metadataAvailable) {
-				console.log(`Loading contestant timeline for video ${videoId} from local files...`);
+				console.info(`Loading contestant timeline for video ${videoId} from local files`);
 				metadata = await loadVideoMetadata(videoId, false);
 			} else {
-				console.log(`Loading contestant timeline for video ${videoId} from API...`);
+				console.info(`Loading contestant timeline for video ${videoId} from API`);
 				metadata = await apiFetch(`/api/videos/metadata/${videoId}`);
 			}
 			
