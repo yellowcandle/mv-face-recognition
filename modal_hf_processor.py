@@ -304,8 +304,11 @@ def process_video(
         proc_config["output"]["galleries_dir"] = str(VOL_MOUNT_PATH / "galleries")
         proc_config["face_recognition"]["similarity_threshold"] = config.similarity_threshold
 
-        # Write modified config
-        modified_config_path = str(VOL_MOUNT_PATH / f"config_{video_name.replace('.', '_')}.yaml")
+        # Write modified config with sanitized filename
+        # Handle path separators and special characters in video names
+        import re
+        safe_name = re.sub(r'[^\w\-]', '_', video_name)
+        modified_config_path = str(VOL_MOUNT_PATH / f"config_{safe_name}.yaml")
         with open(modified_config_path, "w") as f:
             yaml.dump(proc_config, f)
 
@@ -412,13 +415,15 @@ def process_video(
 def process_all_videos_parallel(
     video_list: List[str],
     config: ProcessingConfig = ProcessingConfig(),
+    max_concurrent: int = 50,
 ) -> List[Dict[str, Any]]:
     """
-    Process multiple videos in parallel using Modal's starmap.
+    Process multiple videos in parallel using Modal's starmap with batching.
 
     Args:
         video_list: List of video filenames to process
         config: Processing configuration
+        max_concurrent: Maximum number of videos to process concurrently
 
     Returns:
         List of processing results for each video
@@ -426,20 +431,33 @@ def process_all_videos_parallel(
     from rich.console import Console
 
     console = Console()
-    console.print(f"[bold blue]🚀 Launching {len(video_list)} containers in parallel...[/bold blue]")
+    total_videos = len(video_list)
+    all_results = []
 
     start_time = time.time()
 
-    # Create parameter tuples for starmap
-    params = [(video, config) for video in video_list]
+    # Process in batches to control concurrency
+    for batch_start in range(0, total_videos, max_concurrent):
+        batch_end = min(batch_start + max_concurrent, total_videos)
+        batch = video_list[batch_start:batch_end]
+        batch_num = (batch_start // max_concurrent) + 1
+        total_batches = (total_videos + max_concurrent - 1) // max_concurrent
 
-    # Process in parallel
-    results = list(process_video.starmap(params))
+        console.print(f"[bold blue]🚀 Processing batch {batch_num}/{total_batches}: {len(batch)} videos...[/bold blue]")
+
+        # Create parameter tuples for starmap
+        params = [(video, config) for video in batch]
+
+        # Process batch in parallel
+        batch_results = list(process_video.starmap(params))
+        all_results.extend(batch_results)
+
+        console.print(f"[green]✅ Batch {batch_num} complete ({len(batch)} videos)[/green]")
 
     elapsed = time.time() - start_time
-    console.print(f"[bold green]✅ All {len(video_list)} videos processed in {elapsed:.1f}s[/bold green]")
+    console.print(f"[bold green]✅ All {total_videos} videos processed in {elapsed:.1f}s[/bold green]")
 
-    return results
+    return all_results
 
 
 # --- Utility Functions ---
@@ -629,10 +647,10 @@ def main(
             console.print("[red]❌ No videos found to process[/red]")
             return
 
-        # Limit to max_containers for parallel processing
-        videos_to_process = videos[:max_containers] if len(videos) > max_containers else videos
+        # Process all videos with controlled concurrency
+        videos_to_process = videos
 
-        console.print(f"[green]✅ Processing {len(videos_to_process)} videos in parallel[/green]")
+        console.print(f"[green]✅ Processing {len(videos_to_process)} videos (max {max_containers} concurrent)[/green]")
 
         # Show video list
         table = Table(title="Videos to Process")
@@ -653,7 +671,7 @@ def main(
             console=console,
         ) as progress:
             progress.add_task("Processing all videos in parallel...", total=None)
-            results = process_all_videos_parallel.remote(videos_to_process, config)
+            results = process_all_videos_parallel.remote(videos_to_process, config, max_containers)
 
         total_time = time.time() - start_time
         print_batch_results(console, results, total_time)

@@ -255,17 +255,23 @@ def status():
         border_style="blue"
     ))
 
+    # Video extensions to check
+    video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v"}
+
     # Check local videos
     local_path = Path(LOCAL_VIDEOS_DIR)
     local_videos = list(local_path.glob("*")) if local_path.exists() else []
-    local_video_count = len([f for f in local_videos if f.suffix.lower() in {".mp4", ".avi", ".mov", ".mkv"}])
+    local_video_names = {f.name for f in local_videos if f.suffix.lower() in video_extensions}
+    local_video_count = len(local_video_names)
 
     # Check HF repository
+    hf_video_names = set()
     try:
         from huggingface_hub import HfApi
         api = HfApi()
         files = api.list_repo_files(repo_id=HF_REPO_ID, repo_type="dataset")
-        hf_video_count = len([f for f in files if Path(f).suffix.lower() in {".mp4", ".avi", ".mov", ".mkv"}])
+        hf_video_names = {f for f in files if Path(f).suffix.lower() in video_extensions}
+        hf_video_count = len(hf_video_names)
         hf_status = f"✅ {hf_video_count} videos"
     except Exception as e:
         hf_status = f"❌ Error: {str(e)[:50]}"
@@ -296,13 +302,26 @@ def status():
 
     console.print(table)
 
-    # Show sync status
-    if local_video_count > 0 and hf_video_count >= 0:
-        if local_video_count > hf_video_count:
-            console.print(f"\n[yellow]📤 {local_video_count - hf_video_count} local videos not yet uploaded to HF[/yellow]")
-        elif hf_video_count > local_video_count:
-            console.print(f"\n[yellow]📥 {hf_video_count - local_video_count} HF videos not downloaded locally[/yellow]")
-        else:
+    # Show sync status by comparing actual filenames, not just counts
+    if local_video_count > 0 or hf_video_count > 0:
+        only_local = local_video_names - hf_video_names
+        only_hf = hf_video_names - local_video_names
+
+        if only_local:
+            console.print(f"\n[yellow]📤 {len(only_local)} local videos not yet uploaded to HF[/yellow]")
+            for v in sorted(only_local)[:5]:  # Show first 5
+                console.print(f"   • {v}")
+            if len(only_local) > 5:
+                console.print(f"   ... and {len(only_local) - 5} more")
+
+        if only_hf:
+            console.print(f"\n[yellow]📥 {len(only_hf)} HF videos not downloaded locally[/yellow]")
+            for v in sorted(only_hf)[:5]:  # Show first 5
+                console.print(f"   • {v}")
+            if len(only_hf) > 5:
+                console.print(f"   ... and {len(only_hf) - 5} more")
+
+        if not only_local and not only_hf and local_video_count > 0:
             console.print("\n[green]✅ Local and HF repository are in sync[/green]")
 
 
