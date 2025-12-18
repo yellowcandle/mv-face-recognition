@@ -3351,3 +3351,266 @@ The phased approach allows for incremental improvements with minimal risk, and e
 - Reach out to the development team for clarification
 - Adjust timeline based on resource availability
 - Prioritize phases based on business needs
+---
+
+## Modal + Huggingface Video Processing Migration
+
+### Overview
+
+The video processing pipeline has been migrated to use:
+1. **Huggingface xet storage** - For raw video storage with efficient chunk-level deduplication
+2. **Modal cloud infrastructure** - For GPU-accelerated video processing
+
+This architecture provides:
+- **Cost efficiency**: Only pay for GPU time when processing
+- **Scalability**: Process multiple videos in parallel
+- **Storage efficiency**: Huggingface xet deduplicates at ~64KB chunk level
+- **Reliability**: Enterprise-grade cloud infrastructure
+
+### Architecture
+
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│  Local Videos   │──────│  Huggingface     │──────│  Modal Cloud    │
+│  source/videos/ │ xet  │  Repository      │ GPU  │  Processing     │
+└─────────────────┘      │  (xet storage)   │      │  (T4/A10G GPU)  │
+                         └──────────────────┘      └─────────────────┘
+                                                           │
+                                                           ▼
+                         ┌──────────────────┐      ┌─────────────────┐
+                         │  Cloudflare R2   │◀─────│  Processed      │
+                         │  (CDN delivery)  │      │  Videos/Meta    │
+                         └──────────────────┘      └─────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `modal_hf_processor.py` | Unified Modal processor with HF integration |
+| `scripts/hf_video_manager.py` | Upload/download videos to Huggingface |
+| `scripts/run_modal_pipeline.py` | Orchestration script for full pipeline |
+
+### Prerequisites
+
+1. **Modal Setup**:
+   ```bash
+   pip install modal
+   modal setup
+   ```
+
+2. **Huggingface Setup**:
+   ```bash
+   pip install 'huggingface_hub>=0.32.0' hf_xet
+   huggingface-cli login
+   ```
+
+3. **Modal Secrets** (create via Modal dashboard):
+   - `huggingface-secret`: Contains `HF_TOKEN` with read/write access
+
+### Quick Start
+
+#### Option 1: Full Pipeline (Recommended)
+```bash
+# Run complete pipeline: upload -> process -> download
+python scripts/run_modal_pipeline.py full
+```
+
+#### Option 2: Step-by-Step
+
+```bash
+# Step 1: Upload videos to Huggingface
+python scripts/hf_video_manager.py upload
+
+# Step 2: Process on Modal
+modal run modal_hf_processor.py --parallel
+
+# Step 3: Download results
+python scripts/run_modal_pipeline.py download-results
+```
+
+### Commands Reference
+
+#### Huggingface Video Manager
+```bash
+# Upload local videos to HF
+python scripts/hf_video_manager.py upload
+
+# List videos in HF repository
+python scripts/hf_video_manager.py list
+
+# Download videos from HF
+python scripts/hf_video_manager.py download
+
+# Sync local with HF (upload missing)
+python scripts/hf_video_manager.py sync
+
+# Show repository info
+python scripts/hf_video_manager.py info
+```
+
+#### Modal Processor
+```bash
+# List available videos in HF
+modal run modal_hf_processor.py --list-videos
+
+# Process single video
+modal run modal_hf_processor.py --video "video_name.mp4"
+
+# Process all videos in parallel
+modal run modal_hf_processor.py --parallel --max-containers 4
+
+# Check processing status
+modal run modal_hf_processor.py --status
+
+# Clear cached data
+modal run modal_hf_processor.py --clear-cache-all
+```
+
+#### Pipeline Orchestrator
+```bash
+# Check overall status
+python scripts/run_modal_pipeline.py status
+
+# Run full pipeline
+python scripts/run_modal_pipeline.py full
+
+# Upload only
+python scripts/run_modal_pipeline.py upload
+
+# Process only
+python scripts/run_modal_pipeline.py process --parallel
+
+# Download results only
+python scripts/run_modal_pipeline.py download-results
+```
+
+### Configuration
+
+#### Huggingface Repository
+Default: `yellowcandle/mv-face-recognition-videos`
+
+The repository uses xet storage which provides:
+- Chunk-level deduplication (~64KB chunks)
+- Efficient updates (only changed chunks uploaded)
+- Fast downloads with streaming support
+
+#### Modal Resources
+- **GPU**: NVIDIA T4 (configurable to A10G)
+- **Memory**: 8GB per container
+- **Timeout**: 2 hours per video
+- **Max Containers**: 50 concurrent
+
+### Processing Flow
+
+1. **Video Download**:
+   - Modal container checks local cache first
+   - Downloads from Huggingface if not cached
+   - Uses xet streaming for efficient transfer
+
+2. **Face Recognition**:
+   - Frame extraction at 6 FPS
+   - InsightFace detection (buffalo_l model)
+   - Contestant matching against 96-person database
+   - Temporal smoothing for tracking
+
+3. **Output Generation**:
+   - Annotated videos with face bounding boxes
+   - JSON metadata with timestamps
+   - Thumbnails and galleries
+
+4. **Results Storage**:
+   - Saved to Modal persistent volume
+   - Downloaded locally via `download-results`
+   - Optionally uploaded to Cloudflare R2
+
+### Troubleshooting
+
+#### Modal Issues
+
+**Authentication Error**:
+```bash
+modal setup  # Re-authenticate
+```
+
+**Secret Not Found**:
+Create `huggingface-secret` in Modal dashboard with `HF_TOKEN` key.
+
+**GPU Unavailable**:
+```bash
+# Check GPU quota
+modal config show
+
+# Use CPU fallback (slower)
+# Edit modal_hf_processor.py: gpu=None
+```
+
+#### Huggingface Issues
+
+**Upload Fails**:
+```bash
+# Check authentication
+huggingface-cli whoami
+
+# Re-login
+huggingface-cli login
+```
+
+**Repository Not Found**:
+```bash
+# Create repository manually
+huggingface-cli repo create yellowcandle/mv-face-recognition-videos --type dataset
+```
+
+**Xet Not Working**:
+```bash
+# Verify hf_xet is installed
+pip install hf_xet
+
+# Enable high performance mode
+export HF_XET_HIGH_PERFORMANCE=1
+```
+
+### Cost Estimation
+
+| Resource | Cost |
+|----------|------|
+| Modal T4 GPU | ~$0.59/hour |
+| Modal A10G GPU | ~$1.10/hour |
+| Huggingface Storage | Free (public repos) |
+| Average video (5 min) | ~$0.15-0.30 |
+
+### Migration from Local Processing
+
+If you have existing local processing setup:
+
+1. **Upload existing videos**:
+   ```bash
+   python scripts/hf_video_manager.py upload --local-dir source/videos
+   ```
+
+2. **Verify upload**:
+   ```bash
+   python scripts/hf_video_manager.py list
+   ```
+
+3. **Process on Modal**:
+   ```bash
+   modal run modal_hf_processor.py --parallel
+   ```
+
+4. **Download results**:
+   ```bash
+   python scripts/run_modal_pipeline.py download-results
+   ```
+
+### TODOs
+
+- [ ] Add Cloudflare R2 upload integration to Modal processor
+- [ ] Implement incremental processing (skip already processed videos)
+- [ ] Add webhook notifications for processing completion
+- [ ] Create GitHub Actions workflow for automated processing
+- [ ] Add cost tracking and optimization features
+
+---
+
