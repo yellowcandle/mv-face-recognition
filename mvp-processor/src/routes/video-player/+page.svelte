@@ -26,6 +26,12 @@
   let flagUserLabel = '';
   let isFlagging = false;
 
+  // Batch flagging state
+  let batchMode = false;
+  let selectedFaces: Set<any> = new Set();
+  let showBatchFlagDialog = false;
+  let batchContestantId: number | null = null;
+
   // Flagged faces
   let flaggedFaces: any[] = [];
   let showFlaggedPanel = false;
@@ -176,10 +182,108 @@
   }
 
   function handleFaceClick(face: any) {
-    selectedFace = face;
-    showFlagDialog = true;
-    flagContestantId = null;
-    flagUserLabel = '';
+    if (batchMode) {
+      // In batch mode, toggle selection
+      if (selectedFaces.has(face)) {
+        selectedFaces.delete(face);
+      } else {
+        selectedFaces.add(face);
+      }
+      selectedFaces = selectedFaces; // Trigger reactivity
+    } else {
+      // Single face flagging
+      selectedFace = face;
+      showFlagDialog = true;
+      flagContestantId = null;
+      flagUserLabel = '';
+    }
+  }
+
+  function toggleBatchMode() {
+    batchMode = !batchMode;
+    if (!batchMode) {
+      selectedFaces.clear();
+      selectedFaces = selectedFaces;
+    }
+  }
+
+  function selectAllFaces() {
+    detectedFaces.forEach(face => selectedFaces.add(face));
+    selectedFaces = selectedFaces;
+  }
+
+  function clearSelection() {
+    selectedFaces.clear();
+    selectedFaces = selectedFaces;
+  }
+
+  function openBatchFlagDialog() {
+    if (selectedFaces.size === 0) return;
+    showBatchFlagDialog = true;
+    batchContestantId = null;
+  }
+
+  async function submitBatchFlag() {
+    if (batchContestantId === null || batchContestantId === undefined || !selectedVideo || selectedFaces.size === 0) return;
+
+    isFlagging = true;
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      const facesArray = Array.from(selectedFaces);
+
+      for (const face of facesArray) {
+        try {
+          // Extract thumbnail for each face
+          const thumbnail = extractFaceThumbnail(face);
+
+          const response = await fetch(`${API_BASE}/api/faces/flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contestant_id: batchContestantId,
+              video_id: selectedVideo.id,
+              timestamp: currentTime,
+              bbox: face.bbox,
+              confidence: face.confidence,
+              user_label: `Batch flagged (${facesArray.length} faces) at ${formatTime(currentTime)}`,
+              thumbnail: thumbnail
+            })
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+        }
+      }
+
+      showBatchFlagDialog = false;
+      selectedFaces.clear();
+      selectedFaces = selectedFaces;
+      batchMode = false;
+      await loadFlaggedFaces();
+
+      if (failCount === 0) {
+        alert(`Successfully flagged ${successCount} faces!`);
+      } else {
+        alert(`Flagged ${successCount} faces. ${failCount} failed.`);
+      }
+    } catch (e) {
+      console.error('Batch flag error:', e);
+      alert('Error during batch flagging');
+    } finally {
+      isFlagging = false;
+    }
+  }
+
+  function closeBatchFlagDialog() {
+    showBatchFlagDialog = false;
+    batchContestantId = null;
   }
 
   async function submitFlag() {
@@ -188,6 +292,9 @@
 
     isFlagging = true;
     try {
+      // Extract thumbnail before submitting
+      const thumbnail = extractFaceThumbnail(selectedFace);
+
       const response = await fetch(`${API_BASE}/api/faces/flag`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +304,8 @@
           timestamp: currentTime,
           bbox: selectedFace.bbox,
           confidence: selectedFace.confidence,
-          user_label: flagUserLabel || `Flagged by user at ${formatTime(currentTime)}`
+          user_label: flagUserLabel || `Flagged by user at ${formatTime(currentTime)}`,
+          thumbnail: thumbnail // Include extracted face thumbnail
         })
       });
 
@@ -226,6 +334,54 @@
   function getContestantName(id: number): string {
     const contestant = contestants.find(c => c.number === id || c.id === String(id));
     return contestant ? `${contestant.nickname} (${contestant.name})` : `Contestant #${id}`;
+  }
+
+  // Extract face thumbnail from video using canvas
+  function extractFaceThumbnail(face: any): string | null {
+    if (!videoElement || !face.bbox || face.bbox.length < 4) return null;
+
+    try {
+      const [x, y, w, h] = face.bbox;
+
+      // Add padding around the face (20% on each side)
+      const padding = 0.2;
+      const padX = w * padding;
+      const padY = h * padding;
+
+      const cropX = Math.max(0, x - padX);
+      const cropY = Math.max(0, y - padY);
+      const cropW = Math.min(videoElement.videoWidth - cropX, w + 2 * padX);
+      const cropH = Math.min(videoElement.videoHeight - cropY, h + 2 * padY);
+
+      // Create canvas for cropping
+      const canvas = document.createElement('canvas');
+      const targetSize = 150; // Output thumbnail size
+      const aspectRatio = cropW / cropH;
+
+      if (aspectRatio > 1) {
+        canvas.width = targetSize;
+        canvas.height = Math.round(targetSize / aspectRatio);
+      } else {
+        canvas.height = targetSize;
+        canvas.width = Math.round(targetSize * aspectRatio);
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      // Draw the cropped face region
+      ctx.drawImage(
+        videoElement,
+        cropX, cropY, cropW, cropH,
+        0, 0, canvas.width, canvas.height
+      );
+
+      // Return as base64 JPEG
+      return canvas.toDataURL('image/jpeg', 0.8);
+    } catch (e) {
+      console.error('Failed to extract thumbnail:', e);
+      return null;
+    }
   }
 
   // Calculate bounding box position relative to video
@@ -313,11 +469,15 @@
                 <button
                   class="face-bbox"
                   class:selected={selectedFace === face}
+                  class:batch-selected={batchMode && selectedFaces.has(face)}
                   style={getBboxStyle(face.bbox)}
                   on:click={() => handleFaceClick(face)}
-                  title="Click to flag this face"
+                  title={batchMode ? 'Click to select/deselect' : 'Click to flag this face'}
                 >
                   <span class="face-label">
+                    {#if batchMode && selectedFaces.has(face)}
+                      <span class="check-mark">✓</span>
+                    {/if}
                     {face.contestant_name || 'Unknown'}
                     <br />
                     {((face.confidence ?? 0) * 100).toFixed(1)}%
@@ -374,7 +534,38 @@
           <span>👥 Detected Faces: {detectedFaces.length}</span>
           <span>📍 Current Frame: {Math.floor(currentTime * (videoMetadata?.video_info?.fps || 25))}</span>
           {#if detectedFaces.length > 0}
-            <span class="hint">Click on a face to flag it</span>
+            {#if batchMode}
+              <span class="batch-info">✅ Selected: {selectedFaces.size}</span>
+            {:else}
+              <span class="hint">Click on a face to flag it</span>
+            {/if}
+          {/if}
+        </div>
+
+        <!-- Batch Mode Controls -->
+        <div class="batch-controls">
+          <button
+            class="btn-batch"
+            class:active={batchMode}
+            on:click={toggleBatchMode}
+          >
+            {batchMode ? '✓ Batch Mode ON' : '☐ Batch Mode'}
+          </button>
+
+          {#if batchMode}
+            <button class="btn-secondary-small" on:click={selectAllFaces} disabled={detectedFaces.length === 0}>
+              Select All
+            </button>
+            <button class="btn-secondary-small" on:click={clearSelection} disabled={selectedFaces.size === 0}>
+              Clear
+            </button>
+            <button
+              class="btn-primary-small"
+              on:click={openBatchFlagDialog}
+              disabled={selectedFaces.size === 0}
+            >
+              Flag Selected ({selectedFaces.size})
+            </button>
           {/if}
         </div>
       </div>
@@ -483,6 +674,52 @@
             disabled={!flagContestantId || isFlagging}
           >
             {isFlagging ? 'Flagging...' : 'Flag Face'}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Batch Flag Dialog -->
+  {#if showBatchFlagDialog}
+    <div class="dialog-overlay" on:click={closeBatchFlagDialog} role="button" tabindex="-1" on:keypress={closeBatchFlagDialog}>
+      <div class="dialog" on:click|stopPropagation role="dialog" aria-modal="true">
+        <h3>🏷️ Batch Flag Faces ({selectedFaces.size})</h3>
+        <p>Assign all selected faces to a single contestant.</p>
+
+        <div class="dialog-content">
+          <div class="field">
+            <label>Selected Faces:</label>
+            <div class="batch-faces-preview">
+              {#each Array.from(selectedFaces) as face, i}
+                <span class="batch-face-chip">
+                  {face.contestant_name || 'Unknown'} ({((face.confidence ?? 0) * 100).toFixed(0)}%)
+                </span>
+              {/each}
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="batch-contestant-select">Assign All to Contestant:</label>
+            <select id="batch-contestant-select" bind:value={batchContestantId}>
+              <option value={null}>-- Select Contestant --</option>
+              {#each contestants as contestant}
+                <option value={contestant.number}>
+                  #{contestant.number} - {contestant.nickname} ({contestant.name})
+                </option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <div class="dialog-actions">
+          <button class="btn-secondary" on:click={closeBatchFlagDialog}>Cancel</button>
+          <button
+            class="btn-primary"
+            on:click={submitBatchFlag}
+            disabled={batchContestantId === null || batchContestantId === undefined || isFlagging}
+          >
+            {isFlagging ? 'Flagging...' : `Flag ${selectedFaces.size} Faces`}
           </button>
         </div>
       </div>
@@ -1089,6 +1326,119 @@
 
   .flagged-status.pending {
     background: #f59e0b;
+  }
+
+  /* Batch Mode Styles */
+  .batch-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    background: #1f2937;
+    border-radius: 8px;
+    margin-top: 10px;
+  }
+
+  .btn-batch {
+    padding: 8px 16px;
+    border: 2px solid #4b5563;
+    border-radius: 8px;
+    background: transparent;
+    color: #d1d5db;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .btn-batch:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+
+  .btn-batch.active {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+  }
+
+  .btn-secondary-small,
+  .btn-primary-small {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-secondary-small {
+    background: #4b5563;
+    color: #fff;
+  }
+
+  .btn-secondary-small:hover:not(:disabled) {
+    background: #6b7280;
+  }
+
+  .btn-primary-small {
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .btn-primary-small:hover:not(:disabled) {
+    background: #1d4ed8;
+  }
+
+  .btn-secondary-small:disabled,
+  .btn-primary-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .batch-info {
+    color: #22c55e;
+    font-weight: 500;
+  }
+
+  .face-bbox.batch-selected {
+    border-color: #22c55e;
+    border-width: 3px;
+    background: rgba(34, 197, 94, 0.3);
+  }
+
+  .check-mark {
+    display: inline-block;
+    background: #22c55e;
+    color: #fff;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    text-align: center;
+    font-size: 10px;
+    margin-right: 4px;
+  }
+
+  .batch-faces-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #1f2937;
+    border-radius: 8px;
+  }
+
+  .batch-face-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #374151;
+    border-radius: 16px;
+    font-size: 12px;
+    color: #d1d5db;
   }
 
   /* Mobile Responsive */

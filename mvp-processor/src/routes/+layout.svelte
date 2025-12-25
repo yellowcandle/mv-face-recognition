@@ -7,7 +7,8 @@
     { href: '/', label: 'Dashboard', icon: '🎬' },
     { href: '/video-player', label: 'Video Player', icon: '▶️' },
     { href: '/processing', label: 'Processing', icon: '⚙️' },
-    { href: '/analytics', label: 'Analytics', icon: '📊' }
+    { href: '/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/admin', label: 'Admin', icon: '🔐' }
   ];
   
   let mobileMenuOpen = false;

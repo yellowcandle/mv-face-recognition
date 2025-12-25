@@ -14,6 +14,17 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv.herballemon.dev"
 ENVIRONMENT = "production"
 
+# Cloudflare Zero Trust / Access Configuration
+# To enable admin UI protection:
+# 1. Go to Cloudflare Zero Trust Dashboard: https://one.dash.cloudflare.com/
+# 2. Create an Access Application for mv.herballemon.dev/admin/*
+# 3. Set up authentication (e.g., email OTP, Google, GitHub)
+# 4. Copy the Application Audience (AUD) tag and team domain
+# 5. Add as secrets: wrangler secret put CF_ACCESS_AUD && wrangler secret put CF_ACCESS_TEAM
+#
+# CF_ACCESS_AUD = "your-application-aud-tag"
+# CF_ACCESS_TEAM = "your-team-name"  # e.g., "herballemon" for herballemon.cloudflareaccess.com
+
 routes = [
   { pattern = "mv.herballemon.dev", custom_domain = true }
 ]
