@@ -504,6 +504,223 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       }
       break;
 
+    // Face Flagging Endpoints
+    case '/faces/flag':
+    case '/faces/flag/':
+      if (request.method === 'POST') {
+        try {
+          const flagData = await request.json();
+
+          // Validate required fields
+          if (!flagData.contestant_id || !flagData.video_id || !flagData.timestamp) {
+            return new Response(JSON.stringify({
+              error: 'Missing required fields: contestant_id, video_id, timestamp'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Generate unique flag ID
+          const flagId = `flag_${flagData.contestant_id}_${flagData.video_id}_${Date.now()}`;
+
+          // Create flag record
+          const flagRecord = {
+            id: flagId,
+            contestant_id: flagData.contestant_id,
+            video_id: flagData.video_id,
+            timestamp: flagData.timestamp,
+            bbox: flagData.bbox || null,
+            confidence: flagData.confidence || null,
+            embedding: flagData.embedding || null,
+            user_label: flagData.user_label || null,
+            flagged_at: new Date().toISOString(),
+            status: 'pending' // pending, approved, rejected
+          };
+
+          // Store in KV
+          await env.METADATA_KV.put(`flagged_face_${flagId}`, JSON.stringify(flagRecord));
+
+          // Update flagged faces index
+          let flaggedIndex = await env.METADATA_KV.get('flagged_faces_index');
+          flaggedIndex = flaggedIndex ? JSON.parse(flaggedIndex) : [];
+          flaggedIndex.push({
+            id: flagId,
+            contestant_id: flagData.contestant_id,
+            video_id: flagData.video_id,
+            flagged_at: flagRecord.flagged_at
+          });
+          await env.METADATA_KV.put('flagged_faces_index', JSON.stringify(flaggedIndex));
+
+          logger.info(`Face flagged: ${flagId}`);
+
+          return new Response(JSON.stringify({
+            success: true,
+            flag_id: flagId,
+            message: 'Face flagged successfully'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          logger.error('Error flagging face', { error: error.message });
+          return new Response(JSON.stringify({ error: 'Failed to flag face' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/faces/flagged':
+    case '/faces/flagged/':
+      // Get all flagged faces
+      try {
+        const flaggedIndex = await env.METADATA_KV.get('flagged_faces_index');
+        const index = flaggedIndex ? JSON.parse(flaggedIndex) : [];
+
+        // Optionally filter by contestant_id or video_id
+        const url = new URL(request.url);
+        const contestantFilter = url.searchParams.get('contestant_id');
+        const videoFilter = url.searchParams.get('video_id');
+        const statusFilter = url.searchParams.get('status');
+
+        let filtered = index;
+        if (contestantFilter) {
+          filtered = filtered.filter(f => f.contestant_id === parseInt(contestantFilter));
+        }
+        if (videoFilter) {
+          filtered = filtered.filter(f => f.video_id === videoFilter);
+        }
+
+        // Fetch full details if requested
+        const includeDetails = url.searchParams.get('details') === 'true';
+        let results = filtered;
+
+        if (includeDetails) {
+          results = await Promise.all(
+            filtered.map(async (f) => {
+              const full = await env.METADATA_KV.get(`flagged_face_${f.id}`);
+              return full ? JSON.parse(full) : f;
+            })
+          );
+
+          // Apply status filter on full records
+          if (statusFilter) {
+            results = results.filter(r => r.status === statusFilter);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          flagged_faces: results,
+          total: results.length
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        logger.error('Error getting flagged faces', { error: error.message });
+        return new Response(JSON.stringify({ error: 'Failed to get flagged faces' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+    case '/embeddings/sync':
+    case '/embeddings/sync/':
+      // Trigger embedding sync with HuggingFace
+      if (request.method === 'POST') {
+        try {
+          const syncData = await request.json();
+
+          // This endpoint triggers the embedding update process
+          // The actual processing happens on Modal
+          const syncRecord = {
+            sync_id: `sync_${Date.now()}`,
+            contestant_id: syncData.contestant_id || 'all',
+            requested_at: new Date().toISOString(),
+            status: 'queued'
+          };
+
+          await env.METADATA_KV.put(`embedding_sync_${syncRecord.sync_id}`, JSON.stringify(syncRecord));
+
+          return new Response(JSON.stringify({
+            success: true,
+            sync_id: syncRecord.sync_id,
+            message: 'Embedding sync queued. Process with Modal to update embeddings.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: 'Failed to queue sync' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/faces/detect':
+    case '/faces/detect/':
+      // Get detected faces for a video frame
+      if (request.method === 'GET') {
+        const url = new URL(request.url);
+        const videoId = url.searchParams.get('video_id');
+        const timestamp = parseFloat(url.searchParams.get('timestamp') || '0');
+
+        if (!videoId) {
+          return new Response(JSON.stringify({ error: 'video_id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Try to get from dense metadata
+        const denseMetadata = await env.METADATA_KV.get(`metadata_dense_${videoId}`);
+
+        if (denseMetadata) {
+          const parsed = JSON.parse(denseMetadata);
+          const fps = parsed.video_info?.fps || 25;
+          const frameNumber = Math.floor(timestamp * fps);
+
+          // Find faces near this timestamp
+          const faces = [];
+          for (const [contestantName, timeline] of Object.entries(parsed.contestant_timeline || {})) {
+            const appearances = timeline.detailed_timeline || [];
+            for (const appearance of appearances) {
+              // Check if this appearance is within 0.2 seconds of requested timestamp
+              if (Math.abs(appearance.timestamp - timestamp) < 0.2) {
+                faces.push({
+                  contestant_name: contestantName,
+                  confidence: appearance.confidence,
+                  bbox: appearance.bbox,
+                  timestamp: appearance.timestamp,
+                  frame: appearance.frame
+                });
+              }
+            }
+          }
+
+          return new Response(JSON.stringify({
+            video_id: videoId,
+            timestamp: timestamp,
+            frame: frameNumber,
+            faces: faces
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // No metadata available
+        return new Response(JSON.stringify({
+          video_id: videoId,
+          timestamp: timestamp,
+          faces: [],
+          message: 'No detection metadata available for this video'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      break;
+
     case '/recognition/results':
     case '/recognition/results/':
       // Handle recognition results with optional filtering

@@ -3351,3 +3351,227 @@ The phased approach allows for incremental improvements with minimal risk, and e
 - Reach out to the development team for clarification
 - Adjust timeline based on resource availability
 - Prioritize phases based on business needs
+
+---
+
+## 🆕 Face Flagging & HuggingFace XET Integration (December 2025)
+
+### Overview
+
+New features for improving face recognition accuracy through user feedback and cloud-based data management.
+
+### Features Implemented
+
+#### 1. Face Flagging System
+
+Users can flag detected faces in videos to correct misidentifications, improving recognition accuracy over time.
+
+**API Endpoints:**
+```yaml
+POST /api/faces/flag
+  # Flag a detected face with contestant assignment
+  body:
+    contestant_id: number    # Correct contestant ID
+    video_id: string         # Source video
+    timestamp: number        # Detection timestamp
+    bbox: [x, y, w, h]       # Bounding box
+    confidence: number       # Original confidence
+    user_label: string       # Optional note
+
+GET /api/faces/flagged?contestant_id=&video_id=&details=true
+  # List flagged faces with optional filtering
+
+GET /api/faces/detect?video_id=&timestamp=
+  # Get detected faces at a specific timestamp
+
+POST /api/embeddings/sync
+  # Trigger embedding update from flagged faces
+```
+
+**Frontend Components:**
+- **Face Overlay**: Clickable bounding boxes on video
+- **Flag Dialog**: Contestant selection with search
+- **Flagged Panel**: View and manage flagged faces
+
+#### 2. HuggingFace XET Integration
+
+Store and sync contestant data, embeddings, and videos using HuggingFace's XET storage backend.
+
+**Module**: `src/integrations/huggingface_xet.py`
+
+**Features:**
+- Upload/download contestant CSV data
+- Sync face embeddings with chunk-level deduplication
+- Store flagged face images and embeddings
+- Upload processed videos to cloud storage
+
+**Dataset Structure:**
+```
+yellowcandle/mv-face-recognition-data/
+├── metadata/
+│   ├── contestant_info.csv
+│   └── embedding_manifest.json
+├── embeddings/
+│   └── contestant_{id}/
+│       └── base_embedding.npy
+├── flagged_faces/
+│   └── contestant_{id}/
+│       └── flag_{id}/
+│           ├── face.jpg
+│           ├── embedding.npy
+│           └── metadata.json
+└── videos/
+    ├── processed/
+    └── metadata/
+```
+
+**Usage:**
+```python
+from src.integrations.huggingface_xet import HuggingFaceDataset
+
+dataset = HuggingFaceDataset(
+    repo_id="yellowcandle/mv-face-recognition-data",
+    token=os.getenv("HF_TOKEN")
+)
+
+# Upload contestant data
+dataset.upload_contestant_data()
+
+# Upload flagged face
+dataset.upload_flagged_face(
+    image_data=face_bytes,
+    embedding=embedding_vector,
+    contestant_id=42,
+    video_id="video1",
+    timestamp=12.5,
+    bbox=[100, 100, 200, 200],
+    confidence=0.85,
+    user_label="Clear frontal view"
+)
+
+# Update embeddings from flagged faces
+dataset.update_embeddings_with_flagged(
+    contestant_id=42,
+    output_dir="./embeddings",
+    averaging_weight=0.3
+)
+```
+
+#### 3. Modal Cloud Processing with HuggingFace
+
+**Script**: `scripts/modal_hf_processor.py`
+
+**Commands:**
+```bash
+# Full pipeline: sync -> update embeddings -> process -> upload
+modal run modal_hf_processor.py --full-pipeline
+
+# Individual steps
+modal run modal_hf_processor.py --sync-from-hf
+modal run modal_hf_processor.py --update-embeddings
+modal run modal_hf_processor.py --process-videos
+modal run modal_hf_processor.py --upload-results
+
+# Process single video
+modal run modal_hf_processor.py --process-videos --single-video "video.mp4"
+```
+
+**Setup:**
+```bash
+# Install dependencies
+pip install modal huggingface_hub>=0.32.0
+
+# Configure Modal
+modal setup
+
+# Create HuggingFace secret
+export HF_TOKEN=your_token
+modal secret create hf-secret HF_TOKEN=$HF_TOKEN
+```
+
+#### 4. Enhanced Video Player
+
+The video player now supports:
+- Streaming annotated videos from R2
+- Real-time face detection overlay
+- Click-to-flag interface
+- Recognition statistics display
+- Flagged faces management panel
+
+**Route**: `/video-player`
+
+**Features:**
+- Video streaming with range requests
+- Face bounding box overlay
+- Contestant assignment dialog
+- Frame-by-frame detection polling
+- Video metadata display
+
+### Deployment Configuration
+
+**Domain**: `mv.herballemon.dev`
+
+**wrangler.toml:**
+```toml
+name = "mv-face-recognition-api"
+main = "worker/index.js"
+
+routes = [
+  { pattern = "mv.herballemon.dev", custom_domain = true }
+]
+
+[[r2_buckets]]
+binding = "VIDEOS_BUCKET"
+bucket_name = "mv-face-recognition-videos"
+
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "890d77e11bfc4623ac4ef56db6b9a4ab"
+```
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Interface                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   Video     │  │   Face      │  │   Contestant            │  │
+│  │   Player    │  │   Overlay   │  │   Selector              │  │
+│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
+└─────────┼────────────────┼─────────────────────┼────────────────┘
+          │                │                     │
+          ▼                ▼                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Cloudflare Worker API                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ /api/videos  │  │ /api/faces   │  │ /api/embeddings      │  │
+│  │              │  │   /flag      │  │   /sync              │  │
+│  │              │  │   /detect    │  │                      │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────────┬──────────┘  │
+└─────────┼────────────────┼───────────────────────┼──────────────┘
+          │                │                       │
+          ▼                ▼                       ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
+│   R2 Bucket     │ │   KV Store      │ │   HuggingFace XET       │
+│   (Videos)      │ │   (Metadata)    │ │   (Embeddings/Data)     │
+└─────────────────┘ └─────────────────┘ └─────────────────────────┘
+                                                  │
+                                                  ▼
+                           ┌─────────────────────────────────────┐
+                           │          Modal.com                   │
+                           │   ┌─────────────────────────────┐   │
+                           │   │  GPU Processing (T4/A10G)   │   │
+                           │   │  - Face Detection           │   │
+                           │   │  - Embedding Generation     │   │
+                           │   │  - Video Annotation         │   │
+                           │   └─────────────────────────────┘   │
+                           └─────────────────────────────────────┘
+```
+
+### TODOs
+
+- [ ] Implement batch flagging for multiple faces
+- [ ] Add face thumbnail extraction for flagged faces
+- [ ] Create embedding comparison visualization
+- [ ] Add flagging approval workflow for admins
+- [ ] Implement automatic reprocessing after embedding updates
