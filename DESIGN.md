@@ -3570,6 +3570,7 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 
 ### TODOs
 
+- [ ] **Implement Cloudflare Zero Trust for Admin UI** - Protect admin endpoints (face flagging approval, embedding sync, contestant management) with Cloudflare Access zero-trust authentication. See: https://developers.cloudflare.com/cloudflare-one/applications/
 - [ ] Implement batch flagging for multiple faces
 - [ ] Add face thumbnail extraction for flagged faces
 - [ ] Create embedding comparison visualization
