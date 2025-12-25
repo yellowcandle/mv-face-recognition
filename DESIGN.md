@@ -3576,6 +3576,7 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 - [ ] Create embedding comparison visualization
 - [ ] Add flagging approval workflow for admins
 - [ ] Implement automatic reprocessing after embedding updates
+- [ ] **Admin UI: YouTube video ingestion** - Add functionality for admins to submit YouTube URLs directly for processing (download via yt-dlp → process on Modal → deploy to Cloudflare)
 
 ### 📊 Complete Pipeline Workflow
 
