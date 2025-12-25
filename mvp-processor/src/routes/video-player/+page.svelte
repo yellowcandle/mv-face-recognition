@@ -183,7 +183,8 @@
   }
 
   async function submitFlag() {
-    if (!selectedFace || !flagContestantId || !selectedVideo) return;
+    // Use explicit null check instead of falsy check to allow contestant ID 0
+    if (!selectedFace || flagContestantId === null || flagContestantId === undefined || !selectedVideo) return;
 
     isFlagging = true;
     try {
@@ -319,7 +320,7 @@
                   <span class="face-label">
                     {face.contestant_name || 'Unknown'}
                     <br />
-                    {(face.confidence * 100).toFixed(1)}%
+                    {((face.confidence ?? 0) * 100).toFixed(1)}%
                   </span>
                 </button>
               {/each}
@@ -425,7 +426,7 @@
               {#each detectedFaces as face}
                 <button class="face-item" on:click={() => handleFaceClick(face)}>
                   <span class="face-name">{face.contestant_name || 'Unknown'}</span>
-                  <span class="face-confidence">{(face.confidence * 100).toFixed(1)}%</span>
+                  <span class="face-confidence">{((face.confidence ?? 0) * 100).toFixed(1)}%</span>
                 </button>
               {/each}
             </div>
@@ -447,7 +448,7 @@
             <label>Detected As:</label>
             <p class="detected-info">
               {selectedFace.contestant_name || 'Unknown'}
-              ({(selectedFace.confidence * 100).toFixed(1)}% confidence)
+              ({((selectedFace.confidence ?? 0) * 100).toFixed(1)}% confidence)
             </p>
           </div>
 

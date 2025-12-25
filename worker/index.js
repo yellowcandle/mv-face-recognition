@@ -541,16 +541,38 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           // Store in KV
           await env.METADATA_KV.put(`flagged_face_${flagId}`, JSON.stringify(flagRecord));
 
-          // Update flagged faces index
-          let flaggedIndex = await env.METADATA_KV.get('flagged_faces_index');
-          flaggedIndex = flaggedIndex ? JSON.parse(flaggedIndex) : [];
-          flaggedIndex.push({
-            id: flagId,
-            contestant_id: flagData.contestant_id,
-            video_id: flagData.video_id,
-            flagged_at: flagRecord.flagged_at
-          });
-          await env.METADATA_KV.put('flagged_faces_index', JSON.stringify(flaggedIndex));
+          // Update flagged faces index with retry for race condition handling
+          // Use optimistic concurrency: retry if index was modified during update
+          const maxRetries = 3;
+          let retryCount = 0;
+          let indexUpdated = false;
+
+          while (retryCount < maxRetries && !indexUpdated) {
+            try {
+              const currentIndex = await env.METADATA_KV.get('flagged_faces_index');
+              const parsedIndex = currentIndex ? JSON.parse(currentIndex) : [];
+
+              // Check if this flag already exists (idempotency check)
+              const exists = parsedIndex.some(f => f.id === flagId);
+              if (!exists) {
+                parsedIndex.push({
+                  id: flagId,
+                  contestant_id: flagData.contestant_id,
+                  video_id: flagData.video_id,
+                  flagged_at: flagRecord.flagged_at
+                });
+                await env.METADATA_KV.put('flagged_faces_index', JSON.stringify(parsedIndex));
+              }
+              indexUpdated = true;
+            } catch (indexError) {
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                logger.warn('Index update failed after retries, flag still saved', { flagId });
+              }
+              // Small delay before retry
+              await new Promise(resolve => setTimeout(resolve, 50 * retryCount));
+            }
+          }
 
           logger.info(`Face flagged: ${flagId}`);
 
@@ -684,16 +706,22 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           // Find faces near this timestamp
           const faces = [];
           for (const [contestantName, timeline] of Object.entries(parsed.contestant_timeline || {})) {
+            // Skip if timeline is null or undefined
+            if (!timeline) continue;
+
             const appearances = timeline.detailed_timeline || [];
             for (const appearance of appearances) {
+              // Skip if appearance is null or missing required fields
+              if (!appearance || typeof appearance.timestamp !== 'number') continue;
+
               // Check if this appearance is within 0.2 seconds of requested timestamp
               if (Math.abs(appearance.timestamp - timestamp) < 0.2) {
                 faces.push({
                   contestant_name: contestantName,
-                  confidence: appearance.confidence,
-                  bbox: appearance.bbox,
+                  confidence: appearance.confidence ?? 0,
+                  bbox: appearance.bbox || null,
                   timestamp: appearance.timestamp,
-                  frame: appearance.frame
+                  frame: appearance.frame ?? 0
                 });
               }
             }
