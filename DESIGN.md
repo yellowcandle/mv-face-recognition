@@ -424,18 +424,29 @@ jobs:
 
 ## TODO
 
-- [x] Streamline the frontend to use SvelteKit - COMPLETED
-- [x] Fix API proxy configuration in frontend deployment - COMPLETED
-- [x] Migrate to Cloudflare Workers deployment - COMPLETED
-- [x] Fix the API proxy configuration in frontend deployment - COMPLETED
-- [x] Fix the API proxy configuration in backend deployment - COMPLETED
-- [x] Redesign the Web UI to display the video and the faces being recognized - COMPLETED
-- [x] Fix Cloudflare Workers deployment serving wrong application - COMPLETED
-- [x] Resolve SvelteKit vs legacy Vite app conflicts - COMPLETED
-- [x] Fix Face Recognition page JavaScript errors - COMPLETED (July 10, 2025)
-- [x] Fix missing `/api/recognition/results` endpoint returning 404 - COMPLETED (July 10, 2025)
-- [x] Update vite-plugin-svelte to version 4 for Svelte 5 compatibility - COMPLETED (July 11, 2025)
-- [x] Rewrite frontend video player with comprehensive face recognition overlays and sidebar - COMPLETED (July 11, 2025)
+### Pending
+
+- [ ] **Implement Cloudflare Zero Trust for Admin UI** - Protect admin endpoints (face flagging approval, embedding sync, contestant management) with Cloudflare Access zero-trust authentication. See: https://developers.cloudflare.com/cloudflare-one/applications/
+- [ ] **Admin UI: YouTube video ingestion** - Add functionality for admins to submit YouTube URLs directly for processing (download via yt-dlp → process on Modal → deploy to Cloudflare)
+- [ ] Implement batch flagging for multiple faces
+- [ ] Add face thumbnail extraction for flagged faces
+- [ ] Create embedding comparison visualization
+- [ ] Add flagging approval workflow for admins
+- [ ] Implement automatic reprocessing after embedding updates
+
+### Completed
+
+- [x] Add face flagging system and HuggingFace XET integration (December 2025)
+- [x] Add Modal cloud processing with HuggingFace sync (December 2025)
+- [x] Add pipeline documentation (December 2025)
+- [x] Rewrite frontend video player with comprehensive face recognition overlays and sidebar (July 2025)
+- [x] Update vite-plugin-svelte to version 4 for Svelte 5 compatibility (July 2025)
+- [x] Fix missing `/api/recognition/results` endpoint returning 404 (July 2025)
+- [x] Fix Face Recognition page JavaScript errors (July 2025)
+- [x] Resolve SvelteKit vs legacy Vite app conflicts
+- [x] Fix Cloudflare Workers deployment serving wrong application
+- [x] Migrate to Cloudflare Workers deployment
+- [x] Streamline the frontend to use SvelteKit
 
 ## Overview
 
@@ -3567,16 +3578,6 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
                            │   └─────────────────────────────┘   │
                            └─────────────────────────────────────┘
 ```
-
-### TODOs
-
-- [ ] **Implement Cloudflare Zero Trust for Admin UI** - Protect admin endpoints (face flagging approval, embedding sync, contestant management) with Cloudflare Access zero-trust authentication. See: https://developers.cloudflare.com/cloudflare-one/applications/
-- [ ] Implement batch flagging for multiple faces
-- [ ] Add face thumbnail extraction for flagged faces
-- [ ] Create embedding comparison visualization
-- [ ] Add flagging approval workflow for admins
-- [ ] Implement automatic reprocessing after embedding updates
-- [ ] **Admin UI: YouTube video ingestion** - Add functionality for admins to submit YouTube URLs directly for processing (download via yt-dlp → process on Modal → deploy to Cloudflare)
 
 ### 📊 Complete Pipeline Workflow
 
