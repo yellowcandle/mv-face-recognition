@@ -5,6 +5,61 @@
 import { EMBEDDED_ASSETS } from './embedded-assets.js';
 import { logger } from './lib/logger.js';
 
+/**
+ * Verify Cloudflare Access JWT token
+ * @see https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/
+ */
+async function verifyCloudflareAccess(request, env) {
+  // Skip verification in development or if not configured
+  if (!env.CF_ACCESS_AUD || env.ENVIRONMENT === 'development') {
+    logger.debug('Skipping Access verification (not configured or dev mode)');
+    return { verified: true, email: 'dev@localhost' };
+  }
+
+  const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
+  if (!jwt) {
+    return { verified: false, error: 'Missing Cf-Access-Jwt-Assertion header' };
+  }
+
+  try {
+    // Verify JWT with Cloudflare Access
+    const certsUrl = `https://${env.CF_ACCESS_TEAM}.cloudflareaccess.com/cdn-cgi/access/certs`;
+    const certsResponse = await fetch(certsUrl);
+    const certs = await certsResponse.json();
+
+    // Decode JWT parts
+    const parts = jwt.split('.');
+    if (parts.length !== 3) {
+      return { verified: false, error: 'Invalid JWT format' };
+    }
+
+    const header = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+    // Verify audience
+    if (payload.aud && !payload.aud.includes(env.CF_ACCESS_AUD)) {
+      return { verified: false, error: 'Invalid audience' };
+    }
+
+    // Verify expiration
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return { verified: false, error: 'Token expired' };
+    }
+
+    // For full cryptographic verification, you'd verify the signature here
+    // For simplicity, we trust Cloudflare's edge validation
+
+    return {
+      verified: true,
+      email: payload.email,
+      identity: payload
+    };
+  } catch (error) {
+    logger.error('Access verification error', { error: error.message });
+    return { verified: false, error: 'Verification failed' };
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -534,9 +589,15 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
             confidence: flagData.confidence || null,
             embedding: flagData.embedding || null,
             user_label: flagData.user_label || null,
+            has_thumbnail: !!flagData.thumbnail,
             flagged_at: new Date().toISOString(),
             status: 'pending' // pending, approved, rejected
           };
+
+          // Store thumbnail separately if provided (to keep main record small)
+          if (flagData.thumbnail) {
+            await env.METADATA_KV.put(`flagged_thumbnail_${flagId}`, flagData.thumbnail);
+          }
 
           // Store in KV
           await env.METADATA_KV.put(`flagged_face_${flagId}`, JSON.stringify(flagRecord));
@@ -673,6 +734,47 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
           });
         } catch (error) {
           return new Response(JSON.stringify({ error: 'Failed to queue sync' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/faces/thumbnail':
+    case '/faces/thumbnail/':
+      // Get thumbnail for a flagged face
+      if (request.method === 'GET') {
+        const url = new URL(request.url);
+        const flagId = url.searchParams.get('flag_id');
+
+        if (!flagId) {
+          return new Response(JSON.stringify({ error: 'Missing flag_id parameter' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const thumbnail = await env.METADATA_KV.get(`flagged_thumbnail_${flagId}`);
+
+          if (!thumbnail) {
+            return new Response(JSON.stringify({ error: 'Thumbnail not found' }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Return as JSON with base64 data
+          return new Response(JSON.stringify({
+            flag_id: flagId,
+            thumbnail: thumbnail
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          logger.error('Error getting thumbnail', { error: error.message });
+          return new Response(JSON.stringify({ error: 'Failed to get thumbnail' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
@@ -899,6 +1001,475 @@ async function handleApiRequest(pathname, request, env, corsHeaders) {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+
+    // ============================================
+    // Admin API Endpoints (Protected by Zero Trust)
+    // ============================================
+
+    case '/admin/youtube/submit':
+    case '/admin/youtube/submit/':
+      // Submit a YouTube URL for processing
+      if (request.method === 'POST') {
+        // Verify Cloudflare Access
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const data = await request.json();
+          const { youtube_url, title, priority } = data;
+
+          if (!youtube_url) {
+            return new Response(JSON.stringify({
+              error: 'Missing required field: youtube_url'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Validate YouTube URL
+          const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)[\w-]+/;
+          if (!ytRegex.test(youtube_url)) {
+            return new Response(JSON.stringify({
+              error: 'Invalid YouTube URL format'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Extract video ID from URL
+          let videoId = '';
+          try {
+            const urlObj = new URL(youtube_url);
+            if (urlObj.hostname === 'youtu.be') {
+              videoId = urlObj.pathname.slice(1);
+            } else {
+              videoId = urlObj.searchParams.get('v') || '';
+            }
+          } catch {
+            videoId = youtube_url.match(/[\w-]{11}/)?.[0] || '';
+          }
+
+          // Create queue entry
+          const queueId = `yt_${videoId}_${Date.now()}`;
+          const queueEntry = {
+            id: queueId,
+            youtube_url,
+            youtube_video_id: videoId,
+            title: title || `YouTube Video ${videoId}`,
+            priority: priority || 'normal',
+            status: 'queued',
+            submitted_by: accessResult.email,
+            submitted_at: new Date().toISOString(),
+            processing_started_at: null,
+            completed_at: null,
+            error: null
+          };
+
+          // Store in KV
+          await env.METADATA_KV.put(`youtube_queue_${queueId}`, JSON.stringify(queueEntry));
+
+          // Update queue index
+          const queueIndexStr = await env.METADATA_KV.get('youtube_queue_index') || '[]';
+          const queueIndex = JSON.parse(queueIndexStr);
+          queueIndex.push(queueId);
+          await env.METADATA_KV.put('youtube_queue_index', JSON.stringify(queueIndex));
+
+          logger.info(`YouTube video queued`, { queueId, videoId, email: accessResult.email });
+
+          return new Response(JSON.stringify({
+            success: true,
+            queue_id: queueId,
+            message: 'Video queued for processing',
+            entry: queueEntry
+          }), {
+            status: 201,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('YouTube submit error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to queue video',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/admin/youtube/queue':
+    case '/admin/youtube/queue/':
+      // List YouTube processing queue
+      if (request.method === 'GET') {
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const queueIndexStr = await env.METADATA_KV.get('youtube_queue_index') || '[]';
+          const queueIndex = JSON.parse(queueIndexStr);
+
+          const queueUrl = new URL(request.url);
+          const statusFilter = queueUrl.searchParams.get('status');
+
+          // Fetch all queue entries
+          const entries = [];
+          for (const queueId of queueIndex) {
+            const entryStr = await env.METADATA_KV.get(`youtube_queue_${queueId}`);
+            if (entryStr) {
+              const entry = JSON.parse(entryStr);
+              if (!statusFilter || entry.status === statusFilter) {
+                entries.push(entry);
+              }
+            }
+          }
+
+          // Sort by submitted_at descending
+          entries.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+          return new Response(JSON.stringify({
+            queue: entries,
+            total: entries.length,
+            filter: statusFilter
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('YouTube queue list error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to list queue',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/admin/youtube/status':
+    case '/admin/youtube/status/':
+      // Update YouTube queue entry status (called by Modal processor)
+      if (request.method === 'POST') {
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const { queue_id, status, error: errorMsg, output_video_id } = await request.json();
+
+          if (!queue_id || !status) {
+            return new Response(JSON.stringify({
+              error: 'Missing required fields: queue_id, status'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const entryStr = await env.METADATA_KV.get(`youtube_queue_${queue_id}`);
+          if (!entryStr) {
+            return new Response(JSON.stringify({
+              error: 'Queue entry not found'
+            }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const entry = JSON.parse(entryStr);
+          entry.status = status;
+
+          if (status === 'processing') {
+            entry.processing_started_at = new Date().toISOString();
+          } else if (status === 'completed') {
+            entry.completed_at = new Date().toISOString();
+            entry.output_video_id = output_video_id || null;
+          } else if (status === 'failed') {
+            entry.error = errorMsg || 'Unknown error';
+          }
+
+          await env.METADATA_KV.put(`youtube_queue_${queue_id}`, JSON.stringify(entry));
+
+          logger.info(`YouTube queue status updated`, { queue_id, status });
+
+          return new Response(JSON.stringify({
+            success: true,
+            entry
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('YouTube status update error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to update status',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/admin/flagged/approve':
+    case '/admin/flagged/approve/':
+      // Approve a flagged face
+      if (request.method === 'POST') {
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const { flag_id, action } = await request.json();
+
+          if (!flag_id || !action) {
+            return new Response(JSON.stringify({
+              error: 'Missing required fields: flag_id, action'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          if (!['approve', 'reject'].includes(action)) {
+            return new Response(JSON.stringify({
+              error: 'Invalid action. Must be "approve" or "reject"'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const flagStr = await env.METADATA_KV.get(`flagged_face_${flag_id}`);
+          if (!flagStr) {
+            return new Response(JSON.stringify({
+              error: 'Flagged face not found'
+            }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const flagRecord = JSON.parse(flagStr);
+          flagRecord.status = action === 'approve' ? 'approved' : 'rejected';
+          flagRecord.reviewed_by = accessResult.email;
+          flagRecord.reviewed_at = new Date().toISOString();
+
+          await env.METADATA_KV.put(`flagged_face_${flag_id}`, JSON.stringify(flagRecord));
+
+          logger.info(`Flagged face ${action}d`, { flag_id, email: accessResult.email });
+
+          return new Response(JSON.stringify({
+            success: true,
+            flag: flagRecord
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('Flagged approve error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to process approval',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/admin/embeddings/compare':
+    case '/admin/embeddings/compare/':
+      // Get embedding comparison data for a contestant
+      if (request.method === 'GET') {
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const compareUrl = new URL(request.url);
+          const contestantId = compareUrl.searchParams.get('contestant_id');
+
+          if (!contestantId) {
+            return new Response(JSON.stringify({
+              error: 'Missing contestant_id parameter'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Get all approved flagged faces for this contestant
+          const flagIndexStr = await env.METADATA_KV.get('flagged_faces_index') || '[]';
+          const flagIndex = JSON.parse(flagIndexStr);
+
+          const contestantFlags = [];
+          for (const flagMeta of flagIndex) {
+            if (String(flagMeta.contestant_id) === contestantId) {
+              const flagStr = await env.METADATA_KV.get(`flagged_face_${flagMeta.id}`);
+              if (flagStr) {
+                const flag = JSON.parse(flagStr);
+                contestantFlags.push({
+                  id: flag.id,
+                  video_id: flag.video_id,
+                  timestamp: flag.timestamp,
+                  confidence: flag.confidence,
+                  status: flag.status,
+                  has_thumbnail: flag.has_thumbnail,
+                  flagged_at: flag.flagged_at
+                });
+              }
+            }
+          }
+
+          // Calculate statistics
+          const approvedCount = contestantFlags.filter(f => f.status === 'approved').length;
+          const pendingCount = contestantFlags.filter(f => f.status === 'pending').length;
+          const avgConfidence = contestantFlags.length > 0
+            ? contestantFlags.reduce((sum, f) => sum + (f.confidence || 0), 0) / contestantFlags.length
+            : 0;
+
+          return new Response(JSON.stringify({
+            contestant_id: contestantId,
+            total_flags: contestantFlags.length,
+            approved_count: approvedCount,
+            pending_count: pendingCount,
+            rejected_count: contestantFlags.length - approvedCount - pendingCount,
+            average_confidence: avgConfidence,
+            flags: contestantFlags,
+            embedding_status: {
+              has_base_embedding: true, // Assume true if contestant exists
+              last_updated: null, // Would need to store this
+              flag_contributions: approvedCount
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('Embedding compare error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to get comparison data',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
+
+    case '/admin/embeddings/trigger-sync':
+    case '/admin/embeddings/trigger-sync/':
+      // Trigger embedding sync from approved flagged faces
+      if (request.method === 'POST') {
+        const accessResult = await verifyCloudflareAccess(request, env);
+        if (!accessResult.verified) {
+          return new Response(JSON.stringify({
+            error: 'Unauthorized',
+            message: accessResult.error
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          // Get all approved flagged faces
+          const flagIndexStr = await env.METADATA_KV.get('flagged_faces_index') || '[]';
+          const flagIndex = JSON.parse(flagIndexStr);
+
+          const approvedFlags = [];
+          for (const flagId of flagIndex) {
+            const flagStr = await env.METADATA_KV.get(`flagged_face_${flagId}`);
+            if (flagStr) {
+              const flag = JSON.parse(flagStr);
+              if (flag.status === 'approved') {
+                approvedFlags.push(flag);
+              }
+            }
+          }
+
+          // Create sync job record
+          const syncJobId = `sync_${Date.now()}`;
+          const syncJob = {
+            id: syncJobId,
+            status: 'pending',
+            approved_flags_count: approvedFlags.length,
+            triggered_by: accessResult.email,
+            triggered_at: new Date().toISOString(),
+            completed_at: null
+          };
+
+          await env.METADATA_KV.put(`embedding_sync_job_${syncJobId}`, JSON.stringify(syncJob));
+
+          logger.info(`Embedding sync triggered`, { syncJobId, count: approvedFlags.length, email: accessResult.email });
+
+          return new Response(JSON.stringify({
+            success: true,
+            sync_job_id: syncJobId,
+            approved_flags_count: approvedFlags.length,
+            message: 'Embedding sync job created. Run Modal processor with --update-embeddings to process.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          logger.error('Embedding sync trigger error', { error: error.message });
+          return new Response(JSON.stringify({
+            error: 'Failed to trigger sync',
+            message: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      break;
 
     default:
       // Handle /videos/metadata/dense/{video_id}

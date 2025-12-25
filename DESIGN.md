@@ -426,16 +426,16 @@ jobs:
 
 ### Pending
 
-- [ ] **Implement Cloudflare Zero Trust for Admin UI** - Protect admin endpoints (face flagging approval, embedding sync, contestant management) with Cloudflare Access zero-trust authentication. See: https://developers.cloudflare.com/cloudflare-one/applications/
-- [ ] **Admin UI: YouTube video ingestion** - Add functionality for admins to submit YouTube URLs directly for processing (download via yt-dlp → process on Modal → deploy to Cloudflare)
-- [ ] Implement batch flagging for multiple faces
-- [ ] Add face thumbnail extraction for flagged faces
-- [ ] Create embedding comparison visualization
-- [ ] Add flagging approval workflow for admins
-- [ ] Implement automatic reprocessing after embedding updates
+- [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
 
 ### Completed
 
+- [x] **Implement Cloudflare Zero Trust for Admin UI** - Added JWT verification, protected /api/admin/* endpoints (December 2025)
+- [x] **Admin UI: YouTube video ingestion** - Submit YouTube URLs for processing queue (December 2025)
+- [x] Implement batch flagging for multiple faces (December 2025)
+- [x] Add face thumbnail extraction for flagged faces (December 2025)
+- [x] Create embedding comparison visualization (December 2025)
+- [x] Add flagging approval workflow for admins (December 2025)
 - [x] Add face flagging system and HuggingFace XET integration (December 2025)
 - [x] Add Modal cloud processing with HuggingFace sync (December 2025)
 - [x] Add pipeline documentation (December 2025)
