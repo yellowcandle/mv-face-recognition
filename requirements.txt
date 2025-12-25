@@ -3,7 +3,7 @@
 
 # Core ML and Web Interface
 gradio>=5.11.1  # Updated to latest version for critical security fixes (CVE-2025-56636, CVE-2025-56637, CVE-2025-56638, etc.)
-huggingface_hub>=0.26.0  # Updated for security fixes
+huggingface_hub>=0.32.0  # Updated for XET storage support
 
 # Face Recognition & Computer Vision
 insightface>=0.7.3
