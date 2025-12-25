@@ -3576,3 +3576,259 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 - [ ] Create embedding comparison visualization
 - [ ] Add flagging approval workflow for admins
 - [ ] Implement automatic reprocessing after embedding updates
+
+### 📊 Complete Pipeline Workflow
+
+The MV Face Recognition system follows a 4-phase pipeline for processing videos with face recognition:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                      COMPLETE PIPELINE OVERVIEW                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  PHASE 1              PHASE 2              PHASE 3            PHASE 4   │
+│  ════════            ════════             ════════           ════════   │
+│                                                                          │
+│  ┌─────────┐        ┌─────────┐         ┌─────────┐       ┌─────────┐  │
+│  │  Data   │ ──────►│ Video   │ ───────►│ Deploy  │──────►│ Improve │  │
+│  │  Prep   │        │Process  │         │         │       │ Accuracy│  │
+│  └─────────┘        └─────────┘         └─────────┘       └─────────┘  │
+│                                                                          │
+│  • Photos           • Modal GPU          • Cloudflare      • Flag faces │
+│  • Embeddings       • Face detect        • R2 videos       • Sync HF    │
+│  • HuggingFace      • Annotate           • KV metadata     • Retrain    │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### Phase 1: Data Preparation
+
+**Goal**: Prepare contestant photos and generate face embeddings
+
+```bash
+# 1. Organize contestant photos
+source/photos/
+├── 1/                    # Contestant ID folders
+│   ├── photo1.jpg
+│   └── photo2.jpg
+├── 2/
+│   └── photo.jpg
+└── ...
+
+# 2. Generate embeddings
+python -m src.video_processing.generate_embeddings \
+  --photos-dir source/photos \
+  --output-dir embeddings
+
+# 3. Upload to HuggingFace XET
+python -c "
+from src.integrations import HuggingFaceDataset
+dataset = HuggingFaceDataset('yellowcandle/mv-face-recognition-data')
+dataset.upload_contestant_data()      # Upload CSV
+dataset.sync_embeddings_to_cloud()    # Upload embeddings
+"
+```
+
+**Outputs**:
+- `embeddings/contestant_{id}/base_embedding.npy` - Face embeddings for each contestant
+- `metadata/contestant_info.csv` - Contestant ID/name mapping
+- HuggingFace repository synced with all data
+
+---
+
+#### Phase 2: Video Processing (Modal Cloud GPU)
+
+**Goal**: Process videos with face detection and recognition on cloud GPUs
+
+```bash
+# Option A: Full automated pipeline
+modal run scripts/modal_hf_processor.py --full-pipeline
+
+# Option B: Step-by-step processing
+# 1. Sync latest data from HuggingFace
+modal run scripts/modal_hf_processor.py --sync-from-hf
+
+# 2. Process videos with face recognition
+modal run scripts/modal_hf_processor.py --process-videos
+
+# 3. Upload results back to HuggingFace
+modal run scripts/modal_hf_processor.py --upload-results
+
+# Option C: Process single video
+modal run scripts/modal_hf_processor.py --process-videos --single-video "video.mp4"
+```
+
+**Processing Steps**:
+1. **Frame Extraction**: Extract frames at configured density (default: 5 fps)
+2. **Face Detection**: InsightFace model detects faces in each frame
+3. **Embedding Generation**: Generate 512-dim embeddings for detected faces
+4. **Face Matching**: ChromaDB similarity search against contestant embeddings
+5. **Video Annotation**: Overlay bounding boxes and names on video
+6. **Metadata Generation**: Create timeline JSON with all detections
+
+**Outputs**:
+- `processed_videos/{video}_annotated.mp4` - Video with face overlay
+- `processed_videos/{video}_timeline.json` - Frame-by-frame detection data
+
+---
+
+#### Phase 3: Deployment (Cloudflare)
+
+**Goal**: Deploy processed videos and metadata to production
+
+```bash
+# 1. Build frontend
+cd mvp-processor && npm run build
+
+# 2. Update worker assets
+cd .. && node scripts/update-worker-assets.js
+
+# 3. Upload videos to R2
+for video in processed_videos/*_annotated.mp4; do
+  npx wrangler r2 object put mv-face-recognition-videos/"$(basename $video)" \
+    --file "$video" --content-type video/mp4
+done
+
+# 4. Upload metadata to KV
+for json in processed_videos/*_timeline.json; do
+  video_id=$(basename "$json" _timeline.json)
+  npx wrangler kv:key put --binding=METADATA_KV \
+    "timeline:$video_id" "$(cat $json)"
+done
+
+# 5. Deploy worker
+cd worker && npx wrangler deploy
+```
+
+**Endpoints Available**:
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/videos` | List all processed videos |
+| `GET /api/videos/{id}` | Stream video with range support |
+| `GET /api/videos/{id}/timeline` | Get face detection timeline |
+| `GET /api/contestants` | List all contestants |
+| `GET /api/faces/detect?video_id=&timestamp=` | Get faces at timestamp |
+| `POST /api/faces/flag` | Flag a face for correction |
+
+---
+
+#### Phase 4: Accuracy Improvement Loop
+
+**Goal**: Use user feedback to improve recognition accuracy
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                   ACCURACY IMPROVEMENT LOOP                        │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│   User watches video    User flags incorrect     System records   │
+│   with face overlay ──► face identification ───► flagged face    │
+│          │                      │                      │          │
+│          │                      │                      │          │
+│          ▼                      ▼                      ▼          │
+│   ┌────────────┐        ┌────────────┐        ┌────────────┐     │
+│   │  Video     │        │  Flag      │        │  HuggingFace│     │
+│   │  Player    │        │  Dialog    │        │  Dataset    │     │
+│   └────────────┘        └────────────┘        └────────────┘     │
+│                                                      │            │
+│                                                      ▼            │
+│   Reprocess videos      Update embeddings     Admin approves     │
+│   with new model ◄──── with flagged faces ◄── flagged faces     │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Workflow**:
+
+1. **Flag Incorrect Face** (Frontend):
+   ```
+   - Click on face bounding box in video player
+   - Select correct contestant from dropdown
+   - Optionally add note (e.g., "clear frontal view")
+   - Submit flag
+   ```
+
+2. **Store Flagged Data** (API → HuggingFace):
+   ```python
+   # Automatically syncs to HuggingFace
+   POST /api/faces/flag
+   {
+     "contestant_id": 42,
+     "video_id": "video1",
+     "timestamp": 12.5,
+     "bbox": [100, 100, 200, 200],
+     "confidence": 0.85,
+     "user_label": "Clear frontal view"
+   }
+   ```
+
+3. **Update Embeddings** (Modal):
+   ```bash
+   # Pull flagged faces and update contestant embeddings
+   modal run scripts/modal_hf_processor.py --update-embeddings
+
+   # Uses weighted averaging (default 0.3 weight for new faces)
+   # new_embedding = 0.7 * base + 0.3 * mean(flagged_faces)
+   ```
+
+4. **Reprocess Videos** (Modal):
+   ```bash
+   # Reprocess all videos with updated embeddings
+   modal run scripts/modal_hf_processor.py --full-pipeline
+   ```
+
+---
+
+#### Quick Start Commands
+
+```bash
+# === INITIAL SETUP ===
+git clone https://github.com/yellowcandle/mv-face-recognition.git
+cd mv-face-recognition
+npm install && pip install -r requirements.txt
+
+# === PROCESS NEW VIDEOS ===
+# Place videos in source/videos/
+modal run scripts/modal_hf_processor.py --full-pipeline
+
+# === DEPLOY ===
+cd mvp-processor && npm run build && cd ..
+node scripts/update-worker-assets.js
+cd worker && npx wrangler deploy
+
+# === IMPROVE ACCURACY ===
+# (After users have flagged faces in the web UI)
+modal run scripts/modal_hf_processor.py --update-embeddings
+modal run scripts/modal_hf_processor.py --process-videos
+```
+
+---
+
+#### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `HF_TOKEN` | HuggingFace API token | Yes |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token | Yes |
+| `MODAL_TOKEN_ID` | Modal.com token ID | Yes |
+| `MODAL_TOKEN_SECRET` | Modal.com token secret | Yes |
+
+---
+
+#### Monitoring & Verification
+
+```bash
+# Check deployed videos
+curl -s "https://mv.herballemon.dev/api/videos" | jq .
+
+# Check recognition timeline
+curl -s "https://mv.herballemon.dev/api/videos/{id}/timeline" | jq .
+
+# Check flagged faces
+curl -s "https://mv.herballemon.dev/api/faces/flagged" | jq .
+
+# Check system status
+curl -s "https://mv.herballemon.dev/api/system/status" | jq .
+```
