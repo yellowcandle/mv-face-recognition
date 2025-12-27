@@ -139,19 +139,30 @@ class InputValidator:
 
     def sanitize_sql_input(self, input_str: str) -> str:
         """
-        Sanitize input for SQL queries (basic protection).
-
+        DEPRECATED: Manual SQL sanitization is unsafe and should not be used.
+        
+        This method has been deprecated because manual SQL sanitization is 
+        inherently insecure and prone to bypasses. Modern database libraries
+        provide parameterized queries that are much safer.
+        
         Args:
-            input_str: Input string to sanitize
-
-        Returns:
-            Sanitized string
+            input_str: Input string (not sanitized)
+            
+        Raises:
+            NotImplementedError: Always raises to prevent unsafe usage
+            
+        Example of safe alternative:
+            # WRONG (vulnerable to SQL injection):
+            cursor.execute(f"SELECT * FROM table WHERE name = '{sanitize_sql_input(name)}'")
+            
+            # CORRECT (safe with parameterized queries):
+            # For SQLite/PostgreSQL:
+            cursor.execute("SELECT * FROM table WHERE name = ?", (name,))
+            # For MySQL/PostgreSQL:
+            cursor.execute("SELECT * FROM table WHERE name = %s", (name,))
         """
-        if not isinstance(input_str, str):
-            return str(input_str)
-
-        # Remove or escape dangerous characters
-        sanitized = input_str.replace("'", "''")  # SQL escape
-        sanitized = re.sub(r'[;\-\-]', '', sanitized)  # Remove semicolons and comments
-
-        return sanitized
+        raise NotImplementedError(
+            "Manual SQL sanitization is unsafe and has been deprecated. "
+            "Use parameterized queries instead: "
+            "cursor.execute('SELECT * FROM table WHERE id = ?', (id,))"
+        )
