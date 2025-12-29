@@ -21,3 +21,7 @@ tqdm>=4.65.0
 
 # Optional: GPU acceleration
 # mediapipe>=0.10.0
+
+# Security: Explicitly pin for CVE fixes
+urllib3>=2.3.0  # Fix CVE-2024-37891, CVE-2025-43859
+Pillow>=11.0.0  # Security updates

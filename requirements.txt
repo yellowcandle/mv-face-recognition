@@ -35,3 +35,8 @@ tqdm>=4.67.0  # Updated for security fixes
 # For enhanced processing (optional)
 matplotlib>=3.10.0  # Updated for security fixes
 seaborn>=0.13.0  # Updated for compatibility
+
+# Security: Explicitly pin transitive dependencies
+urllib3>=2.3.0  # Fix CVE-2024-37891, CVE-2025-43859 (streaming API, decompression chain)
+fonttools>=4.55.3  # Fix CVE-2025-50919 (arbitrary file write, XML injection)
+filelock>=3.16.1  # Fix CVE-2024-53109 (TOCTOU race condition)
