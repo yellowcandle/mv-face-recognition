@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import Card from '$lib/components/Card.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Badge from '$lib/components/Badge.svelte';
   
   interface AnalyticsData {
     totalVideos: number;
@@ -74,143 +77,159 @@
 
   <!-- Key Metrics -->
   <div class="metrics-grid">
-    <div class="metric-card">
-      <div class="metric-icon">🎬</div>
-      <div class="metric-content">
-        <div class="metric-value">{analyticsData.totalVideos}</div>
-        <div class="metric-label">Videos Processed</div>
+    <Card variant="interactive" padding="md">
+      <div class="metric-card-inner">
+        <div class="metric-icon">🎬</div>
+        <div class="metric-content">
+          <div class="metric-value">{analyticsData.totalVideos}</div>
+          <div class="metric-label">Videos Processed</div>
+        </div>
       </div>
-    </div>
+    </Card>
     
-    <div class="metric-card">
-      <div class="metric-icon">👥</div>
-      <div class="metric-content">
-        <div class="metric-value">{analyticsData.totalFacesDetected.toLocaleString()}</div>
-        <div class="metric-label">Faces Detected</div>
+    <Card variant="interactive" padding="md">
+      <div class="metric-card-inner">
+        <div class="metric-icon">👥</div>
+        <div class="metric-content">
+          <div class="metric-value">{analyticsData.totalFacesDetected.toLocaleString()}</div>
+          <div class="metric-label">Faces Detected</div>
+        </div>
       </div>
-    </div>
+    </Card>
     
-    <div class="metric-card">
-      <div class="metric-icon">✅</div>
-      <div class="metric-content">
-        <div class="metric-value">{analyticsData.totalFacesRecognized.toLocaleString()}</div>
-        <div class="metric-label">Faces Recognized</div>
+    <Card variant="interactive" padding="md">
+      <div class="metric-card-inner">
+        <div class="metric-icon">✅</div>
+        <div class="metric-content">
+          <div class="metric-value">{analyticsData.totalFacesRecognized.toLocaleString()}</div>
+          <div class="metric-label">Faces Recognized</div>
+        </div>
       </div>
-    </div>
+    </Card>
     
-    <div class="metric-card">
-      <div class="metric-icon">⏱️</div>
-      <div class="metric-content">
-        <div class="metric-value">{formatTime(analyticsData.processingTime)}</div>
-        <div class="metric-label">Total Processing Time</div>
+    <Card variant="interactive" padding="md">
+      <div class="metric-card-inner">
+        <div class="metric-icon">⏱️</div>
+        <div class="metric-content">
+          <div class="metric-value">{formatTime(analyticsData.processingTime)}</div>
+          <div class="metric-label">Total Processing Time</div>
+        </div>
       </div>
-    </div>
+    </Card>
   </div>
 
   <div class="analytics-main">
     <!-- Recognition Accuracy -->
-    <div class="accuracy-panel">
-      <h3>Recognition Accuracy</h3>
-      
-      <div class="accuracy-display">
-        <div class="accuracy-circle">
-          <div class="accuracy-value">{analyticsData.accuracy.toFixed(1)}%</div>
-          <div class="accuracy-label">Overall Accuracy</div>
-        </div>
+    <Card class="accuracy-panel">
+      <div class="accuracy-panel-inner">
+        <h3>Recognition Accuracy</h3>
         
-        <div class="accuracy-breakdown">
-          <div class="breakdown-item">
-            <span class="breakdown-label">High Confidence (&gt;80%):</span>
-            <span class="breakdown-value">67%</span>
+        <div class="accuracy-display">
+          <div class="accuracy-circle" style="--accuracy: {analyticsData.accuracy}">
+            <div class="accuracy-value">{analyticsData.accuracy.toFixed(1)}%</div>
+            <div class="accuracy-label">Overall Accuracy</div>
           </div>
-          <div class="breakdown-item">
-            <span class="breakdown-label">Medium Confidence (60-80%):</span>
-            <span class="breakdown-value">23%</span>
-          </div>
-          <div class="breakdown-item">
-            <span class="breakdown-label">Low Confidence (&lt;60%):</span>
-            <span class="breakdown-value">10%</span>
+          
+          <div class="accuracy-breakdown">
+            <div class="breakdown-item">
+              <span class="breakdown-label">High Confidence (&gt;80%):</span>
+              <span class="breakdown-value">67%</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Medium Confidence (60-80%):</span>
+              <span class="breakdown-value">23%</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Low Confidence (&lt;60%):</span>
+              <span class="breakdown-value">10%</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Top Contestants -->
-    <div class="contestants-panel">
-      <h3>Top Recognized Contestants</h3>
-      
-      <div class="contestants-list">
-        {#each topContestants as contestant, index}
-          <div class="contestant-item">
-            <div class="contestant-rank">#{index + 1}</div>
-            <div class="contestant-info">
-              <div class="contestant-name">{contestant.name}</div>
-              <div class="contestant-stats">
-                <span class="stat">
-                  <span class="stat-icon">👁️</span>
-                  {contestant.appearances} appearances
-                </span>
-                <span class="stat">
-                  <span class="stat-icon">🎯</span>
-                  {contestant.confidence}% avg confidence
-                </span>
+    <Card class="contestants-panel">
+      <div class="contestants-panel-inner">
+        <h3>Top Recognized Contestants</h3>
+        
+        <div class="contestants-list">
+          {#each topContestants as contestant, index}
+            <div class="contestant-item">
+              <div class="contestant-rank">#{index + 1}</div>
+              <div class="contestant-info">
+                <div class="contestant-name">{contestant.name}</div>
+                <div class="contestant-stats">
+                  <span class="stat">
+                    <span class="stat-icon">👁️</span>
+                    {contestant.appearances} appearances
+                  </span>
+                  <span class="stat">
+                    <span class="stat-icon">🎯</span>
+                    {contestant.confidence}% avg confidence
+                  </span>
+                </div>
+              </div>
+              <div class="contestant-confidence">
+                <div class="confidence-bar">
+                  <div 
+                    class="confidence-fill" 
+                    style="width: {contestant.confidence}%"
+                  ></div>
+                </div>
               </div>
             </div>
-            <div class="contestant-confidence">
-              <div class="confidence-bar">
-                <div 
-                  class="confidence-fill" 
-                  style="width: {contestant.confidence}%"
-                ></div>
-              </div>
+          {/each}
+        </div>
+      </div>
+    </Card>
+  </div>
+
+  <!-- Processing History -->
+  <Card class="history-panel">
+    <div class="history-panel-inner">
+      <h3>Processing History</h3>
+      
+      <div class="history-table">
+        <div class="table-header">
+          <div class="header-cell">Date</div>
+          <div class="header-cell">Videos</div>
+          <div class="header-cell">Faces Detected</div>
+          <div class="header-cell">Accuracy</div>
+        </div>
+        
+        {#each processingHistory as record}
+          <div class="table-row">
+            <div class="table-cell">{formatDate(record.date)}</div>
+            <div class="table-cell">{record.videos}</div>
+            <div class="table-cell">{record.faces}</div>
+            <div class="table-cell">
+              <Badge variant="success" class="accuracy-badge-item">{record.accuracy}%</Badge>
             </div>
           </div>
         {/each}
       </div>
     </div>
-  </div>
-
-  <!-- Processing History -->
-  <div class="history-panel">
-    <h3>Processing History</h3>
-    
-    <div class="history-table">
-      <div class="table-header">
-        <div class="header-cell">Date</div>
-        <div class="header-cell">Videos</div>
-        <div class="header-cell">Faces Detected</div>
-        <div class="header-cell">Accuracy</div>
-      </div>
-      
-      {#each processingHistory as record}
-        <div class="table-row">
-          <div class="table-cell">{formatDate(record.date)}</div>
-          <div class="table-cell">{record.videos}</div>
-          <div class="table-cell">{record.faces}</div>
-          <div class="table-cell">
-            <span class="accuracy-badge">{record.accuracy}%</span>
-          </div>
-        </div>
-      {/each}
-    </div>
-  </div>
+  </Card>
 
   <!-- Export Options -->
-  <div class="export-panel">
-    <h3>Export Data</h3>
-    
-    <div class="export-options">
-      <button class="export-btn">
-        📊 Export CSV
-      </button>
-      <button class="export-btn">
-        📈 Export JSON
-      </button>
-      <button class="export-btn">
-        📋 Generate Report
-      </button>
+  <Card class="export-panel">
+    <div class="export-panel-inner">
+      <h3>Export Data</h3>
+      
+      <div class="export-options">
+        <Button variant="primary" size="md">
+          📊 Export CSV
+        </Button>
+        <Button variant="secondary" size="md">
+          📈 Export JSON
+        </Button>
+        <Button variant="secondary" size="md">
+          📋 Generate Report
+        </Button>
+      </div>
     </div>
-  </div>
+  </Card>
 </div>
 
 <style>
@@ -218,12 +237,301 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    background-color: #1a1a1a;
-    color: #ffffff;
-    gap: 20px;
+    padding: var(--space-5);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    gap: var(--space-5);
     overflow-y: auto;
   }
+
+  .analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--space-4);
+    border-bottom: var(--space-px) solid var(--border-default);
+  }
+
+  .analytics-header h1 {
+    font-size: var(--text-h3-size);
+    font-weight: var(--text-h3-weight);
+    margin: 0;
+  }
+
+  .refresh-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+  }
+
+  .refresh-indicator {
+    animation: spin var(--duration-slower) linear infinite;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-5);
+  }
+
+  .metric-card-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .metric-icon {
+    font-size: var(--text-display-size);
+    width: 3.125rem;
+    text-align: center;
+  }
+
+  .metric-content {
+    flex: 1;
+  }
+
+  .metric-value {
+    font-size: var(--text-h2-size);
+    font-weight: var(--text-h2-weight);
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+  }
+
+  .analytics-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+
+  .accuracy-panel-inner h3,
+  .contestants-panel-inner h3 {
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
+  }
+
+  .accuracy-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .accuracy-circle {
+    width: 9.375rem;
+    height: 9.375rem;
+    border-radius: var(--radius-full);
+    background: conic-gradient(var(--color-success-500) 0deg, var(--color-success-500) calc(var(--accuracy, 78.1) * 3.6deg), var(--color-gray-700) calc(var(--accuracy, 78.1) * 3.6deg), var(--color-gray-700) 360deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .accuracy-circle::before {
+    content: '';
+    position: absolute;
+    width: 7.5rem;
+    height: 7.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-full);
+  }
+
+  .accuracy-value {
+    font-size: var(--text-h3-size);
+    font-weight: var(--text-h3-weight);
+    color: var(--text-primary);
+    z-index: var(--z-base);
+  }
+
+  .accuracy-label {
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
+    z-index: var(--z-base);
+  }
+
+  .accuracy-breakdown {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) 0;
+    border-bottom: var(--space-px) solid var(--border-subtle);
+  }
+
+  .breakdown-item:last-child {
+    border-bottom: none;
+  }
+
+  .breakdown-label {
+    color: var(--text-secondary);
+    font-size: var(--text-body-sm-size);
+  }
+
+  .breakdown-value {
+    color: var(--text-primary);
+    font-weight: var(--text-h6-weight);
+  }
+
+  .contestants-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .contestant-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    transition: all var(--duration-normal);
+  }
+
+  .contestant-item:hover {
+    background-color: var(--color-gray-700);
+  }
+
+  .contestant-rank {
+    width: var(--space-7-5); /* approx 30px */
+    height: var(--space-7-5); 
+    background-color: var(--color-primary-500);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--text-h6-weight);
+    font-size: var(--text-body-sm-size);
+    color: white;
+  }
+
+  .contestant-info {
+    flex: 1;
+  }
+
+  .contestant-name {
+    font-weight: var(--text-h6-weight);
+    margin-bottom: var(--space-1);
+    color: var(--text-primary);
+  }
+
+  .contestant-stats {
+    display: flex;
+    gap: var(--space-4);
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
+  }
+
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .stat-icon {
+    font-size: var(--text-body-xs-size);
+  }
+
+  .contestant-confidence {
+    width: 6.25rem;
+  }
+
+  .confidence-bar {
+    height: 6px;
+    background-color: var(--color-gray-700);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background-color: var(--color-success-500);
+    border-radius: var(--radius-full);
+    transition: width var(--duration-slow) var(--ease-in-out);
+  }
+
+  .history-panel-inner h3 {
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
+  }
+
+  .history-table {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .table-header {
+    display: grid;
+    grid-template-columns: 1fr 80px 120px 100px;
+    gap: var(--space-4);
+    padding: var(--space-2-5) var(--space-4);
+    background-color: var(--color-gray-700);
+    border-radius: var(--radius-md);
+    font-weight: var(--text-h6-weight);
+    color: var(--text-primary);
+  }
+
+  .table-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 120px 100px;
+    gap: var(--space-4);
+    padding: var(--space-2-5) var(--space-4);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    transition: background-color var(--duration-normal);
+  }
+
+  .table-row:hover {
+    background-color: var(--color-gray-700);
+  }
+
+  .header-cell {
+    font-size: var(--text-body-sm-size);
+  }
+
+  .table-cell {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+  }
+
+  .accuracy-badge-item {
+    font-weight: var(--text-h6-weight);
+  }
+
+  .export-panel-inner h3 {
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
+  }
+
+  .export-options {
+    display: flex;
+    gap: var(--space-4);
+  }
+
 
   .analytics-header {
     display: flex;

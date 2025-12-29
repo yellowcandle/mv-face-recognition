@@ -1,5 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import Card from '$lib/components/Card.svelte';
+  import Badge from '$lib/components/Badge.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   
   interface ProcessingJob {
     id: string;
@@ -130,30 +134,30 @@
     <h1>Video Processing</h1>
     <div class="processing-controls">
       {#if isProcessingActive}
-        <button class="control-btn pause-btn" on:click={pauseProcessing}>
+        <Button variant="warning" size="sm" on:click={pauseProcessing}>
           ⏸️ Pause Processing
-        </button>
+        </Button>
       {:else}
-        <button class="control-btn resume-btn" on:click={resumeProcessing}>
+        <Button variant="primary" size="sm" on:click={resumeProcessing}>
           ▶️ Resume Processing
-        </button>
+        </Button>
       {/if}
-      <button class="control-btn start-btn" on:click={startProcessing}>
+      <Button variant="success" size="sm" on:click={startProcessing}>
         🚀 Start New Job
-      </button>
+      </Button>
     </div>
   </div>
 
   <div class="processing-main">
     <!-- System Status Panel -->
-    <div class="status-panel">
+    <Card class="status-panel">
       <h3>System Status</h3>
       
-      <div class="status-indicator">
-        <span class="status-dot" class:active={isProcessingActive}></span>
-        <span class="status-text">
-          {isProcessingActive ? 'Processing Active' : 'Processing Paused'}
-        </span>
+      <div class="status-indicator-wrapper">
+        <StatusIndicator 
+          status={isProcessingActive ? 'success' : 'neutral'} 
+          label={isProcessingActive ? 'Processing Active' : 'Processing Paused'}
+        />
       </div>
       
       <div class="resource-metrics">
@@ -196,10 +200,10 @@
           </div>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Processing Queue -->
-    <div class="queue-panel">
+    <Card class="queue-panel">
       <h3>Processing Queue</h3>
       
       <div class="job-list">
@@ -209,11 +213,10 @@
               <div class="job-info">
                 <h4 class="job-filename">{job.filename}</h4>
                 <div class="job-meta">
-                  <span 
-                    class="job-status" 
-                    style="color: {getStatusColor(job.status)}"
-                  >
-                    {job.status.toUpperCase()}
+                  <span class="job-status">
+                    <Badge variant={job.status === 'completed' ? 'success' : job.status === 'processing' ? 'primary' : job.status === 'failed' ? 'error' : 'neutral'}>
+                      {job.status.toUpperCase()}
+                    </Badge>
                   </span>
                   <span class="job-duration">
                     {formatDuration(job.startTime, job.endTime)}
@@ -259,47 +262,57 @@
           </div>
         {/each}
       </div>
-    </div>
+    </Card>
   </div>
 
   <!-- Processing Statistics -->
-  <div class="stats-panel">
-    <h3>Processing Statistics</h3>
-    
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-content">
-          <div class="stat-value">3</div>
-          <div class="stat-label">Total Jobs</div>
-        </div>
-      </div>
+  <Card class="stats-panel">
+    <div class="stats-panel-inner">
+      <h3>Processing Statistics</h3>
       
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
-        <div class="stat-content">
-          <div class="stat-value">1</div>
-          <div class="stat-label">Completed</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-content">
-          <div class="stat-value">1</div>
-          <div class="stat-label">Processing</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">⏳</div>
-        <div class="stat-content">
-          <div class="stat-value">1</div>
-          <div class="stat-label">Pending</div>
-        </div>
+      <div class="stats-grid">
+        <Card variant="bordered" padding="sm">
+          <div class="stat-card-inner">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+              <div class="stat-value">3</div>
+              <div class="stat-label">Total Jobs</div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card variant="bordered" padding="sm">
+          <div class="stat-card-inner">
+            <div class="stat-icon">✅</div>
+            <div class="stat-content">
+              <div class="stat-value">1</div>
+              <div class="stat-label">Completed</div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card variant="bordered" padding="sm">
+          <div class="stat-card-inner">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-content">
+              <div class="stat-value">1</div>
+              <div class="stat-label">Processing</div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card variant="bordered" padding="sm">
+          <div class="stat-card-inner">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-content">
+              <div class="stat-value">1</div>
+              <div class="stat-label">Pending</div>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
-  </div>
+  </Card>
 </div>
 
 <style>
@@ -307,29 +320,29 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    background-color: #1a1a1a;
-    color: #ffffff;
-    gap: 20px;
+    padding: var(--space-5);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    gap: var(--space-5);
   }
 
   .processing-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #444;
+    padding-bottom: var(--space-4);
+    border-bottom: var(--space-px) solid var(--border-default);
   }
 
   .processing-header h1 {
-    font-size: 24px;
-    font-weight: 600;
+    font-size: var(--text-h3-size);
+    font-weight: var(--text-h3-weight);
     margin: 0;
   }
 
   .processing-controls {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .control-btn {
@@ -371,55 +384,41 @@
 
   .status-panel {
     width: 300px;
-    background-color: #1e293b;
-    border-radius: 8px;
-    padding: 20px;
     height: fit-content;
   }
 
   .status-panel h3 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    color: #ffffff;
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
   }
 
-  .status-indicator {
+  .status-indicator-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 25px;
-    padding: 12px;
-    background-color: #2d3748;
-    border-radius: 6px;
-  }
-
-  .status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background-color: #6b7280;
-    transition: background-color 0.3s;
-  }
-
-  .status-dot.active {
-    background-color: #22c55e;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+    padding: var(--space-3);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
   }
 
   .status-text {
-    font-weight: 500;
+    font-weight: var(--text-label-weight);
+    font-size: var(--text-label-size);
   }
 
   .resource-metrics {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: var(--space-4);
   }
 
   .metric {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .metric-header {
@@ -429,79 +428,76 @@
   }
 
   .metric-label {
-    font-size: 14px;
-    color: #9ca3af;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
   }
 
   .metric-value {
-    font-weight: 600;
-    color: #ffffff;
+    font-weight: var(--text-h6-weight);
+    color: var(--text-primary);
   }
 
   .metric-bar {
     height: 8px;
-    background-color: #374151;
-    border-radius: 4px;
+    background-color: var(--color-neutral-700);
+    border-radius: var(--radius-full);
     overflow: hidden;
   }
 
   .metric-fill {
     height: 100%;
-    transition: width 0.3s ease;
-    border-radius: 4px;
+    transition: width var(--duration-slow) var(--ease-in-out);
+    border-radius: var(--radius-full);
   }
 
   .metric-fill.cpu {
-    background-color: #3b82f6;
+    background-color: var(--color-primary-500);
   }
 
   .metric-fill.memory {
-    background-color: #eab308;
+    background-color: var(--color-warning-500);
   }
 
   .metric-fill.gpu {
-    background-color: #22c55e;
+    background-color: var(--color-success-500);
   }
 
   .queue-panel {
     flex: 1;
-    background-color: #1e293b;
-    border-radius: 8px;
-    padding: 20px;
     overflow-y: auto;
   }
 
   .queue-panel h3 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    color: #ffffff;
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
   }
 
   .job-list {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: var(--space-4);
   }
 
   .job-item {
-    background-color: #2d3748;
-    border-radius: 8px;
-    padding: 15px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     border: 2px solid transparent;
-    transition: all 0.2s;
+    transition: all var(--duration-normal);
   }
 
   .job-item.active {
-    border-color: #3b82f6;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    border-color: var(--color-primary-500);
+    box-shadow: var(--shadow-dark-md);
   }
 
   .job-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2.5);
   }
 
   .job-info {
@@ -509,50 +505,50 @@
   }
 
   .job-filename {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0 0 5px 0;
-    color: #ffffff;
+    font-size: var(--text-body-size);
+    font-weight: var(--text-h6-weight);
+    margin: 0 0 var(--space-1) 0;
+    color: var(--text-primary);
   }
 
   .job-meta {
     display: flex;
-    gap: 15px;
-    font-size: 12px;
+    gap: var(--space-4);
+    font-size: var(--text-body-xs-size);
   }
 
   .job-status {
-    font-weight: 600;
+    font-weight: var(--text-h6-weight);
   }
 
   .job-duration {
-    color: #9ca3af;
+    color: var(--text-secondary);
   }
 
   .job-progress-text {
-    font-size: 14px;
-    font-weight: 600;
-    color: #ffffff;
+    font-size: var(--text-body-sm-size);
+    font-weight: var(--text-h6-weight);
+    color: var(--text-primary);
   }
 
   .job-progress-bar {
     height: 6px;
-    background-color: #374151;
-    border-radius: 3px;
+    background-color: var(--color-neutral-700);
+    border-radius: var(--radius-full);
     overflow: hidden;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2.5);
   }
 
   .job-progress-fill {
     height: 100%;
-    transition: width 0.3s ease;
-    border-radius: 3px;
+    transition: width var(--duration-slow) var(--ease-in-out);
+    border-radius: var(--radius-full);
   }
 
   .job-results {
     display: flex;
-    gap: 20px;
-    margin-top: 10px;
+    gap: var(--space-5);
+    margin-top: var(--space-2.5);
   }
 
   .result-item {
@@ -562,56 +558,47 @@
   }
 
   .result-label {
-    font-size: 12px;
-    color: #9ca3af;
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
   }
 
   .result-value {
-    font-size: 16px;
-    font-weight: 600;
-    color: #22c55e;
+    font-size: var(--text-body-size);
+    font-weight: var(--text-h6-weight);
+    color: var(--color-success-500);
   }
 
   .job-details {
-    margin-top: 10px;
-    font-size: 12px;
-    color: #9ca3af;
+    margin-top: var(--space-2.5);
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
   }
 
   .detail-item {
     padding: 2px 0;
   }
 
-  .stats-panel {
-    background-color: #1e293b;
-    border-radius: 8px;
-    padding: 20px;
-  }
-
-  .stats-panel h3 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    color: #ffffff;
+  .stats-panel-inner h3 {
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    margin-bottom: var(--space-5);
+    color: var(--text-primary);
   }
 
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    gap: var(--space-4);
   }
 
-  .stat-card {
-    background-color: #2d3748;
-    border-radius: 8px;
-    padding: 15px;
+  .stat-card-inner {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .stat-icon {
-    font-size: 24px;
+    font-size: var(--text-h3-size);
   }
 
   .stat-content {
@@ -620,14 +607,14 @@
   }
 
   .stat-value {
-    font-size: 20px;
-    font-weight: 700;
-    color: #ffffff;
+    font-size: var(--text-h4-size);
+    font-weight: var(--text-h4-weight);
+    color: var(--text-primary);
   }
 
   .stat-label {
-    font-size: 12px;
-    color: #9ca3af;
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
   }
 
   /* Mobile Responsive */

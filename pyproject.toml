@@ -22,6 +22,9 @@ dependencies = [
     "chromadb>=0.4.0",
     # Media processing
     "ffmpeg-python>=0.2.0",
+    "yt-dlp>=2024.8.6",
+    # Cloud processing
+    "modal>=0.64.0",
     # Utilities
     "tqdm>=4.65.0",
     # GUI Framework

@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+
+  // Import design system
+  import '$lib/styles/design-tokens.css';
+  import { StatusIndicator, NavigationLink, IconButton } from '$lib/components';
   
   // Navigation items (YouTube moved to Admin for Cloudflare Zero Trust auth)
   const navItems = [
@@ -12,9 +16,9 @@
   ];
   
   let mobileMenuOpen = false;
-  let systemStatus = 'checking';
+  let systemStatus: 'online' | 'offline' | 'checking' = 'checking';
   let currentTime = new Date().toLocaleString();
-  
+
   onMount(() => {
     const timeInterval = setInterval(() => {
       currentTime = new Date().toLocaleString();
@@ -23,9 +27,9 @@
     const checkStatus = async () => {
       try {
         const response = await fetch('/api/system/status');
-        systemStatus = response.ok ? 'LIVE' : 'OFFLINE';
+        systemStatus = response.ok ? 'online' : 'offline';
       } catch {
-        systemStatus = 'OFFLINE';
+        systemStatus = 'offline';
       }
     };
 
@@ -49,30 +53,33 @@
   <!-- Header Bar -->
   <div class="header-bar">
     <div class="app-title">Face Recognition Dashboard</div>
-    <div class="status-indicator" class:offline={systemStatus === 'OFFLINE'}>
-      {systemStatus}
-    </div>
+    <StatusIndicator status={systemStatus} size="md" />
     <div class="timestamp">{currentTime}</div>
   </div>
 
   <!-- Navigation -->
   <nav class="nav-bar">
     <div class="nav-content">
-      <button class="mobile-menu-button" on:click={toggleMobileMenu} aria-label="Toggle menu">
-        <span class="hamburger"></span>
-      </button>
-      
+      <IconButton
+        variant="ghost"
+        size="md"
+        on:click={toggleMobileMenu}
+        aria-label="Toggle menu"
+        class="mobile-menu-button"
+      >
+        ☰
+      </IconButton>
+
       <div class="nav-links" class:mobile-open={mobileMenuOpen}>
         {#each navItems as item}
-          <a 
-            href={item.href} 
-            class="nav-link"
-            class:active={$page.url.pathname === item.href}
+          <NavigationLink
+            href={item.href}
+            active={$page.url.pathname === item.href}
+            icon={item.icon}
             on:click={closeMobileMenu}
           >
-            <span class="nav-icon">{item.icon}</span>
             {item.label}
-          </a>
+          </NavigationLink>
         {/each}
       </div>
     </div>
@@ -87,108 +94,56 @@
 <style>
   .dashboard-layout {
     min-height: 100vh;
-    background-color: #1a1a1a;
-    color: #ffffff;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     display: flex;
     flex-direction: column;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-sans);
   }
 
   .header-bar {
     height: 60px;
-    background-color: #2a2a2a;
+    background-color: var(--bg-secondary);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
-    border-bottom: 1px solid #444;
+    padding: 0 var(--space-5);
+    border-bottom: 1px solid var(--border-default);
     flex-shrink: 0;
   }
 
   .app-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #ffffff;
-  }
-
-  .status-indicator {
-    background-color: #22c55e;
-    color: #000;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 12px;
-    animation: pulse 2s infinite;
-  }
-
-  .status-indicator.offline {
-    background-color: #ef4444;
-    color: #fff;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    font-size: var(--text-h4-size);
+    font-weight: var(--text-label-weight);
+    color: var(--text-primary);
   }
 
   .timestamp {
-    font-size: 14px;
-    color: #9ca3af;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
   }
 
   .nav-bar {
-    background-color: #374151;
-    border-bottom: 1px solid #444;
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-default);
     flex-shrink: 0;
   }
 
   .nav-content {
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 var(--space-5);
     height: 50px;
   }
 
-  .mobile-menu-button {
+  :global(.mobile-menu-button) {
     display: none;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-    color: #ffffff;
   }
 
   .nav-links {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
     align-items: center;
-  }
-
-  .nav-link {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    text-decoration: none;
-    color: #9ca3af;
-    font-weight: 500;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-
-  .nav-link:hover {
-    background-color: #4b5563;
-    color: #ffffff;
-  }
-
-  .nav-link.active {
-    background-color: #2563eb;
-    color: white;
-  }
-
-  .nav-icon {
-    font-size: 1.1rem;
   }
 
   .main-content {
@@ -200,36 +155,30 @@
 
   /* Mobile Styles */
   @media (max-width: 768px) {
-    .mobile-menu-button {
-      display: block;
+    :global(.mobile-menu-button) {
+      display: inline-flex;
     }
-    
+
     .nav-links {
       position: absolute;
       top: 100%;
       left: 0;
       right: 0;
-      background-color: #374151;
+      background-color: var(--bg-tertiary);
       flex-direction: column;
-      border-bottom: 1px solid #444;
+      border-bottom: 1px solid var(--border-default);
       display: none;
-      z-index: 50;
+      z-index: var(--z-overlay);
     }
-    
+
     .nav-links.mobile-open {
       display: flex;
     }
-    
-    .nav-link {
-      width: 100%;
-      padding: 1rem 1.5rem;
-      border-radius: 0;
-    }
-    
+
     .app-title {
-      font-size: 16px;
+      font-size: var(--text-body-size);
     }
-    
+
     .timestamp {
       display: none;
     }

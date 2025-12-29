@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-
+  import Card from '$lib/components/Card.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Badge from '$lib/components/Badge.svelte';
+  import Input from '$lib/components/Input.svelte';
+  
   // YouTube Queue
   interface YouTubeQueueEntry {
     id: string;
@@ -294,363 +298,1001 @@
 
   <!-- YouTube Ingestion Tab -->
   {#if activeTab === 'youtube'}
-    <div class="panel">
-      <div class="panel-header-row">
-        <div>
-          <h2>Submit YouTube Video</h2>
-          <p class="panel-description">Add a YouTube video URL to the processing queue</p>
-        </div>
-        <a href="/admin/youtube" class="btn btn-primary">
-          Open Enhanced Form
-        </a>
-      </div>
-
-      <form on:submit|preventDefault={submitYouTubeUrl} class="form">
-        <div class="form-group">
-          <label for="youtube-url">YouTube URL *</label>
-          <input
-            id="youtube-url"
-            type="text"
-            bind:value={youtubeUrl}
-            placeholder="https://www.youtube.com/watch?v=..."
-            class="input"
-          />
+    <Card class="panel">
+      <div class="panel-inner">
+        <div class="panel-header-row">
+          <div>
+            <h2>Submit YouTube Video</h2>
+            <p class="panel-description">Add a YouTube video URL to the processing queue</p>
+          </div>
+          <Button href="/admin/youtube" variant="primary">
+            Open Enhanced Form
+          </Button>
         </div>
 
-        <div class="form-group">
-          <label for="video-title">Title (optional)</label>
-          <input
-            id="video-title"
-            type="text"
-            bind:value={videoTitle}
-            placeholder="Custom title for the video"
-            class="input"
-          />
-        </div>
+        <form on:submit|preventDefault={submitYouTubeUrl} class="form">
+          <div class="form-group">
+            <label for="youtube-url">YouTube URL *</label>
+            <Input
+              id="youtube-url"
+              type="text"
+              bind:value={youtubeUrl}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="priority">Priority</label>
-          <select id="priority" bind:value={priority} class="select">
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
+          <div class="form-group">
+            <label for="video-title">Title (optional)</label>
+            <Input
+              id="video-title"
+              type="text"
+              bind:value={videoTitle}
+              placeholder="Custom title for the video"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="priority">Priority</label>
+            <select id="priority" bind:value={priority} class="select">
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <Button type="submit" variant="primary" disabled={loading}>
+            {loading ? 'Submitting...' : 'Add to Queue'}
+          </Button>
+        </form>
+
+        <div class="divider"></div>
+
+        <h3>Processing Queue</h3>
+        <div class="filter-row">
+          <label for="status-filter">Filter by status:</label>
+          <select id="status-filter" bind:value={statusFilter} on:change={loadYouTubeQueue} class="select select-small">
+            <option value="">All</option>
+            <option value="queued">Queued</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
           </select>
+          <Button variant="secondary" size="sm" on:click={loadYouTubeQueue}>Refresh</Button>
         </div>
 
-        <button type="submit" class="btn btn-primary" disabled={loading}>
-          {loading ? 'Submitting...' : 'Add to Queue'}
-        </button>
-      </form>
-
-      <div class="divider"></div>
-
-      <h3>Processing Queue</h3>
-      <div class="filter-row">
-        <label for="status-filter">Filter by status:</label>
-        <select id="status-filter" bind:value={statusFilter} on:change={loadYouTubeQueue} class="select select-small">
-          <option value="">All</option>
-          <option value="queued">Queued</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-        </select>
-        <button class="btn btn-secondary btn-small" on:click={loadYouTubeQueue}>Refresh</button>
-      </div>
-
-      {#if youtubeQueue.length === 0}
-        <p class="empty-message">No videos in queue</p>
-      {:else}
-        <div class="table-container">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Submitted</th>
-                <th>Completed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each youtubeQueue as entry}
+        {#if youtubeQueue.length === 0}
+          <p class="empty-message">No videos in queue</p>
+        {:else}
+          <div class="table-container">
+            <table class="table">
+              <thead>
                 <tr>
-                  <td>
-                    <div class="video-info">
-                      <a href={entry.youtube_url} target="_blank" rel="noopener noreferrer">
-                        {entry.title}
-                      </a>
-                      <span class="video-id">{entry.youtube_video_id}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="status-badge" style="background-color: {getStatusColor(entry.status)}">
-                      {entry.status}
-                    </span>
-                    {#if entry.error}
-                      <span class="error-text" title={entry.error}>Error</span>
-                    {/if}
-                  </td>
-                  <td>{entry.priority}</td>
-                  <td>
-                    <div class="date-info">
-                      {formatDate(entry.submitted_at)}
-                      <span class="submitted-by">by {entry.submitted_by}</span>
-                    </div>
-                  </td>
-                  <td>{formatDate(entry.completed_at)}</td>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Submitted</th>
+                  <th>Completed</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-    </div>
+              </thead>
+              <tbody>
+                {#each youtubeQueue as entry}
+                  <tr>
+                    <td>
+                      <div class="video-info">
+                        <a href={entry.youtube_url} target="_blank" rel="noopener noreferrer">
+                          {entry.title}
+                        </a>
+                        <span class="video-id">{entry.youtube_video_id}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <Badge variant={entry.status === 'completed' ? 'success' : entry.status === 'processing' ? 'primary' : entry.status === 'failed' ? 'error' : 'neutral'} class="status-badge-item">
+                        {entry.status}
+                      </Badge>
+                      {#if entry.error}
+                        <span class="error-text" title={entry.error}>Error</span>
+                      {/if}
+                    </td>
+                    <td>{entry.priority}</td>
+                    <td>
+                      <div class="date-info">
+                        {formatDate(entry.submitted_at)}
+                        <span class="submitted-by">by {entry.submitted_by}</span>
+                      </div>
+                    </td>
+                    <td>{formatDate(entry.completed_at)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </div>
+    </Card>
   {/if}
 
   <!-- Face Flagging Approval Tab -->
   {#if activeTab === 'flagging'}
-    <div class="panel">
-      <h2>Flagged Faces Review</h2>
-      <p class="panel-description">Review and approve/reject user-submitted face corrections</p>
+    <Card class="panel">
+      <div class="panel-inner">
+        <h2>Flagged Faces Review</h2>
+        <p class="panel-description">Review and approve/reject user-submitted face corrections</p>
 
-      <div class="filter-row">
-        <button class="btn btn-secondary btn-small" on:click={loadFlaggedFaces}>Refresh</button>
-        <span class="count-badge">{flaggedFaces.filter(f => f.status === 'pending').length} pending</span>
-      </div>
-
-      {#if flaggedFaces.length === 0}
-        <p class="empty-message">No flagged faces to review</p>
-      {:else}
-        <div class="flags-grid">
-          {#each flaggedFaces as flag}
-            <div class="flag-card">
-              <div class="flag-header">
-                <span class="status-badge" style="background-color: {getStatusColor(flag.status)}">
-                  {flag.status}
-                </span>
-                <span class="flag-id">{flag.id.substring(0, 20)}...</span>
-              </div>
-
-              <!-- Face Thumbnail -->
-              {#if flag.has_thumbnail && thumbnailCache.has(flag.id)}
-                <div class="flag-thumbnail">
-                  <img src={thumbnailCache.get(flag.id)} alt="Face thumbnail" />
-                </div>
-              {:else if flag.has_thumbnail}
-                <div class="flag-thumbnail placeholder">
-                  <span>Loading...</span>
-                </div>
-              {/if}
-
-              <div class="flag-details">
-                <div class="detail-row">
-                  <span class="label">Contestant ID:</span>
-                  <span class="value">{flag.contestant_id}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="label">Video:</span>
-                  <span class="value">{flag.video_id}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="label">Timestamp:</span>
-                  <span class="value">{flag.timestamp?.toFixed(2)}s</span>
-                </div>
-                {#if flag.confidence}
-                  <div class="detail-row">
-                    <span class="label">Confidence:</span>
-                    <span class="value">{(flag.confidence * 100).toFixed(1)}%</span>
-                  </div>
-                {/if}
-                {#if flag.user_label}
-                  <div class="detail-row">
-                    <span class="label">Note:</span>
-                    <span class="value">{flag.user_label}</span>
-                  </div>
-                {/if}
-                <div class="detail-row">
-                  <span class="label">Flagged:</span>
-                  <span class="value">{formatDate(flag.flagged_at)}</span>
-                </div>
-              </div>
-
-              {#if flag.status === 'pending'}
-                <div class="flag-actions">
-                  <button
-                    class="btn btn-success btn-small"
-                    on:click={() => approveFlag(flag.id, 'approve')}
-                    disabled={loading}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    class="btn btn-danger btn-small"
-                    on:click={() => approveFlag(flag.id, 'reject')}
-                    disabled={loading}
-                  >
-                    Reject
-                  </button>
-                </div>
-              {:else}
-                <div class="flag-reviewed">
-                  Reviewed by {flag.reviewed_by} on {formatDate(flag.reviewed_at ?? null)}
-                </div>
-              {/if}
-            </div>
-          {/each}
+        <div class="filter-row">
+          <Button variant="secondary" size="sm" on:click={loadFlaggedFaces}>Refresh</Button>
+          <Badge variant="neutral">{flaggedFaces.filter(f => f.status === 'pending').length} pending</Badge>
         </div>
-      {/if}
-    </div>
+
+        {#if flaggedFaces.length === 0}
+          <p class="empty-message">No flagged faces to review</p>
+        {:else}
+          <div class="flags-grid">
+            {#each flaggedFaces as flag}
+              <Card variant="bordered" class="flag-card-wrapper">
+                <div class="flag-card-inner">
+                  <div class="flag-header">
+                    <Badge variant={flag.status === 'approved' ? 'success' : flag.status === 'pending' ? 'warning' : 'error'} class="status-badge-item">
+                      {flag.status}
+                    </Badge>
+                    <span class="flag-id">{flag.id.substring(0, 20)}...</span>
+                  </div>
+
+                  <!-- Face Thumbnail -->
+                  {#if flag.has_thumbnail && thumbnailCache.has(flag.id)}
+                    <div class="flag-thumbnail">
+                      <img src={thumbnailCache.get(flag.id)} alt="Face thumbnail" />
+                    </div>
+                  {:else if flag.has_thumbnail}
+                    <div class="flag-thumbnail placeholder">
+                      <span>Loading...</span>
+                    </div>
+                  {/if}
+
+                  <div class="flag-details">
+                    <div class="detail-row">
+                      <span class="label">Contestant ID:</span>
+                      <span class="value">{flag.contestant_id}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="label">Video:</span>
+                      <span class="value">{flag.video_id}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="label">Timestamp:</span>
+                      <span class="value">{flag.timestamp?.toFixed(2)}s</span>
+                    </div>
+                    {#if flag.confidence}
+                      <div class="detail-row">
+                        <span class="label">Confidence:</span>
+                        <span class="value">{(flag.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                    {/if}
+                    {#if flag.user_label}
+                      <div class="detail-row">
+                        <span class="label">Note:</span>
+                        <span class="value">{flag.user_label}</span>
+                      </div>
+                    {/if}
+                    <div class="detail-row">
+                      <span class="label">Flagged:</span>
+                      <span class="value">{formatDate(flag.flagged_at)}</span>
+                    </div>
+                  </div>
+
+                  {#if flag.status === 'pending'}
+                    <div class="flag-actions">
+                      <Button
+                        variant="success"
+                        size="sm"
+                        on:click={() => approveFlag(flag.id, 'approve')}
+                        disabled={loading}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        on:click={() => approveFlag(flag.id, 'reject')}
+                        disabled={loading}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  {:else}
+                    <div class="flag-reviewed">
+                      Reviewed by {flag.reviewed_by} on {formatDate(flag.reviewed_at ?? null)}
+                    </div>
+                  {/if}
+                </div>
+              </Card>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </Card>
   {/if}
 
   <!-- Embedding Sync Tab -->
   {#if activeTab === 'embeddings'}
-    <div class="panel">
-      <h2>Embedding Synchronization</h2>
-      <p class="panel-description">Update face embeddings from approved flagged faces</p>
+    <Card class="panel">
+      <div class="panel-inner">
+        <h2>Embedding Synchronization</h2>
+        <p class="panel-description">Update face embeddings from approved flagged faces</p>
 
-      <div class="sync-stats">
-        <div class="stat-card">
-          <div class="stat-value">{flaggedFaces.filter(f => f.status === 'approved').length}</div>
-          <div class="stat-label">Approved Flags</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{flaggedFaces.filter(f => f.status === 'pending').length}</div>
-          <div class="stat-label">Pending Review</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{flaggedFaces.filter(f => f.status === 'rejected').length}</div>
-          <div class="stat-label">Rejected</div>
-        </div>
-      </div>
-
-      <div class="sync-section">
-        <h3>Trigger Embedding Update</h3>
-        <p>This will create a sync job that processes all approved flags and updates the contestant embeddings.</p>
-        <p class="warning-text">After triggering, run: <code>modal run scripts/modal_hf_processor.py --update-embeddings</code></p>
-
-        <button
-          class="btn btn-primary"
-          on:click={triggerEmbeddingSync}
-          disabled={loading || flaggedFaces.filter(f => f.status === 'approved').length === 0}
-        >
-          {loading ? 'Triggering...' : 'Trigger Embedding Sync'}
-        </button>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Embedding Comparison Visualization -->
-      <h3>Embedding Comparison</h3>
-      <p class="panel-description">View flagged face statistics per contestant</p>
-
-      {#if contestantsWithFlags.length === 0}
-        <p class="empty-message">No contestants with flagged faces yet</p>
-      {:else}
-        <div class="comparison-container">
-          <div class="contestant-selector">
-            <label for="contestant-compare">Select Contestant:</label>
-            <select
-              id="contestant-compare"
-              bind:value={selectedContestantForComparison}
-              on:change={() => selectedContestantForComparison && loadEmbeddingComparison(selectedContestantForComparison)}
-              class="select"
-            >
-              <option value={null}>-- Select --</option>
-              {#each contestantsWithFlags as id}
-                <option value={id}>Contestant #{id}</option>
-              {/each}
-            </select>
-          </div>
-
-          {#if loadingComparison}
-            <div class="loading-comparison">Loading comparison data...</div>
-          {:else if comparisonData}
-            <div class="comparison-results">
-              <div class="comparison-header">
-                <h4>Contestant #{comparisonData.contestant_id} - Embedding Analysis</h4>
-              </div>
-
-              <div class="comparison-stats">
-                <div class="comp-stat">
-                  <div class="comp-stat-value">{comparisonData.total_flags}</div>
-                  <div class="comp-stat-label">Total Flags</div>
-                </div>
-                <div class="comp-stat approved">
-                  <div class="comp-stat-value">{comparisonData.approved_count}</div>
-                  <div class="comp-stat-label">Approved</div>
-                </div>
-                <div class="comp-stat pending">
-                  <div class="comp-stat-value">{comparisonData.pending_count}</div>
-                  <div class="comp-stat-label">Pending</div>
-                </div>
-                <div class="comp-stat rejected">
-                  <div class="comp-stat-value">{comparisonData.rejected_count}</div>
-                  <div class="comp-stat-label">Rejected</div>
-                </div>
-              </div>
-
-              <!-- Confidence Distribution Bar -->
-              <div class="confidence-section">
-                <h5>Average Confidence</h5>
-                <div class="confidence-bar-container">
-                  <div
-                    class="confidence-bar"
-                    style="width: {comparisonData.average_confidence * 100}%"
-                  ></div>
-                  <span class="confidence-value">{(comparisonData.average_confidence * 100).toFixed(1)}%</span>
-                </div>
-              </div>
-
-              <!-- Flag Timeline -->
-              {#if comparisonData.flags && comparisonData.flags.length > 0}
-                <div class="flag-timeline-section">
-                  <h5>Flag Timeline</h5>
-                  <div class="flag-timeline">
-                    {#each comparisonData.flags.slice(0, 10) as flag}
-                      <div class="timeline-item">
-                        <span class="timeline-status" style="background-color: {getStatusColor(flag.status)}"></span>
-                        <span class="timeline-video">{flag.video_id}</span>
-                        <span class="timeline-time">@ {flag.timestamp?.toFixed(1)}s</span>
-                        <span class="timeline-conf">{((flag.confidence || 0) * 100).toFixed(0)}%</span>
-                      </div>
-                    {/each}
-                    {#if comparisonData.flags.length > 10}
-                      <p class="more-flags">... and {comparisonData.flags.length - 10} more</p>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-
-              <!-- Embedding Status -->
-              <div class="embedding-status-section">
-                <h5>Embedding Status</h5>
-                <div class="embedding-info">
-                  <div class="info-row">
-                    <span class="info-label">Base Embedding:</span>
-                    <span class="info-value" class:active={comparisonData.embedding_status?.has_base_embedding}>
-                      {comparisonData.embedding_status?.has_base_embedding ? 'Available' : 'Missing'}
-                    </span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">Flag Contributions:</span>
-                    <span class="info-value">{comparisonData.embedding_status?.flag_contributions || 0}</span>
-                  </div>
-                </div>
-              </div>
+        <div class="sync-stats">
+          <Card variant="bordered">
+            <div class="stat-card-content">
+              <div class="stat-value">{flaggedFaces.filter(f => f.status === 'approved').length}</div>
+              <div class="stat-label">Approved Flags</div>
             </div>
-          {/if}
+          </Card>
+          <Card variant="bordered">
+            <div class="stat-card-content">
+              <div class="stat-value">{flaggedFaces.filter(f => f.status === 'pending').length}</div>
+              <div class="stat-label">Pending Review</div>
+            </div>
+          </Card>
+          <Card variant="bordered">
+            <div class="stat-card-content">
+              <div class="stat-value">{flaggedFaces.filter(f => f.status === 'rejected').length}</div>
+              <div class="stat-label">Rejected</div>
+            </div>
+          </Card>
         </div>
-      {/if}
-    </div>
+
+        <Card variant="surface" padding="none">
+          <div class="sync-section-inner">
+            <h3>Trigger Embedding Update</h3>
+            <p>This will create a sync job that processes all approved flags and updates the contestant embeddings.</p>
+            <div class="warning-text">
+              After triggering, run: <code>modal run scripts/modal_hf_processor.py --update-embeddings</code>
+            </div>
+
+            <Button
+              variant="primary"
+              on:click={triggerEmbeddingSync}
+              disabled={loading || flaggedFaces.filter(f => f.status === 'approved').length === 0}
+            >
+              {loading ? 'Triggering...' : 'Trigger Embedding Sync'}
+            </Button>
+          </div>
+        </Card>
+
+        <div class="divider"></div>
+
+        <!-- Embedding Comparison Visualization -->
+        <h3>Embedding Comparison</h3>
+        <p class="panel-description">View flagged face statistics per contestant</p>
+
+        {#if contestantsWithFlags.length === 0}
+          <p class="empty-message">No contestants with flagged faces yet</p>
+        {:else}
+          <div class="comparison-container">
+            <div class="contestant-selector">
+              <label for="contestant-compare">Select Contestant:</label>
+              <select
+                id="contestant-compare"
+                bind:value={selectedContestantForComparison}
+                on:change={() => selectedContestantForComparison && loadEmbeddingComparison(selectedContestantForComparison)}
+                class="select"
+              >
+                <option value={null}>-- Select --</option>
+                {#each contestantsWithFlags as id}
+                  <option value={id}>Contestant #{id}</option>
+                {/each}
+              </select>
+            </div>
+
+            {#if loadingComparison}
+              <div class="loading-comparison">Loading comparison data...</div>
+            {:else if comparisonData}
+              <Card variant="bordered" padding="none">
+                <div class="comparison-results-inner">
+                  <div class="comparison-header">
+                    <h4>Contestant #{comparisonData.contestant_id} - Embedding Analysis</h4>
+                  </div>
+
+                  <div class="comparison-stats">
+                    <div class="comp-stat">
+                      <div class="comp-stat-value">{comparisonData.total_flags}</div>
+                      <div class="comp-stat-label">Total Flags</div>
+                    </div>
+                    <div class="comp-stat approved">
+                      <div class="comp-stat-value">{comparisonData.approved_count}</div>
+                      <div class="comp-stat-label">Approved</div>
+                    </div>
+                    <div class="comp-stat pending">
+                      <div class="comp-stat-value">{comparisonData.pending_count}</div>
+                      <div class="comp-stat-label">Pending</div>
+                    </div>
+                    <div class="comp-stat rejected">
+                      <div class="comp-stat-value">{comparisonData.rejected_count}</div>
+                      <div class="comp-stat-label">Rejected</div>
+                    </div>
+                  </div>
+
+                  <!-- Confidence Distribution Bar -->
+                  <div class="confidence-section">
+                    <h5>Average Confidence</h5>
+                    <div class="confidence-bar-container">
+                      <div
+                        class="confidence-bar"
+                        style="width: {comparisonData.average_confidence * 100}%"
+                      ></div>
+                      <span class="confidence-value">{(comparisonData.average_confidence * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  <!-- Flag Timeline -->
+                  {#if comparisonData.flags && comparisonData.flags.length > 0}
+                    <div class="flag-timeline-section">
+                      <h5>Flag Timeline</h5>
+                      <div class="flag-timeline">
+                        {#each comparisonData.flags.slice(0, 10) as flag}
+                          <div class="timeline-item">
+                            <span class="timeline-status" style="background-color: {getStatusColor(flag.status)}"></span>
+                            <span class="timeline-video">{flag.video_id}</span>
+                            <span class="timeline-time">@ {flag.timestamp?.toFixed(1)}s</span>
+                            <span class="timeline-conf">{((flag.confidence || 0) * 100).toFixed(0)}%</span>
+                          </div>
+                        {/each}
+                        {#if comparisonData.flags.length > 10}
+                          <p class="more-flags">... and {comparisonData.flags.length - 10} more</p>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+
+                  <!-- Embedding Status -->
+                  <div class="embedding-status-section">
+                    <h5>Embedding Status</h5>
+                    <div class="embedding-info">
+                      <div class="info-row">
+                        <span class="info-label">Base Embedding:</span>
+                        <span class="info-value" class:active={comparisonData.embedding_status?.has_base_embedding}>
+                          {comparisonData.embedding_status?.has_base_embedding ? 'Available' : 'Missing'}
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Flag Contributions:</span>
+                        <span class="info-value">{comparisonData.embedding_status?.flag_contributions || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    </Card>
   {/if}
 </div>
 
 <style>
   .admin-container {
-    padding: 20px;
+    padding: var(--space-5);
     max-width: 1200px;
     margin: 0 auto;
   }
+
+  .admin-header {
+    margin-bottom: var(--space-6);
+  }
+
+  .admin-header h1 {
+    font-size: var(--text-h2-size);
+    font-weight: var(--text-h2-weight);
+    margin: 0 0 var(--space-2) 0;
+    color: var(--text-primary);
+  }
+
+  .admin-description {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+  }
+
+  .alert-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    border: var(--space-px) solid var(--color-error-500);
+    color: var(--color-error-300);
+  }
+
+  .alert-success {
+    background-color: rgba(34, 197, 94, 0.2);
+    border: var(--space-px) solid var(--color-success-500);
+    color: var(--color-success-300);
+  }
+
+  .alert-icon {
+    font-weight: var(--text-h6-weight);
+    padding: var(--space-0-5) var(--space-2);
+    border-radius: var(--radius-sm);
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .alert-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .tabs {
+    display: flex;
+    gap: var(--space-1);
+    margin-bottom: var(--space-5);
+    border-bottom: var(--space-px) solid var(--border-default);
+    padding-bottom: var(--space-1);
+  }
+
+  .tab {
+    padding: var(--space-3) var(--space-5);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: var(--text-body-sm-size);
+    font-weight: var(--text-label-weight);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: all var(--duration-normal);
+  }
+
+  .tab:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-tertiary);
+  }
+
+  .tab.active {
+    color: var(--text-primary);
+    background-color: var(--color-primary-600);
+  }
+
+  .panel-inner h2 {
+    font-size: var(--text-h4-size);
+    font-weight: var(--text-h4-weight);
+    margin: 0 0 var(--space-2) 0;
+    color: var(--text-primary);
+  }
+
+  .panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-5);
+    gap: var(--space-4);
+  }
+
+  .panel-header-row .btn {
+    white-space: nowrap;
+  }
+
+  .panel-inner h3 {
+    font-size: var(--text-body-size);
+    font-weight: var(--text-h6-weight);
+    margin: var(--space-5) 0 var(--space-3) 0;
+    color: var(--text-primary);
+  }
+
+  .panel-description {
+    color: var(--text-secondary);
+    margin: 0 0 var(--space-5) 0;
+    font-size: var(--text-body-sm-size);
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 500px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+  }
+
+  .form-group label {
+    font-size: var(--text-body-sm-size);
+    font-weight: var(--text-label-weight);
+    color: var(--text-secondary);
+  }
+
+  .select {
+    padding: var(--space-2-5) var(--space-3-5);
+    border: var(--space-px) solid var(--border-default);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: var(--text-body-sm-size);
+  }
+
+  .select:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: var(--focus-ring);
+  }
+
+  .select-small {
+    padding: var(--space-1-5) var(--space-2-5);
+    font-size: var(--text-body-xs-size);
+  }
+
+  .divider {
+    height: var(--space-px);
+    background-color: var(--border-subtle);
+    margin: var(--space-6) 0;
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .filter-row label {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+  }
+
+  .count-badge {
+    background-color: var(--bg-tertiary);
+    padding: var(--space-1) var(--space-2-5);
+    border-radius: var(--radius-full);
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
+  }
+
+  .empty-message {
+    color: var(--text-disabled);
+    text-align: center;
+    padding: var(--space-10);
+    font-style: italic;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    border-radius: var(--radius-lg);
+    border: var(--space-px) solid var(--border-subtle);
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-body-sm-size);
+  }
+
+  .table th, .table td {
+    padding: var(--space-3);
+    text-align: left;
+    border-bottom: var(--space-px) solid var(--border-subtle);
+  }
+
+  .table th {
+    font-weight: var(--text-h6-weight);
+    color: var(--text-secondary);
+    background-color: var(--bg-tertiary);
+  }
+
+  .table td {
+    color: var(--text-primary);
+  }
+
+  .table tr:hover {
+    background-color: var(--bg-elevated);
+  }
+
+  .video-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .video-info a {
+    color: var(--color-primary-400);
+    text-decoration: none;
+  }
+
+  .video-info a:hover {
+    text-decoration: underline;
+  }
+
+  .video-id {
+    font-size: var(--text-body-xs-size);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+  }
+
+  .status-badge-item {
+    text-transform: capitalize;
+  }
+
+  .error-text {
+    color: var(--color-error-500);
+    font-size: var(--text-body-xs-size);
+    margin-left: var(--space-2);
+  }
+
+  .date-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .submitted-by {
+    font-size: var(--text-body-xs-size);
+    color: var(--text-tertiary);
+  }
+
+  .flags-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .flag-card-inner {
+    padding: var(--space-4);
+  }
+
+  .flag-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+
+  .flag-id {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+  }
+
+  .flag-thumbnail {
+    width: 100%;
+    height: 120px;
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: var(--space-px) solid var(--border-subtle);
+  }
+
+  .flag-thumbnail img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+  }
+
+  .flag-thumbnail.placeholder {
+    color: var(--text-disabled);
+    font-size: var(--text-body-xs-size);
+  }
+
+  .flag-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .detail-row {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .detail-row .label {
+    color: var(--text-secondary);
+    font-size: var(--text-body-xs-size);
+    min-width: 100px;
+  }
+
+  .detail-row .value {
+    color: var(--text-primary);
+    font-size: var(--text-body-xs-size);
+    font-weight: var(--text-label-weight);
+  }
+
+  .flag-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .flag-reviewed {
+    font-size: var(--text-body-xs-size);
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  .sync-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .stat-card-content {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: var(--text-h2-size);
+    font-weight: var(--text-h2-weight);
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+  }
+
+  .stat-label {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+  }
+
+  .sync-section-inner {
+    padding: var(--space-5);
+  }
+
+  .sync-section-inner h3 {
+    margin-top: 0;
+  }
+
+  .sync-section-inner p {
+    color: var(--text-secondary);
+    font-size: var(--text-body-sm-size);
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .warning-text {
+    background-color: rgba(245, 158, 11, 0.1);
+    border: var(--space-px) solid var(--color-warning-500);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-warning-300);
+    margin-bottom: var(--space-4);
+  }
+
+  .warning-text code {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: var(--space-0-5) var(--space-1-5);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-body-xs-size);
+  }
+
+  .comparison-container {
+    margin-top: var(--space-4);
+  }
+
+  .contestant-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+
+  .contestant-selector label {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+  }
+
+  .loading-comparison {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: var(--space-10);
+  }
+
+  .comparison-results-inner {
+    padding: var(--space-5);
+  }
+
+  .comparison-header h4 {
+    margin: 0 0 var(--space-4) 0;
+    color: var(--text-primary);
+    font-size: var(--text-h5-size);
+  }
+
+  .comparison-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+
+  .comp-stat {
+    background-color: var(--bg-primary);
+    border: var(--space-px) solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    text-align: center;
+  }
+
+  .comp-stat-value {
+    font-size: var(--text-h4-size);
+    font-weight: var(--text-h4-weight);
+    color: var(--text-primary);
+  }
+
+  .comp-stat-label {
+    font-size: var(--text-body-xs-size);
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+  }
+
+  .comp-stat.approved .comp-stat-value { color: var(--color-success-500); }
+  .comp-stat.pending .comp-stat-value { color: var(--color-warning-500); }
+  .comp-stat.rejected .comp-stat-value { color: var(--color-error-500); }
+
+  .confidence-section {
+    margin-bottom: var(--space-5);
+  }
+
+  .confidence-section h5 {
+    margin: 0 0 var(--space-2) 0;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-primary);
+  }
+
+  .confidence-bar-container {
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    height: 32px;
+    position: relative;
+    overflow: hidden;
+    border: var(--space-px) solid var(--border-subtle);
+  }
+
+  .confidence-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-success-600), var(--color-success-400));
+    border-radius: var(--radius-md);
+    transition: width var(--duration-normal) var(--ease-in-out);
+  }
+
+  .confidence-value {
+    position: absolute;
+    right: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: var(--text-label-weight);
+    color: var(--text-primary);
+    font-size: var(--text-body-sm-size);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  .flag-timeline-section {
+    margin-bottom: var(--space-5);
+  }
+
+  .flag-timeline-section h5 {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-primary);
+  }
+
+  .flag-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    font-size: var(--text-body-xs-size);
+    border: var(--space-px) solid var(--border-subtle);
+  }
+
+  .timeline-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .timeline-video {
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .timeline-time {
+    color: var(--text-secondary);
+  }
+
+  .timeline-conf {
+    color: var(--color-primary-400);
+    font-weight: var(--text-label-weight);
+  }
+
+  .more-flags {
+    color: var(--text-disabled);
+    font-size: var(--text-body-xs-size);
+    text-align: center;
+    margin: var(--space-2) 0 0 0;
+  }
+
+  .embedding-status-section h5 {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-primary);
+  }
+
+  .embedding-info {
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    border: var(--space-px) solid var(--border-subtle);
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+    border-bottom: var(--space-px) solid var(--border-subtle);
+  }
+
+  .info-row:last-child {
+    border-bottom: none;
+  }
+
+  .info-label {
+    color: var(--text-secondary);
+    font-size: var(--text-body-xs-size);
+  }
+
+  .info-value {
+    color: var(--text-primary);
+    font-size: var(--text-body-xs-size);
+    font-weight: var(--text-label-weight);
+  }
+
+  .info-value.active {
+    color: var(--color-success-500);
+  }
+
+  @media (max-width: 768px) {
+    .admin-container {
+      padding: var(--space-3);
+    }
+
+    .tabs {
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      padding: var(--space-2-5) var(--space-3);
+      font-size: var(--text-body-xs-size);
+    }
+
+    .sync-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .flags-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
 
   .admin-header {
     margin-bottom: 24px;
@@ -955,13 +1597,48 @@
 
   .status-badge {
     display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-body-xs-size);
+    font-weight: var(--text-label-weight);
     color: white;
     text-transform: capitalize;
   }
+
+  .flag-card {
+    background-color: var(--bg-tertiary);
+    border: var(--space-px) solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+  }
+
+  .sync-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .sync-section {
+    background-color: var(--bg-tertiary);
+    border: var(--space-px) solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+  }
+
+  .sync-section p {
+    color: var(--text-secondary);
+    font-size: var(--text-body-sm-size);
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .comparison-results {
+    background-color: var(--bg-tertiary);
+    border: var(--space-px) solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+  }
+
 
   .error-text {
     color: #ef4444;

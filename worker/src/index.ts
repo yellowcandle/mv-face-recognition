@@ -634,6 +634,27 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
       }
       break;
 
+    case '/admin/youtube/samples':
+    case '/admin/youtube/samples/':
+      if (request.method === 'GET') {
+        return await handleYoutubeSamples(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/youtube/validate':
+    case '/admin/youtube/validate/':
+      if (request.method === 'POST') {
+        return await handleYoutubeValidate(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/youtube/bootstrap':
+    case '/admin/youtube/bootstrap/':
+      if (request.method === 'POST') {
+        return await handleYoutubeBootstrap(request, env, corsHeaders);
+      }
+      break;
+
     default:
       // Handle dynamic routes
       if (path.startsWith('/videos/metadata/dense/')) {
@@ -1312,6 +1333,230 @@ async function handleYoutubeStatus(request: Request, env: Env, corsHeaders: Cors
     const err = error as Error;
     logger.error('YouTube status update error', { error: err.message });
     return new Response(JSON.stringify({ error: 'Failed to update status', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleYoutubeSamples(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const queueId = url.searchParams.get('queue_id');
+
+    if (!queueId) {
+      return new Response(JSON.stringify({ error: 'Missing required parameter: queue_id' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Get detections from KV storage (uploaded from Modal after processing)
+    const detectionsStr = await env.METADATA_KV.get(`youtube_detections_${queueId}`);
+    if (!detectionsStr) {
+      return new Response(JSON.stringify({
+        error: 'No samples found',
+        message: 'Video may not have been processed yet'
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const detections = JSON.parse(detectionsStr);
+
+    // Get validation status for each detection
+    const validationsStr = await env.METADATA_KV.get(`youtube_validations_${queueId}`) || '{}';
+    const validations = JSON.parse(validationsStr);
+
+    // Merge validation data with detections
+    const samplesWithValidation = detections.map((detection: any, index: number) => ({
+      ...detection,
+      sample_id: `${queueId}_${index}`,
+      validation: validations[index] || null,
+    }));
+
+    logger.info(`Retrieved YouTube samples`, { queueId, count: samplesWithValidation.length });
+
+    return new Response(JSON.stringify({
+      success: true,
+      queue_id: queueId,
+      samples: samplesWithValidation,
+      total: samplesWithValidation.length,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('YouTube samples retrieval error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to retrieve samples', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleYoutubeValidate(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const data = await request.json() as {
+      queue_id?: string;
+      sample_id?: string;
+      is_correct?: boolean;
+      correct_contestant_id?: string;
+      notes?: string;
+    };
+
+    const { queue_id, sample_id, is_correct, correct_contestant_id, notes } = data;
+
+    if (!queue_id || !sample_id || is_correct === undefined) {
+      return new Response(JSON.stringify({
+        error: 'Missing required fields: queue_id, sample_id, is_correct'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Parse sample_id to get index
+    const sampleIndex = parseInt(sample_id.split('_').pop() || '0');
+
+    // Get existing validations
+    const validationsStr = await env.METADATA_KV.get(`youtube_validations_${queue_id}`) || '{}';
+    const validations = JSON.parse(validationsStr);
+
+    // Add/update validation
+    validations[sampleIndex] = {
+      is_correct,
+      correct_contestant_id: is_correct ? null : correct_contestant_id,
+      notes,
+      validated_by: accessResult.email,
+      validated_at: new Date().toISOString(),
+    };
+
+    // Save back to KV
+    await env.METADATA_KV.put(`youtube_validations_${queue_id}`, JSON.stringify(validations));
+
+    logger.info(`YouTube sample validated`, {
+      queue_id,
+      sample_id,
+      is_correct,
+      email: accessResult.email
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Validation recorded',
+      validation: validations[sampleIndex],
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('YouTube validation error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to record validation', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleYoutubeBootstrap(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const data = await request.json() as {
+      queue_id?: string;
+      use_supplied_photos?: boolean;
+    };
+
+    const { queue_id, use_supplied_photos = true } = data;
+
+    if (!queue_id) {
+      return new Response(JSON.stringify({ error: 'Missing required field: queue_id' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Get validations
+    const validationsStr = await env.METADATA_KV.get(`youtube_validations_${queue_id}`);
+    if (!validationsStr) {
+      return new Response(JSON.stringify({
+        error: 'No validations found',
+        message: 'Please validate some faces first'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const validations = JSON.parse(validationsStr);
+    const validatedCount = Object.keys(validations).length;
+
+    // Create bootstrap job metadata
+    const bootstrapJob = {
+      id: `bootstrap_${queue_id}_${Date.now()}`,
+      queue_id,
+      use_supplied_photos,
+      validated_samples: validatedCount,
+      status: 'queued',
+      created_by: accessResult.email,
+      created_at: new Date().toISOString(),
+    };
+
+    // Store bootstrap job
+    await env.METADATA_KV.put(`bootstrap_job_${bootstrapJob.id}`, JSON.stringify(bootstrapJob));
+
+    // Add to bootstrap queue
+    const bootstrapQueueStr = await env.METADATA_KV.get('bootstrap_queue_index') || '[]';
+    const bootstrapQueue = JSON.parse(bootstrapQueueStr) as string[];
+    bootstrapQueue.push(bootstrapJob.id);
+    await env.METADATA_KV.put('bootstrap_queue_index', JSON.stringify(bootstrapQueue));
+
+    logger.info(`Bootstrap job created`, {
+      job_id: bootstrapJob.id,
+      queue_id,
+      validated_samples: validatedCount
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Bootstrap job queued',
+      job: bootstrapJob,
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('YouTube bootstrap error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to create bootstrap job', message: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
