@@ -26,16 +26,22 @@ Usage:
     dataset.download_to_modal_volume()
 """
 
-import os
 import json
+import logging
+import os
 import shutil
 import tempfile
-from pathlib import Path
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
-    from huggingface_hub import HfApi, hf_hub_download, snapshot_download, upload_file, upload_folder
+    from huggingface_hub import (
+        HfApi,
+        hf_hub_download,
+        snapshot_download,
+        upload_file,
+    )
     HF_AVAILABLE = True
 except ImportError:
     HF_AVAILABLE = False
@@ -45,6 +51,9 @@ try:
     NP_AVAILABLE = True
 except ImportError:
     NP_AVAILABLE = False
+
+
+logger = logging.getLogger(__name__)
 
 
 class HuggingFaceDataset:
@@ -128,10 +137,10 @@ class HuggingFaceDataset:
                     private=False,
                     exist_ok=True,
                 )
-                print(f"✅ Created HuggingFace repository: {self.repo_id}")
+                logger.info(f"✅ Created HuggingFace repository: {self.repo_id}")
                 return True
             except Exception as e:
-                print(f"❌ Failed to create repository: {e}")
+                logger.info(f"❌ Failed to create repository: {e}")
                 return False
 
     def upload_contestant_data(
@@ -150,7 +159,7 @@ class HuggingFaceDataset:
             True if upload successful
         """
         if not os.path.exists(csv_path):
-            print(f"❌ Contestant CSV not found: {csv_path}")
+            logger.info(f"❌ Contestant CSV not found: {csv_path}")
             return False
 
         try:
@@ -178,11 +187,11 @@ class HuggingFaceDataset:
                     token=self.token,
                 )
 
-            print(f"✅ Uploaded contestant data to {self.repo_id}")
+            logger.info(f"✅ Uploaded contestant data to {self.repo_id}")
             return True
 
         except Exception as e:
-            print(f"❌ Failed to upload contestant data: {e}")
+            logger.info(f"❌ Failed to upload contestant data: {e}")
             return False
 
     def upload_embeddings(
@@ -203,7 +212,7 @@ class HuggingFaceDataset:
         if not NP_AVAILABLE:
             raise ImportError("numpy is required for embedding upload")
 
-        stats = {
+        stats: Dict[str, Any] = {
             "uploaded": 0,
             "failed": 0,
             "skipped": 0,
@@ -212,13 +221,13 @@ class HuggingFaceDataset:
 
         embeddings_path = Path(embeddings_dir)
         if not embeddings_path.exists():
-            print(f"❌ Embeddings directory not found: {embeddings_dir}")
+            logger.info(f"❌ Embeddings directory not found: {embeddings_dir}")
             return stats
 
         # Find all embedding files
         embedding_files = list(embeddings_path.rglob("*_embedding.npy"))
 
-        print(f"📦 Found {len(embedding_files)} embedding files to upload")
+        logger.info(f"📦 Found {len(embedding_files)} embedding files to upload")
 
         for embedding_file in embedding_files:
             try:
@@ -239,14 +248,14 @@ class HuggingFaceDataset:
                 )
 
                 stats["uploaded"] += 1
-                print(f"  ✅ Uploaded: {remote_path}")
+                logger.info(f"  ✅ Uploaded: {remote_path}")
 
             except Exception as e:
                 stats["failed"] += 1
                 stats["errors"].append({"file": str(embedding_file), "error": str(e)})
-                print(f"  ❌ Failed: {embedding_file} - {e}")
+                logger.info(f"  ❌ Failed: {embedding_file} - {e}")
 
-        print(f"\n📊 Upload Summary: {stats['uploaded']} uploaded, {stats['failed']} failed")
+        logger.info(f"\n📊 Upload Summary: {stats['uploaded']} uploaded, {stats['failed']} failed")
         return stats
 
     def upload_flagged_face(
@@ -279,7 +288,7 @@ class HuggingFaceDataset:
         if not NP_AVAILABLE:
             raise ImportError("numpy is required for flagged face upload")
 
-        result = {
+        result: Dict[str, Any] = {
             "success": False,
             "face_id": None,
             "error": None,
@@ -335,14 +344,14 @@ class HuggingFaceDataset:
                 )
 
             result["success"] = True
-            print(f"✅ Uploaded flagged face: {face_id}")
+            logger.info(f"✅ Uploaded flagged face: {face_id}")
 
             # Clean up temp files
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ Failed to upload flagged face: {e}")
+            logger.info(f"❌ Failed to upload flagged face: {e}")
 
         return result
 
@@ -363,7 +372,7 @@ class HuggingFaceDataset:
         Returns:
             Dictionary with download statistics
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "downloaded_files": 0,
             "total_size_mb": 0,
             "errors": [],
@@ -399,11 +408,11 @@ class HuggingFaceDataset:
                     stats["downloaded_files"] += 1
                     stats["total_size_mb"] += os.path.getsize(file_path) / (1024 * 1024)
 
-            print(f"✅ Downloaded {stats['downloaded_files']} files ({stats['total_size_mb']:.2f} MB)")
+            logger.info(f"✅ Downloaded {stats['downloaded_files']} files ({stats['total_size_mb']:.2f} MB)")
 
         except Exception as e:
             stats["errors"].append(str(e))
-            print(f"❌ Download failed: {e}")
+            logger.info(f"❌ Download failed: {e}")
 
         return stats
 
@@ -420,7 +429,7 @@ class HuggingFaceDataset:
         Returns:
             Dictionary with download result
         """
-        result = {
+        result: Dict[str, Any] = {
             "success": False,
             "files_downloaded": 0,
             "paths": {},
@@ -465,11 +474,11 @@ class HuggingFaceDataset:
             result["paths"]["embeddings_dir"] = f"{volume_path}/source/photo/contestants"
             result["success"] = True
 
-            print(f"✅ Downloaded dataset to Modal volume: {result['files_downloaded']} files")
+            logger.info(f"✅ Downloaded dataset to Modal volume: {result['files_downloaded']} files")
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ Failed to download to Modal volume: {e}")
+            logger.info(f"❌ Failed to download to Modal volume: {e}")
 
         return result
 
@@ -520,7 +529,7 @@ class HuggingFaceDataset:
                     flagged_faces.append(metadata)
 
         except Exception as e:
-            print(f"❌ Failed to get flagged faces: {e}")
+            logger.info(f"❌ Failed to get flagged faces: {e}")
 
         return flagged_faces
 
@@ -547,7 +556,7 @@ class HuggingFaceDataset:
         if not NP_AVAILABLE:
             raise ImportError("numpy is required for embedding update")
 
-        result = {
+        result: Dict[str, Any] = {
             "success": False,
             "original_embedding": None,
             "flagged_count": 0,
@@ -575,7 +584,7 @@ class HuggingFaceDataset:
                 base_embedding = np.load(base_path)
                 result["original_embedding"] = base_path
             except Exception:
-                print(f"⚠️ No base embedding found for contestant {contestant_id}")
+                logger.info(f"⚠️ No base embedding found for contestant {contestant_id}")
 
             # Collect flagged embeddings
             flagged_embeddings = []
@@ -591,7 +600,7 @@ class HuggingFaceDataset:
                     emb = np.load(emb_path)
                     flagged_embeddings.append(emb)
                 except Exception as e:
-                    print(f"⚠️ Failed to load embedding for {face_id}: {e}")
+                    logger.info(f"⚠️ Failed to load embedding for {face_id}: {e}")
 
             if len(flagged_embeddings) == 0:
                 result["error"] = "Could not load any flagged embeddings"
@@ -631,11 +640,11 @@ class HuggingFaceDataset:
             )
 
             result["success"] = True
-            print(f"✅ Updated embedding for contestant {contestant_id} with {len(flagged_embeddings)} flagged faces")
+            logger.info(f"✅ Updated embedding for contestant {contestant_id} with {len(flagged_embeddings)} flagged faces")
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ Failed to update embeddings: {e}")
+            logger.info(f"❌ Failed to update embeddings: {e}")
 
         return result
 
@@ -654,7 +663,7 @@ class HuggingFaceDataset:
         Returns:
             Dictionary with upload result
         """
-        result = {
+        result: Dict[str, Any] = {
             "success": False,
             "video_url": None,
             "error": None,
@@ -688,11 +697,11 @@ class HuggingFaceDataset:
                 )
 
             result["success"] = True
-            print(f"✅ Uploaded processed video: {video_filename}")
+            logger.info(f"✅ Uploaded processed video: {video_filename}")
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ Failed to upload video: {e}")
+            logger.info(f"❌ Failed to upload video: {e}")
 
         return result
 

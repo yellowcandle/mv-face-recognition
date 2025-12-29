@@ -40,7 +40,7 @@
   let videoMetadata: any = null;
 
   // Polling interval for face detection
-  let facePollingInterval: number | null = null;
+  let facePollingInterval: ReturnType<typeof setInterval> | null = null;
 
   async function loadVideos() {
     try {

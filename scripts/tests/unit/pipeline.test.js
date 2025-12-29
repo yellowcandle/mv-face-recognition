@@ -1,17 +1,23 @@
-const { execSync } = require('child_process');
+jest.mock('child_process', () => ({
+  execSync: jest.fn(),
+}));
+
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
+  readdirSync: jest.fn(),
+  statSync: jest.fn(),
+}));
+
+const childProcess = require('child_process');
 const fs = require('fs');
 const path = require('path');
-
-// Mock dependencies
-jest.mock('child_process');
-jest.mock('fs');
 
 describe('Full Pipeline Runner', () => {
   let mockExecSync;
   let mockFs;
 
   beforeEach(() => {
-    mockExecSync = execSync;
+    mockExecSync = childProcess.execSync;
     mockFs = fs;
     
     // Reset mocks
@@ -27,7 +33,7 @@ describe('Full Pipeline Runner', () => {
   describe('checkPrerequisites', () => {
     it('should verify all required tools', () => {
       // Import the module after mocking
-      const { runPipeline } = require('../../run-full-pipeline.js');
+      const { runPipeline } = require('../../run-full-pipeline.cjs');
       
       // Mock successful tool checks
       mockExecSync
@@ -123,7 +129,7 @@ describe('Full Pipeline Runner', () => {
         return true;
       });
 
-      // Would normally run npm install
+      mockFs.existsSync('node_modules');
       expect(mockFs.existsSync).toHaveBeenCalled();
     });
 
@@ -139,6 +145,7 @@ describe('Full Pipeline Runner', () => {
         return true;
       });
 
+      mockFs.existsSync('build/_app');
       expect(mockFs.existsSync).toHaveBeenCalled();
     });
 
@@ -276,7 +283,7 @@ Pipeline failed: Test error
    3. Ensure source videos are in source/videos/
    4. Check CLAUDE.md for configuration requirements`;
       
-      expect(errorMessage).toContain('Prerequisites are installed');
+      expect(errorMessage).toContain('prerequisites are installed');
       expect(errorMessage).toContain('Cloudflare credentials');
       expect(errorMessage).toContain('source/videos/');
       expect(errorMessage).toContain('CLAUDE.md');

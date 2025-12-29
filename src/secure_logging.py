@@ -4,7 +4,6 @@ Provides sanitized logging that protects sensitive information.
 """
 
 import logging
-import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 

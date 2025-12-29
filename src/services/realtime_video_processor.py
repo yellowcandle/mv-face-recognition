@@ -6,12 +6,13 @@ Designed for generating comprehensive metadata for smooth video player synchroni
 import json
 import logging
 import time
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, List, Optional
+
 import cv2
 import numpy as np
-from datetime import datetime
-from collections import defaultdict
 from tqdm import tqdm
 
 from src.core.face_detector import FaceDetector
@@ -466,15 +467,15 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python realtime_video_processor.py <video_path>")
+        logger.info("Usage: python realtime_video_processor.py <video_path>")
         sys.exit(1)
 
     video_path = sys.argv[1]
     result = create_dense_metadata_for_video(video_path)
 
     if result["success"]:
-        print("Dense processing completed successfully!")
-        print(f"Metadata saved to: {result['metadata_file']}")
-        print(f"Processing stats: {result['processing_stats']}")
+        logger.info("Dense processing completed successfully!")
+        logger.info(f"Metadata saved to: {result['metadata_file']}")
+        logger.info(f"Processing stats: {result['processing_stats']}")
     else:
-        print(f"Processing failed: {result['error']}")
+        logger.info(f"Processing failed: {result['error']}")

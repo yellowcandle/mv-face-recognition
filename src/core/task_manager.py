@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 from enum import Enum
 
@@ -35,8 +35,8 @@ class Task:
         description: str = "",
         priority: TaskPriority = TaskPriority.MEDIUM,
         status: TaskStatus = TaskStatus.PENDING,
-        dependencies: List[str] = None,
-        metadata: Dict[str, Any] = None,
+        dependencies: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         self.task_id = task_id
         self.name = name
@@ -64,7 +64,7 @@ class Task:
             )
             return False
 
-    def complete(self, result: Dict[str, Any] = None):
+    def complete(self, result: Optional[Dict[str, Any]] = None):
         """Complete the task"""
         if self.status == TaskStatus.ACTIVE:
             self.status = TaskStatus.COMPLETED
@@ -180,8 +180,8 @@ class TaskManager:
         name: str,
         description: str = "",
         priority: TaskPriority = TaskPriority.MEDIUM,
-        dependencies: List[str] = None,
-        metadata: Dict[str, Any] = None,
+        dependencies: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Create a new task"""
         task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.tasks)}"
@@ -223,7 +223,7 @@ class TaskManager:
         return False
 
     def activate_tasks(
-        self, task_ids: List[str] = None, filters: Dict[str, Any] = None
+        self, task_ids: Optional[List[str]] = None, filters: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """Activate multiple tasks"""
         activated = []
@@ -249,7 +249,7 @@ class TaskManager:
         logger.info(f"Activated {len(activated)} tasks")
         return activated
 
-    def complete_task(self, task_id: str, result: Dict[str, Any] = None) -> bool:
+    def complete_task(self, task_id: str, result: Optional[Dict[str, Any]] = None) -> bool:
         """Complete a task"""
         if task_id not in self.tasks:
             logger.error(f"Task ID '{task_id}' not found")
@@ -268,7 +268,7 @@ class TaskManager:
         return list(self.active_tasks.values())
 
     def get_tasks(
-        self, status: TaskStatus = None, priority: TaskPriority = None
+        self, status: Optional[TaskStatus] = None, priority: Optional[TaskPriority] = None
     ) -> List[Task]:
         """Get tasks with optional filtering"""
         tasks = list(self.tasks.values())
