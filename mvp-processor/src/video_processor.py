@@ -8,8 +8,14 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, Generator, List
 
-# from moviepy.editor import VideoFileClip  # Temporarily disabled
 import logging
+
+from src.exceptions import (
+    VideoProcessingError,
+    VideoNotFoundError,
+    CorruptedVideoError,
+    FrameExtractionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -139,9 +145,15 @@ class VideoProcessor:
         Yields:
             Tuple of (frame, timestamp)
         """
+        if not Path(video_path).exists():
+            raise VideoNotFoundError(video_path)
+            
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise ValueError(f"Could not open video file: {video_path}")
+            raise CorruptedVideoError(
+                "Could not open video file (may be corrupted or unsupported format)",
+                video_path=video_path
+            )
 
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_interval = int(fps / self.fps_sample_rate)
@@ -377,9 +389,15 @@ class VideoProcessor:
         thumbnail_width = self.config.get("thumbnails", {}).get("width", 320)
         thumbnail_quality = self.config.get("thumbnails", {}).get("quality", 85)
 
+        if not Path(video_path).exists():
+            raise VideoNotFoundError(video_path)
+            
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise ValueError(f"Could not open video file: {video_path}")
+            raise CorruptedVideoError(
+                "Could not open video file for thumbnails",
+                video_path=video_path
+            )
 
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_duration = cap.get(cv2.CAP_PROP_FRAME_COUNT) / fps

@@ -5,7 +5,7 @@ Face detection module with pluggable backends (production-like skeletons and saf
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 
 # Attempt to import InsightFace; provide a safe mock fallback if unavailable
@@ -112,7 +112,7 @@ class InsightFaceBackend(DetectorBackend):
             embedding = r.get("embedding") if isinstance(r, dict) else None
 
             faces_out.append(
-                DetectedFace(bbox=bb, confidence=conf, embedding=embedding)
+                DetectedFace(bbox=BoundingBox(bb.x, bb.y, bb.width, bb.height, conf), embedding=None, metadata={"embedding": embedding})
             )
 
         return faces_out
@@ -123,7 +123,7 @@ class MockBackend(DetectorBackend):
 
     def detect(self, image: Any) -> List[DetectedFace]:
         bb = BoundingBox(0, 0, 1, 1, 0.99)
-        df = DetectedFace(bbox=bb, confidence=0.99, embedding=None)
+        df = DetectedFace(bbox=bb, embedding=None)
         return [df]
 
 
@@ -158,9 +158,42 @@ class FaceDetector:
     def detect(self, image: Any, confidence: Optional[float] = None) -> List[DetectedFace]:
         if self._backend is None:
             self._ensure_backend()
-        result = self._backend.detect(image)
+
+        backend = self._backend
+        if backend is None:
+            return []
+
+        result = backend.detect(image)
         threshold = confidence if confidence is not None else self.confidence_threshold
-        return [f for f in result if f.confidence >= threshold]
+        return [f for f in result if f.bbox.confidence >= threshold]
+
+    def detect_faces(self, image: Any, confidence: Optional[float] = None) -> List[Dict[str, Any]]:
+        faces = self.detect(image, confidence=confidence)
+        out: List[Dict[str, Any]] = []
+        for face in faces:
+            embedding = None
+            if face.metadata is not None:
+                embedding = face.metadata.get("embedding")
+
+            out.append(
+                {
+                    "bbox": [
+                        float(face.bbox.x),
+                        float(face.bbox.y),
+                        float(face.bbox.width),
+                        float(face.bbox.height),
+                    ],
+                    "confidence": float(face.bbox.confidence),
+                    "embedding": embedding,
+                }
+            )
+        return out
+
+    def get_hardware_info(self) -> Dict[str, Any]:
+        return {
+            "model_name": self.model_name,
+            "insightface_available": INSIGHTFACE_AVAILABLE,
+        }
 
 
 def load_model(model_name: str = "default") -> str:

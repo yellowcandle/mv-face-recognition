@@ -5,10 +5,8 @@ Provides security headers, CSRF protection, and other web security measures.
 
 import hashlib
 import hmac
-import secrets
 import time
-from typing import Optional, Dict, Any, Callable
-from functools import wraps
+from typing import Optional, Dict, Any
 
 
 class SecurityHeadersMiddleware:
@@ -196,27 +194,33 @@ class InputSanitizer:
     @staticmethod
     def sanitize_sql_input(input_str: str) -> str:
         """
-        Sanitize input for SQL queries.
-
+        DEPRECATED: Manual SQL sanitization is unsafe and should not be used.
+        
+        This method has been deprecated because manual SQL sanitization is 
+        inherently insecure and prone to bypasses. Modern database libraries
+        provide parameterized queries that are much safer.
+        
         Args:
-            input_str: Input string to sanitize
-
-        Returns:
-            Sanitized string safe for SQL
+            input_str: Input string (not sanitized)
+            
+        Raises:
+            NotImplementedError: Always raises to prevent unsafe usage
+            
+        Example of safe alternative:
+            # WRONG (vulnerable to SQL injection):
+            cursor.execute(f"SELECT * FROM table WHERE name = '{sanitize_sql_input(name)}'")
+            
+            # CORRECT (safe with parameterized queries):
+            # For SQLite/PostgreSQL:
+            cursor.execute("SELECT * FROM table WHERE name = ?", (name,))
+            # For MySQL/PostgreSQL:
+            cursor.execute("SELECT * FROM table WHERE name = %s", (name,))
         """
-        if not isinstance(input_str, str):
-            return str(input_str)
-
-        # Remove dangerous SQL characters
-        sanitized = input_str.replace("'", "''")  # Escape quotes
-        sanitized = sanitized.replace("\\", "\\\\")  # Escape backslashes
-
-        # Remove SQL comment starters
-        sanitized = sanitized.replace("--", "")
-        sanitized = sanitized.replace("/*", "")
-        sanitized = sanitized.replace("*/", "")
-
-        return sanitized
+        raise NotImplementedError(
+            "Manual SQL sanitization is unsafe and has been deprecated. "
+            "Use parameterized queries instead: "
+            "cursor.execute('SELECT * FROM table WHERE id = ?', (id,))"
+        )
 
     @staticmethod
     def validate_file_upload(filename: str, allowed_extensions: list) -> bool:

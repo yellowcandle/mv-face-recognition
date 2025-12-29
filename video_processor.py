@@ -1,57 +1,34 @@
-# video_processor.py
-"""
-Compatibility wrapper for MVP VideoProcessor
-This module exposes VideoProcessor (and FrameProcessor when available)
-by dynamically loading the real implementation from the MVP package.
+"""Compatibility shim for legacy imports.
+
+Some tests/tools import `video_processor.VideoProcessor` from the repo root.
+The active implementation lives in `mvp-processor/src/video_processor.py`.
+
+This shim loads that file by path and re-exports `VideoProcessor`.
 """
 
 from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from typing import Optional
+from types import ModuleType
 
 
-def _load_real_video_processor():
-    # Assume this file sits at repo root: /Users/.../mv-face-recognition/video_processor.py
-    root = Path(__file__).resolve().parent
-    candidates = [
-        root / "mvp-processor" / "src" / "video_processor.py",
-        root / "mvp-processor" / "video_processor.py",
-    ]
-    real_path: Optional[Path] = None
-    for p in candidates:
-        if p.exists():
-            real_path = p
-            break
-    if real_path is None:
-        raise ImportError(
-            "Cannot locate MVP VideoProcessor implementation at expected paths: "
-            f"{[str(c) for c in candidates]}"
-        )
+def _load_mvp_video_processor_module() -> ModuleType:
+    module_path = (
+        Path(__file__).resolve().parent / "mvp-processor" / "src" / "video_processor.py"
+    )
 
-    spec = importlib.util.spec_from_file_location("mv_video_processor", str(real_path))
+    spec = importlib.util.spec_from_file_location("mvp_video_processor", module_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Failed to create import spec for {real_path}")
+        raise ImportError(f"Failed to create module spec for {module_path}")
 
-    module = importlib.util.module_from_spec(spec)  # type: ignore
-    spec.loader.exec_module(module)  # type: ignore
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     return module
 
 
-_real = _load_real_video_processor()
+_mvp_video_processor = _load_mvp_video_processor_module()
 
-# Expose the real classes if they exist in the MVP module
-VideoProcessor = getattr(_real, "VideoProcessor", None)
-FrameProcessor = getattr(_real, "FrameProcessor", None)
-
-if VideoProcessor is None:
-
-    class _NoVideoProcessor:  # pragma: no cover
-        pass
-
-    VideoProcessor = _NoVideoProcessor  # type: ignore
+VideoProcessor = _mvp_video_processor.VideoProcessor  # type: ignore[attr-defined]
 
 __all__ = ["VideoProcessor"]
-if FrameProcessor is not None:
-    __all__.append("FrameProcessor")

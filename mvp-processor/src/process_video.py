@@ -374,36 +374,36 @@ def main(
 
             # Print summary
             metadata = upload_package["metadata"]
-            print("\n📊 Processing Summary:")
-            print(f"   Video: {metadata['video_info']['filename']}")
-            print(f"   Duration: {metadata['video_info']['duration']:.1f}s")
-            print(
+            logger.info("\n📊 Processing Summary:")
+            logger.info(f"   Video: {metadata['video_info']['filename']}")
+            logger.info(f"   Duration: {metadata['video_info']['duration']:.1f}s")
+            logger.info(
                 f"   Frames processed: {metadata['processing_summary']['frames_processed']}"
             )
-            print(
+            logger.info(
                 f"   Faces detected: {metadata['processing_summary']['total_faces_detected']}"
             )
-            print(
+            logger.info(
                 f"   Recognitions: {metadata['processing_summary']['total_recognitions']}"
             )
-            print(f"   Unique contestants: {len(metadata['contestant_timeline'])}")
+            logger.info(f"   Unique contestants: {len(metadata['contestant_timeline'])}")
 
             # Output location information
             if local_only:
                 local_config = pipeline.config["output"]["local_mode"]
-                print(
+                logger.info(
                     f"   📁  Local output saved to: {local_config['base_output_dir']}"
                 )
-                print(
+                logger.info(
                     f"   📹  Processed videos: {local_config['processed_videos_dir']}"
                 )
-                print(f"   🖼️  Thumbnails: {local_config['thumbnails_dir']}")
-                print(f"   📄  Metadata: {local_config['metadata_dir']}")
-                print(f"   🎭  Galleries: {local_config['galleries_dir']}")
+                logger.info(f"   🖼️  Thumbnails: {local_config['thumbnails_dir']}")
+                logger.info(f"   📄  Metadata: {local_config['metadata_dir']}")
+                logger.info(f"   🎭  Galleries: {local_config['galleries_dir']}")
             elif not no_upload and pipeline.cloudflare_uploader:
-                print("   ☁️  Uploaded to Cloudflare R2")
+                logger.info("   ☁️  Uploaded to Cloudflare R2")
             else:
-                print("   📁  Saved to local directories (cloud upload disabled)")
+                logger.info("   📁  Saved to local directories (cloud upload disabled)")
 
         finally:
             # Clean up temporary config file

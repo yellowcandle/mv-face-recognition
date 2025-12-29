@@ -2,12 +2,13 @@
 Face matching module using ChromaDB for similarity search.
 """
 
+import hashlib
 import json
 import logging
-import hashlib
-from functools import lru_cache
-from typing import List, Tuple, Optional, Dict
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
+
 from src.database.chroma_setup import ChromaDBManager
 
 logger = logging.getLogger(__name__)
@@ -144,12 +145,15 @@ class FaceMatcher:
                 include=["distances"]
             )
 
+            ids = results.get("ids") or []
+            distances = results.get("distances") or []
+
             # Process batch results
             matches = []
             for i in range(len(embeddings)):
-                if results["ids"][i] and results["distances"][i]:
-                    name = results["ids"][i][0]
-                    distance = results["distances"][i][0]
+                if i < len(ids) and i < len(distances) and ids[i] and distances[i]:
+                    name = ids[i][0]
+                    distance = distances[i][0]
 
                     # Convert distance to similarity with clamping
                     similarity = max(0.0, min(1.0, 1.0 - distance))
@@ -315,6 +319,7 @@ class BatchFaceMatcher:
 def test_face_matcher():
     """Test the face matcher with sample embeddings."""
     import os
+
     import numpy as np
 
     # Setup logging
@@ -325,7 +330,7 @@ def test_face_matcher():
 
     # Get database info
     db_info = matcher.get_database_info()
-    print(f"Database info: {db_info}")
+    logger.info(f"Database info: {db_info}")
 
     # Test with a sample embedding file
     test_embedding_path = "source/photo/contestants/Alice_embedding.npy"
@@ -333,31 +338,31 @@ def test_face_matcher():
     if os.path.exists(test_embedding_path):
         # Load test embedding
         embedding = np.load(test_embedding_path)
-        print(f"Loaded test embedding shape: {embedding.shape}")
+        logger.info(f"Loaded test embedding shape: {embedding.shape}")
 
         # Test matching
         match = matcher.match_face(embedding)
         if match:
             name, similarity = match
-            print(f"Match found: {name} (similarity: {similarity:.3f})")
+            logger.info(f"Match found: {name} (similarity: {similarity:.3f})")
         else:
-            print("No match found")
+            logger.info("No match found")
 
         # Test detailed matching
         details = matcher.match_with_details(embedding)
-        print(f"Detailed match: {details}")
+        logger.info(f"Detailed match: {details}")
 
         # Test top matches
         top_matches = matcher.get_top_matches(embedding, n_results=3)
-        print(f"Top 3 matches: {top_matches}")
+        logger.info(f"Top 3 matches: {top_matches}")
 
     else:
-        print(f"Test embedding not found: {test_embedding_path}")
-        print("Available embedding files:")
+        logger.info(f"Test embedding not found: {test_embedding_path}")
+        logger.info("Available embedding files:")
         contestants_dir = "source/photo/contestants"
         for file in os.listdir(contestants_dir):
             if file.endswith("_embedding.npy"):
-                print(f"  {file}")
+                logger.info(f"  {file}")
 
 
 if __name__ == "__main__":

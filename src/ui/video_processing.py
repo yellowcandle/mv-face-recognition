@@ -1,9 +1,12 @@
-import streamlit as st
-import time
-import os
 import json
-import pandas as pd
 import logging
+import os
+import time
+from typing import Any, Dict, cast
+
+import pandas as pd
+import streamlit as st
+
 from src.services.video_processor import VideoProcessor
 from src.ui.shared_components import show_final_summary
 
@@ -227,8 +230,7 @@ def process_video_realtime(
         # Estimate total frames
         estimated_total = int((end_time - start_time) * 30 / frame_skip)
 
-        # Storage for results
-        all_results = {
+        all_results: Dict[str, Any] = {
             "video_name": video_name,
             "total_frames_processed": 0,
             "total_faces_detected": 0,
@@ -237,12 +239,9 @@ def process_video_realtime(
             "frame_results": [],
         }
 
-        contestant_counts = {}
+        contestant_counts: Dict[str, int] = {}
 
-        # Real-time processing
-        processor = st.session_state.video_processor.process_video_realtime(
-            video_name, start_time, end_time
-        )
+        processor = st.session_state.video_processor.process_video_realtime(video_name, start_time, end_time)
 
         for frame_num, annotated_frame, face_results, frame_stats in processor:
             # Update frame display
@@ -260,7 +259,7 @@ def process_video_realtime(
                 minutes = timestamp // 60
                 seconds = timestamp % 60
                 st.caption(
-                    f"Frame {all_results['total_frames_processed'] + 1} | {minutes}:{seconds:02d} | "
+                    f"Frame {cast(int, all_results['total_frames_processed']) + 1} | {minutes}:{seconds:02d} | "
                     f"{frame_stats['processing_fps']:.1f} FPS"
                 )
 
@@ -294,8 +293,7 @@ def process_video_realtime(
                     for name, count in sorted_contestants:
                         st.text(f"• {name}: {count} appearances")
 
-            # Store results
-            all_results["total_frames_processed"] += 1
+            all_results["total_frames_processed"] = cast(int, all_results["total_frames_processed"]) + 1
             all_results["total_faces_detected"] = frame_stats["total_faces_detected"]
             all_results["total_faces_recognized"] = frame_stats[
                 "total_faces_recognized"
@@ -305,15 +303,16 @@ def process_video_realtime(
             for face_result in face_results:
                 if face_result["matched"]:
                     name = face_result["contestant_name"]
-                    if name not in all_results["contestant_appearances"]:
-                        all_results["contestant_appearances"][name] = {
+                    contestant_appearances = cast(Dict[str, Any], all_results["contestant_appearances"])
+                    if name not in contestant_appearances:
+                        contestant_appearances[name] = {
                             "total_appearances": 0,
                             "first_appearance": frame_num,
                             "last_appearance": frame_num,
                             "confidence_scores": [],
                         }
 
-                    appearances = all_results["contestant_appearances"][name]
+                    appearances = contestant_appearances[name]
                     appearances["total_appearances"] += 1
                     appearances["last_appearance"] = frame_num
                     appearances["confidence_scores"].append(
@@ -327,7 +326,7 @@ def process_video_realtime(
         st.success("✅ Real-time processing completed!")
 
         # Calculate final statistics
-        for name, appearances in all_results["contestant_appearances"].items():
+        for name, appearances in cast(Dict[str, Any], all_results["contestant_appearances"]).items():
             if appearances["confidence_scores"]:
                 appearances["avg_confidence"] = sum(
                     appearances["confidence_scores"]
