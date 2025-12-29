@@ -295,8 +295,15 @@
   <!-- YouTube Ingestion Tab -->
   {#if activeTab === 'youtube'}
     <div class="panel">
-      <h2>Submit YouTube Video</h2>
-      <p class="panel-description">Add a YouTube video URL to the processing queue</p>
+      <div class="panel-header-row">
+        <div>
+          <h2>Submit YouTube Video</h2>
+          <p class="panel-description">Add a YouTube video URL to the processing queue</p>
+        </div>
+        <a href="/admin/youtube" class="btn btn-primary">
+          Open Enhanced Form
+        </a>
+      </div>
 
       <form on:submit|preventDefault={submitYouTubeUrl} class="form">
         <div class="form-group">
@@ -740,6 +747,18 @@
     font-weight: 600;
     margin: 0 0 8px 0;
     color: #ffffff;
+  }
+
+  .panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 16px;
+  }
+
+  .panel-header-row .btn {
+    white-space: nowrap;
   }
 
   .panel h3 {

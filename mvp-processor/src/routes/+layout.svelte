@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   
-  // Navigation items
+  // Navigation items (YouTube moved to Admin for Cloudflare Zero Trust auth)
   const navItems = [
     { href: '/', label: 'Dashboard', icon: '🎬' },
     { href: '/video-player', label: 'Video Player', icon: '▶️' },
