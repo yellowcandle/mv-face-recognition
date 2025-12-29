@@ -150,7 +150,16 @@
       "Bash(git fetch:*)",
       "Bash(git rm:*)",
       "WebSearch",
-      "Bash(gh pr list:*)"
+      "Bash(gh pr list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(gh auth status:*)",
+      "Bash(GIT_ASKPASS= gh pr create --head yellowcandle:claude/new-branch-US7EX --title \"Merge TypeScript migration and YouTube admin features\" --body \"$\\(cat <<''EOF''\n## Summary\n\nThis PR merges the TypeScript migration and project modernization work with the YouTube admin features from `feature/youtube-to-admin`.\n\n## Key Changes\n\n### TypeScript Migration & Modernization\n- ✅ **Worker Migration**: Complete migration from JavaScript to TypeScript \\(`worker/index.js` → `worker/src/index.ts`\\)\n- ✅ **Build Artifacts**: Excluded `.svelte-kit/` and `build/` directories from version control\n- ✅ **Archive Cleanup**: Moved legacy debug/benchmark scripts and Gradio apps to `archive/` directories\n- ✅ **Documentation**: Streamlined DESIGN.md from 4k lines to 300 lines\n\n### Security Enhancements\n- 🔒 **JWT Authentication**: Added PyJWT and cryptography for secure authentication\n- 🔐 **Secure Logging**: New `secure_logging.py` module with sensitive data sanitization\n- 🛡️ **Zero Trust Prep**: YouTube functionality moved behind admin authentication\n- 📦 **Security Patches**: Updated urllib3 \\(2.6.0+\\) and starlette \\(0.49.1+\\)\n\n### Frontend Updates\n- 📦 **SvelteKit**: Added Cloudflare adapter for deployment\n- ⬆️ **Dependencies**: Upgraded eslint-plugin-svelte to 3.13.1\n- ⬇️ **Vite**: Downgraded to 5.4.12 for SvelteKit compatibility\n- 🎨 **Admin Route**: New admin interface for YouTube ingestion\n\n### Backend Improvements\n- 🔧 **Face Detection API**: Enhanced with `detect_faces\\(\\)` and `get_hardware_info\\(\\)` methods\n- 📊 **Embedding Manager**: New service interface for embedding management\n- 🧪 **Testing**: Added moto[s3] for S3 mocking in test suite\n\n### Dependencies Added\n**Python:**\n- PyJWT >= 2.10.1\n- cryptography >= 43.0.0\n- filelock >= 3.20.1\n- fonttools >= 4.60.2\n- moto[s3] >= 5.0.0 \\(dev\\)\n\n**Frontend:**\n- @sveltejs/adapter-cloudflare ^7.2.4\n\n## Merge Conflicts Resolved\n- `.gitignore`: Merged SvelteKit artifacts + archive exclusions\n- `pyproject.toml`: Combined dependencies from both branches\n- `.claude/settings.local.json`: Merged permissions\n- `mvp-processor/package.json`: Kept Vite 5.4.12\n- `mvp-processor/package-lock.json`: Regenerated\n\n## Breaking Changes\n- Worker entry point changed from `index.js` to `src/index.ts`\n- Removed `src/logging.py` in favor of `src/secure_logging.py`\n- SvelteKit build artifacts now excluded from git\n\n## Testing\n- ✅ npm install successful \\(441 packages\\)\n- ✅ All merge conflicts resolved\n- ✅ Clean working tree\n\n## Files Changed\n88 staged changes with comprehensive modernization\n\n---\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\" --base main)",
+      "Bash(git config:*)",
+      "Bash(python3 -c:*)",
+      "Bash(gh pr view:*)",
+      "Bash(jobs:*)"
     ]
   },
   "enableAllProjectMcpServers": true
