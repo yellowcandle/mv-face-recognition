@@ -2,7 +2,7 @@
 # Security: Updated to address CVE-2025-54121 and other vulnerabilities
 fastapi>=0.115.0  # Updated for security fixes
 uvicorn[standard]>=0.34.0  # Updated for security fixes
-starlette>=0.47.2  # Explicitly pin to fix CVE-2025-54121 (DoS via Range header)
+starlette>=0.49.1  # Explicitly pin to fix CVE-2025-54121, GHSA-7f5h-v6xp-fcq8 (DoS via Range header)
 python-multipart>=0.0.20  # Updated for security fixes
 pydantic>=2.10.0  # Updated for security fixes
 pydantic-settings>=2.7.0  # Updated for compatibility
@@ -14,7 +14,7 @@ fastapi-cors>=0.0.6
 aiofiles>=24.1.0  # Updated for security fixes
 
 # Network libraries (explicitly pin for security)
-urllib3>=2.3.0  # Fix redirect handling vulnerabilities
+urllib3>=2.6.0  # Fix redirect handling vulnerabilities, GHSA-gm62-xv2j-4w53, GHSA-2xpw-w6gg-jr37
 
 # ML Dependencies with CUDA Support
 opencv-python>=4.10.0  # Updated for security fixes
