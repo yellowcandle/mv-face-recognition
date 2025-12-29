@@ -143,7 +143,12 @@
       "mcp__serena__search_for_pattern",
       "mcp__serena__write_memory",
       "mcp__serena__find_symbol",
-      "WebFetch(domain:deepwiki.com)"
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(wrangler --version:*)",
+      "Bash(npx wrangler --version)",
+      "mcp__serena__replace_symbol_body",
+      "Bash(git fetch:*)",
+      "Bash(git rm:*)"
     ]
   },
   "enableAllProjectMcpServers": true

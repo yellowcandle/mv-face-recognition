@@ -32,7 +32,7 @@ export interface LogMetadata {
 /**
  * HTTP request metadata
  */
-export interface RequestMetadata {
+export interface RequestMetadata extends LogMetadata {
   method: string;
   path: string;
   status?: number;

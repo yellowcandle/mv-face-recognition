@@ -3,12 +3,15 @@ Advanced face tracking system with Kalman filtering and embedding-based matching
 Provides stable face trajectory tracking to reduce bbox flickering and improve recognition consistency.
 """
 
-import numpy as np
-import cv2
 import logging
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+import cv2 as _cv2
+import numpy as np
+
+cv2: Any = _cv2
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ class FaceTrajectory:
     consecutive_misses: int = 0
 
     # Kalman filter state
-    kalman_filter: Optional[Any] = None
+    kalman_filter: Any = None
     predicted_bbox: Optional[np.ndarray] = None
 
     # Confidence metrics
@@ -194,7 +197,7 @@ class FaceTrajectory:
                         0.0, 1.0 - (vel_std / max(vel_mean, 1.0))
                     )
 
-    def get_smoothed_bbox(self, alpha: float = 0.7) -> np.ndarray:
+    def get_smoothed_bbox(self, alpha: float = 0.7) -> Optional[np.ndarray]:
         """Get exponentially smoothed bbox."""
         if len(self.bbox_history) == 0:
             return None

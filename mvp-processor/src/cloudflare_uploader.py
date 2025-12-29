@@ -333,4 +333,4 @@ Edit config/processing_config.yaml:
 ## 5. Test Connection
 python -c "from cloudflare_uploader import CloudflareUploader; import yaml; config = yaml.safe_load(open('config/processing_config.yaml')); uploader = CloudflareUploader(config)"
 """
-        print(instructions)
+        logger.info(instructions)

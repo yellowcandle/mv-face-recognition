@@ -44,6 +44,8 @@ dependencies = [
     "urllib3>=2.3.0",
     "pyyaml>=6.0",
     "click>=8.2.1",
+    "PyJWT>=2.10.1",
+    "cryptography>=43.0.0",
 ]
 
 [project.scripts]
@@ -65,6 +67,7 @@ dev-dependencies = [
     "mypy",
     "psutil>=6.1.1",
     "pip-audit>=2.9.0",
+    "moto[s3]>=5.0.0",
 ]
 
 [tool.black]

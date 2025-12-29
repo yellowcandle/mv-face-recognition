@@ -6,7 +6,7 @@ Provides automatic detection and configuration for optimal performance.
 import logging
 import platform
 import subprocess
-from typing import List, Dict
+from typing import Any, Dict, List, Optional
 import os
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,8 @@ class HardwareAccelerator:
         try:
             import onnxruntime as ort
 
-            all_providers = ort.get_available_providers()
+            ort_any: Any = ort
+            all_providers = ort_any.get_available_providers()
 
             logger.info(f"ONNXRuntime available providers: {all_providers}")
 
@@ -216,7 +217,7 @@ class HardwareAccelerator:
         logger.info(f"Set OpenCV threads to {optimal_threads}")
         return optimal_threads
 
-    def get_memory_optimization_settings(self) -> Dict[str, any]:
+    def get_memory_optimization_settings(self) -> Dict[str, Any]:
         """Get memory optimization settings."""
         settings = {
             "enable_memory_pattern": True,
@@ -313,11 +314,14 @@ class HardwareAccelerator:
         return results
 
 
+_hardware_accelerator_instance: Optional[HardwareAccelerator] = None
+
+
 def get_hardware_accelerator() -> HardwareAccelerator:
-    """Get singleton hardware accelerator instance."""
-    if not hasattr(get_hardware_accelerator, "_instance"):
-        get_hardware_accelerator._instance = HardwareAccelerator()
-    return get_hardware_accelerator._instance
+    global _hardware_accelerator_instance
+    if _hardware_accelerator_instance is None:
+        _hardware_accelerator_instance = HardwareAccelerator()
+    return _hardware_accelerator_instance
 
 
 def test_hardware_acceleration():

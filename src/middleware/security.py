@@ -5,10 +5,8 @@ Provides security headers, CSRF protection, and other web security measures.
 
 import hashlib
 import hmac
-import secrets
 import time
-from typing import Optional, Dict, Any, Callable
-from functools import wraps
+from typing import Optional, Dict, Any
 
 
 class SecurityHeadersMiddleware:

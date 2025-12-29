@@ -5,20 +5,23 @@ Extends the existing video processor with batch processing and metadata generati
 
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Generator, Callable
-import cv2
-import numpy as np
-from datetime import datetime
+import os
 import shutil
 import subprocess
 import tempfile
-import os
 from collections import defaultdict, deque
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
+
+import cv2 as _cv2
+import numpy as np
 from tqdm import tqdm
 
 from src.core.face_detector import FaceDetector
 from src.core.face_matcher import FaceMatcher
+
+cv2: Any = _cv2
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,7 @@ class FaceTracker:
         self.smoothing_window = smoothing_window
         self.position_weight = position_weight
         self.face_tracks = defaultdict(lambda: deque(maxlen=smoothing_window))
+
 
     def update_face(
         self, contestant_name: str, bbox: List[int], frame_number: int
@@ -138,10 +142,10 @@ class EnhancedVideoProcessor:
             "similarity_threshold", 0.25
         )
 
-        # Log hardware acceleration info
-        if hasattr(self.face_detector, "print_hardware_info"):
+        printer = getattr(self.face_detector, "print_hardware_info", None)
+        if callable(printer):
             logger.info("Hardware acceleration status:")
-            self.face_detector.print_hardware_info()
+            printer()
 
         # Check FFmpeg availability for audio preservation
         self.ffmpeg_available = self._check_ffmpeg_availability()
@@ -438,7 +442,7 @@ class EnhancedVideoProcessor:
             if os.path.exists(temp_video_path):
                 try:
                     os.unlink(temp_video_path)
-                except:
+                except Exception:
                     pass
 
     def _create_annotated_video_opencv_only(
@@ -909,7 +913,7 @@ class EnhancedVideoProcessor:
 
         return [video.name for video in sorted(videos)]
 
-    def get_video_info(self, video_name: str) -> Dict:
+    def get_video_info(self, video_name: str) -> Dict[str, Any]:
         """Get basic information about a video file."""
         video_path = Path(self.videos_dir) / video_name
 
@@ -918,18 +922,22 @@ class EnhancedVideoProcessor:
 
         try:
             cap = cv2.VideoCapture(str(video_path))
-            info = {
+
+            fps = float(cap.get(cv2.CAP_PROP_FPS))
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+            info: Dict[str, Any] = {
                 "filename": video_name,
                 "path": str(video_path),
-                "fps": cap.get(cv2.CAP_PROP_FPS),
-                "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+                "fps": fps,
+                "frame_count": frame_count,
                 "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                 "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                 "file_size_mb": round(video_path.stat().st_size / (1024 * 1024), 2),
             }
 
-            if info["fps"] > 0:
-                info["duration_seconds"] = round(info["frame_count"] / info["fps"], 2)
+            if fps > 0:
+                info["duration_seconds"] = round(frame_count / fps, 2)
 
             cap.release()
             return info
@@ -944,7 +952,7 @@ class EnhancedVideoProcessor:
         start_time: float = 0,
         end_time: Optional[float] = None,
         progress_callback=None,
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """
         Process video for face recognition with frame-level face detection skip logic.
 
@@ -959,7 +967,7 @@ class EnhancedVideoProcessor:
         """
         logger.info(f"Processing video for recognition: {video_name}")
 
-        results = {
+        results: Dict[str, Any] = {
             "video_name": video_name,
             "total_frames_processed": 0,
             "total_frames_skipped": 0,

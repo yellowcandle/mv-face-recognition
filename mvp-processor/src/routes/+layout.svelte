@@ -15,24 +15,22 @@
   let systemStatus = 'checking';
   let currentTime = new Date().toLocaleString();
   
-  onMount(async () => {
-    // Update time every second
+  onMount(() => {
     const timeInterval = setInterval(() => {
       currentTime = new Date().toLocaleString();
     }, 1000);
-    
-    // Check system status
-    try {
-      const response = await fetch('/api/system/status');
-      if (response.ok) {
-        systemStatus = 'LIVE';
-      } else {
+
+    const checkStatus = async () => {
+      try {
+        const response = await fetch('/api/system/status');
+        systemStatus = response.ok ? 'LIVE' : 'OFFLINE';
+      } catch {
         systemStatus = 'OFFLINE';
       }
-    } catch (error) {
-      systemStatus = 'OFFLINE';
-    }
-    
+    };
+
+    void checkStatus();
+
     return () => {
       clearInterval(timeInterval);
     };

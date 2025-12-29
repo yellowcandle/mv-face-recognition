@@ -44,8 +44,8 @@ export interface CorsHeaders {
  * Base class for all application errors
  */
 export class AppError extends Error {
-  public readonly statusCode: number;
-  public readonly code: string;
+  public statusCode: number;
+  public code: string;
   public readonly details: ErrorDetails;
   public readonly timestamp: string;
 
@@ -62,9 +62,11 @@ export class AppError extends Error {
     this.details = details;
     this.timestamp = new Date().toISOString();
 
-    // Capture stack trace
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
+    const captureStackTrace = (Error as unknown as {
+      captureStackTrace?: (targetObject: object, constructorOpt?: Function) => void;
+    }).captureStackTrace;
+    if (captureStackTrace) {
+      captureStackTrace(this, this.constructor as unknown as Function);
     }
   }
 

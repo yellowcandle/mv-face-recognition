@@ -4,7 +4,6 @@ Provides safe error responses without exposing sensitive information.
 """
 
 import logging
-import traceback
 from typing import Dict, Any, Optional
 from enum import Enum
 
@@ -88,7 +87,6 @@ class SecureErrorHandler:
         """
         Determine error severity based on exception type and content.
         """
-        error_type = type(error).__name__
         error_msg = str(error).lower()
 
         # Critical errors

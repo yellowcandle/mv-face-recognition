@@ -5,7 +5,7 @@ Provides secure validation of file uploads, API inputs, and user data.
 
 import os
 import re
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from pathlib import Path
 
 class InputValidator:
@@ -117,7 +117,7 @@ class InputValidator:
         Returns:
             Dict with validation result and sanitized data
         """
-        result = {"valid": True, "error": None, "sanitized": data.copy()}
+        result: Dict[str, Any] = {"valid": True, "error": None, "sanitized": data.copy()}
 
         # Check for dangerous keys
         dangerous_keys = ['__class__', '__globals__', '__import__', 'eval', 'exec']

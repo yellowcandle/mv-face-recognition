@@ -192,12 +192,13 @@ class ChromaDBManager:
             include=["metadatas", "distances"],
         )
 
+        ids = results.get("ids") or []
+        distances = results.get("distances") or []
+
         # Process results
         matches = []
-        if results["ids"] and results["ids"][0]:  # Check if we have results
-            for i, (id_, distance) in enumerate(
-                zip(results["ids"][0], results["distances"][0])
-            ):
+        if ids and distances and ids[0] and distances[0]:
+            for i, (id_, distance) in enumerate(zip(ids[0], distances[0])):
                 # Convert distance to similarity (ChromaDB uses cosine distance)
                 # Cosine distance for normalized vectors: [0, 1]
                 # Clamp to ensure valid similarity scores
@@ -270,4 +271,4 @@ if __name__ == "__main__":
 
     # Print stats
     stats = db_manager.get_database_stats()
-    print(f"Database Stats: {stats}")
+    logger.info(f"Database Stats: {stats}")
