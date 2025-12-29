@@ -35,3 +35,9 @@ tqdm>=4.67.0  # Updated for security fixes
 # For enhanced processing (optional)
 matplotlib>=3.10.0  # Updated for security fixes
 seaborn>=0.13.0  # Updated for compatibility
+
+# Security: Explicitly pin transitive dependencies
+urllib3>=2.6.0  # Fix CVE-2024-37891, CVE-2025-43859, GHSA-gm62-xv2j-4w53, GHSA-2xpw-w6gg-jr37
+fonttools>=4.60.2  # Fix CVE-2025-50919, GHSA-768j-98cg-p3fv (arbitrary file write, XML injection)
+filelock>=3.20.1  # Fix CVE-2024-53109, GHSA-w853-jp5j-5j7f (TOCTOU race condition)
+starlette>=0.49.1  # Fix GHSA-7f5h-v6xp-fcq8
