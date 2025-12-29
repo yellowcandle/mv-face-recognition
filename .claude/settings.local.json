@@ -143,7 +143,14 @@
       "mcp__serena__search_for_pattern",
       "mcp__serena__write_memory",
       "mcp__serena__find_symbol",
-      "WebFetch(domain:deepwiki.com)"
+      "WebFetch(domain:deepwiki.com)",
+      "WebSearch",
+      "Bash(git -C /Users/swong/dev/mv-face-recognition fetch --all)",
+      "Bash(git fetch:*)",
+      "Bash(/bin/bash -c 'cd /Users/swong/dev/mv-face-recognition && git status')",
+      "Bash(/usr/bin/git -C /Users/swong/dev/mv-face-recognition fetch origin)",
+      "Bash(/usr/bin/git -C /Users/swong/dev/mv-face-recognition merge origin/claude/new-branch-US7EX --no-edit)",
+      "Bash(gh pr list:*)"
     ]
   },
   "enableAllProjectMcpServers": true
