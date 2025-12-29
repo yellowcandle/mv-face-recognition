@@ -13,8 +13,9 @@ from typing import Optional
 
 
 def _load_real_video_processor():
-    # Assume this file sits at repo root: /Users/.../mv-face-recognition/video_processor.py
-    root = Path(__file__).resolve().parent
+    # This file is at archive/legacy/video_processor.py
+    # Need to go up 3 levels: legacy -> archive -> repo_root
+    root = Path(__file__).resolve().parent.parent.parent
     candidates = [
         root / "mvp-processor" / "src" / "video_processor.py",
         root / "mvp-processor" / "video_processor.py",
