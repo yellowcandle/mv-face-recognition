@@ -825,7 +825,7 @@
   .video-selector {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: 10px;
   }
 
   .video-selector label {
@@ -1029,13 +1029,13 @@
 
   .detection-bar {
     background-color: #1e293b;
-    padding: var(--space-3) var(--space-4);
+    padding: 10px var(--space-4);
     display: flex;
     gap: var(--space-5);
     font-size: 13px;
     color: var(--color-gray-400);
     border-radius: var(--space-2);
-    margin-top: var(--space-3);
+    margin-top: 10px;
   }
 
   .detection-bar .hint {
@@ -1133,7 +1133,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-3) var(--space-3);
+    padding: 10px var(--space-3);
     background-color: var(--color-gray-700);
     border: 1px solid var(--color-gray-600);
     border-radius: var(--space-2);
@@ -1181,7 +1181,7 @@
   }
 
   .dialog h3 {
-    margin: 0 0 var(--space-3);
+    margin: 0 0 10px;
     font-size: var(--space-5);
   }
 
@@ -1213,7 +1213,7 @@
     background-color: var(--color-gray-700);
     border: 1px solid var(--color-gray-600);
     border-radius: var(--space-2);
-    padding: var(--space-3) var(--space-3);
+    padding: 10px var(--space-3);
     color: #fff;
     font-size: 1var(--space-1);
   }
@@ -1240,7 +1240,7 @@
     max-height: 60vh;
     background: #1e293b;
     border-radius: var(--space-3);
-    box-shadow: 0 var(--space-3) 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     z-index: 100;
     overflow: hidden;
   }
@@ -1332,11 +1332,11 @@
   .batch-controls {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    gap: 10px;
+    padding: 10px var(--space-4);
     background: #1f2937;
     border-radius: var(--space-2);
-    margin-top: var(--space-3);
+    margin-top: 10px;
   }
 
   .btn-batch {
@@ -1417,7 +1417,7 @@
     height: var(--space-4);
     line-height: var(--space-4);
     text-align: center;
-    font-size: var(--space-3);
+    font-size: 10px;
     margin-right: var(--space-1);
   }
 
@@ -1425,16 +1425,16 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    max-height: var(--space-40);
+    max-height: 150px;
     overflow-y: auto;
-    padding: var(--space-3);
+    padding: 10px;
     background: #1f2937;
     border-radius: var(--space-2);
   }
 
   .batch-face-chip {
     display: inline-block;
-    padding: var(--space-1) var(--space-3);
+    padding: var(--space-1) 10px;
     background: var(--color-gray-700);
     border-radius: var(--space-4);
     font-size: var(--space-3);
@@ -1442,7 +1442,7 @@
   }
 
   /* Mobile Responsive */
-  @media (max-width: 768px) {
+  @media (max-width: 76var(--space-2)) {
     .player-header {
       flex-direction: column;
       align-items: flex-start;
@@ -1465,7 +1465,7 @@
 
     .video-controls {
       flex-wrap: wrap;
-      gap: var(--space-3);
+      gap: 10px;
     }
 
     .progress-container {

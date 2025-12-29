@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  
+  import { Card, Badge } from '$lib/components';
+
   interface DetectedFace {
     id: string;
     name: string;
@@ -29,7 +30,13 @@
     if (confidence >= 60) return 'medium-confidence';
     return 'low-confidence';
   }
-  
+
+  function getConfidenceBadgeVariant(confidence: number): 'success' | 'warning' | 'error' {
+    if (confidence >= 80) return 'success';
+    if (confidence >= 60) return 'warning';
+    return 'error';
+  }
+
   function getBarClass(confidence: number): string {
     if (confidence >= 80) return '';
     if (confidence >= 60) return 'medium';
@@ -57,7 +64,7 @@
   <!-- Main Content Area -->
   <div class="content-wrapper">
     <!-- Video Player Panel -->
-    <div class="video-panel">
+    <Card variant="elevated" padding="none" class="video-panel">
       <div class="video-container">
         <div class="video-placeholder">
           <div class="video-info">
@@ -87,13 +94,13 @@
           <div class="frame-info">{resolution}</div>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Face Recognition Panel -->
-    <div class="face-panel">
+    <Card variant="surface" padding="md" class="face-panel">
       <div class="face-panel-header">
         <div class="face-panel-title">Detected Faces</div>
-        <div class="face-count-badge">{detectedFaces.length}</div>
+        <Badge variant="primary" size="sm">{detectedFaces.length}</Badge>
       </div>
 
       <div class="face-tiles-grid">
@@ -104,16 +111,18 @@
             </div>
             <div class="face-info">
               <div class="face-name">{face.name}</div>
-              <div class="face-confidence">{Math.round(face.confidence)}%</div>
+              <Badge variant={getConfidenceBadgeVariant(face.confidence)} size="sm">
+                {Math.round(face.confidence)}%
+              </Badge>
             </div>
           </div>
         {/each}
       </div>
-    </div>
+    </Card>
   </div>
 
   <!-- Similarity Scores Panel -->
-  <div class="similarity-panel">
+  <Card variant="bordered" padding="lg" class="similarity-panel">
     <div class="similarity-title">Recognition Confidence Scores</div>
     <div class="chart-container">
       {#each detectedFaces as face}
@@ -128,7 +137,7 @@
         </div>
       {/each}
     </div>
-  </div>
+  </Card>
 </div>
 
 <style>
@@ -146,19 +155,19 @@
   }
 
   /* Video Player Panel */
-  .video-panel {
+  :global(.video-panel) {
     width: 60%;
-    background-color: #000000;
     position: relative;
-    border-right: 1px solid #444;
+    border-right: 1px solid var(--border-default);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .video-container {
     flex: 1;
     position: relative;
-    background: linear-gradient(45deg, #111, #222);
+    background: linear-gradient(45deg, var(--color-neutral-900), var(--color-neutral-800));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -167,15 +176,15 @@
   .video-placeholder {
     width: 90%;
     height: 80%;
-    background: #1a1a1a;
-    border: 2px dashed #444;
+    background: var(--bg-primary);
+    border: 2px dashed var(--border-default);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #666;
-    font-size: 18px;
+    color: var(--text-tertiary);
+    font-size: var(--text-body-lg-size);
     position: relative;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
   }
 
   .video-info {
@@ -183,31 +192,31 @@
   }
 
   .video-info h3 {
-    color: #ffffff;
-    font-size: 24px;
-    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-size: var(--text-h3-size);
+    margin-bottom: var(--space-2);
   }
 
   .video-info p {
-    color: #9ca3af;
-    font-size: 16px;
+    color: var(--text-secondary);
+    font-size: var(--text-body-size);
   }
 
   /* Face Detection Overlays */
   .detection-overlay {
     position: absolute;
-    border: 2px solid #22c55e;
+    border: 2px solid var(--color-success-500);
     background: rgba(34, 197, 94, 0.1);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .detection-1 {
-    border-color: #22c55e;
+    border-color: var(--color-success-500);
     background: rgba(34, 197, 94, 0.1);
   }
 
   .detection-2 {
-    border-color: #eab308;
+    border-color: var(--color-warning-500);
     background: rgba(234, 179, 8, 0.1);
   }
 
@@ -216,48 +225,46 @@
     top: -25px;
     left: 0;
     background: rgba(0, 0, 0, 0.8);
-    padding: 2px 6px;
-    font-size: 11px;
-    border-radius: 3px;
-    color: #ffffff;
-    font-weight: 600;
+    padding: var(--space-0-5) var(--space-1-5);
+    font-size: var(--text-caption-size);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-weight: var(--text-label-weight);
   }
 
   /* Video Controls */
   .video-controls {
     position: absolute;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
+    bottom: var(--space-2-5);
+    left: var(--space-2-5);
+    right: var(--space-2-5);
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: rgba(0, 0, 0, 0.7);
-    padding: 8px 12px;
-    border-radius: 6px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
   }
 
   .frame-info {
-    font-size: 12px;
-    color: #9ca3af;
+    font-size: var(--text-caption-size);
+    color: var(--text-secondary);
     font-weight: 500;
   }
 
   .processing-status {
-    font-size: 12px;
-    color: #ef4444;
-    font-weight: 600;
+    font-size: var(--text-caption-size);
+    color: var(--color-error-500);
+    font-weight: var(--text-label-weight);
   }
 
   .processing-status.active {
-    color: #22c55e;
+    color: var(--color-success-500);
   }
 
   /* Face Recognition Panel */
-  .face-panel {
+  :global(.face-panel) {
     width: 40%;
-    background-color: #1e293b;
-    padding: 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -266,31 +273,22 @@
   .face-panel-header {
     display: flex;
     align-items: center;
-    margin-bottom: 20px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
     flex-shrink: 0;
   }
 
   .face-panel-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-right: 10px;
-    color: #ffffff;
-  }
-
-  .face-count-badge {
-    background-color: #3b82f6;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--text-body-lg-size);
+    font-weight: var(--text-label-weight);
+    color: var(--text-primary);
   }
 
   /* Face Tiles Grid */
   .face-tiles-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
+    gap: var(--space-2-5);
     flex: 1;
   }
 
@@ -298,93 +296,90 @@
     width: 120px;
     height: 120px;
     border: 2px solid;
-    border-radius: 8px;
-    padding: 8px;
-    background-color: #2d3748;
+    border-radius: var(--radius-lg);
+    padding: var(--space-2);
+    background-color: var(--bg-tertiary);
     display: flex;
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-all);
   }
 
   .face-tile:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
   }
 
   .face-tile.high-confidence {
-    border-color: #22c55e;
+    border-color: var(--color-success-500);
   }
 
   .face-tile.medium-confidence {
-    border-color: #eab308;
+    border-color: var(--color-warning-500);
   }
 
   .face-tile.low-confidence {
-    border-color: #ef4444;
+    border-color: var(--color-error-500);
   }
 
   .face-image {
     width: 80px;
     height: 80px;
-    background: #4a5568;
-    border-radius: 4px;
-    margin-bottom: 6px;
+    background: var(--color-neutral-700);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-1-5);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    color: #9ca3af;
+    font-size: var(--text-caption-size);
+    color: var(--text-secondary);
   }
 
   .face-placeholder {
-    font-size: 9px;
+    font-size: var(--text-caption-size);
     text-align: center;
   }
 
   .face-info {
     text-align: center;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .face-name {
-    font-size: 10px;
-    font-weight: 600;
-    margin-bottom: 2px;
+    font-size: var(--text-caption-size);
+    font-weight: var(--text-label-weight);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #ffffff;
-  }
-
-  .face-confidence {
-    font-size: 9px;
-    color: #9ca3af;
+    color: var(--text-primary);
+    width: 100%;
   }
 
   /* Similarity Scores Panel */
-  .similarity-panel {
+  :global(.similarity-panel) {
     height: 200px;
-    background-color: #374151;
-    padding: 20px;
-    border-top: 1px solid #444;
+    border-top: 1px solid var(--border-default);
     flex-shrink: 0;
   }
 
   .similarity-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 15px;
-    color: #ffffff;
+    font-size: var(--text-body-size);
+    font-weight: var(--text-label-weight);
+    margin-bottom: var(--space-4);
+    color: var(--text-primary);
   }
 
   .chart-container {
     height: 140px;
     display: flex;
     align-items: end;
-    gap: 15px;
-    padding: 0 10px;
+    gap: var(--space-4);
+    padding: 0 var(--space-2-5);
     overflow-x: auto;
   }
 
@@ -398,19 +393,19 @@
 
   .bar {
     width: 40px;
-    background-color: #22c55e;
-    border-radius: 4px 4px 0 0;
-    transition: all 0.3s ease;
+    background-color: var(--color-success-500);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: var(--transition-all);
     position: relative;
     min-height: 20px;
   }
 
   .bar.medium {
-    background-color: #eab308;
+    background-color: var(--color-warning-500);
   }
 
   .bar.low {
-    background-color: #ef4444;
+    background-color: var(--color-error-500);
   }
 
   .bar-value {
@@ -418,16 +413,16 @@
     top: -20px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
-    color: #fff;
-    font-weight: 600;
+    font-size: var(--text-caption-size);
+    color: var(--text-primary);
+    font-weight: var(--text-label-weight);
     white-space: nowrap;
   }
 
   .bar-label {
-    margin-top: 8px;
-    font-size: 11px;
-    color: #9ca3af;
+    margin-top: var(--space-2);
+    font-size: var(--text-caption-size);
+    color: var(--text-secondary);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -440,32 +435,32 @@
     .content-wrapper {
       flex-direction: column;
     }
-    
-    .video-panel {
+
+    :global(.video-panel) {
       width: 100%;
       height: 50vh;
     }
-    
-    .face-panel {
+
+    :global(.face-panel) {
       width: 100%;
       height: auto;
       flex: 1;
     }
-    
+
     .face-tiles-grid {
       grid-template-columns: repeat(3, 1fr);
     }
-    
+
     .face-tile {
       width: 100%;
     }
-    
-    .similarity-panel {
+
+    :global(.similarity-panel) {
       height: 150px;
     }
-    
+
     .chart-container {
-      gap: 8px;
+      gap: var(--space-2);
     }
   }
 </style>

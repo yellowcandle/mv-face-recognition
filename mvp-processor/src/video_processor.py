@@ -495,14 +495,46 @@ class VideoProcessor:
             output_path: Output video path
             format_config: Format configuration (resolution, quality, etc.)
         """
-        # Temporarily disabled - just copy the original file for testing
-        import shutil
-
-        logger.info(
-            f"Video conversion temporarily disabled - copying original file to {output_path}"
-        )
-        shutil.copy2(input_path, output_path)
-        logger.info(f"Copied video: {output_path}")
+        try:
+            from moviepy import VideoFileClip
+            
+            res_map = {
+                "360p": 360,
+                "480p": 480,
+                "720p": 720,
+                "1080p": 1080
+            }
+            
+            target_height = res_map.get(format_config.get("resolution"), 720)
+            
+            with VideoFileClip(input_path) as clip:
+                if clip.h != target_height:
+                    clip = clip.resize(height=target_height)
+                
+                bitrate_map = {
+                    "low": "1000k",
+                    "medium": "3000k",
+                    "high": "6000k"
+                }
+                bitrate = bitrate_map.get(format_config.get("quality", "medium"), "3000k")
+                
+                clip.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    bitrate=bitrate,
+                    logger=None
+                )
+                
+            logger.info(f"Converted video: {output_path}")
+            
+        except ImportError:
+            logger.warning("MoviePy not found - falling back to simple file copy")
+            import shutil
+            shutil.copy2(input_path, output_path)
+        except Exception as e:
+            logger.error(f"Failed to convert video format: {e}")
+            raise VideoProcessingError(f"Conversion failed: {e}")
 
 
 class FrameProcessor:
