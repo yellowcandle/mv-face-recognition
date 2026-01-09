@@ -41,6 +41,7 @@ try:
         hf_hub_download,
         snapshot_download,
         upload_file,
+        upload_folder,
     )
     HF_AVAILABLE = True
 except ImportError:
@@ -256,6 +257,147 @@ class HuggingFaceDataset:
                 logger.info(f"  ❌ Failed: {embedding_file} - {e}")
 
         logger.info(f"\n📊 Upload Summary: {stats['uploaded']} uploaded, {stats['failed']} failed")
+        return stats
+
+    def upload_contestant_photos(
+        self,
+        photos_dir: str = "source/photo/contestants",
+        batch_size: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Upload all contestant photos to HuggingFace XET using batch folder upload.
+
+        Args:
+            photos_dir: Directory containing contestant photo directories (1-96)
+            batch_size: Unused (kept for backward compatibility)
+
+        Returns:
+            Dictionary with upload statistics
+        """
+        stats: Dict[str, Any] = {
+            "uploaded": 0,
+            "failed": 0,
+            "skipped": 0,
+            "total_size_mb": 0,
+            "errors": [],
+        }
+
+        photos_path = Path(photos_dir)
+        if not photos_path.exists():
+            logger.info(f"❌ Photos directory not found: {photos_dir}")
+            return stats
+
+        # Create temporary directory with reorganized structure for upload
+        temp_upload_dir = os.path.join(self.local_cache_dir, "photos_upload")
+        os.makedirs(temp_upload_dir, exist_ok=True)
+
+        try:
+            # Find all photo files (JPG and PNG)
+            photo_files = []
+            photo_files.extend(photos_path.rglob("*.jpg"))
+            photo_files.extend(photos_path.rglob("*.JPG"))
+            photo_files.extend(photos_path.rglob("*.png"))
+            photo_files.extend(photos_path.rglob("*.PNG"))
+
+            # Filter out embedding files and screenshots
+            photo_files = [
+                f for f in photo_files
+                if not f.name.endswith("_embedding.npy")
+                and not f.name.startswith("Screenshot")
+            ]
+
+            logger.info(f"📦 Found {len(photo_files)} photo files to upload")
+
+            # Create manifest for tracking
+            manifest: Dict[str, Any] = {
+                "upload_date": datetime.now().isoformat(),
+                "total_photos": len(photo_files),
+                "photos": [],
+            }
+
+            # Copy files to temp directory with organized structure
+            for photo_file in photo_files:
+                try:
+                    # Extract contestant info from path
+                    relative_path = photo_file.relative_to(photos_path)
+                    parts = list(relative_path.parts)
+
+                    if len(parts) < 2:
+                        logger.info(f"  ⚠️ Skipping invalid path structure: {photo_file}")
+                        stats["skipped"] += 1
+                        continue
+
+                    contestant_dir = parts[0]
+                    filename = parts[-1]
+
+                    # Calculate file size
+                    file_size = photo_file.stat().st_size
+                    stats["total_size_mb"] += file_size / (1024 * 1024)
+
+                    # Create target directory
+                    target_dir = os.path.join(temp_upload_dir, f"contestant_{contestant_dir}")
+                    os.makedirs(target_dir, exist_ok=True)
+
+                    # Copy file to temp directory
+                    target_file = os.path.join(target_dir, filename)
+                    shutil.copy2(photo_file, target_file)
+
+                    stats["uploaded"] += 1
+                    manifest["photos"].append({
+                        "contestant_id": contestant_dir,
+                        "filename": filename,
+                        "size_bytes": file_size,
+                        "remote_path": f"photos/contestant_{contestant_dir}/{filename}",
+                    })
+
+                except Exception as e:
+                    stats["failed"] += 1
+                    stats["errors"].append({"file": str(photo_file), "error": str(e)})
+                    logger.info(f"  ❌ Failed to prepare: {photo_file} - {e}")
+
+            # Upload entire folder in one commit
+            logger.info(f"\n📤 Uploading {stats['uploaded']} photos in batch...")
+
+            upload_folder(
+                folder_path=temp_upload_dir,
+                path_in_repo="photos",
+                repo_id=self.repo_id,
+                repo_type="dataset",
+                token=self.token,
+                commit_message=f"Upload {stats['uploaded']} contestant photos",
+            )
+
+            logger.info(f"  ✅ Batch upload complete!")
+
+            # Upload manifest
+            try:
+                manifest_path = os.path.join(self.local_cache_dir, "photo_manifest.json")
+                with open(manifest_path, "w", encoding="utf-8") as f:
+                    json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+                upload_file(
+                    path_or_fileobj=manifest_path,
+                    path_in_repo="metadata/photo_manifest.json",
+                    repo_id=self.repo_id,
+                    repo_type="dataset",
+                    token=self.token,
+                    commit_message="Update photo manifest",
+                )
+                logger.info(f"  ✅ Uploaded photo manifest")
+
+            except Exception as e:
+                logger.info(f"  ⚠️ Failed to upload manifest: {e}")
+
+        finally:
+            # Clean up temp directory
+            if os.path.exists(temp_upload_dir):
+                shutil.rmtree(temp_upload_dir, ignore_errors=True)
+
+        logger.info(f"\n📊 Photo Upload Summary:")
+        logger.info(f"  • Uploaded: {stats['uploaded']} photos ({stats['total_size_mb']:.2f} MB)")
+        logger.info(f"  • Failed: {stats['failed']}")
+        logger.info(f"  • Skipped: {stats['skipped']}")
+
         return stats
 
     def upload_flagged_face(
