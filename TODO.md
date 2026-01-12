@@ -2,32 +2,137 @@
 
 ## Pending
 
-### Admin UI Component Library (January 2025)
+### Priority 1: Production Modal Integration (January 2026)
 
-#### Components to Create
-- [x] Create Button component (5 variants: primary, secondary, success, danger, ghost)
-- [x] Create Badge component (5 color variants with optional status dot)
-- [x] Create Input component (text, email, url, password, number types)
-- [x] Create StatusIndicator component (online, offline, checking, error states)
-- [x] Create NavigationLink component (active state styling with icon support)
-- [x] Create IconButton component (circular icon-only buttons)
-- [x] Create barrel export index.ts for component imports
-- [x] Update root layout (+layout.svelte) to load design tokens globally
-- [x] Test admin UI in browser (verify all pages render correctly)
+#### Worker Backend - Modal API Integration
+- [ ] Add `MODAL_JOBS` KV namespace binding to wrangler.toml
+- [ ] Add `MODAL_TOKEN` secret for Modal API authentication
+- [ ] Integrate Worker Modal routes into main index.ts router
+- [ ] Replace simulated Modal execution with actual Modal API calls
+- [ ] Add job result persistence to R2 bucket
 
-**Context**: Admin pages (`/admin`, `/admin/youtube`) are architecturally complete but reference 7 non-existent components. Building custom component library with dark theme to match existing admin page usage patterns.
+#### Modal Script Enhancements
+- [ ] Add HTTP webhook endpoint to modal_hf_processor.py for job status callbacks
+- [ ] Implement job progress reporting via Modal's `modal.web_endpoint`
+- [ ] Add structured JSON output for job results parsing
 
-### System Improvements
-- [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
+**Context**: Frontend Modal integration UI is complete. Backend needs actual Modal API integration to replace simulated job execution.
 
-### Modal Video Processing Enhancements
-- [x] **Automatic Modal Trigger**: Integrate Modal's HTTP API to auto-trigger processing
-- [x] **Progress Polling**: Add WebSocket updates for real-time processing status
-- [x] **Job Queue UI**: Show list of queued/processing jobs with progress bars
-- [ ] **Batch Processing**: Allow uploading multiple videos at once
-- [ ] **Result Notifications**: Email/webhook when processing completes
+### Priority 2: System Improvements
 
-**Context**: Modal cloud processing can now be triggered directly from the frontend processing page. Users can monitor job status in real-time via WebSocket connections and cancel jobs if needed. Embeddings can be updated automatically after face flagging.
+#### Automatic Reprocessing Pipeline
+- [ ] Implement Cloudflare Queue for embedding update triggers
+- [ ] Create scheduled Cron job for batch reprocessing
+- [ ] Add webhook endpoint for HuggingFace dataset updates
+- [ ] Implement video reprocessing after embedding changes
+
+#### Error Handling & Monitoring
+- [ ] Add Sentry/error tracking integration
+- [ ] Implement job failure retry logic with exponential backoff
+- [ ] Add alerting for failed processing jobs
+- [ ] Create admin dashboard for job monitoring
+
+#### Performance Optimization
+- [ ] Implement video chunking for files >2GB to prevent OOM errors during processing
+- [ ] Add GPU utilization monitoring and auto-scaling thresholds in Modal containers
+- [ ] Implement Redis-based caching for face recognition results (reduce ChromaDB queries by 60%)
+- [ ] Optimize ChromaDB queries with proper indexing on contestant IDs and timestamps
+- [ ] Add parallel video processing pipeline with configurable worker counts
+
+#### Security & Compliance
+- [ ] Conduct comprehensive security audit using OWASP ZAP on all 21 API endpoints
+- [ ] Implement API rate limiting using Cloudflare Workers rate limiting features
+- [ ] Create data retention and privacy compliance framework (GDPR-like policies)
+- [ ] Enhance access control with role-based permissions (admin, operator, viewer)
+- [ ] Audit and strengthen input validation across all API endpoints
+
+### Priority 3: Modal Video Processing Enhancements
+
+#### Batch Processing
+- [ ] Frontend: Multi-file upload component with drag-and-drop
+- [ ] Backend: Batch job creation endpoint
+- [ ] Modal: Parallel video processing with `starmap()`
+- [ ] Progress tracking for batch jobs (individual + overall)
+
+#### Result Notifications
+- [ ] Email notification service (SendGrid/Resend integration)
+- [ ] Webhook callback system for external integrations
+- [ ] In-app notification system with bell icon
+- [ ] Slack/Discord integration (optional)
+
+#### User Experience & Accessibility
+- [ ] Optimize video player for mobile devices with touch controls and responsive design
+- [ ] Achieve WCAG 2.1 AA accessibility compliance across all components
+- [ ] Implement internationalization (i18n) framework for multi-language support
+- [ ] Add offline functionality with service workers for cached video metadata
+- [ ] Convert to Progressive Web App (PWA) with offline capabilities
+
+#### Monitoring & Observability
+- [ ] Integrate Application Performance Monitoring (DataDog/New Relic) for production metrics
+- [ ] Implement real-time error tracking with Sentry for both frontend and backend
+- [ ] Create usage analytics dashboard for processing jobs, API usage, and system performance
+- [ ] Add comprehensive health checks with dependency monitoring (ChromaDB, R2, KV)
+- [ ] Implement log aggregation pipeline with structured logging and analysis
+
+### Priority 4: Testing & Quality Assurance
+
+#### Modal Integration Tests
+- [ ] Unit tests for job management API endpoints
+- [ ] Integration tests for Modal job lifecycle
+- [ ] E2E tests for processing page UI
+- [ ] Load testing for concurrent job handling
+
+#### CI/CD Pipeline Updates
+- [ ] Add Modal deployment to GitHub Actions
+- [ ] Automated KV namespace setup for preview deployments
+- [ ] Staging environment with separate Modal app
+
+#### Developer Experience
+- [ ] Auto-generate OpenAPI/Swagger documentation from TypeScript interfaces
+- [ ] Develop SDK/Client library for external integrations with face recognition API
+- [ ] Create improved local development setup with Docker Compose for all services
+- [ ] Add advanced debugging tools with profiling for video processing pipeline
+- [ ] Build component library documentation site with live examples
+
+#### Infrastructure & DevOps
+- [ ] Implement multi-region Cloudflare Workers deployment for global latency reduction
+- [ ] Create automated backup and disaster recovery procedures for R2 and KV
+- [ ] Add cost optimization monitoring and alerts for cloud resources
+- [ ] Develop Infrastructure as Code using Terraform for reproducible deployments
+- [ ] Implement blue-green deployment pipeline for zero-downtime updates
+
+### Priority 5: Documentation & DevX
+
+#### Developer Documentation
+- [ ] Modal integration setup guide
+- [ ] API documentation for job management endpoints
+- [ ] Troubleshooting guide for common issues
+- [ ] Architecture diagram updates
+
+#### Data Management
+- [ ] Implement automated data retention policies for processed videos and metadata
+- [ ] Create database migration and versioning system for ChromaDB schemas
+- [ ] Build data quality assurance pipelines for embedding consistency
+- [ ] Add automated backup verification and integrity checking
+- [ ] Develop data archiving strategies for long-term storage optimization
+
+#### Advanced Testing & Quality Assurance
+- [ ] Implement load testing for 100+ concurrent video processing jobs
+- [ ] Conduct security penetration testing on Modal integration endpoints
+- [ ] Add performance regression testing with automated alerts
+- [ ] Implement automated accessibility testing with axe-core integration
+- [ ] Create cross-browser compatibility testing suite for video player
+
+---
+
+## In Progress
+
+### Modal-Frontend Integration (PR #29)
+- [x] Frontend API routes for job management
+- [x] Enhanced processing page with dual modes
+- [x] Real-time job monitoring via WebSocket
+- [x] Worker backend structure (pending actual Modal integration)
+- [ ] **Pending merge and production testing**
 
 ---
 
