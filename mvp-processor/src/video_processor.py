@@ -509,7 +509,7 @@ class VideoProcessor:
             
             with VideoFileClip(input_path) as clip:
                 if clip.h != target_height:
-                    clip = clip.resize(height=target_height)
+                    clip = clip.resized(height=target_height)
                 
                 bitrate_map = {
                     "low": "1000k",

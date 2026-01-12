@@ -847,6 +847,69 @@ class HuggingFaceDataset:
 
         return result
 
+    def upload_source_video(
+        self,
+        video_path: str,
+        video_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Upload a source (original/unprocessed) video to HuggingFace.
+
+        Args:
+            video_path: Path to the source video file
+            video_name: Optional custom name for the video (defaults to filename)
+
+        Returns:
+            Dictionary with upload result including remote URL
+        """
+        result: Dict[str, Any] = {
+            "success": False,
+            "video_url": None,
+            "video_name": None,
+            "error": None,
+        }
+
+        try:
+            if not os.path.exists(video_path):
+                result["error"] = f"Video file not found: {video_path}"
+                logger.error(f"❌ {result['error']}")
+                return result
+
+            # Use custom name or filename
+            if video_name is None:
+                video_name = os.path.basename(video_path)
+
+            remote_path = f"videos/source/{video_name}"
+
+            # Get file size for logging
+            file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+
+            logger.info(f"📤 Uploading source video: {video_name} ({file_size_mb:.2f} MB)")
+            logger.info(f"   Remote path: {remote_path}")
+
+            # Upload video to HuggingFace
+            upload_file(
+                path_or_fileobj=video_path,
+                path_in_repo=remote_path,
+                repo_id=self.repo_id,
+                repo_type="dataset",
+                token=self.token,
+                commit_message=f"Upload source video: {video_name}",
+            )
+
+            result["video_url"] = f"https://huggingface.co/datasets/{self.repo_id}/resolve/main/{remote_path}"
+            result["video_name"] = video_name
+            result["success"] = True
+
+            logger.info(f"✅ Uploaded source video: {video_name}")
+            logger.info(f"   URL: {result['video_url']}")
+
+        except Exception as e:
+            result["error"] = str(e)
+            logger.error(f"❌ Failed to upload source video: {e}")
+
+        return result
+
 
 def create_dataset_readme(repo_id: str) -> str:
     """Generate README content for the HuggingFace dataset."""

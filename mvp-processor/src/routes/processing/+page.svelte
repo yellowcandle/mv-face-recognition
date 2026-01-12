@@ -1,645 +1,532 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import {
+    triggerModalJob,
+    getModalJobs,
+    cancelModalJob,
+    clearCompletedJobs,
+    WebSocketManager,
+    formatTimestamp
+  } from '$lib/utils/api';
+  import { processingJobs } from '$lib/stores/processingJobs';
   import Card from '$lib/components/Card.svelte';
-  import Badge from '$lib/components/Badge.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Badge from '$lib/components/Badge.svelte';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
+  import IconButton from '$lib/components/IconButton.svelte';
   
-  interface ProcessingJob {
-    id: string;
-    filename: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
-    progress: number;
-    startTime?: Date;
-    endTime?: Date;
-    faces_detected?: number;
-    faces_recognized?: number;
+  let error: string | null = null;
+  let isProcessing = false;
+  let ws: WebSocketManager | null = null;
+  let mounted = false;
+  
+  // Load existing jobs on mount
+  onMount(async () => {
+    mounted = true;
+    
+    try {
+      // Connect to WebSocket for real-time updates
+      const wsUrl = window.location.origin.replace('http', 'ws') + '/ws/modal-jobs';
+      ws = new WebSocketManager(wsUrl);
+      
+      ws.connect(
+        (data) => {
+          // Handle job updates from WebSocket
+          if (data.job || data.job_id) {
+            const job = data.job || { id: data.job_id, ...data };
+            processingJobs.updateJob(job.id, job);
+          }
+        },
+        (error) => {
+          console.error('WebSocket error:', error);
+        }
+      );
+      
+      // Load existing jobs
+      const { jobs } = await getModalJobs();
+      jobs.forEach(job => processingJobs.addJob(job));
+    } catch (err) {
+      console.error('Failed to load jobs:', err);
+      error = 'Failed to connect to processing service';
+    }
+    
+    // Refresh job status every 5 seconds
+    const interval = setInterval(async () => {
+      try {
+        const { jobs } = await getModalJobs();
+        jobs.forEach(job => processingJobs.updateJob(job.id, job));
+      } catch (err) {
+        console.error('Failed to refresh jobs:', err);
+      }
+    }, 5000);
+    
+    return () => {
+      clearInterval(interval);
+      ws?.disconnect();
+    };
+  });
+  
+  onDestroy(() => {
+    mounted = false;
+    ws?.disconnect();
+  });
+  
+  async function handleStartInitialProcessing() {
+    isProcessing = true;
+    error = null;
+    
+    try {
+      const { job_id } = await triggerModalJob({
+        mode: 'initial',
+        similarity_threshold: 0.25,
+        sync_from_hf: true,
+        upload_results: true
+      });
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to start processing';
+    } finally {
+      isProcessing = false;
+    }
   }
   
-  let processingJobs: ProcessingJob[] = [
-    {
-      id: '1',
-      filename: 'video-1.mp4',
-      status: 'completed',
-      progress: 100,
-      startTime: new Date(Date.now() - 300000),
-      endTime: new Date(Date.now() - 60000),
-      faces_detected: 127,
-      faces_recognized: 89
-    },
-    {
-      id: '2',
-      filename: 'video-2.mp4',
-      status: 'processing',
-      progress: 65,
-      startTime: new Date(Date.now() - 120000)
-    },
-    {
-      id: '3',
-      filename: 'video-3.mp4',
-      status: 'pending',
-      progress: 0
+  async function handleUpdateEmbeddings() {
+    isProcessing = true;
+    error = null;
+    
+    try {
+      const { job_id } = await triggerModalJob({
+        mode: 'embedding-update',
+        sync_from_hf: true
+      });
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to update embeddings';
+    } finally {
+      isProcessing = false;
     }
-  ];
+  }
   
-  let isProcessingActive = true;
-  let systemResources = {
-    cpu: 45,
-    memory: 62,
-    gpu: 78
-  };
+  async function handleCancelJob(jobId: string) {
+    try {
+      await cancelModalJob(jobId);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to cancel job';
+    }
+  }
+  
+  async function handleClearCompleted() {
+    try {
+      await clearCompletedJobs();
+      processingJobs.clearCompleted();
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to clear completed jobs';
+    }
+  }
   
   function getStatusColor(status: string): string {
     switch (status) {
       case 'completed': return '#22c55e';
-      case 'processing': return '#3b82f6';
+      case 'running': return '#3b82f6';
       case 'failed': return '#ef4444';
-      default: return '#6b7280';
+      case 'cancelled': return '#6b7280';
+      default: return '#f59e0b';
     }
   }
   
-  function formatDuration(start?: Date, end?: Date): string {
+  function formatDuration(start?: number, end?: number): string {
     if (!start) return '--';
-    const endTime = end || new Date();
-    const diff = Math.floor((endTime.getTime() - start.getTime()) / 1000);
+    const endTime = end || Date.now();
+    const diff = Math.floor((endTime - start) / 1000);
     const mins = Math.floor(diff / 60);
     const secs = diff % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
   
-  function startProcessing() {
-    // Simulate starting processing for pending jobs
-    processingJobs = processingJobs.map(job => {
-      if (job.status === 'pending') {
-        return {
-          ...job,
-          status: 'processing',
-          startTime: new Date(),
-          progress: 1
-        };
-      }
-      return job;
-    });
-  }
-  
-  function pauseProcessing() {
-    isProcessingActive = false;
-  }
-  
-  function resumeProcessing() {
-    isProcessingActive = true;
-  }
-  
-  onMount(() => {
-    // Simulate processing progress
-    const interval = setInterval(() => {
-      if (isProcessingActive) {
-        processingJobs = processingJobs.map(job => {
-          if (job.status === 'processing' && job.progress < 100) {
-            const newProgress = Math.min(100, job.progress + Math.random() * 5);
-            if (newProgress >= 100) {
-              return {
-                ...job,
-                status: 'completed',
-                progress: 100,
-                endTime: new Date(),
-                faces_detected: Math.floor(Math.random() * 200 + 50),
-                faces_recognized: Math.floor(Math.random() * 150 + 30)
-              };
-            }
-            return { ...job, progress: newProgress };
-          }
-          return job;
-        });
-        
-        // Update system resources
-        systemResources = {
-          cpu: Math.max(20, Math.min(90, systemResources.cpu + (Math.random() - 0.5) * 10)),
-          memory: Math.max(30, Math.min(95, systemResources.memory + (Math.random() - 0.5) * 8)),
-          gpu: Math.max(40, Math.min(100, systemResources.gpu + (Math.random() - 0.5) * 12))
-        };
-      }
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  });
+  $: activeJobsCount = $processingJobs.filter(j => j.status === 'running' || j.status === 'queued').length;
+  $: completedJobsCount = $processingJobs.filter(j => j.status === 'completed').length;
 </script>
 
-<svelte:head>
-  <title>Processing - Face Recognition Dashboard</title>
-</svelte:head>
-
-<div class="processing-container">
-  <div class="processing-header">
+<div class="processing-page">
+  <div class="header">
     <h1>Video Processing</h1>
-    <div class="processing-controls">
-      {#if isProcessingActive}
-        <Button variant="warning" size="sm" on:click={pauseProcessing}>
-          ⏸️ Pause Processing
-        </Button>
-      {:else}
-        <Button variant="primary" size="sm" on:click={resumeProcessing}>
-          ▶️ Resume Processing
-        </Button>
-      {/if}
-      <Button variant="success" size="sm" on:click={startProcessing}>
-        🚀 Start New Job
-      </Button>
-    </div>
+    <p>Manage Modal cloud processing jobs for face recognition</p>
   </div>
-
-  <div class="processing-main">
-    <!-- System Status Panel -->
-    <Card class="status-panel">
-      <h3>System Status</h3>
-      
-      <div class="status-indicator-wrapper">
-        <StatusIndicator 
-          status={isProcessingActive ? 'success' : 'neutral'} 
-          label={isProcessingActive ? 'Processing Active' : 'Processing Paused'}
-        />
+  
+  {#if error}
+    <div class="error-banner">
+      {error}
+    </div>
+  {/if}
+  
+  {#if activeJobsCount > 0}
+    <div class="status-banner active">
+      🔄 {activeJobsCount} job{activeJobsCount !== 1 ? 's' : ''} running
+    </div>
+  {/if}
+  
+  <div class="processing-grid">
+    <Card>
+      <div class="card-header">
+        <h2>Initial Processing</h2>
+        <StatusIndicator status="ready" />
       </div>
       
-      <div class="resource-metrics">
-        <div class="metric">
-          <div class="metric-header">
-            <span class="metric-label">CPU Usage</span>
-            <span class="metric-value">{Math.round(systemResources.cpu)}%</span>
-          </div>
-          <div class="metric-bar">
-            <div 
-              class="metric-fill cpu"
-              style="width: {systemResources.cpu}%"
-            ></div>
-          </div>
-        </div>
-        
-        <div class="metric">
-          <div class="metric-header">
-            <span class="metric-label">Memory Usage</span>
-            <span class="metric-value">{Math.round(systemResources.memory)}%</span>
-          </div>
-          <div class="metric-bar">
-            <div 
-              class="metric-fill memory"
-              style="width: {systemResources.memory}%"
-            ></div>
-          </div>
-        </div>
-        
-        <div class="metric">
-          <div class="metric-header">
-            <span class="metric-label">GPU Usage</span>
-            <span class="metric-value">{Math.round(systemResources.gpu)}%</span>
-          </div>
-          <div class="metric-bar">
-            <div 
-              class="metric-fill gpu"
-              style="width: {systemResources.gpu}%"
-            ></div>
-          </div>
-        </div>
+      <p class="description">
+        Process all videos using cloud GPUs for initial face detection and recognition
+      </p>
+      
+      <div class="controls">
+        <Button
+          on:click={handleStartInitialProcessing}
+          disabled={isProcessing}
+          loading={isProcessing}
+          variant="primary"
+          fullWidth
+        >
+          🚀 Start Processing
+        </Button>
+      </div>
+      
+      <div class="features">
+        <ul>
+          <li>🎬 Process all unprocessed videos</li>
+          <li>👥 Detect and recognize faces</li>
+          <li>⚡ Cloud GPU acceleration</li>
+          <li>☁️ Automatic HuggingFace sync</li>
+        </ul>
       </div>
     </Card>
-
-    <!-- Processing Queue -->
-    <Card class="queue-panel">
-      <h3>Processing Queue</h3>
+    
+    <Card>
+      <div class="card-header">
+        <h2>Embedding Update</h2>
+        <StatusIndicator status="ready" />
+      </div>
       
+      <p class="description">
+        Improve recognition accuracy by incorporating user-flagged faces into embeddings
+      </p>
+      
+      <div class="controls">
+        <Button
+          on:click={handleUpdateEmbeddings}
+          disabled={isProcessing}
+          loading={isProcessing}
+          variant="secondary"
+          fullWidth
+        >
+          🔄 Update Embeddings
+        </Button>
+      </div>
+      
+      <div class="features">
+        <ul>
+          <li>🎯 Improve face recognition accuracy</li>
+          <li>🏷️ Incorporate user feedback</li>
+          <li>⚡ Fast embedding recalculation</li>
+          <li>🔄 Automatic database rebuild</li>
+        </ul>
+      </div>
+    </Card>
+  </div>
+  
+  <Card>
+    <div class="card-header">
+      <h2>Processing Jobs</h2>
+      <div class="job-stats">
+        <Badge color="#3b82f6">{activeJobsCount} Active</Badge>
+        <Badge color="#22c55e">{completedJobsCount} Completed</Badge>
+        {#if completedJobsCount > 0}
+          <Button
+            size="small"
+            variant="text"
+            on:click={handleClearCompleted}
+          >
+            Clear Completed
+          </Button>
+        {/if}
+      </div>
+    </div>
+    
+    {#if $processingJobs.length === 0}
+      <div class="empty-state">
+        <p>No processing jobs yet</p>
+        <p class="help">Start a processing job to see it here</p>
+      </div>
+    {:else}
       <div class="job-list">
-        {#each processingJobs as job}
-          <div class="job-item" class:active={job.status === 'processing'}>
-            <div class="job-header">
-              <div class="job-info">
-                <h4 class="job-filename">{job.filename}</h4>
-                <div class="job-meta">
-                  <span class="job-status">
-                    <Badge variant={job.status === 'completed' ? 'success' : job.status === 'processing' ? 'primary' : job.status === 'failed' ? 'error' : 'neutral'}>
-                      {job.status.toUpperCase()}
-                    </Badge>
-                  </span>
-                  <span class="job-duration">
-                    {formatDuration(job.startTime, job.endTime)}
-                  </span>
-                </div>
+        {#each $processingJobs as job}
+          <div class="job-item">
+            <div class="job-main">
+              <div class="job-header">
+                <h3>{job.mode ? job.mode.replace('-', ' ').toUpperCase() : 'Processing'}</h3>
+                <Badge color={getStatusColor(job.status)}>
+                  {job.status}
+                </Badge>
               </div>
               
-              <div class="job-progress-text">
-                {Math.round(job.progress)}%
+              {#if job.current_video}
+                <p class="current-video">📹 {job.current_video}</p>
+              {/if}
+              
+              {#if job.videos_processed !== undefined && job.total_videos}
+                <p class="video-progress">
+                  {job.videos_processed} / {job.total_videos} videos
+                </p>
+              {/if}
+              
+              <div class="progress-section">
+                <div class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    style="width: {job.progress || 0}%"
+                  ></div>
+                </div>
+                <span class="progress-text">{job.progress || 0}%</span>
               </div>
             </div>
             
-            <div class="job-progress-bar">
-              <div 
-                class="job-progress-fill"
-                style="width: {job.progress}%; background-color: {getStatusColor(job.status)}"
-              ></div>
+            <div class="job-actions">
+              {#if job.status === 'queued' || job.status === 'running'}
+                <IconButton
+                  icon="x-circle"
+                  title="Cancel job"
+                  on:click={() => handleCancelJob(job.id)}
+                  disabled={job.status === 'cancelled'}
+                />
+              {/if}
+              
+              <div class="job-times">
+                {#if job.created_at}
+                  <span class="time-label">Created: {formatTimestamp(new Date(job.created_at).toISOString())}</span>
+                {/if}
+                {#if job.started_at}
+                  <span class="time-label">Duration: {formatDuration(job.started_at, job.completed_at)}</span>
+                {/if}
+              </div>
             </div>
-            
-            {#if job.status === 'completed'}
-              <div class="job-results">
-                <div class="result-item">
-                  <span class="result-label">Faces Detected:</span>
-                  <span class="result-value">{job.faces_detected}</span>
-                </div>
-                <div class="result-item">
-                  <span class="result-label">Faces Recognized:</span>
-                  <span class="result-value">{job.faces_recognized}</span>
-                </div>
-              </div>
-            {/if}
-            
-            {#if job.status === 'processing'}
-              <div class="job-details">
-                <div class="detail-item">
-                  <span>Processing frames...</span>
-                </div>
-                <div class="detail-item">
-                  <span>Detecting faces...</span>
-                </div>
-              </div>
-            {/if}
           </div>
         {/each}
       </div>
-    </Card>
-  </div>
-
-  <!-- Processing Statistics -->
-  <Card class="stats-panel">
-    <div class="stats-panel-inner">
-      <h3>Processing Statistics</h3>
-      
-      <div class="stats-grid">
-        <Card variant="bordered" padding="sm">
-          <div class="stat-card-inner">
-            <div class="stat-icon">📊</div>
-            <div class="stat-content">
-              <div class="stat-value">3</div>
-              <div class="stat-label">Total Jobs</div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="bordered" padding="sm">
-          <div class="stat-card-inner">
-            <div class="stat-icon">✅</div>
-            <div class="stat-content">
-              <div class="stat-value">1</div>
-              <div class="stat-label">Completed</div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="bordered" padding="sm">
-          <div class="stat-card-inner">
-            <div class="stat-icon">⚡</div>
-            <div class="stat-content">
-              <div class="stat-value">1</div>
-              <div class="stat-label">Processing</div>
-            </div>
-          </div>
-        </Card>
-        
-        <Card variant="bordered" padding="sm">
-          <div class="stat-card-inner">
-            <div class="stat-icon">⏳</div>
-            <div class="stat-content">
-              <div class="stat-value">1</div>
-              <div class="stat-label">Pending</div>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </div>
+    {/if}
   </Card>
 </div>
 
 <style>
-  .processing-container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-5);
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    gap: var(--space-5);
+  .processing-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
   }
-
-  .processing-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: var(--space-4);
-    border-bottom: var(--space-px) solid var(--border-default);
+  
+  .header {
+    margin-bottom: 2rem;
+    
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #1f2937;
+    }
+    
+    p {
+      color: #6b7280;
+      font-size: 1.125rem;
+    }
   }
-
-  .processing-header h1 {
-    font-size: var(--text-h3-size);
-    font-weight: var(--text-h3-weight);
-    margin: 0;
-  }
-
-  .processing-controls {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .control-btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
+  
+  .error-banner {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 14px;
   }
-
-  .start-btn {
-    background-color: #22c55e;
-    color: #000;
-  }
-
-  .pause-btn {
-    background-color: #eab308;
-    color: #000;
-  }
-
-  .resume-btn {
-    background-color: #3b82f6;
-    color: #fff;
-  }
-
-  .control-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .processing-main {
-    flex: 1;
-    display: flex;
-    gap: 20px;
-    min-height: 0;
-  }
-
-  .status-panel {
-    width: 300px;
-    height: fit-content;
-  }
-
-  .status-panel h3 {
-    font-size: var(--text-h5-size);
-    font-weight: var(--text-h5-weight);
-    margin-bottom: var(--space-5);
-    color: var(--text-primary);
-  }
-
-  .status-indicator-wrapper {
+  
+  .status-banner {
+    padding: 1rem 1.5rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-6);
-    padding: var(--space-3);
-    background-color: var(--bg-tertiary);
-    border-radius: var(--radius-md);
+    gap: 0.5rem;
+    
+    &.active {
+      background: #dbeafe;
+      border: 1px solid #3b82f6;
+      color: #1d4ed8;
+    }
   }
-
-  .status-text {
-    font-weight: var(--text-label-weight);
-    font-size: var(--text-label-size);
+  
+  .processing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
   }
-
-  .resource-metrics {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  .metric {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1-5);
-  }
-
-  .metric-header {
+  
+  .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 1rem;
+    
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: #1f2937;
+    }
   }
-
-  .metric-label {
-    font-size: var(--text-body-sm-size);
-    color: var(--text-secondary);
+  
+  .description {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
   }
-
-  .metric-value {
-    font-weight: var(--text-h6-weight);
-    color: var(--text-primary);
+  
+  .controls {
+    margin-bottom: 1.5rem;
   }
-
-  .metric-bar {
-    height: 8px;
-    background-color: var(--color-neutral-700);
-    border-radius: var(--radius-full);
-    overflow: hidden;
+  
+  .features {
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      
+      li {
+        padding: 0.25rem 0;
+        color: #6b7280;
+        font-size: 0.875rem;
+        
+        &:before {
+          content: '✓';
+          color: #10b981;
+          font-weight: bold;
+          margin-right: 0.5rem;
+        }
+      }
+    }
   }
-
-  .metric-fill {
-    height: 100%;
-    transition: width var(--duration-slow) var(--ease-in-out);
-    border-radius: var(--radius-full);
+  
+  .job-stats {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
   }
-
-  .metric-fill.cpu {
-    background-color: var(--color-primary-500);
+  
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #9ca3af;
+    
+    .help {
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
   }
-
-  .metric-fill.memory {
-    background-color: var(--color-warning-500);
-  }
-
-  .metric-fill.gpu {
-    background-color: var(--color-success-500);
-  }
-
-  .queue-panel {
-    flex: 1;
-    overflow-y: auto;
-  }
-
-  .queue-panel h3 {
-    font-size: var(--text-h5-size);
-    font-weight: var(--text-h5-weight);
-    margin-bottom: var(--space-5);
-    color: var(--text-primary);
-  }
-
+  
   .job-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: 1rem;
   }
-
+  
   .job-item {
-    background-color: var(--bg-tertiary);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    border: 2px solid transparent;
-    transition: all var(--duration-normal);
-  }
-
-  .job-item.active {
-    border-color: var(--color-primary-500);
-    box-shadow: var(--shadow-dark-md);
-  }
-
-  .job-header {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    background: #f9fafb;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--space-2.5);
-  }
-
-  .job-info {
-    flex: 1;
-  }
-
-  .job-filename {
-    font-size: var(--text-body-size);
-    font-weight: var(--text-h6-weight);
-    margin: 0 0 var(--space-1) 0;
-    color: var(--text-primary);
-  }
-
-  .job-meta {
-    display: flex;
-    gap: var(--space-4);
-    font-size: var(--text-body-xs-size);
-  }
-
-  .job-status {
-    font-weight: var(--text-h6-weight);
-  }
-
-  .job-duration {
-    color: var(--text-secondary);
-  }
-
-  .job-progress-text {
-    font-size: var(--text-body-sm-size);
-    font-weight: var(--text-h6-weight);
-    color: var(--text-primary);
-  }
-
-  .job-progress-bar {
-    height: 6px;
-    background-color: var(--color-neutral-700);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    margin-bottom: var(--space-2.5);
-  }
-
-  .job-progress-fill {
-    height: 100%;
-    transition: width var(--duration-slow) var(--ease-in-out);
-    border-radius: var(--radius-full);
-  }
-
-  .job-results {
-    display: flex;
-    gap: var(--space-5);
-    margin-top: var(--space-2.5);
-  }
-
-  .result-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .result-label {
-    font-size: var(--text-body-xs-size);
-    color: var(--text-secondary);
-  }
-
-  .result-value {
-    font-size: var(--text-body-size);
-    font-weight: var(--text-h6-weight);
-    color: var(--color-success-500);
-  }
-
-  .job-details {
-    margin-top: var(--space-2.5);
-    font-size: var(--text-body-xs-size);
-    color: var(--text-secondary);
-  }
-
-  .detail-item {
-    padding: 2px 0;
-  }
-
-  .stats-panel-inner h3 {
-    font-size: var(--text-h5-size);
-    font-weight: var(--text-h5-weight);
-    margin-bottom: var(--space-5);
-    color: var(--text-primary);
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-4);
-  }
-
-  .stat-card-inner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .stat-icon {
-    font-size: var(--text-h3-size);
-  }
-
-  .stat-content {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .stat-value {
-    font-size: var(--text-h4-size);
-    font-weight: var(--text-h4-weight);
-    color: var(--text-primary);
-  }
-
-  .stat-label {
-    font-size: var(--text-body-xs-size);
-    color: var(--text-secondary);
-  }
-
-  /* Mobile Responsive */
-  @media (max-width: 768px) {
-    .processing-header {
+    transition: box-shadow 0.2s ease;
+    
+    &:hover {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .job-main {
+      flex: 1;
+    }
+    
+    .job-header {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      
+      h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1f2937;
+      }
+    }
+    
+    .current-video {
+      margin: 0.25rem 0;
+      font-size: 0.875rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    
+    .video-progress {
+      margin: 0.5rem 0;
+      font-size: 0.875rem;
+      color: #374151;
+      font-weight: 500;
+    }
+    
+    .progress-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+      
+      .progress-bar {
+        flex: 1;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+        
+        .progress-fill {
+          height: 100%;
+          background: #3b82f6;
+          transition: width 0.3s ease;
+        }
+      }
+      
+      .progress-text {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+        min-width: 40px;
+      }
+    }
+    
+    .job-actions {
+      display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 15px;
-    }
-    
-    .processing-controls {
-      width: 100%;
-      justify-content: space-between;
-    }
-    
-    .processing-main {
-      flex-direction: column;
-    }
-    
-    .status-panel {
-      width: 100%;
-    }
-    
-    .stats-grid {
-      grid-template-columns: repeat(2, 1fr);
+      align-items: flex-end;
+      gap: 0.5rem;
+      margin-left: 1rem;
+      
+      .job-times {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.25rem;
+        
+        .time-label {
+          font-size: 0.75rem;
+          color: #6b7280;
+        }
+      }
     }
   }
 </style>
