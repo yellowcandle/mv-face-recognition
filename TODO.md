@@ -20,14 +20,14 @@
 ### System Improvements
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
 
-### Modal Video Processing Enhancements (Optional)
-- [ ] **Automatic Modal Trigger**: Integrate Modal's HTTP API to auto-trigger processing
-- [ ] **Progress Polling**: Add WebSocket updates for real-time processing status
-- [ ] **Job Queue UI**: Show list of queued/processing jobs
+### Modal Video Processing Enhancements
+- [x] **Automatic Modal Trigger**: Integrate Modal's HTTP API to auto-trigger processing
+- [x] **Progress Polling**: Add WebSocket updates for real-time processing status
+- [x] **Job Queue UI**: Show list of queued/processing jobs with progress bars
 - [ ] **Batch Processing**: Allow uploading multiple videos at once
 - [ ] **Result Notifications**: Email/webhook when processing completes
 
-**Context**: Current system requires manual Modal command execution after frontend upload. These enhancements would provide full automation and real-time feedback.
+**Context**: Modal cloud processing can now be triggered directly from the frontend processing page. Users can monitor job status in real-time via WebSocket connections and cancel jobs if needed. Embeddings can be updated automatically after face flagging.
 
 ---
 
@@ -61,6 +61,16 @@
 - [x] Backend: replace remaining print() usage with logging
 - [x] Repo cleanup: archive/move legacy root scripts (gradio, debug, benchmarks, legacy video_processor)
 - [x] Python: rename src/logging.py -> src/secure_logging.py (avoid shadowing stdlib logging; enable ty)
+
+### Completed (January 2026)
+- [x] **Modal-Frontend Integration** - Complete cloud processing control from web UI
+  - [x] Frontend API routes for job management (trigger, status, cancel, list)
+  - [x] Enhanced processing page with dual modes (Initial & Embedding Update)
+  - [x] Real-time job monitoring via WebSocket
+  - [x] Progress bars and visual status indicators
+  - [x] Job cancellation support
+  - [x] Worker backend with KV-based job persistence
+  - [x] Integration with existing Modal scripts (modal_hf_processor.py)
 
 ### Completed (July 2025)
 - [x] Comprehensive video player with face recognition overlays
