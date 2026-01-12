@@ -39,6 +39,9 @@
   // Video metadata
   let videoMetadata: any = null;
 
+  // Video source toggle (original vs annotated)
+  let showOriginalVideo = false;
+
   // Polling interval for face detection
   let facePollingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -179,6 +182,40 @@
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function getVideoSource(): string {
+    if (!selectedVideo) return '';
+
+    if (showOriginalVideo) {
+      // Serve original video from static symlink
+      // The filename should match the source video filename
+      const filename = selectedVideo.filename || `${selectedVideo.id}.mp4`;
+      return `/source/videos/${filename}`;
+    } else {
+      // Use processed/annotated video from R2
+      return `${API_BASE}${selectedVideo.stream_url}`;
+    }
+  }
+
+  function toggleVideoSource() {
+    if (!videoElement) return;
+
+    const currentTime = videoElement.currentTime;
+    const wasPlaying = isPlaying;
+
+    // Toggle source
+    showOriginalVideo = !showOriginalVideo;
+
+    // Update video source and restore playback position
+    const newSource = getVideoSource();
+    if (videoElement.src !== newSource) {
+      videoElement.src = newSource;
+      videoElement.currentTime = currentTime;
+      if (wasPlaying) {
+        videoElement.play();
+      }
+    }
   }
 
   function handleFaceClick(face: any) {
@@ -452,7 +489,7 @@
           {#if selectedVideo}
             <video
               bind:this={videoElement}
-              src="{API_BASE}{selectedVideo.stream_url}"
+              src={getVideoSource()}
               on:timeupdate={handleTimeUpdate}
               on:loadedmetadata={handleLoadedMetadata}
               on:play={() => { isPlaying = true; startFacePolling(); }}
@@ -531,6 +568,14 @@
 
         <!-- Detection Info Bar -->
         <div class="detection-bar">
+          <button
+            class="video-source-toggle"
+            class:active={!showOriginalVideo}
+            on:click={toggleVideoSource}
+            title={showOriginalVideo ? 'Switch to Annotated Video' : 'Switch to Original Video'}
+          >
+            {showOriginalVideo ? '📹 Original' : '🎨 Annotated'}
+          </button>
           <span>👥 Detected Faces: {detectedFaces.length}</span>
           <span>📍 Current Frame: {Math.floor(currentTime * (videoMetadata?.video_info?.fps || 25))}</span>
           {#if detectedFaces.length > 0}
@@ -1031,6 +1076,7 @@
     background-color: #1e293b;
     padding: var(--space-3) var(--space-4);
     display: flex;
+    align-items: center;
     gap: var(--space-5);
     font-size: 13px;
     color: var(--color-gray-400);
@@ -1041,6 +1087,33 @@
   .detection-bar .hint {
     color: var(--color-primary-500);
     margin-left: auto;
+  }
+
+  .video-source-toggle {
+    padding: var(--space-2) var(--space-4);
+    border: 2px solid var(--color-gray-600);
+    border-radius: var(--space-2);
+    background: var(--color-gray-700);
+    color: #d1d5db;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: var(--text-weight-medium);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .video-source-toggle:hover {
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-500);
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .video-source-toggle.active {
+    border-color: var(--color-success-500);
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--color-success-500);
   }
 
   .info-panel {

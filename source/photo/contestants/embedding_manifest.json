@@ -1,0 +1,482 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-09T07:18:17.867474+00:00",
+  "dimension": 512,
+  "embeddings": {
+    "Jackie": {
+      "filename": "Jackie_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968110.556432
+    },
+    "Carina": {
+      "filename": "Carina_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.3019707
+    },
+    "Chloe Au": {
+      "filename": "Chloe Au_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968107.481991
+    },
+    "\u6771\u6771": {
+      "filename": "\u6771\u6771_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968097.7026532
+    },
+    "Candy": {
+      "filename": "Candy_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.4324503
+    },
+    "Christine": {
+      "filename": "Christine_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968107.480735
+    },
+    "Gao": {
+      "filename": "Gao_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.0553753
+    },
+    "WINKA": {
+      "filename": "WINKA_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968117.5388124
+    },
+    "\u963f\u86cb": {
+      "filename": "\u963f\u86cb_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.9942367
+    },
+    "Elka": {
+      "filename": "Elka_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968108.3203266
+    },
+    "\u8212\u6587": {
+      "filename": "\u8212\u6587_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4858284
+    },
+    "\u99ac\u6b23": {
+      "filename": "\u99ac\u6b23_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968228.0861769
+    },
+    "\u82af\u99d6": {
+      "filename": "\u82af\u99d6_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.522544
+    },
+    "\u7a4e\u854e": {
+      "filename": "\u7a4e\u854e_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4790945
+    },
+    "Ashi": {
+      "filename": "Ashi_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.072892
+    },
+    "Yanis": {
+      "filename": "Yanis_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968118.2775593
+    },
+    "TABI": {
+      "filename": "TABI_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968116.1028404
+    },
+    "\u7cbe\u9748": {
+      "filename": "\u7cbe\u9748_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4586515
+    },
+    "CK": {
+      "filename": "CK_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.073535
+    },
+    "\u963f\u59b9": {
+      "filename": "\u963f\u59b9_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968228.0169606
+    },
+    "\u5609\u5609": {
+      "filename": "\u5609\u5609_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.8999023
+    },
+    "Ana": {
+      "filename": "Ana_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968102.8575685
+    },
+    "Jade Chan": {
+      "filename": "Jade Chan_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968110.586315
+    },
+    "\u5496\u55b1": {
+      "filename": "\u5496\u55b1_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.8278291
+    },
+    "Emi": {
+      "filename": "Emi_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968096.1508117
+    },
+    "\u963f bee": {
+      "filename": "\u963f bee_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.9844744
+    },
+    "Yanny": {
+      "filename": "Yanny_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968118.4132247
+    },
+    "Miko": {
+      "filename": "Miko_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968113.9213765
+    },
+    "\u9732\u9ac0": {
+      "filename": "\u9732\u9ac0_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968228.019584
+    },
+    "Ace": {
+      "filename": "Ace_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968100.6104877
+    },
+    "Liu \u54e5": {
+      "filename": "Liu \u54e5_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968112.6753402
+    },
+    "Mei Mei": {
+      "filename": "Mei Mei_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968113.2323704
+    },
+    "Caca": {
+      "filename": "Caca_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.0737813
+    },
+    "Karen": {
+      "filename": "Karen_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968111.4851987
+    },
+    "Stella": {
+      "filename": "Stella_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968115.6425047
+    },
+    "Sica": {
+      "filename": "Sica_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968114.8308268
+    },
+    "\u5b50\u6d93": {
+      "filename": "\u5b50\u6d93_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.9494035
+    },
+    "Ika": {
+      "filename": "Ika_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.8085244
+    },
+    "\u71d2\u8ce3": {
+      "filename": "\u71d2\u8ce3_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.46155
+    },
+    "Man C": {
+      "filename": "Man C_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968112.324737
+    },
+    "Zoe": {
+      "filename": "Zoe_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.0330899
+    },
+    "\u5b89\u5e0c\u5a77": {
+      "filename": "\u5b89\u5e0c\u5a77_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968120.4974027
+    },
+    "Bubu": {
+      "filename": "Bubu_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.0732875
+    },
+    "2Ling": {
+      "filename": "2Ling_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968099.1298652
+    },
+    "\u963f Wing": {
+      "filename": "\u963f Wing_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.7544534
+    },
+    "Alice": {
+      "filename": "Alice_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968102.1002479
+    },
+    "\u7c73\u7dda": {
+      "filename": "\u7c73\u7dda_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4554646
+    },
+    "Catrina": {
+      "filename": "Catrina_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968107.409319
+    },
+    "Day": {
+      "filename": "Day_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968108.2665527
+    },
+    "Emiko": {
+      "filename": "Emiko_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.0538955
+    },
+    "\u963f J": {
+      "filename": "\u963f J_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.7404912
+    },
+    "\u963f Yo": {
+      "filename": "\u963f Yo_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.7947924
+    },
+    "\u9266\u8cbd": {
+      "filename": "\u9266\u8cbd_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.7435162
+    },
+    "Tengie": {
+      "filename": "Tengie_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968116.8334255
+    },
+    "Kay": {
+      "filename": "Kay_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968111.4981174
+    },
+    "\u699b\u7da6": {
+      "filename": "\u699b\u7da6_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.2904477
+    },
+    "Sarah": {
+      "filename": "Sarah_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968114.666329
+    },
+    "\u4e01\u4e01": {
+      "filename": "\u4e01\u4e01_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.173217
+    },
+    "\u8607\u83f2": {
+      "filename": "\u8607\u83f2_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.739277
+    },
+    "Marf": {
+      "filename": "Marf_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968112.5090246
+    },
+    "\u7b60\u5152": {
+      "filename": "\u7b60\u5152_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4807656
+    },
+    "VAL": {
+      "filename": "VAL_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968116.8321598
+    },
+    "Ada \u4ed4": {
+      "filename": "Ada \u4ed4_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968101.3686428
+    },
+    "\u9673\u7956": {
+      "filename": "\u9673\u7956_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.9929736
+    },
+    "Sinnie": {
+      "filename": "Sinnie_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968115.3553705
+    },
+    "Ash": {
+      "filename": "Ash_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.07248
+    },
+    "Ivy So": {
+      "filename": "Ivy So_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.8059187
+    },
+    "\u8d85\u9178": {
+      "filename": "\u8d85\u9178_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.737781
+    },
+    "Ariel": {
+      "filename": "Ariel_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.0717006
+    },
+    "Vicky": {
+      "filename": "Vicky_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968116.9981127
+    },
+    "So Ching": {
+      "filename": "So Ching_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968115.5418203
+    },
+    "Sam": {
+      "filename": "Sam_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968114.1550446
+    },
+    "Tania": {
+      "filename": "Tania_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968116.2868614
+    },
+    "May May": {
+      "filename": "May May_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968113.4670105
+    },
+    "Dru": {
+      "filename": "Dru_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968108.3193579
+    },
+    "\u838e\u838e": {
+      "filename": "\u838e\u838e_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.4880702
+    },
+    "Yoyo": {
+      "filename": "Yoyo_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968118.5527964
+    },
+    "Michelle": {
+      "filename": "Michelle_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968113.440684
+    },
+    "Ariels": {
+      "filename": "Ariels_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.0720656
+    },
+    "\u963f Mic": {
+      "filename": "\u963f Mic_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.7422738
+    },
+    "Hannah": {
+      "filename": "Hannah_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.7783113
+    },
+    "3\u00a0\u59b9": {
+      "filename": "3\u00a0\u59b9_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968099.8511841
+    },
+    "\u4f55\u4f69": {
+      "filename": "\u4f55\u4f69_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968119.2737646
+    },
+    "Win Win": {
+      "filename": "Win Win_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968117.67087
+    },
+    "\u9435\u9435": {
+      "filename": "\u9435\u9435_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968228.1321406
+    },
+    "Puipui": {
+      "filename": "Puipui_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968114.5820491
+    },
+    "\u5bb6\u742a": {
+      "filename": "\u5bb6\u742a_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968121.07044
+    },
+    "Carmina": {
+      "filename": "Carmina_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968106.4337993
+    },
+    "\u5c0f\u7802": {
+      "filename": "\u5c0f\u7802_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968111.7649662
+    },
+    "\u6690\u7ff9": {
+      "filename": "\u6690\u7ff9_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968098.4077735
+    },
+    "\u65b9\u65b9": {
+      "filename": "\u65b9\u65b9_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968109.03204
+    },
+    "Jolin": {
+      "filename": "Jolin_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968110.6054363
+    },
+    "Kinki": {
+      "filename": "Kinki_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968096.865438
+    },
+    "\u963f\u6770": {
+      "filename": "\u963f\u6770_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968227.9916375
+    },
+    "Winkie": {
+      "filename": "Winkie_embedding.npy",
+      "dimension": 512,
+      "mtime": 1766968117.8194163
+    }
+  }
+}

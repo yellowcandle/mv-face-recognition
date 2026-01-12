@@ -1,0 +1,3613 @@
+{
+  "video_info": {
+    "filename": "test-video-mv2.mp4",
+    "fps": 25.03267973856209,
+    "frame_count": 766,
+    "width": 3840,
+    "height": 1600,
+    "duration": 30.6,
+    "processed_name": "test-video-mv2",
+    "processing_date": "2026-01-09T11:25:27.818681"
+  },
+  "processing_summary": {
+    "frames_processed": 156,
+    "total_faces_detected": 244,
+    "total_recognitions": 0,
+    "unique_contestants": 0,
+    "recognition_rate": 0.0,
+    "confidence_stats": {
+      "average": 0.0,
+      "minimum": 0.0,
+      "maximum": 0.0
+    },
+    "processing_timestamp": "2026-01-09T11:25:27.818648"
+  },
+  "contestant_timeline": {},
+  "timeline_markers": [],
+  "frame_data": [
+    {
+      "frame_number": 0,
+      "timestamp": 0.0,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01709368058754579,
+          "face_location": [
+            162,
+            1188,
+            547,
+            803
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 1,
+      "timestamp": 0.1597911227154047,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016013378793145794,
+          "face_location": [
+            162,
+            1274,
+            547,
+            889
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 3,
+      "timestamp": 0.4793733681462141,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016383377995367265,
+          "face_location": [
+            143,
+            1375,
+            605,
+            913
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 4,
+      "timestamp": 0.6391644908616188,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.012481129004047187,
+          "face_location": [
+            194,
+            1375,
+            657,
+            913
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 6,
+      "timestamp": 0.9587467362924282,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013217937874732577,
+          "face_location": [
+            217,
+            1157,
+            440,
+            935
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 7,
+      "timestamp": 1.118537859007833,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013214853534620707,
+          "face_location": [
+            201,
+            1152,
+            468,
+            884
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 8,
+      "timestamp": 1.2783289817232375,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009936781703901332,
+          "face_location": [
+            242,
+            1083,
+            464,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 9,
+      "timestamp": 1.4381201044386422,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 10,
+      "timestamp": 1.597911227154047,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 11,
+      "timestamp": 1.7577023498694517,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 12,
+      "timestamp": 1.9174934725848565,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 13,
+      "timestamp": 2.077284595300261,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0027258031433416985,
+          "face_location": [
+            291,
+            935,
+            514,
+            712
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 14,
+      "timestamp": 2.237075718015666,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 16,
+      "timestamp": 2.556657963446475,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "87",
+          "contestant_name": "葛綽瑤",
+          "contestant_nickname": "Yoyo",
+          "confidence": 0.014072880778378316,
+          "face_location": [
+            356,
+            769,
+            511,
+            614
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01100697835646025,
+          "face_location": [
+            23,
+            1686,
+            290,
+            1419
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 17,
+      "timestamp": 2.7164490861618797,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.00502667673461521,
+          "face_location": [
+            0,
+            1668,
+            313,
+            1347
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 18,
+      "timestamp": 2.8762402088772845,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.006244576147856784,
+          "face_location": [
+            0,
+            1596,
+            313,
+            1275
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 19,
+      "timestamp": 3.0360313315926892,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01248130236875078,
+          "face_location": [
+            0,
+            675,
+            376,
+            290
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 32,
+      "timestamp": 5.11331592689295,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01855767776851347,
+          "face_location": [
+            495,
+            1455,
+            557,
+            1393
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 33,
+      "timestamp": 5.273107049608355,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0068386614884312635,
+          "face_location": [
+            391,
+            1462,
+            453,
+            1400
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 34,
+      "timestamp": 5.4328981723237595,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0016671493642449464,
+          "face_location": [
+            389,
+            665,
+            441,
+            613
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 35,
+      "timestamp": 5.592689295039165,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "95",
+          "contestant_name": "許寶恆",
+          "contestant_nickname": "Alice",
+          "confidence": 0.0003435140002667758,
+          "face_location": [
+            267,
+            1448,
+            329,
+            1386
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025120610542731625,
+          "face_location": [
+            366,
+            700,
+            418,
+            648
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.010448412059516077,
+          "face_location": [
+            350,
+            1197,
+            386,
+            1161
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 36,
+      "timestamp": 5.752480417754569,
+      "detections_count": 3,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013712770569406896,
+          "face_location": [
+            322,
+            1185,
+            358,
+            1149
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 37,
+      "timestamp": 5.912271540469974,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0018082834240891188,
+          "face_location": [
+            218,
+            1400,
+            281,
+            1338
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.018744025037141787,
+          "face_location": [
+            298,
+            1173,
+            334,
+            1137
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 38,
+      "timestamp": 6.0720626631853785,
+      "detections_count": 4,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.011760639016705654,
+          "face_location": [
+            386,
+            917,
+            422,
+            881
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.014616723131862464,
+          "face_location": [
+            286,
+            1157,
+            322,
+            1121
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025171348530095172,
+          "face_location": [
+            303,
+            688,
+            355,
+            636
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 39,
+      "timestamp": 6.231853785900784,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.0028091802590120007,
+          "face_location": [
+            378,
+            909,
+            414,
+            873
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.018028662750321334,
+          "face_location": [
+            286,
+            1141,
+            322,
+            1105
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022860554421092028,
+          "face_location": [
+            297,
+            677,
+            349,
+            625
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 40,
+      "timestamp": 6.391644908616188,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0058528264248861595,
+          "face_location": [
+            282,
+            1121,
+            318,
+            1085
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02200462280199922,
+          "face_location": [
+            297,
+            677,
+            349,
+            625
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 41,
+      "timestamp": 6.551436031331593,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01849515546920988,
+          "face_location": [
+            291,
+            688,
+            343,
+            636
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011640879846822383,
+          "face_location": [
+            282,
+            1113,
+            318,
+            1077
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 42,
+      "timestamp": 6.711227154046997,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.003211638251627069,
+          "face_location": [
+            374,
+            897,
+            410,
+            861
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03694518562233473,
+          "face_location": [
+            274,
+            700,
+            326,
+            648
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009014247677668452,
+          "face_location": [
+            282,
+            1109,
+            318,
+            1073
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 43,
+      "timestamp": 6.871018276762402,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.005618226896561773,
+          "face_location": [
+            282,
+            1105,
+            318,
+            1069
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 44,
+      "timestamp": 7.030809399477807,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "95",
+          "contestant_name": "許寶恆",
+          "contestant_nickname": "Alice",
+          "confidence": 0.004255372646148392,
+          "face_location": [
+            366,
+            889,
+            402,
+            853
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01519165125618116,
+          "face_location": [
+            278,
+            1101,
+            314,
+            1065
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 45,
+      "timestamp": 7.190600522193211,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025189981836693742,
+          "face_location": [
+            180,
+            1439,
+            366,
+            1253
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 46,
+      "timestamp": 7.350391644908616,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.033107507436257455,
+          "face_location": [
+            266,
+            538,
+            489,
+            315
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02550103699101791,
+          "face_location": [
+            142,
+            1504,
+            365,
+            1281
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 47,
+      "timestamp": 7.510182767624021,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01994547955580972,
+          "face_location": [
+            290,
+            587,
+            558,
+            319
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.021387468236705676,
+          "face_location": [
+            142,
+            1529,
+            365,
+            1306
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 48,
+      "timestamp": 7.669973890339426,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0305367624905295,
+          "face_location": [
+            341,
+            662,
+            563,
+            439
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016135081931340722,
+          "face_location": [
+            160,
+            1521,
+            345,
+            1336
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 51,
+      "timestamp": 8.14934725848564,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "95",
+          "contestant_name": "許寶恆",
+          "contestant_nickname": "Alice",
+          "confidence": 0.011008853451621503,
+          "face_location": [
+            655,
+            737,
+            800,
+            551
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 52,
+      "timestamp": 8.309138381201045,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.009029826790638906,
+          "face_location": [
+            655,
+            778,
+            800,
+            593
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 53,
+      "timestamp": 8.46892950391645,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0162576705076527,
+          "face_location": [
+            655,
+            840,
+            800,
+            655
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 56,
+      "timestamp": 8.948302872062664,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0004389312634081044,
+          "face_location": [
+            68,
+            1752,
+            291,
+            1529
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 57,
+      "timestamp": 9.108093994778068,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022891271744551855,
+          "face_location": [
+            98,
+            1728,
+            284,
+            1542
+          ]
+        },
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.0027872029918097896,
+          "face_location": [
+            593,
+            923,
+            779,
+            737
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 58,
+      "timestamp": 9.267885117493472,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02025967485815139,
+          "face_location": [
+            98,
+            1748,
+            284,
+            1563
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 59,
+      "timestamp": 9.427676240208877,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.021428716566761152,
+          "face_location": [
+            57,
+            1748,
+            242,
+            1563
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 60,
+      "timestamp": 9.587467362924283,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 61,
+      "timestamp": 9.747258485639687,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 62,
+      "timestamp": 9.907049608355091,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016445791501816687,
+          "face_location": [
+            77,
+            1769,
+            263,
+            1583
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 63,
+      "timestamp": 10.066840731070496,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022510836869456874,
+          "face_location": [
+            218,
+            598,
+            281,
+            536
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.002818350719157481,
+          "face_location": [
+            360,
+            901,
+            412,
+            849
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.021679747369061864,
+          "face_location": [
+            242,
+            1183,
+            286,
+            1140
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 64,
+      "timestamp": 10.2266318537859,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.0043695291474311615,
+          "face_location": [
+            367,
+            900,
+            410,
+            856
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025727176870858015,
+          "face_location": [
+            238,
+            1188,
+            281,
+            1144
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 65,
+      "timestamp": 10.386422976501306,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.00669438486077234,
+          "face_location": [
+            366,
+            913,
+            418,
+            861
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.017852583007892275,
+          "face_location": [
+            213,
+            577,
+            287,
+            502
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 66,
+      "timestamp": 10.54621409921671,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016395155853300314,
+          "face_location": [
+            228,
+            1218,
+            280,
+            1166
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0295193153520511,
+          "face_location": [
+            246,
+            550,
+            308,
+            487
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 67,
+      "timestamp": 10.706005221932115,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0014361511952603045,
+          "face_location": [
+            367,
+            909,
+            410,
+            866
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.008452120925514617,
+          "face_location": [
+            149,
+            1531,
+            211,
+            1469
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016273817024106352,
+          "face_location": [
+            222,
+            1218,
+            274,
+            1166
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 68,
+      "timestamp": 10.865796344647519,
+      "detections_count": 3,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01771761232653324,
+          "face_location": [
+            222,
+            1212,
+            274,
+            1160
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 69,
+      "timestamp": 11.025587467362925,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03012602321667912,
+          "face_location": [
+            218,
+            1220,
+            281,
+            1158
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013856404733989303,
+          "face_location": [
+            121,
+            1572,
+            196,
+            1498
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 70,
+      "timestamp": 11.18537859007833,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013268536472418213,
+          "face_location": [
+            105,
+            1564,
+            179,
+            1489
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01803692219308739,
+          "face_location": [
+            218,
+            1213,
+            281,
+            1151
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 71,
+      "timestamp": 11.345169712793734,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.023851874363447156,
+          "face_location": [
+            130,
+            1539,
+            204,
+            1465
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02438417249275826,
+          "face_location": [
+            225,
+            1213,
+            288,
+            1151
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 72,
+      "timestamp": 11.504960835509138,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.032043307456200765,
+          "face_location": [
+            239,
+            1201,
+            291,
+            1149
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025115763700242155,
+          "face_location": [
+            138,
+            1514,
+            213,
+            1440
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 73,
+      "timestamp": 11.664751958224542,
+      "detections_count": 4,
+      "recognitions_count": 4,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.020693973365663032,
+          "face_location": [
+            155,
+            1498,
+            229,
+            1423
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.007860667600362525,
+          "face_location": [
+            406,
+            924,
+            458,
+            872
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025661448987719826,
+          "face_location": [
+            245,
+            1201,
+            297,
+            1149
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013965644381877307,
+          "face_location": [
+            274,
+            584,
+            336,
+            522
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 74,
+      "timestamp": 11.824543080939948,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009730574128248626,
+          "face_location": [
+            191,
+            1490,
+            253,
+            1427
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0027030293389961324,
+          "face_location": [
+            401,
+            924,
+            452,
+            872
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 75,
+      "timestamp": 11.984334203655353,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.025267924232232675,
+          "face_location": [
+            260,
+            598,
+            322,
+            536
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.007870994367233597,
+          "face_location": [
+            389,
+            924,
+            441,
+            872
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 80,
+      "timestamp": 12.783289817232376,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.008367404018033597,
+          "face_location": [
+            118,
+            1315,
+            304,
+            1129
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 81,
+      "timestamp": 12.94308093994778,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.007385878313624139,
+          "face_location": [
+            98,
+            1253,
+            284,
+            1067
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 82,
+      "timestamp": 13.102872062663186,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 83,
+      "timestamp": 13.26266318537859,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011487827881026202,
+          "face_location": [
+            93,
+            1058,
+            316,
+            835
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 84,
+      "timestamp": 13.422454308093995,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.014786477969470746,
+          "face_location": [
+            139,
+            964,
+            325,
+            778
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 85,
+      "timestamp": 13.5822454308094,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 86,
+      "timestamp": 13.742036553524803,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.033720250853834344,
+          "face_location": [
+            242,
+            687,
+            464,
+            464
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 87,
+      "timestamp": 13.90182767624021,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.028267201459120095,
+          "face_location": [
+            266,
+            687,
+            489,
+            464
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 88,
+      "timestamp": 14.061618798955614,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03118257472902841,
+          "face_location": [
+            266,
+            662,
+            489,
+            439
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 89,
+      "timestamp": 14.221409921671018,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02471373004435773,
+          "face_location": [
+            291,
+            687,
+            514,
+            464
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 90,
+      "timestamp": 14.381201044386422,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009528874628099593,
+          "face_location": [
+            291,
+            761,
+            514,
+            538
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 91,
+      "timestamp": 14.540992167101829,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0001944048659352493,
+          "face_location": [
+            217,
+            835,
+            440,
+            613
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 92,
+      "timestamp": 14.700783289817233,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01010055751947092,
+          "face_location": [
+            142,
+            885,
+            365,
+            662
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 93,
+      "timestamp": 14.860574412532637,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 94,
+      "timestamp": 15.020365535248041,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "91",
+          "contestant_name": "許軼",
+          "contestant_nickname": "Day",
+          "confidence": 0.0045921602244306525,
+          "face_location": [
+            43,
+            959,
+            266,
+            736
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 95,
+      "timestamp": 15.180156657963446,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.020062147992464197,
+          "face_location": [
+            290,
+            1146,
+            675,
+            760
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.026081531288757343,
+          "face_location": [
+            461,
+            1830,
+            800,
+            1445
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 96,
+      "timestamp": 15.339947780678852,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02798213603062616,
+          "face_location": [
+            204,
+            1188,
+            590,
+            803
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.017421984191514195,
+          "face_location": [
+            461,
+            1745,
+            800,
+            1359
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 97,
+      "timestamp": 15.499738903394256,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.019374006808596578,
+          "face_location": [
+            162,
+            1231,
+            547,
+            846
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 98,
+      "timestamp": 15.65953002610966,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.026561808658803643,
+          "face_location": [
+            162,
+            1188,
+            547,
+            803
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02498088877877347,
+          "face_location": [
+            376,
+            1745,
+            761,
+            1359
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 99,
+      "timestamp": 15.819321148825065,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.019499299193279973,
+          "face_location": [
+            162,
+            1188,
+            547,
+            803
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.014849549619274871,
+          "face_location": [
+            297,
+            1837,
+            759,
+            1375
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 100,
+      "timestamp": 15.97911227154047,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.019910434917018827,
+          "face_location": [
+            167,
+            1455,
+            390,
+            1232
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 101,
+      "timestamp": 16.138903394255873,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009705899045291844,
+          "face_location": [
+            180,
+            1480,
+            366,
+            1294
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022479672526829808,
+          "face_location": [
+            263,
+            882,
+            449,
+            696
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 102,
+      "timestamp": 16.29869451697128,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.006551165313825047,
+          "face_location": [
+            160,
+            1501,
+            345,
+            1315
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.018214023233986354,
+          "face_location": [
+            242,
+            902,
+            428,
+            716
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 103,
+      "timestamp": 16.458485639686685,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.012816805062452419,
+          "face_location": [
+            167,
+            1554,
+            390,
+            1331
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016267799844038144,
+          "face_location": [
+            222,
+            882,
+            407,
+            696
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 104,
+      "timestamp": 16.61827676240209,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016198575031009854,
+          "face_location": [
+            201,
+            882,
+            387,
+            696
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.014371730746760347,
+          "face_location": [
+            139,
+            1521,
+            325,
+            1336
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 105,
+      "timestamp": 16.778067885117494,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03018210562711532,
+          "face_location": [
+            167,
+            910,
+            390,
+            687
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011981446341827406,
+          "face_location": [
+            98,
+            1501,
+            284,
+            1315
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 106,
+      "timestamp": 16.9378590078329,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.012689919401035699,
+          "face_location": [
+            142,
+            935,
+            365,
+            712
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 107,
+      "timestamp": 17.097650130548303,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0005739440149832298,
+          "face_location": [
+            270,
+            992,
+            425,
+            838
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 108,
+      "timestamp": 17.257441253263707,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 109,
+      "timestamp": 17.41723237597911,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 110,
+      "timestamp": 17.577023498694516,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009138315121872909,
+          "face_location": [
+            222,
+            985,
+            407,
+            799
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 111,
+      "timestamp": 17.736814621409923,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02168258747851426,
+          "face_location": [
+            143,
+            1118,
+            605,
+            656
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 112,
+      "timestamp": 17.896605744125328,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0039722991919906026,
+          "face_location": [
+            0,
+            1062,
+            260,
+            795
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 114,
+      "timestamp": 18.216187989556136,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.0032426065286798034,
+          "face_location": [
+            242,
+            1331,
+            464,
+            1108
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 115,
+      "timestamp": 18.37597911227154,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 116,
+      "timestamp": 18.535770234986945,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "91",
+          "contestant_name": "許軼",
+          "contestant_nickname": "Day",
+          "confidence": 0.0021651529834340044,
+          "face_location": [
+            0,
+            1088,
+            180,
+            902
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 117,
+      "timestamp": 18.69556135770235,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.027940625338087277,
+          "face_location": [
+            160,
+            1212,
+            345,
+            1026
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 118,
+      "timestamp": 18.855352480417753,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.007544864931322226,
+          "face_location": [
+            139,
+            1129,
+            325,
+            944
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 119,
+      "timestamp": 19.015143603133158,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.007390732194449745,
+          "face_location": [
+            222,
+            1171,
+            407,
+            985
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 121,
+      "timestamp": 19.33472584856397,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 122,
+      "timestamp": 19.494516971279374,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0018692719569672889,
+          "face_location": [
+            166,
+            1081,
+            255,
+            991
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 123,
+      "timestamp": 19.65430809399478,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0011330380968447296,
+          "face_location": [
+            163,
+            1083,
+            271,
+            975
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 124,
+      "timestamp": 19.814099216710183,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.005323281539181601,
+          "face_location": [
+            211,
+            1083,
+            319,
+            975
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 125,
+      "timestamp": 19.973890339425587,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.008409432380901527,
+          "face_location": [
+            223,
+            1071,
+            331,
+            963
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 126,
+      "timestamp": 20.13368146214099,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "95",
+          "contestant_name": "許寶恆",
+          "contestant_nickname": "Alice",
+          "confidence": 0.006084066037650104,
+          "face_location": [
+            225,
+            1156,
+            354,
+            1027
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 127,
+      "timestamp": 20.293472584856396,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0006025152063448003,
+          "face_location": [
+            196,
+            1199,
+            325,
+            1070
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 128,
+      "timestamp": 20.4532637075718,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.024868482043408857,
+          "face_location": [
+            287,
+            602,
+            362,
+            527
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.023786059569164575,
+          "face_location": [
+            33,
+            1146,
+            418,
+            760
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 129,
+      "timestamp": 20.613054830287208,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.028926143680104266,
+          "face_location": [
+            287,
+            610,
+            362,
+            536
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02901603236750172,
+          "face_location": [
+            237,
+            1348,
+            312,
+            1274
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 130,
+      "timestamp": 20.772845953002612,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.020752218197428007,
+          "face_location": [
+            262,
+            619,
+            337,
+            544
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 131,
+      "timestamp": 20.932637075718016,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 132,
+      "timestamp": 21.09242819843342,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016586958567391008,
+          "face_location": [
+            329,
+            646,
+            391,
+            584
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 133,
+      "timestamp": 21.252219321148825,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.017815756267951177,
+          "face_location": [
+            225,
+            941,
+            354,
+            812
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 137,
+      "timestamp": 21.891383812010442,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 138,
+      "timestamp": 22.05117493472585,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 139,
+      "timestamp": 22.210966057441254,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 140,
+      "timestamp": 22.37075718015666,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0018228279914523915,
+          "face_location": [
+            260,
+            973,
+            528,
+            706
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 141,
+      "timestamp": 22.530548302872063,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 142,
+      "timestamp": 22.690339425587467,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0012089476695643642,
+          "face_location": [
+            290,
+            914,
+            558,
+            646
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 143,
+      "timestamp": 22.85013054830287,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 144,
+      "timestamp": 23.009921671018276,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 145,
+      "timestamp": 23.16971279373368,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 146,
+      "timestamp": 23.329503916449084,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0017464610855302265,
+          "face_location": [
+            333,
+            1920,
+            718,
+            1573
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02057768013906558,
+          "face_location": [
+            33,
+            1146,
+            418,
+            760
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 147,
+      "timestamp": 23.489295039164492,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01375422883911992,
+          "face_location": [
+            297,
+            1920,
+            759,
+            1529
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.023769268760848283,
+          "face_location": [
+            134,
+            1026,
+            455,
+            705
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 148,
+      "timestamp": 23.649086161879897,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02957801101891322,
+          "face_location": [
+            247,
+            932,
+            632,
+            546
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02721874117784573,
+          "face_location": [
+            376,
+            1830,
+            761,
+            1445
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 149,
+      "timestamp": 23.8088772845953,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.029052234361340523,
+          "face_location": [
+            348,
+            1786,
+            800,
+            1324
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022768850622891357,
+          "face_location": [
+            241,
+            883,
+            562,
+            562
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 150,
+      "timestamp": 23.968668407310705,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02012632951647597,
+          "face_location": [
+            76,
+            889,
+            461,
+            504
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.01782322720993801,
+          "face_location": [
+            418,
+            1702,
+            800,
+            1317
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 151,
+      "timestamp": 24.12845953002611,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.037327836007742254,
+          "face_location": [
+            33,
+            974,
+            418,
+            589
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.029468316467416655,
+          "face_location": [
+            418,
+            1702,
+            800,
+            1317
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 152,
+      "timestamp": 24.288250652741514,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03646165562318737,
+          "face_location": [
+            297,
+            1837,
+            759,
+            1375
+          ]
+        },
+        {
+          "contestant_id": "90",
+          "contestant_name": "鄭嘉欣",
+          "contestant_nickname": "Christine",
+          "confidence": 0.019394645781559694,
+          "face_location": [
+            52,
+            973,
+            320,
+            706
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 154,
+      "timestamp": 24.607832898172322,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 155,
+      "timestamp": 24.76762402088773,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02053446794573288,
+          "face_location": [
+            236,
+            1191,
+            325,
+            1101
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.023048997129635262,
+          "face_location": [
+            221,
+            1614,
+            296,
+            1539
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 156,
+      "timestamp": 24.927415143603135,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02397972572301499,
+          "face_location": [
+            245,
+            1071,
+            335,
+            982
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 157,
+      "timestamp": 25.08720626631854,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.022498227363076273,
+          "face_location": [
+            265,
+            972,
+            355,
+            882
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 158,
+      "timestamp": 25.246997389033943,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.038199449420168285,
+          "face_location": [
+            246,
+            1456,
+            320,
+            1382
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 159,
+      "timestamp": 25.406788511749347,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03045482744089112,
+          "face_location": [
+            267,
+            1462,
+            329,
+            1400
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 160,
+      "timestamp": 25.566579634464752,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013730114914063618,
+          "face_location": [
+            271,
+            1465,
+            345,
+            1390
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 161,
+      "timestamp": 25.726370757180156,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.030966332344449454,
+          "face_location": [
+            255,
+            1429,
+            345,
+            1340
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011936865702642852,
+          "face_location": [
+            167,
+            1629,
+            322,
+            1474
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 162,
+      "timestamp": 25.88616187989556,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.010769077179754616,
+          "face_location": [
+            254,
+            1912,
+            329,
+            1838
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0426920734536399,
+          "face_location": [
+            337,
+            701,
+            412,
+            627
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 163,
+      "timestamp": 26.045953002610965,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013476039865977563,
+          "face_location": [
+            202,
+            1164,
+            356,
+            1010
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.018340191926116134,
+          "face_location": [
+            265,
+            1310,
+            355,
+            1220
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 164,
+      "timestamp": 26.205744125326373,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.035679494490107766,
+          "face_location": [
+            275,
+            1310,
+            365,
+            1220
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.008514069596867069,
+          "face_location": [
+            201,
+            944,
+            387,
+            758
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 165,
+      "timestamp": 26.365535248041777,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.037049291373168924,
+          "face_location": [
+            275,
+            1290,
+            365,
+            1200
+          ]
+        },
+        {
+          "contestant_id": "72",
+          "contestant_name": "廖芷嘉",
+          "contestant_nickname": "Ika",
+          "confidence": 0.020482136653271366,
+          "face_location": [
+            201,
+            737,
+            387,
+            551
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 166,
+      "timestamp": 26.52532637075718,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03789128317903834,
+          "face_location": [
+            305,
+            1230,
+            395,
+            1141
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.013102759195207203,
+          "face_location": [
+            201,
+            551,
+            387,
+            366
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 167,
+      "timestamp": 26.685117493472585,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011323971118812892,
+          "face_location": [
+            320,
+            527,
+            395,
+            453
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.020904208933600565,
+          "face_location": [
+            263,
+            304,
+            449,
+            118
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 168,
+      "timestamp": 26.84490861618799,
+      "detections_count": 3,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03128532725827471,
+          "face_location": [
+            320,
+            419,
+            395,
+            345
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03246182213330018,
+          "face_location": [
+            265,
+            1041,
+            355,
+            952
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 169,
+      "timestamp": 27.004699738903394,
+      "detections_count": 3,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "72",
+          "contestant_name": "廖芷嘉",
+          "contestant_nickname": "Ika",
+          "confidence": 0.019729940609794272,
+          "face_location": [
+            362,
+            287,
+            437,
+            212
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 170,
+      "timestamp": 27.1644908616188,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0010068961692778489,
+          "face_location": [
+            285,
+            1489,
+            375,
+            1400
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 171,
+      "timestamp": 27.324281984334203,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0011563776561545058,
+          "face_location": [
+            366,
+            613,
+            552,
+            428
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 172,
+      "timestamp": 27.484073107049607,
+      "detections_count": 3,
+      "recognitions_count": 3,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.004482864082626659,
+          "face_location": [
+            217,
+            464,
+            440,
+            241
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.009224410315568421,
+          "face_location": [
+            335,
+            1270,
+            425,
+            1181
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.019660891121064172,
+          "face_location": [
+            365,
+            693,
+            454,
+            603
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 173,
+      "timestamp": 27.643864229765015,
+      "detections_count": 3,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02979886250404662,
+          "face_location": [
+            362,
+            619,
+            437,
+            544
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 174,
+      "timestamp": 27.80365535248042,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.00491439891918366,
+          "face_location": [
+            325,
+            1101,
+            415,
+            1011
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.0189375647616995,
+          "face_location": [
+            354,
+            569,
+            428,
+            494
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 175,
+      "timestamp": 27.963446475195823,
+      "detections_count": 2,
+      "recognitions_count": 2,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.011575041325869062,
+          "face_location": [
+            354,
+            1058,
+            428,
+            983
+          ]
+        },
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016447382425316515,
+          "face_location": [
+            263,
+            1418,
+            449,
+            1232
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 176,
+      "timestamp": 28.123237597911228,
+      "detections_count": 2,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.016007683356336733,
+          "face_location": [
+            222,
+            1480,
+            407,
+            1294
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 177,
+      "timestamp": 28.283028720626632,
+      "detections_count": 1,
+      "recognitions_count": 0,
+      "recognitions": []
+    },
+    {
+      "frame_number": 178,
+      "timestamp": 28.442819843342036,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.030771173882323866,
+          "face_location": [
+            384,
+            1382,
+            705,
+            1061
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 184,
+      "timestamp": 29.401566579634466,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.030940535091378174,
+          "face_location": [
+            290,
+            1270,
+            558,
+            1003
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 185,
+      "timestamp": 29.56135770234987,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.04305929725518054,
+          "face_location": [
+            170,
+            1382,
+            491,
+            1061
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 186,
+      "timestamp": 29.721148825065274,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.03029676326762576,
+          "face_location": [
+            27,
+            1382,
+            348,
+            1061
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 187,
+      "timestamp": 29.88093994778068,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.019057045678636753,
+          "face_location": [
+            63,
+            1347,
+            384,
+            1026
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 188,
+      "timestamp": 30.040731070496083,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.017026256274875418,
+          "face_location": [
+            63,
+            1275,
+            384,
+            954
+          ]
+        }
+      ]
+    },
+    {
+      "frame_number": 189,
+      "timestamp": 30.200522193211487,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "recognitions": [
+        {
+          "contestant_id": "86",
+          "contestant_name": "黎美萱",
+          "contestant_nickname": "Michelle",
+          "confidence": 0.02031352243169393,
+          "face_location": [
+            112,
+            1241,
+            379,
+            973
+          ]
+        }
+      ]
+    }
+  ],
+  "thumbnails": [
+    "/Users/swong/dev/mv-face-recognition/local_output/thumbnails/test-video-mv2_thumb_000.jpg"
+  ],
+  "recognition_config": {
+    "tolerance": 0.6,
+    "min_confidence": 0.5,
+    "detection_model": "insightface"
+  }
+}

@@ -260,3 +260,44 @@ export class WebSocketManager {
 		}
 	}
 }
+/**
+ * Trigger Modal processing job
+ */
+export async function triggerModalJob(params: any): Promise<{ job_id: string }> {
+	return apiRequest('/modal/trigger-processing', {
+		method: 'POST',
+		body: JSON.stringify(params)
+	});
+}
+
+/**
+ * Get Modal job status
+ */
+export async function getModalJobStatus(jobId: string): Promise<any> {
+	return apiRequest(`/modal/job/${jobId}`);
+}
+
+/**
+ * Get all Modal jobs
+ */
+export async function getModalJobs(): Promise<{ jobs: any[] }> {
+	return apiRequest('/modal/jobs');
+}
+
+/**
+ * Cancel Modal job
+ */
+export async function cancelModalJob(jobId: string): Promise<{ success: boolean }> {
+	return apiRequest(`/modal/job/${jobId}`, {
+		method: 'DELETE'
+	});
+}
+
+/**
+ * Clear completed Modal jobs
+ */
+export async function clearCompletedJobs(): Promise<{ success: boolean; cleared: number }> {
+	return apiRequest('/modal/jobs/clear-completed', {
+		method: 'POST'
+	});
+}

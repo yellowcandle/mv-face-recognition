@@ -1,12 +1,20 @@
-#!/usr/bin/env node
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-/**
- * Update embedded assets in the Cloudflare Worker from frontend build
- */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const fs = require('fs');
-const path = require('path');
-const { logger } = require('./lib/logger');
+function logger(prefix = 'update-worker-assets') {
+  return {
+    info: (msg, data) => console.log(`[INFO] ${msg}`, data ? JSON.stringify(data) : ''),
+    debug: (msg, data) => console.log(`[DEBUG] ${msg}`, data ? JSON.stringify(data) : ''),
+    warn: (msg, data) => console.warn(`[WARN] ${msg}`, data ? JSON.stringify(data) : ''),
+    error: (msg, data) => console.error(`[ERROR] ${msg}`, data ? JSON.stringify(data) : ''),
+  };
+}
+
+const { info, debug, warn, error } = logger();
 
 function readDirectoryRecursively(dir, baseDir = '') {
   const assets = {};
@@ -38,7 +46,7 @@ function readDirectoryRecursively(dir, baseDir = '') {
 function main() {
   logger.info('Updating worker embedded assets');
 
-  const buildDir = path.join(__dirname, '../frontend/build');
+  const buildDir = path.join(__dirname, '../mvp-processor/build');
   const workerDir = path.join(__dirname, '../worker');
   const embeddedAssetsFile = path.join(workerDir, 'embedded-assets.js');
 
@@ -47,35 +55,7 @@ function main() {
     process.exit(1);
   }
 
-  const assets = {};
-
-  // Read HTML file
-  const indexHtmlPath = path.join(buildDir, 'index.html');
-  if (fs.existsSync(indexHtmlPath)) {
-    assets['index.html'] = fs.readFileSync(indexHtmlPath, 'utf8');
-    logger.debug('Added index.html');
-  }
-
-  // Read favicon
-  const faviconPath = path.join(buildDir, 'favicon.ico');
-  if (fs.existsSync(faviconPath)) {
-    // For favicon, we'll skip it as it's binary and we can serve it separately
-    logger.info('Skipping favicon.ico (binary file)');
-  }
-
-  // Read _app directory (SvelteKit structure)
-  const appDir = path.join(buildDir, '_app');
-  if (fs.existsSync(appDir)) {
-    const appAssets = readDirectoryRecursively(appDir, '_app');
-    Object.assign(assets, appAssets);
-  }
-
-  // Also check for legacy assets directory (old Vite structure)
-  const assetsDir = path.join(buildDir, 'assets');
-  if (fs.existsSync(assetsDir)) {
-    const legacyAssets = readDirectoryRecursively(assetsDir, 'assets');
-    Object.assign(assets, legacyAssets);
-  }
+  const assets = readDirectoryRecursively(buildDir, '');\n\n  // Skip favicon if present\n  delete assets['favicon.ico'];\n\n  logger.info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
 
   // Generate embedded-assets.js
   const embeddedAssetsContent = `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};`;
@@ -88,8 +68,6 @@ function main() {
   });
 }
 
-if (require.main === module) {
+if (process.argv[1] === import.meta.url) {
   main();
-}
-
-module.exports = { main }; 
+} 

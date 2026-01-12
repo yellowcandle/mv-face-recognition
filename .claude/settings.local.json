@@ -156,7 +156,11 @@
       "mcp__serena__find_file",
       "Skill(frontend-design:frontend-design)",
       "Bash(xargs ls:*)",
-      "Bash(git -C /Users/swong/dev/mv-face-recognition lfs status:*)"
+      "Bash(git -C /Users/swong/dev/mv-face-recognition lfs status:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(huggingface-cli whoami:*)",
+      "Bash(hf auth whoami:*)",
+      "Bash(lsof:*)"
     ]
   },
   "enableAllProjectMcpServers": true
