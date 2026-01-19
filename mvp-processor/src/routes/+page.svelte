@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Card, Badge, Button } from '$lib/components';
+  import { Card, Badge, Button, Flex, Grid, Background } from '$lib/components';
 
   interface SystemStats {
     totalVideos: number;
@@ -69,94 +69,107 @@
 </svelte:head>
 
 <div class="dashboard-page">
-  <div class="welcome-section">
-    <h1>🎬 Welcome to MV Face Recognition</h1>
-    <p class="welcome-text">
-      Automatically identify contestants in video content with real-time face overlays
-    </p>
-  </div>
+  <Flex direction="column" gap="lg">
+    <Flex direction="column" gap="sm" align="center">
+      <h1>🎬 Welcome to MV Face Recognition</h1>
+      <p class="welcome-text">
+        Automatically identify contestants in video content with real-time face overlays
+      </p>
+    </Flex>
 
-  <div class="stats-grid">
-    <Card variant="interactive" padding="md">
-      <div class="stat-card">
-        <span class="stat-icon">🎬</span>
-        <div class="stat-content">
-          <div class="stat-value">{stats.totalVideos}</div>
-          <div class="stat-label">Videos Processed</div>
-        </div>
-      </div>
+    <Grid columns="auto" minWidth="280px" gap="md">
+      <Card variant="elevated" padding="md" class="stat-card-wrapper">
+        <Flex direction="row" gap="md" align="center">
+          <span class="stat-icon">🎬</span>
+          <Flex direction="column" gap="xs">
+            <div class="stat-value">{stats.totalVideos}</div>
+            <div class="stat-label">Videos Processed</div>
+          </Flex>
+        </Flex>
+      </Card>
+
+      <Card variant="elevated" padding="md" class="stat-card-wrapper">
+        <Flex direction="row" gap="md" align="center">
+          <span class="stat-icon">👥</span>
+          <Flex direction="column" gap="xs">
+            <div class="stat-value">{stats.totalContestants}</div>
+            <div class="stat-label">Contestants</div>
+          </Flex>
+        </Flex>
+      </Card>
+
+      <Card variant="elevated" padding="md" class="stat-card-wrapper">
+        <Flex direction="row" gap="md" align="center">
+          <span class="stat-icon">🚩</span>
+          <Flex direction="column" gap="xs">
+            <div class="stat-value">{stats.pendingFlags}</div>
+            <div class="stat-label">Pending Flags</div>
+          </Flex>
+        </Flex>
+      </Card>
+    </Grid>
+
+    <Flex direction="column" gap="md">
+      <h2>Quick Actions</h2>
+      <Grid columns="auto" minWidth="280px" gap="md">
+        {#each quickLinks as link}
+          <Card variant="bordered" padding="md" interactive class="action-card">
+            <a href={link.href} class="card-link">
+              <Flex direction="row" gap="md" align="center">
+                <span class="action-icon">{link.icon}</span>
+                <Flex direction="column" gap="xs" class="action-content">
+                  <div class="action-label">{link.label}</div>
+                  <div class="action-description">{link.description}</div>
+                </Flex>
+                <span class="action-arrow">→</span>
+              </Flex>
+            </a>
+          </Card>
+        {/each}
+      </Grid>
+    </Flex>
+
+    <Card variant="bordered" padding="lg" class="cta-card" shadow={true}>
+      <Flex direction="row" justify="between" align="center" gap="lg">
+        <Flex direction="column" gap="sm">
+          <h3>Ready to watch annotated videos?</h3>
+          <p>Jump into the video player to see face recognition in action</p>
+        </Flex>
+        <Button variant="primary" size="lg" href="/video-player">
+          ▶️ Open Video Player
+        </Button>
+      </Flex>
     </Card>
-
-    <Card variant="interactive" padding="md">
-      <div class="stat-card">
-        <span class="stat-icon">👥</span>
-        <div class="stat-content">
-          <div class="stat-value">{stats.totalContestants}</div>
-          <div class="stat-label">Contestants</div>
-        </div>
-      </div>
-    </Card>
-
-    <Card variant="interactive" padding="md">
-      <div class="stat-card">
-        <span class="stat-icon">🚩</span>
-        <div class="stat-content">
-          <div class="stat-value">{stats.pendingFlags}</div>
-          <div class="stat-label">Pending Flags</div>
-        </div>
-      </div>
-    </Card>
-  </div>
-
-  <div class="quick-actions">
-    <h2>Quick Actions</h2>
-    <div class="actions-grid">
-      {#each quickLinks as link}
-        <a href={link.href} class="action-card">
-          <span class="action-icon">{link.icon}</span>
-          <div class="action-content">
-            <div class="action-label">{link.label}</div>
-            <div class="action-description">{link.description}</div>
-          </div>
-          <span class="action-arrow">→</span>
-        </a>
-      {/each}
-    </div>
-  </div>
-
-  <Card variant="bordered" padding="lg" class="cta-card">
-    <div class="cta-content">
-      <div class="cta-text">
-        <h3>Ready to watch annotated videos?</h3>
-        <p>Jump into the video player to see face recognition in action</p>
-      </div>
-      <Button variant="primary" size="lg" href="/player">
-        ▶️ Open Video Player
-      </Button>
-    </div>
-  </Card>
+  </Flex>
 </div>
 
 <style>
   .dashboard-page {
     padding: var(--space-6);
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
   }
 
-  .welcome-section {
-    text-align: center;
-    margin-bottom: var(--space-8);
-  }
-
-  .welcome-section h1 {
+  h1 {
     font-size: var(--text-h1-size);
     font-weight: 700;
-    margin: 0 0 var(--space-3);
-    background: linear-gradient(135deg, var(--color-primary-400), var(--color-secondary-400));
+    margin: 0;
+    background: linear-gradient(135deg, var(--brand-medium), var(--color-secondary-400));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  h2 {
+    font-size: var(--text-h4-size);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  h3 {
+    font-size: var(--text-h4-size);
+    font-weight: 600;
+    margin: 0;
   }
 
   .welcome-text {
@@ -165,17 +178,13 @@
     margin: 0;
   }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-4);
-    margin-bottom: var(--space-8);
+  :global(.stat-card-wrapper) {
+    transition: transform var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out);
   }
 
-  .stat-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
+  :global(.stat-card-wrapper:hover) {
+    transform: translateY(-2px);
   }
 
   .stat-icon {
@@ -183,55 +192,24 @@
     line-height: 1;
   }
 
-  .stat-content {
-    flex: 1;
-  }
-
   .stat-value {
     font-size: var(--text-h2-size);
     font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1;
+    color: var(--brand-medium);
   }
 
   .stat-label {
     font-size: var(--text-body-sm-size);
     color: var(--text-secondary);
-    margin-top: var(--space-1);
   }
 
-  .quick-actions {
-    margin-bottom: var(--space-8);
+  :global(.action-card) {
+    transition: all var(--duration-normal) var(--ease-out);
   }
 
-  .quick-actions h2 {
-    font-size: var(--text-h4-size);
-    font-weight: 600;
-    margin: 0 0 var(--space-4);
-  }
-
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--space-4);
-  }
-
-  .action-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-4);
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    text-decoration: none;
-    color: inherit;
-    transition: var(--transition-all);
-  }
-
-  .action-card:hover {
-    border-color: var(--color-primary-500);
-    background-color: var(--bg-tertiary);
+  :global(.action-card:hover) {
+    border-color: var(--brand-medium);
+    background-color: var(--surface-tertiary);
     transform: translateX(4px);
   }
 
@@ -248,7 +226,6 @@
     font-weight: 600;
     font-size: var(--text-body-size);
     color: var(--text-primary);
-    margin-bottom: var(--space-1);
   }
 
   .action-description {
@@ -262,45 +239,36 @@
     transition: transform var(--duration-fast) var(--ease-out);
   }
 
-  .action-card:hover .action-arrow {
+  :global(.action-card:hover) .action-arrow {
     transform: translateX(4px);
-    color: var(--color-primary-400);
+    color: var(--brand-medium);
+  }
+
+  .card-link {
+    text-decoration: none;
+    color: inherit;
+    width: 100%;
+    display: block;
   }
 
   :global(.cta-card) {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(14, 165, 233, 0.1));
+    background: linear-gradient(135deg, var(--brand-alpha-weak), rgba(14, 165, 233, 0.1));
+    border-color: var(--border-medium);
   }
 
-  .cta-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-6);
-  }
-
-  .cta-text h3 {
-    font-size: var(--text-h4-size);
-    font-weight: 600;
-    margin: 0 0 var(--space-2);
-  }
-
-  .cta-text p {
+  p {
     color: var(--text-secondary);
     margin: 0;
   }
 
   @media (max-width: 768px) {
-    .welcome-section h1 {
+    h1 {
       font-size: var(--text-h2-size);
     }
 
-    .cta-content {
+    :global(.cta-card) {
       flex-direction: column;
       text-align: center;
-    }
-
-    .actions-grid {
-      grid-template-columns: 1fr;
     }
   }
 </style>
