@@ -11,6 +11,23 @@ This document describes the architecture and design decisions for the MV Face Re
 ## TODO
 
 ### Pending
+
+#### Admin UI Component Library (January 2025)
+- [x] Create design tokens CSS file (`mvp-processor/src/lib/styles/design-tokens.css`)
+- [x] Create Card component with variants (default, elevated, outlined, bordered, surface)
+- [ ] Create Button component (5 variants: primary, secondary, success, danger, ghost)
+- [ ] Create Badge component (5 color variants with optional status dot)
+- [ ] Create Input component (text, email, url, password, number types)
+- [ ] Create StatusIndicator component (online, offline, checking, error states)
+- [ ] Create NavigationLink component (active state styling with icon support)
+- [ ] Create IconButton component (circular icon-only buttons)
+- [ ] Create barrel export index.ts for component imports
+- [ ] Update root layout (+layout.svelte) to load design tokens globally
+- [ ] Test admin UI in browser (verify all pages render correctly)
+
+**Context**: Admin pages (`/admin`, `/admin/youtube`) are architecturally complete but reference 7 non-existent components. Building custom component library with dark theme to match existing admin page usage patterns.
+
+#### System Improvements
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
 - [ ] **User-provided video upload workflow** - Users will provide video files and metadata directly (bypasses YouTube download issues)
 - [ ] ~~Fix yt-dlp YouTube download in Modal containers~~ (deprioritized - user provides videos directly)
@@ -18,6 +35,24 @@ This document describes the architecture and design decisions for the MV Face Re
   - **Local fix**: `yt-dlp --remote-components ejs:github --cookies-from-browser chrome`
   - **Modal container fix**: Install deno + enable remote components in `modal_youtube_processor.py`
   - See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+
+### Completed (January 2026)
+
+#### Automatic Embedding Regeneration System
+- [x] `scripts/validate_embeddings.py` - Validation script for checking embedding compatibility
+- [x] `scripts/upload_embeddings_to_hf.py` - Upload regenerated embeddings to HuggingFace XET storage
+- [x] `scripts/modal_hf_processor.py` - Add `validate_and_regenerate_embeddings()` for Modal container startup
+- [x] `mvp-processor/src/face_detector.py` - Export `regenerate_embeddings_from_contestant_photos()` function
+- [x] `mvp-processor/config/processing_config.yaml` - Add `embedding:` configuration section
+- [x] `DESIGN.md` - Document automatic embedding regeneration system
+
+**System Status**: Embeddings are already 512-dim and compatible with current face_recognition library. The automatic regeneration system is implemented and ready for use when needed.
+
+**Important Notes**:
+- Embeddings are stored at `source/photo/contestants/{nickname}_embedding.npy`
+- Photos are organized by contestant number in `source/photo/contestants/{number}/`
+- Fallback photo location is `source/photo/contestants/photos/contestant_{number}/` (may contain LFS pointers)
+- System handles dimension mismatch via cosine similarity fallback (128-dim → 512-dim compatibility)
 
 ### Completed (December 2025 - Continued)
 - [x] **Video Processing Pipeline Optimization** (Phase 1)
@@ -447,6 +482,243 @@ bootstrap_job_{jobId}: {
 Added to `pyproject.toml`:
 - `yt-dlp>=2024.8.6` - YouTube video downloader
 - `modal>=0.64.0` - Cloud GPU processing
+
+---
+
+## Automatic Embedding Regeneration (January 2026)
+
+**NEW**: Automated embedding dimension validation and regeneration at Modal container startup to handle `face_recognition` library updates.
+
+### Problem
+
+The `face_recognition` library may change embedding dimensions between versions:
+- Older versions: 128-dimensional embeddings
+- Current version: 512-dimensional embeddings
+
+When embeddings stored on HuggingFace don't match the current library version, face recognition produces very low confidence scores (~0.01-0.02).
+
+### Solution
+
+```
+Modal Container Startup
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  validate_embeddings.py             │
+│  • Check embedding dimensions       │
+│  • Detect missing files             │
+│  • Compare photo timestamps         │
+│  • Return validation result         │
+└─────────────────────────────────────┘
+    │
+    ▼ (if needs regeneration)
+┌─────────────────────────────────────┐
+│  face_detector.py                   │
+│  regenerate_embeddings_from_        │
+│  contestant_photos()                │
+│  • Load contestant photos           │
+│  • Generate 512-dim encodings       │
+│  • Save to embeddings directory     │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  upload_embeddings_to_hf.py         │
+│  • Upload regenerated .npy files    │
+│  • Create embedding_manifest.json   │
+│  • Commit to HuggingFace            │
+└─────────────────────────────────────┘
+    │
+    ▼
+Continue with video processing
+```
+
+### Components
+
+#### 1. Validation Script (`scripts/validate_embeddings.py`)
+
+Validates embeddings and determines if regeneration is needed:
+
+```python
+from scripts.validate_embeddings import validate_all_embeddings
+
+result = validate_all_embeddings(
+    photo_base_dir=Path("source/photo/contestants"),
+    embeddings_dir=Path("source/photo/contestants"),
+    contestants_csv_path=Path("metadata/contestant_info.csv"),
+    expected_dim=512,
+)
+# Returns: EmbeddingValidationResult with all_valid, needs_regeneration, counts, etc.
+```
+
+**Validation checks:**
+- Embedding dimension matches expected (512)
+- All contestants have embeddings
+- Photos haven't changed since embedding creation
+
+#### 2. Regeneration Function (`mvp-processor/src/face_detector.py`)
+
+Regenerates embeddings from contestant photos:
+
+```python
+from src.face_detector import regenerate_embeddings_from_contestant_photos
+
+result = regenerate_embeddings_from_contestant_photos(
+    photo_base_dir=Path("source/photo/contestants"),
+    embeddings_output_dir=Path("source/photo/contestants"),
+    contestants_csv_path=Path("metadata/contestant_info.csv"),
+    expected_dim=512,
+)
+# Returns: RegenerationResult with success, count, failures, duration
+```
+
+**Output format:**
+- File: `{nickname}_embedding.npy` (e.g., `Michelle_embedding.npy`)
+- Dimension: 512 (current face_recognition standard)
+- Location: Same directory as source photos
+
+#### 3. HuggingFace Upload Script (`scripts/upload_embeddings_to_hf.py`)
+
+Uploads regenerated embeddings to HuggingFace XET storage:
+
+```bash
+python scripts/upload_embeddings_to_hf.py \
+  --dir source/photo/contestants \
+  --repo-id yellowcandle/mv-face-recognition-data \
+  --dimension 512
+```
+
+**Features:**
+- Batch upload using `upload_folder()` (rate-limit optimized)
+- Creates `embedding_manifest.json` tracking dimensions and timestamps
+- Verification option to download and check uploaded files
+
+#### 4. Modal Integration (`scripts/modal_hf_processor.py`)
+
+Automatic validation and regeneration at container startup:
+
+```python
+from scripts.modal_hf_processor import validate_and_regenerate_embeddings
+
+result = validate_and_regenerate_embeddings(
+    volume_path=VOL_MOUNT_PATH,
+    embeddings_subdir="source/photo/contestants",
+    photos_subdir="source/photo/contestants/photos",
+    metadata_subdir="metadata",
+    expected_dim=512,
+    upload_to_hf=True,
+)
+```
+
+### Configuration (`mvp-processor/config/processing_config.yaml`)
+
+```yaml
+embedding:
+  required_dimension: 512
+  
+  regenerate_on_dimension_mismatch: true
+  regenerate_on_photo_change: true
+  
+  photo_base_dir: "../source/photo/contestants"
+  photo_subdir: "photos"
+  embeddings_dir: "../source/photo/contestants"
+  
+  contestants_csv: "../metadata/contestant_info.csv"
+  
+  huggingface:
+    sync_embeddings_to_hf: true
+    repo_id: "yellowcandle/mv-face-recognition-data"
+    upload_on_regeneration: true
+    create_manifest: true
+  
+  fallback_on_regeneration_failure: true
+```
+
+### Usage
+
+**Manual validation:**
+```bash
+# Check embeddings without regenerating
+python scripts/validate_embeddings.py --dir source/photo/contestants --json
+
+# Check and show details
+python scripts/validate_embeddings.py --dir source/photo/contestants
+```
+
+**Manual regeneration:**
+```bash
+# Regenerate and upload to HuggingFace
+python -c "
+from scripts.validate_embeddings import validate_all_embeddings
+from src.face_detector import regenerate_embeddings_from_contestant_photos
+from pathlib import Path
+
+result = validate_all_embeddings(
+    photo_base_dir=Path('source/photo/contestants'),
+    embeddings_dir=Path('source/photo/contestants'),
+    contestants_csv_path=Path('metadata/contestant_info.csv'),
+)
+if result.needs_regeneration:
+    regen = regenerate_embeddings_from_contestant_photos(
+        photo_base_dir=Path('source/photo/contestants'),
+        embeddings_output_dir=Path('source/photo/contestants'),
+        contestants_csv_path=Path('metadata/contestant_info.csv'),
+    )
+    print(f'Regenerated: {regen.regenerated_count}, Failed: {regen.failed_count}')
+"
+```
+
+**Modal container (automatic):**
+```bash
+# Regeneration happens automatically at container startup
+modal run scripts/modal_hf_processor.py --full-pipeline
+```
+
+### Error Handling
+
+| Scenario | Handling |
+|----------|----------|
+| HuggingFace upload fails | Log warning, continue with local embeddings |
+| Partial regeneration failure | Continue with valid embeddings, log failures |
+| No photos available | Exit with clear error message |
+| Timeout during regeneration | Set timeout, log partial results |
+| HF_TOKEN not set | Skip upload, continue processing |
+
+### Files Created/Modified
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `scripts/validate_embeddings.py` | Create | Embedding validation logic |
+| `scripts/upload_embeddings_to_hf.py` | Create | HuggingFace upload for embeddings |
+| `scripts/modal_hf_processor.py` | Modify | Add `validate_and_regenerate_embeddings()` |
+| `mvp-processor/src/face_detector.py` | Modify | Export `regenerate_embeddings_from_contestant_photos()` |
+| `mvp-processor/config/processing_config.yaml` | Modify | Add `embedding:` section |
+| `DESIGN.md` | Modify | Add documentation |
+
+### Testing
+
+```bash
+# Test validation script
+python scripts/validate_embeddings.py --dir source/photo/contestants
+
+# Test regeneration
+python -c "
+from src.face_detector import regenerate_embeddings_from_contestant_photos
+from pathlib import Path
+
+result = regenerate_embeddings_from_contestant_photos(
+    photo_base_dir=Path('source/photo/contestants'),
+    embeddings_output_dir=Path('/tmp/test_embeddings'),
+    contestants_csv_path=Path('metadata/contestant_info.csv'),
+)
+print(f'Success: {result.success}')
+print(f'Regenerated: {result.regenerated_count}')
+print(f'Dimension: {result.dimension}')
+"
+
+# Test HuggingFace upload (dry run)
+python scripts/upload_embeddings_to_hf.py --dir /tmp/test_embeddings --dry-run
+```
 
 ---
 

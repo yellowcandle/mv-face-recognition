@@ -13,6 +13,12 @@ dataset_staging/videos/**/*.mkv
 source/videos_hf_clean/*.mp4
 source/videos_hf_optimized/*.mp4
 
+# Contestant data now stored on HuggingFace XET
+# Repository: https://huggingface.co/datasets/yellowcandle/mv-face-recognition-data
+source/photo/contestants/**/*.jpg
+source/photo/contestants/**/*.png
+source/photo/contestants/**/*.jpeg
+
 # Embedding files and model artifacts
 *.npy
 *.pkl

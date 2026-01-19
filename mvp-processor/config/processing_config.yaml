@@ -118,3 +118,33 @@ logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "logs/processing.log"
+
+# Embedding Regeneration Settings
+# Automatically regenerates embeddings when dimension mismatch or photos change
+embedding:
+  # Expected embedding dimension for current face_recognition library
+  required_dimension: 512
+
+  # Regeneration triggers
+  regenerate_on_dimension_mismatch: true
+  regenerate_on_photo_change: true
+
+  # Photo and embedding directories (relative to volume mount in Modal)
+  photo_base_dir: "../source/photo/contestants"
+  photo_subdir: "photos"  # photos/contestant_{id}/
+  embeddings_dir: "../source/photo/contestants"
+  embeddings_subdir: ""  # Embeddings at root of contestants dir
+
+  # Contestant CSV path
+  contestants_csv: "../metadata/contestant_info.csv"
+
+  # HuggingFace sync settings
+  huggingface:
+    sync_embeddings_to_hf: true  # Upload regenerated embeddings to HuggingFace
+    repo_id: "yellowcandle/mv-face-recognition-data"
+    upload_on_regeneration: true  # Auto-upload after regeneration
+    create_manifest: true  # Create embedding_manifest.json on upload
+
+  # Fallback behavior when regeneration fails
+  fallback_on_regeneration_failure: true  # Use existing embeddings if regeneration fails
+  require_dimensions_match: false  # If true, fail processing on dimension mismatch

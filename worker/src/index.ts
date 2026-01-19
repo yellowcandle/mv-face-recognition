@@ -15,12 +15,15 @@ import {
  */
 interface Env {
   METADATA_KV: KVNamespace;
+  MODAL_JOBS: KVNamespace;
   VIDEOS_BUCKET: R2Bucket;
   CF_ACCESS_AUD?: string;
   CF_ACCESS_TEAM?: string;
   ENVIRONMENT?: string;
   ALLOWED_ORIGINS?: string;
   LOG_LEVEL?: string;
+  HF_TOKEN?: string;
+  MODAL_TOKEN?: string;
 }
 
 /**
@@ -674,6 +677,20 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
     case '/admin/youtube/bootstrap/':
       if (request.method === 'POST') {
         return await handleYoutubeBootstrap(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/upload-video':
+    case '/admin/upload-video/':
+      if (request.method === 'POST') {
+        return await handleUploadVideo(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/trigger-modal':
+    case '/admin/trigger-modal/':
+      if (request.method === 'POST') {
+        return await handleTriggerModal(request, env, corsHeaders);
       }
       break;
 
@@ -2109,6 +2126,154 @@ async function handleVideoMetadata(path: string, env: Env, corsHeaders: CorsHead
   return new Response(JSON.stringify(metadata), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
+}
+
+/**
+ * Handle video upload to HuggingFace XET
+ */
+async function handleUploadVideo(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const videoFile = formData.get('video') as File;
+    const filename = formData.get('filename') as string || videoFile?.name;
+
+    if (!videoFile) {
+      return new Response(JSON.stringify({ error: 'No video file provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    logger.info('Video upload requested', { filename, size: videoFile.size });
+
+    // Get HuggingFace token from environment
+    const hfToken = env.HF_TOKEN;
+    if (!hfToken) {
+      return new Response(JSON.stringify({
+        error: 'HuggingFace token not configured. Please set HF_TOKEN environment variable.'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Upload to HuggingFace
+    const repoId = 'yellowcandle/mv-face-recognition-data';
+    const remotePath = `videos/source/${filename}`;
+    const uploadUrl = `https://huggingface.co/api/datasets/${repoId}/upload/main/${remotePath}`;
+
+    logger.debug('Uploading to HuggingFace', { uploadUrl, filename });
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${hfToken}`,
+      },
+      body: videoFile
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      logger.error('HuggingFace upload failed', { status: uploadResponse.status, error: errorText });
+      return new Response(JSON.stringify({
+        error: 'Failed to upload to HuggingFace',
+        details: errorText
+      }), {
+        status: uploadResponse.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const videoUrl = `https://huggingface.co/datasets/${repoId}/resolve/main/${remotePath}`;
+
+    logger.info('Video uploaded successfully', { videoUrl, filename });
+
+    return new Response(JSON.stringify({
+      success: true,
+      video_name: filename,
+      video_url: videoUrl,
+      message: 'Video uploaded to HuggingFace XET'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Upload error', { error: err.message, stack: err.stack });
+    return new Response(JSON.stringify({
+      error: 'Upload failed',
+      details: err.message
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Handle Modal processing trigger
+ */
+async function handleTriggerModal(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const body = await request.json() as { video_url?: string; video_name?: string };
+    const { video_url, video_name } = body;
+
+    if (!video_url) {
+      return new Response(JSON.stringify({ error: 'No video URL provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    logger.info('Modal processing trigger requested', { video_url, video_name });
+
+    // Store processing job in KV for tracking
+    const jobId = `modal_job_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const jobData = {
+      id: jobId,
+      video_url,
+      video_name,
+      status: 'queued',
+      created_at: new Date().toISOString(),
+      trigger_method: 'frontend_ui'
+    };
+
+    await env.METADATA_KV.put(`modal_job_${jobId}`, JSON.stringify(jobData), {
+      expirationTtl: 86400 * 7 // 7 days
+    });
+
+    logger.info('Modal job queued', { jobId, video_name });
+
+    // Return instructions for manual processing
+    return new Response(JSON.stringify({
+      success: true,
+      job_id: jobId,
+      message: 'Processing job queued. Run Modal command to process:',
+      command: 'modal run scripts/modal_hf_processor.py --sync-from-hf --include-videos --process-videos',
+      video_url,
+      video_name,
+      status: 'queued',
+      notes: [
+        'Video is available on HuggingFace XET',
+        'Run the Modal command to start GPU processing',
+        'Processing typically takes 5-15 minutes depending on video length',
+        'Processed video will be uploaded back to HuggingFace'
+      ]
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Modal trigger error', { error: err.message, stack: err.stack });
+    return new Response(JSON.stringify({
+      error: 'Failed to trigger Modal processing',
+      details: err.message
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 /**

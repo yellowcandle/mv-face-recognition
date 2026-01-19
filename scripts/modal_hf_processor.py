@@ -82,6 +82,162 @@ VOL_MOUNT_PATH = Path("/data")
 # HuggingFace configuration
 HF_REPO_ID = "yellowcandle/mv-face-recognition-dataset"
 
+# --- Embedding Validation & Regeneration Functions ---
+
+def validate_and_regenerate_embeddings(
+    volume_path: Path = VOL_MOUNT_PATH,
+    embeddings_subdir: str = "source/photo/contestants",
+    photos_subdir: str = "source/photo/contestants/photos",
+    metadata_subdir: str = "metadata",
+    expected_dim: int = 512,
+    upload_to_hf: bool = True,
+) -> Dict[str, Any]:
+    """
+    Validate embeddings at container startup and regenerate if needed.
+
+    This function is called at Modal container startup to ensure embeddings
+    are compatible with the current face_recognition library (512-dim).
+
+    Args:
+        volume_path: Mount path for persistent volume
+        embeddings_subdir: Subdirectory containing embeddings
+        photos_subdir: Subdirectory containing contestant photos
+        metadata_subdir: Subdirectory containing contestant CSV
+        expected_dim: Expected embedding dimension (512 for current library)
+        upload_to_hf: Whether to upload regenerated embeddings to HuggingFace
+
+    Returns:
+        Dictionary with validation/regeneration results
+    """
+    from src.face_detector import regenerate_embeddings_from_contestant_photos
+
+    photo_base_dir = volume_path / photos_subdir
+    embeddings_dir = volume_path / embeddings_subdir
+    metadata_dir = volume_path / metadata_subdir
+    contestants_csv = metadata_dir / "contestant_info.csv"
+
+    result = {
+        "validated": False,
+        "needs_regeneration": False,
+        "regenerated": 0,
+        "uploaded": 0,
+        "dimension": expected_dim,
+        "reason": "",
+        "errors": [],
+    }
+
+    print(f"\n🔍 Validating embeddings...")
+    print(f"   Photo dir: {photo_base_dir}")
+    print(f"   Embeddings dir: {embeddings_dir}")
+    print(f"   Expected dimension: {expected_dim}")
+
+    # Check if embeddings exist
+    embedding_files = list(embeddings_dir.glob("*_embedding.npy"))
+    print(f"   Found {len(embedding_files)} existing embeddings")
+
+    if not embedding_files:
+        result["needs_regeneration"] = True
+        result["reason"] = "no_embeddings_found"
+        print(f"   ⚠️  No embeddings found")
+
+    # Validate dimensions of existing embeddings
+    dimension_mismatches = 0
+    for emb_path in embedding_files:
+        try:
+            import numpy as np
+            embedding = np.load(str(emb_path))
+            actual_dim = embedding.shape[0] if embedding.ndim == 1 else embedding.shape[1]
+            if actual_dim != expected_dim:
+                dimension_mismatches += 1
+                print(f"   ⚠️  {emb_path.name}: dim={actual_dim}, expected={expected_dim}")
+        except Exception as e:
+            print(f"   ⚠️  Failed to load {emb_path.name}: {e}")
+
+    if dimension_mismatches > 0:
+        result["needs_regeneration"] = True
+        result["reason"] = f"dimension_mismatch ({dimension_mismatches} files)"
+        print(f"   ⚠️  {dimension_mismatches} embeddings have wrong dimension")
+
+    # Check if CSV exists for regeneration
+    if result["needs_regeneration"] and not contestants_csv.exists():
+        result["errors"].append(f"Contestant CSV not found: {contestants_csv}")
+        print(f"   ❌ Cannot regenerate: CSV not found")
+        return result
+
+    # Regenerate if needed
+    if result["needs_regeneration"]:
+        print(f"\n🔄 Regenerating embeddings...")
+        start_time = time.time()
+
+        regen_result = regenerate_embeddings_from_contestant_photos(
+            photo_base_dir=photo_base_dir,
+            embeddings_output_dir=embeddings_dir,
+            contestants_csv_path=contestants_csv,
+            expected_dim=expected_dim,
+        )
+
+        result["regenerated"] = regen_result.regenerated_count
+        result["duration"] = regen_result.duration_seconds
+
+        if regen_result.success:
+            print(f"   ✅ Regenerated {regen_result.regenerated_count} embeddings in {regen_result.duration_seconds:.1f}s")
+
+            # Upload to HuggingFace if requested
+            if upload_to_hf:
+                print(f"\n📤 Uploading regenerated embeddings to HuggingFace...")
+                try:
+                    from huggingface_hub import HfApi
+                    token = os.environ.get("HF_TOKEN")
+                    if token:
+                        api = HfApi(token=token)
+
+                        # Upload each embedding
+                        for emb_path in embeddings_dir.glob("*_embedding.npy"):
+                            try:
+                                api.upload_file(
+                                    path_or_fileobj=str(emb_path),
+                                    path_in_repo=f"embeddings/{emb_path.name}",
+                                    repo_id=HF_REPO_ID,
+                                    repo_type="dataset",
+                                    token=token,
+                                )
+                                result["uploaded"] += 1
+                            except Exception as e:
+                                result["errors"].append(f"Upload failed: {emb_path.name}: {e}")
+
+                        print(f"   ✅ Uploaded {result['uploaded']} embeddings to HuggingFace")
+                    else:
+                        print(f"   ⚠️  No HF_TOKEN, skipping upload")
+                except Exception as e:
+                    result["errors"].append(f"HuggingFace upload failed: {e}")
+                    print(f"   ⚠️  Upload failed: {e}")
+
+            # Commit volume changes
+            try:
+                volume.commit()
+                print(f"   💾 Volume committed")
+            except Exception as e:
+                result["errors"].append(f"Volume commit failed: {e}")
+                print(f"   ⚠️  Volume commit failed: {e}")
+        else:
+            print(f"   ❌ Regeneration failed: {regen_result.failed_contestants}")
+            result["errors"] = [str(f) for f in regen_result.failed_contestants]
+
+    # Commit volume even if no regeneration (to persist any changes)
+    if not result["needs_regeneration"]:
+        try:
+            volume.commit()
+        except Exception as e:
+            print(f"   ⚠️  Volume commit failed: {e}")
+
+    result["validated"] = True
+    print(f"\n✅ Embedding validation complete")
+    print(f"   Valid: {not result['needs_regeneration']}")
+    print(f"   Regenerated: {result['regenerated']}")
+    print(f"   Uploaded: {result['uploaded']}")
+
+    return result
+
 
 # --- HuggingFace Sync Function ---
 
@@ -177,11 +333,29 @@ def sync_from_huggingface(
                 result["files_downloaded"] += flagged_count
                 print(f"  🏷️ Copied {flagged_count} flagged face files")
 
+        # Copy source videos if requested
+        if include_videos:
+            videos_src = Path(local_dir) / "videos" / "source"
+            if videos_src.exists():
+                dst_videos = VOL_MOUNT_PATH / "source/videos"
+                os.makedirs(dst_videos, exist_ok=True)
+                video_count = 0
+                for video_file in videos_src.glob("*"):
+                    if video_file.is_file() and video_file.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+                        shutil.copy2(video_file, dst_videos / video_file.name)
+                        video_count += 1
+                        result["files_downloaded"] += 1
+                        file_size_mb = video_file.stat().st_size / (1024 * 1024)
+                        print(f"  📹 {video_file.name} ({file_size_mb:.2f} MB)")
+                if video_count > 0:
+                    print(f"  ✅ Copied {video_count} source video(s)")
+
         result["success"] = True
         result["paths"] = {
             "metadata": str(VOL_MOUNT_PATH / "metadata"),
             "embeddings": str(VOL_MOUNT_PATH / "source/photo/contestants"),
             "flagged": str(VOL_MOUNT_PATH / "flagged_faces"),
+            "videos": str(VOL_MOUNT_PATH / "source/videos"),
         }
 
         # Commit volume changes

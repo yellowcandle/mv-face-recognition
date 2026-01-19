@@ -22,6 +22,8 @@ dependencies = [
     "onnx>=1.17.0",
     "onnxslim>=0.1.70",
     "onnxruntime>=1.20.1",
+    "aiohttp>=3.13.3",
+    "urllib3>=2.6.3",
 ]
 
 [tool.uv.sources]

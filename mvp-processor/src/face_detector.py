@@ -6,9 +6,9 @@ Handles face detection, encoding, and recognition against contestant database
 import face_recognition
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -66,34 +66,53 @@ class ContestantDatabase:
             logger.error(f"Failed to load contestants info: {e}")
 
     def build_face_encodings(self, force_rebuild: bool = False):
-        """Build face encodings for all contestants from local photos"""
-        logger.info("Building face encodings from local photos...")
+        """Build face encodings for all contestants from local photos or existing embeddings"""
+        logger.info("Building face encodings from local photos or embeddings...")
 
         self.face_encodings = {}
         self.contestant_names = []
 
         contestants_dir = self.photo_dir
-        for contestant_dir in contestants_dir.iterdir():
-            if contestant_dir.is_dir():
-                contestant_id = contestant_dir.name
-                if contestant_id in self.contestants_info:
-                    encodings = []
-                    for photo_path in contestant_dir.glob("*.jpg"):
+
+        for contestant_id, info in self.contestants_info.items():
+            nickname = info.get("nickname", "")
+
+            # First, try to load existing embedding from {nickname}_embedding.npy
+            embedding_path = contestants_dir / f"{nickname}_embedding.npy"
+            if embedding_path.exists():
+                try:
+                    encoding = np.load(str(embedding_path))
+                    # Ensure encoding is 1D (flatten if needed)
+                    encoding = encoding.flatten()
+                    self.face_encodings[contestant_id] = encoding
+                    self.contestant_names.append(contestant_id)
+                    logger.debug(f"Loaded embedding for contestant {contestant_id} ({nickname}), shape: {encoding.shape}")
+                    continue
+                except Exception as e:
+                    logger.warning(f"Failed to load embedding for {nickname}: {e}")
+
+            # Fall back to generating from photos in photos/contestant_{id}/
+            photos_subdir = contestants_dir / "photos" / f"contestant_{contestant_id}"
+            if photos_subdir.exists():
+                encodings = []
+                for photo_path in photos_subdir.glob("*.jpg"):
+                    try:
                         image = face_recognition.load_image_file(str(photo_path))
-                        face_encodings = face_recognition.face_encodings(image)
-                        if face_encodings:
-                            encodings.append(face_encodings[0])
-                            logger.debug(
-                                f"Encoded {photo_path} for contestant {contestant_id}"
-                            )
+                        face_encs = face_recognition.face_encodings(image)
+                        if face_encs:
+                            encodings.append(face_encs[0])
+                            logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to encode {photo_path}: {e}")
 
-                    if encodings:
-                        # Average multiple encodings if available
-                        avg_encoding = np.mean(encodings, axis=0)
-                        self.face_encodings[contestant_id] = avg_encoding
-                        self.contestant_names.append(contestant_id)
+                if encodings:
+                    # Average multiple encodings if available
+                    avg_encoding = np.mean(encodings, axis=0)
+                    self.face_encodings[contestant_id] = avg_encoding
+                    self.contestant_names.append(contestant_id)
+                    logger.info(f"Built encoding for contestant {contestant_id} ({nickname}) from {len(encodings)} photos")
 
-        logger.info(f"Built {len(self.face_encodings)} face encodings")
+        logger.info(f"Built {len(self.face_encodings)} face encodings for {len(self.contestant_names)} contestants")
 
     def get_contestant_info(self, contestant_id: str) -> Dict:
         """Get contestant information by ID"""
@@ -225,24 +244,57 @@ class FaceRecognizer:
         known_encodings = list(self.contestant_db.face_encodings.values())
         known_names = list(self.contestant_db.face_encodings.keys())
 
+        # Check if embedding dimensions match
+        detection_encoding_dim = detections[0].encoding.shape[0] if len(detections) > 0 else 0
+        known_encoding_dim = known_encodings[0].shape[0] if known_encodings else 0
+        dimensions_match = detection_encoding_dim == known_encoding_dim
+
+        # Use higher tolerance when dimensions don't match (cosine similarity on subset of features)
+        effective_tolerance = self.tolerance if dimensions_match else min(self.tolerance * 1.5, 0.9)
+
         for detection in detections:
             try:
-                # Calculate distances to all known faces
-                matches = face_recognition.face_distance(
-                    known_encodings, detection.encoding
-                )
-                min_distance = min(matches)
+                # Handle dimension mismatch between stored embeddings and current face_recognition model
+                if not dimensions_match:
+                    # Compute distances manually using cosine similarity
+                    detection_norm = detection.encoding / np.linalg.norm(detection.encoding)
+                    
+                    best_match_idx = -1
+                    best_distance = float('inf')
+                    
+                    for idx, known_encoding in enumerate(known_encodings):
+                        # Flatten and normalize known encoding
+                        known_flat = known_encoding.flatten()
+                        known_norm = known_flat / np.linalg.norm(known_flat)
+                        
+                        # Use cosine distance (1 - cosine similarity)
+                        # Handle different lengths by using minimum common length
+                        min_len = min(len(detection_norm), len(known_norm))
+                        cosine_dist = 1 - np.sum(detection_norm[:min_len] * known_norm[:min_len])
+                        
+                        if cosine_dist < best_distance:
+                            best_distance = cosine_dist
+                            best_match_idx = idx
+                    
+                    min_distance = best_distance
+                    matched_index = best_match_idx
+                else:
+                    # Use built-in face_distance when dimensions match
+                    matches = face_recognition.face_distance(
+                        known_encodings, detection.encoding
+                    )
+                    min_distance = float(np.min(matches))
+                    matched_index = int(np.argmin(matches))
 
                 # Early termination: if we have a very high confidence match, accept immediately
-                if min_distance < self.tolerance:
-                    matched_index = np.argmin(matches)
+                if min_distance < effective_tolerance:
                     contestant_id = known_names[matched_index]
                     contestant_info = self.contestant_db.get_contestant_info(
                         contestant_id
                     )
 
                     # Convert distance to confidence (lower distance = higher confidence)
-                    confidence = 1 - (min_distance / self.tolerance)
+                    confidence = 1 - (min_distance / effective_tolerance)
 
                     recognition = FaceRecognition(
                         detection=detection,
@@ -348,3 +400,190 @@ class FaceRecognizer:
             f"(min_confidence: {min_confidence})"
         )
         return filtered
+
+
+@dataclass
+class RegenerationResult:
+    """Result of embedding regeneration."""
+    success: bool
+    regenerated_count: int
+    failed_count: int
+    failed_contestants: List[Dict[str, str]] = field(default_factory=list)
+    embedding_dir: Optional[Path] = None
+    duration_seconds: float = 0.0
+    dimension: int = 512
+
+
+def regenerate_embeddings_from_contestant_photos(
+    photo_base_dir: Path,
+    embeddings_output_dir: Path,
+    contestants_csv_path: Path,
+    expected_dim: int = 512,
+) -> RegenerationResult:
+    """
+    Regenerate face embeddings from contestant photos using current face_recognition library.
+
+    This function creates 512-dimensional embeddings (matching current face_recognition library)
+    from contestant photos. It handles dimension mismatch by regenerating rather than using
+    outdated embeddings.
+
+    Args:
+        photo_base_dir: Base directory containing photos (expects photos/ subdirectory)
+        embeddings_output_dir: Directory to save regenerated embeddings
+        contestants_csv_path: Path to contestant_info.csv with contestant metadata
+        expected_dim: Expected embedding dimension (default: 512 for current face_recognition)
+
+    Returns:
+        RegenerationResult with count of successful/failed regenerations
+
+    Example:
+        >>> result = regenerate_embeddings_from_contestant_photos(
+        ...     photo_base_dir=Path("source/photo/contestants"),
+        ...     embeddings_output_dir=Path("source/photo/contestants"),
+        ...     contestants_csv_path=Path("metadata/contestant_info.csv"),
+        ... )
+        >>> print(f"Regenerated {result.regenerated_count} embeddings")
+    """
+    import time
+
+    start_time = time.time()
+    failed_contestants = []
+    regenerated_count = 0
+
+    # Ensure output directory exists
+    embeddings_output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load contestant info
+    contestants_info = {}
+    try:
+        df = pd.read_csv(contestants_csv_path)
+        for _, row in df.iterrows():
+            contestant_id = str(row["編號"])
+            contestants_info[contestant_id] = {
+                "id": contestant_id,
+                "name": row["姓名"],
+                "nickname": row["暱稱"],
+                "age": str(row["年齡"]),
+            }
+        logger.info(f"Loaded {len(contestants_info)} contestants from CSV")
+    except Exception as e:
+        logger.error(f"Failed to load contestants CSV: {e}")
+        return RegenerationResult(
+            success=False,
+            regenerated_count=0,
+            failed_count=0,
+            failed_contestants=[{"id": "all", "reason": f"CSV load failed: {e}"}],
+            embedding_dir=embeddings_output_dir,
+            duration_seconds=time.time() - start_time,
+        )
+
+    # Process each contestant
+    for contestant_id, info in contestants_info.items():
+        nickname = info.get("nickname", "")
+        if not nickname:
+            logger.warning(f"Contestant {contestant_id} has no nickname, skipping")
+            continue
+
+        photos_subdir = photo_base_dir / "photos" / f"contestant_{contestant_id}"
+        if not photos_subdir.exists():
+            logger.warning(f"Photos directory not found: {photos_subdir}")
+            failed_contestants.append({
+                "contestant_id": contestant_id,
+                "nickname": nickname,
+                "reason": "photos_directory_not_found",
+            })
+            continue
+
+        # Find photo files
+        photo_extensions = {".jpg", ".jpeg", ".png"}
+        photo_files = [
+            f for f in photos_subdir.iterdir()
+            if f.suffix.lower() in photo_extensions
+        ]
+
+        if not photo_files:
+            logger.warning(f"No photos found in {photos_subdir}")
+            failed_contestants.append({
+                "contestant_id": contestant_id,
+                "nickname": nickname,
+                "reason": "no_photos_found",
+            })
+            continue
+
+        # Encode all photos
+        encodings = []
+        for photo_path in photo_files:
+            try:
+                image = face_recognition.load_image_file(str(photo_path))
+                face_encs = face_recognition.face_encodings(image)
+                if face_encs:
+                    encodings.append(face_encs[0])
+                    logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id} ({nickname})")
+            except Exception as e:
+                logger.warning(f"Failed to encode {photo_path}: {e}")
+                failed_contestants.append({
+                    "contestant_id": contestant_id,
+                    "nickname": nickname,
+                    "reason": f"encode_failed: {e}",
+                })
+
+        if encodings:
+            # Average multiple encodings for robustness
+            avg_encoding = np.mean(encodings, axis=0)
+
+            # Verify dimension
+            actual_dim = avg_encoding.shape[0] if avg_encoding.ndim == 1 else avg_encoding.shape[1]
+            if actual_dim != expected_dim:
+                logger.warning(
+                    f"Embedding dimension mismatch for {nickname}: "
+                    f"got {actual_dim}, expected {expected_dim}"
+                )
+
+            # Save embedding
+            embedding_path = embeddings_output_dir / f"{nickname}_embedding.npy"
+            try:
+                np.save(str(embedding_path), avg_encoding)
+                regenerated_count += 1
+                logger.info(
+                    f"Saved embedding for {nickname} ({contestant_id}): "
+                    f"{len(encodings)} photos, dim={actual_dim}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to save embedding for {nickname}: {e}")
+                failed_contestants.append({
+                    "contestant_id": contestant_id,
+                    "nickname": nickname,
+                    "reason": f"save_failed: {e}",
+                })
+        else:
+            logger.warning(f"No valid encodings for contestant {contestant_id} ({nickname})")
+            failed_contestants.append({
+                "contestant_id": contestant_id,
+                "nickname": nickname,
+                "reason": "no_valid_encodings",
+            })
+
+    duration = time.time() - start_time
+    success = regenerated_count > 0 and len(failed_contestants) < len(contestants_info)
+
+    result = RegenerationResult(
+        success=success,
+        regenerated_count=regenerated_count,
+        failed_count=len(failed_contestants),
+        failed_contestants=failed_contestants,
+        embedding_dir=embeddings_output_dir,
+        duration_seconds=duration,
+        dimension=expected_dim,
+    )
+
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"Embedding Regeneration Summary:")
+    logger.info(f"  Total contestants: {len(contestants_info)}")
+    logger.info(f"  Successfully regenerated: {result.regenerated_count}")
+    logger.info(f"  Failed: {result.failed_count}")
+    logger.info(f"  Dimension: {result.dimension}")
+    logger.info(f"  Duration: {result.duration_seconds:.2f}s")
+    logger.info(f"{'=' * 60}\n")
+
+    return result
+

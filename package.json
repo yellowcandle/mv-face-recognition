@@ -5,9 +5,9 @@
   "main": "worker/index.js",
   "scripts": {
     "build": "npm run build:frontend",
-    "build:frontend": "cd frontend-svelte && npm run build",
-    "deploy": "wrangler deploy",
-    "deploy:staging": "wrangler deploy --env staging",
+    "build:frontend": "cd mvp-processor && npm run build",
+    "deploy": "cd worker && wrangler deploy",
+    "deploy:staging": "cd worker && wrangler deploy --env staging",
     "upload:videos": "node scripts/upload-to-r2.js",
     "upload:metadata": "node scripts/upload-metadata.js",
     "dev": "wrangler dev",

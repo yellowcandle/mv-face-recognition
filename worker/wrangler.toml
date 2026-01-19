@@ -11,6 +11,11 @@ binding = "METADATA_KV"
 id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 preview_id = "ba09879957074c0892d9a208f2fb1e5c"
 
+[[kv_namespaces]]
+binding = "MODAL_JOBS"
+id = "9096b9cd7c204ad2b511c173057e85ab"
+preview_id = "9096b9cd7c204ad2b511c173057e85ab"
+
 [[r2_buckets]]
 binding = "VIDEOS_BUCKET"
 bucket_name = "mv-face-recognition-videos"

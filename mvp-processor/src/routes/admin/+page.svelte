@@ -3,24 +3,7 @@
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
   import Badge from '$lib/components/Badge.svelte';
-  import Input from '$lib/components/Input.svelte';
   
-  // YouTube Queue
-  interface YouTubeQueueEntry {
-    id: string;
-    youtube_url: string;
-    youtube_video_id: string;
-    title: string;
-    priority: string;
-    status: string;
-    submitted_by: string;
-    submitted_at: string;
-    processing_started_at: string | null;
-    completed_at: string | null;
-    error: string | null;
-    output_video_id?: string;
-  }
-
   // Flagged Faces
   interface FlaggedFace {
     id: string;
@@ -41,16 +24,18 @@
   // Thumbnail cache
   let thumbnailCache: Map<string, string> = new Map();
 
-  let youtubeUrl = '';
-  let videoTitle = '';
-  let priority = 'normal';
-  let youtubeQueue: YouTubeQueueEntry[] = [];
   let flaggedFaces: FlaggedFace[] = [];
   let loading = false;
   let error = '';
   let success = '';
-  let activeTab = 'youtube';
-  let statusFilter = '';
+  let activeTab = 'flagging';
+
+  // Video upload state
+  let uploadingVideo = false;
+  let uploadProgress = 0;
+  let selectedFile: File | null = null;
+  let uploadedVideoUrl = '';
+  let processingStatus = 'idle'; // idle, uploading, uploaded, processing, completed, failed
 
   // Embedding comparison state
   let selectedContestantForComparison: number | null = null;
@@ -61,28 +46,8 @@
   $: contestantsWithFlags = [...new Set(flaggedFaces.map(f => f.contestant_id))].sort((a, b) => a - b);
 
   onMount(async () => {
-    await Promise.all([
-      loadYouTubeQueue(),
-      loadFlaggedFaces()
-    ]);
+    await loadFlaggedFaces();
   });
-
-  async function loadYouTubeQueue() {
-    try {
-      const url = statusFilter
-        ? `/api/admin/youtube/queue?status=${statusFilter}`
-        : '/api/admin/youtube/queue';
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        youtubeQueue = data.queue || [];
-      } else if (response.status === 401) {
-        error = 'Unauthorized. Please configure Cloudflare Access.';
-      }
-    } catch (e) {
-      console.error('Failed to load YouTube queue:', e);
-    }
-  }
 
   async function loadFlaggedFaces() {
     try {
@@ -113,45 +78,6 @@
       }
     } catch (e) {
       console.error('Failed to load thumbnail:', e);
-    }
-  }
-
-  async function submitYouTubeUrl() {
-    if (!youtubeUrl.trim()) {
-      error = 'Please enter a YouTube URL';
-      return;
-    }
-
-    loading = true;
-    error = '';
-    success = '';
-
-    try {
-      const response = await fetch('/api/admin/youtube/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          youtube_url: youtubeUrl,
-          title: videoTitle || undefined,
-          priority
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        success = `Video queued successfully! Queue ID: ${data.queue_id}`;
-        youtubeUrl = '';
-        videoTitle = '';
-        priority = 'normal';
-        await loadYouTubeQueue();
-      } else {
-        error = data.error || 'Failed to queue video';
-      }
-    } catch (e) {
-      error = 'Network error. Please try again.';
-    } finally {
-      loading = false;
     }
   }
 
@@ -243,6 +169,103 @@
       default: return '#6b7280';
     }
   }
+
+  function handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      selectedFile = input.files[0];
+      error = '';
+      success = '';
+    }
+  }
+
+  async function uploadVideoToHF() {
+    if (!selectedFile) {
+      error = 'Please select a video file first';
+      return;
+    }
+
+    uploadingVideo = true;
+    processingStatus = 'uploading';
+    uploadProgress = 0;
+    error = '';
+    success = '';
+
+    try {
+      const formData = new FormData();
+      formData.append('video', selectedFile);
+      formData.append('filename', selectedFile.name);
+
+      const response = await fetch('/api/admin/upload-video', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        uploadedVideoUrl = data.video_url;
+        processingStatus = 'uploaded';
+        success = `Video uploaded successfully: ${data.video_name}`;
+        uploadProgress = 100;
+      } else {
+        error = data.error || 'Upload failed';
+        processingStatus = 'failed';
+      }
+    } catch (e) {
+      error = 'Network error during upload';
+      processingStatus = 'failed';
+    } finally {
+      uploadingVideo = false;
+    }
+  }
+
+  async function triggerModalProcessing() {
+    if (!uploadedVideoUrl) {
+      error = 'Please upload a video first';
+      return;
+    }
+
+    loading = true;
+    processingStatus = 'processing';
+    error = '';
+    success = '';
+
+    try {
+      const response = await fetch('/api/admin/trigger-modal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_url: uploadedVideoUrl,
+          video_name: selectedFile?.name,
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        success = data.message || 'Modal processing triggered successfully!';
+        processingStatus = 'processing';
+      } else {
+        error = data.error || 'Failed to trigger Modal processing';
+        processingStatus = 'failed';
+      }
+    } catch (e) {
+      error = 'Network error triggering Modal';
+      processingStatus = 'failed';
+    } finally {
+      loading = false;
+    }
+  }
+
+  function resetUpload() {
+    selectedFile = null;
+    uploadedVideoUrl = '';
+    uploadProgress = 0;
+    processingStatus = 'idle';
+    error = '';
+    success = '';
+  }
 </script>
 
 <svelte:head>
@@ -252,7 +275,7 @@
 <div class="admin-container">
   <div class="admin-header">
     <h1>Admin Panel</h1>
-    <p class="admin-description">Manage YouTube video processing and face flagging approvals</p>
+    <p class="admin-description">Manage face flagging approvals and embedding synchronization</p>
   </div>
 
   {#if error}
@@ -275,13 +298,6 @@
   <div class="tabs">
     <button
       class="tab"
-      class:active={activeTab === 'youtube'}
-      on:click={() => activeTab = 'youtube'}
-    >
-      YouTube Ingestion
-    </button>
-    <button
-      class="tab"
       class:active={activeTab === 'flagging'}
       on:click={() => activeTab = 'flagging'}
     >
@@ -294,122 +310,14 @@
     >
       Embedding Sync
     </button>
+    <button
+      class="tab"
+      class:active={activeTab === 'processing'}
+      on:click={() => activeTab = 'processing'}
+    >
+      Video Processing
+    </button>
   </div>
-
-  <!-- YouTube Ingestion Tab -->
-  {#if activeTab === 'youtube'}
-    <Card class="panel">
-      <div class="panel-inner">
-        <div class="panel-header-row">
-          <div>
-            <h2>Submit YouTube Video</h2>
-            <p class="panel-description">Add a YouTube video URL to the processing queue</p>
-          </div>
-          <Button href="/admin/youtube" variant="primary">
-            Open Enhanced Form
-          </Button>
-        </div>
-
-        <form on:submit|preventDefault={submitYouTubeUrl} class="form">
-          <div class="form-group">
-            <label for="youtube-url">YouTube URL *</label>
-            <Input
-              id="youtube-url"
-              type="text"
-              bind:value={youtubeUrl}
-              placeholder="https://www.youtube.com/watch?v=..."
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="video-title">Title (optional)</label>
-            <Input
-              id="video-title"
-              type="text"
-              bind:value={videoTitle}
-              placeholder="Custom title for the video"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="priority">Priority</label>
-            <select id="priority" bind:value={priority} class="select">
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-
-          <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? 'Submitting...' : 'Add to Queue'}
-          </Button>
-        </form>
-
-        <div class="divider"></div>
-
-        <h3>Processing Queue</h3>
-        <div class="filter-row">
-          <label for="status-filter">Filter by status:</label>
-          <select id="status-filter" bind:value={statusFilter} on:change={loadYouTubeQueue} class="select select-small">
-            <option value="">All</option>
-            <option value="queued">Queued</option>
-            <option value="processing">Processing</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-          </select>
-          <Button variant="secondary" size="sm" on:click={loadYouTubeQueue}>Refresh</Button>
-        </div>
-
-        {#if youtubeQueue.length === 0}
-          <p class="empty-message">No videos in queue</p>
-        {:else}
-          <div class="table-container">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Submitted</th>
-                  <th>Completed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each youtubeQueue as entry}
-                  <tr>
-                    <td>
-                      <div class="video-info">
-                        <a href={entry.youtube_url} target="_blank" rel="noopener noreferrer">
-                          {entry.title}
-                        </a>
-                        <span class="video-id">{entry.youtube_video_id}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge variant={entry.status === 'completed' ? 'success' : entry.status === 'processing' ? 'primary' : entry.status === 'failed' ? 'error' : 'neutral'} class="status-badge-item">
-                        {entry.status}
-                      </Badge>
-                      {#if entry.error}
-                        <span class="error-text" title={entry.error}>Error</span>
-                      {/if}
-                    </td>
-                    <td>{entry.priority}</td>
-                    <td>
-                      <div class="date-info">
-                        {formatDate(entry.submitted_at)}
-                        <span class="submitted-by">by {entry.submitted_by}</span>
-                      </div>
-                    </td>
-                    <td>{formatDate(entry.completed_at)}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/if}
-      </div>
-    </Card>
-  {/if}
 
   <!-- Face Flagging Approval Tab -->
   {#if activeTab === 'flagging'}
@@ -664,6 +572,173 @@
             {/if}
           </div>
         {/if}
+      </div>
+    </Card>
+  {/if}
+
+  <!-- Video Processing Tab -->
+  {#if activeTab === 'processing'}
+    <Card class="panel">
+      <div class="panel-inner">
+        <h2>Video Processing with Modal</h2>
+        <p class="panel-description">Upload videos to HuggingFace and trigger cloud GPU processing</p>
+
+        <div class="processing-workflow">
+          <!-- Step 1: File Selection -->
+          <Card variant="bordered" padding="none">
+            <div class="step-section">
+              <div class="step-header">
+                <div class="step-number" class:completed={selectedFile}>1</div>
+                <div>
+                  <h3>Select Video File</h3>
+                  <p>Choose a video file to upload and process</p>
+                </div>
+              </div>
+
+              <div class="file-input-wrapper">
+                <input
+                  type="file"
+                  id="video-upload"
+                  accept="video/mp4,video/avi,video/mov,video/mkv"
+                  on:change={handleFileSelect}
+                  disabled={uploadingVideo || loading}
+                />
+                <label for="video-upload" class="file-input-label">
+                  {selectedFile ? selectedFile.name : 'Choose Video File'}
+                </label>
+                {#if selectedFile}
+                  <Badge variant="success">
+                    {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                  </Badge>
+                {/if}
+              </div>
+            </div>
+          </Card>
+
+          <!-- Step 2: Upload to HuggingFace -->
+          <Card variant="bordered" padding="none">
+            <div class="step-section">
+              <div class="step-header">
+                <div class="step-number" class:completed={processingStatus === 'uploaded' || processingStatus === 'processing'}>2</div>
+                <div>
+                  <h3>Upload to HuggingFace XET</h3>
+                  <p>Store video in cloud for Modal processing</p>
+                </div>
+              </div>
+
+              {#if processingStatus === 'uploading'}
+                <div class="progress-section">
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: {uploadProgress}%"></div>
+                  </div>
+                  <p class="progress-text">Uploading... {uploadProgress}%</p>
+                </div>
+              {:else if processingStatus === 'uploaded'}
+                <div class="success-message">
+                  Video uploaded successfully!
+                  <a href={uploadedVideoUrl} target="_blank" rel="noopener" class="video-link">
+                    View on HuggingFace
+                  </a>
+                </div>
+              {:else}
+                <Button
+                  variant="primary"
+                  on:click={uploadVideoToHF}
+                  disabled={!selectedFile || uploadingVideo || loading}
+                >
+                  {uploadingVideo ? 'Uploading...' : 'Upload to HuggingFace'}
+                </Button>
+              {/if}
+            </div>
+          </Card>
+
+          <!-- Step 3: Trigger Modal Processing -->
+          <Card variant="bordered" padding="none">
+            <div class="step-section">
+              <div class="step-header">
+                <div class="step-number" class:completed={processingStatus === 'processing'}>3</div>
+                <div>
+                  <h3>Process with Modal</h3>
+                  <p>Run face recognition with cloud GPUs</p>
+                </div>
+              </div>
+
+              {#if processingStatus === 'processing'}
+                <div class="processing-indicator">
+                  <div class="spinner"></div>
+                  <p>Processing video with Modal cloud GPUs...</p>
+                  <p class="help-text">This may take several minutes. Check Modal dashboard for progress.</p>
+                </div>
+              {:else}
+                <Button
+                  variant="success"
+                  on:click={triggerModalProcessing}
+                  disabled={processingStatus !== 'uploaded' || loading}
+                >
+                  {loading ? 'Triggering...' : 'Trigger Modal Processing'}
+                </Button>
+              {/if}
+
+              {#if processingStatus === 'uploaded' || processingStatus === 'processing'}
+                <div class="modal-info">
+                  <p><strong>Manual Trigger:</strong></p>
+                  <code class="command-code">
+                    modal run scripts/modal_hf_processor.py --sync-from-hf --include-videos --process-videos
+                  </code>
+                </div>
+              {/if}
+            </div>
+          </Card>
+
+          <!-- Reset Button -->
+          {#if selectedFile}
+            <div class="reset-section">
+              <Button
+                variant="secondary"
+                size="sm"
+                on:click={resetUpload}
+                disabled={uploadingVideo || loading}
+              >
+                Reset / Upload Another Video
+              </Button>
+            </div>
+          {/if}
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Processing Status Guide -->
+        <h3>Processing Workflow Guide</h3>
+        <div class="guide-grid">
+          <Card variant="surface" padding="none">
+            <div class="guide-card">
+              <div class="guide-icon">📹</div>
+              <h4>1. Upload Video</h4>
+              <p>Videos are uploaded to HuggingFace XET storage with efficient deduplication</p>
+            </div>
+          </Card>
+          <Card variant="surface" padding="none">
+            <div class="guide-card">
+              <div class="guide-icon">🔄</div>
+              <h4>2. Modal Sync</h4>
+              <p>Modal downloads the video and contestant embeddings from HuggingFace</p>
+            </div>
+          </Card>
+          <Card variant="surface" padding="none">
+            <div class="guide-card">
+              <div class="guide-icon">🎯</div>
+              <h4>3. Face Recognition</h4>
+              <p>Cloud GPUs process the video with face detection and matching</p>
+            </div>
+          </Card>
+          <Card variant="surface" padding="none">
+            <div class="guide-card">
+              <div class="guide-icon">✨</div>
+              <h4>4. Results Upload</h4>
+              <p>Processed video with annotations is uploaded back to HuggingFace</p>
+            </div>
+          </Card>
+        </div>
       </div>
     </Card>
   {/if}
@@ -2013,5 +2088,217 @@
     .flags-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  /* Video Processing Tab Styles */
+  .processing-workflow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .step-section {
+    padding: var(--space-5);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--bg-primary);
+    border: 2px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-h5-size);
+    font-weight: var(--text-h5-weight);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .step-number.completed {
+    background-color: var(--color-success-500);
+    border-color: var(--color-success-500);
+    color: white;
+  }
+
+  .step-section h3 {
+    font-size: var(--text-body-size);
+    font-weight: var(--text-h6-weight);
+    margin: 0 0 var(--space-1) 0;
+    color: var(--text-primary);
+  }
+
+  .step-section p {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .file-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .file-input-wrapper input[type="file"] {
+    display: none;
+  }
+
+  .file-input-label {
+    padding: var(--space-3) var(--space-5);
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: var(--text-body-sm-size);
+    font-weight: var(--text-label-weight);
+    transition: all var(--duration-normal);
+  }
+
+  .file-input-label:hover {
+    border-color: var(--color-primary-500);
+    background-color: var(--bg-elevated);
+  }
+
+  .progress-section {
+    margin: var(--space-4) 0;
+  }
+
+  .progress-bar-container {
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: var(--space-2);
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary-600), var(--color-primary-400));
+    border-radius: var(--radius-md);
+    transition: width var(--duration-normal);
+  }
+
+  .progress-text {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .success-message {
+    background-color: rgba(34, 197, 94, 0.1);
+    border: 1px solid var(--color-success-500);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-success-300);
+    font-size: var(--text-body-sm-size);
+  }
+
+  .video-link {
+    color: var(--color-primary-400);
+    text-decoration: underline;
+    margin-left: var(--space-2);
+  }
+
+  .processing-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-5) 0;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-default);
+    border-top-color: var(--color-primary-500);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .processing-indicator p {
+    color: var(--text-primary);
+    font-size: var(--text-body-size);
+    margin: 0;
+  }
+
+  .help-text {
+    color: var(--text-secondary);
+    font-size: var(--text-body-sm-size);
+  }
+
+  .modal-info {
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+  }
+
+  .modal-info p {
+    margin: 0 0 var(--space-2) 0;
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+  }
+
+  .command-code {
+    display: block;
+    padding: var(--space-2-5) var(--space-3);
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-body-xs-size);
+    color: var(--color-primary-300);
+    overflow-x: auto;
+  }
+
+  .reset-section {
+    display: flex;
+    justify-content: center;
+  }
+
+  .guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .guide-card {
+    padding: var(--space-5);
+    text-align: center;
+  }
+
+  .guide-icon {
+    font-size: 48px;
+    margin-bottom: var(--space-3);
+  }
+
+  .guide-card h4 {
+    font-size: var(--text-body-size);
+    font-weight: var(--text-h6-weight);
+    margin: 0 0 var(--space-2) 0;
+    color: var(--text-primary);
+  }
+
+  .guide-card p {
+    font-size: var(--text-body-sm-size);
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
   }
 </style>
