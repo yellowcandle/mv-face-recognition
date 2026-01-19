@@ -15,6 +15,7 @@ import {
  */
 interface Env {
   METADATA_KV: KVNamespace;
+  MODAL_JOBS: KVNamespace;
   VIDEOS_BUCKET: R2Bucket;
   CF_ACCESS_AUD?: string;
   CF_ACCESS_TEAM?: string;
@@ -22,6 +23,7 @@ interface Env {
   ALLOWED_ORIGINS?: string;
   LOG_LEVEL?: string;
   HF_TOKEN?: string;
+  MODAL_TOKEN?: string;
 }
 
 /**
