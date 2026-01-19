@@ -32,7 +32,8 @@ app = App("mv-youtube-processor")
 # Docker image with all dependencies
 modal_image = (
     Image.debian_slim(python_version="3.11")
-    .apt_install("git", "ffmpeg", "sqlite3")
+    .apt_install("git", "ffmpeg", "sqlite3", "curl", "unzip")
+    .run_commands("curl -fsSL https://deno.land/install.sh | sh && mv /root/.deno/bin/deno /usr/local/bin/")
     .pip_install(
         "yt-dlp>=2024.8.6",  # YouTube downloader
         "opencv-python>=4.8.0",
@@ -44,6 +45,7 @@ modal_image = (
         "torch>=2.8.0",
         "supervision>=0.19.0",
     )
+    .pip_install("pysqlite3-binary")  # Newer SQLite for ChromaDB compatibility
     .add_local_dir("src", "/src")
 )
 
@@ -90,6 +92,15 @@ class FaceDetection:
 class YouTubeProcessor:
     """Modal class for processing YouTube videos"""
 
+    def __enter__(self):
+        """Initialize container: fix SQLite for ChromaDB compatibility."""
+        import sys
+        try:
+            import pysqlite3
+            sys.modules["sqlite3"] = pysqlite3
+        except ImportError:
+            pass
+
     @method()
     def download_video(self, youtube_url: str, queue_id: str) -> Dict:
         """
@@ -106,20 +117,24 @@ class YouTubeProcessor:
 
         print(f"[Stage 1] Downloading YouTube video: {youtube_url}")
 
-        # Create directories
         download_dir = VOL_MOUNT_PATH / "youtube_downloads" / queue_id
         download_dir.mkdir(parents=True, exist_ok=True)
 
-        # yt-dlp options
+        cookies_file = VOL_MOUNT_PATH / "youtube_cookies.txt"
+
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[vcodec^=hvc1]+bestaudio/bestvideo[vcodec^=avc]+bestaudio/best[ext=mp4]/best',
             'outtmpl': str(download_dir / '%(id)s.%(ext)s'),
             'quiet': False,
             'no_warnings': False,
             'extract_flat': False,
-            'writeinfojson': True,  # Save metadata
+            'writeinfojson': True,
             'writethumbnail': True,
         }
+
+        if cookies_file.exists():
+            ydl_opts['cookiefile'] = str(cookies_file)
+            print(f"  Using cookies from {cookies_file}")
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -572,12 +587,36 @@ class YouTubeProcessor:
         }
 
 
-# --- Main Entry Point ---
+def send_webhook(webhook_url: str, job_id: str, **kwargs) -> bool:
+    """Send status update to webhook endpoint."""
+    if not webhook_url:
+        return True
+    
+    import urllib.request
+    import urllib.error
+    
+    payload = json.dumps({"job_id": job_id, **kwargs}).encode('utf-8')
+    
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status == 200
+    except urllib.error.URLError as e:
+        print(f"Webhook failed: {e}")
+        return False
+
 
 @app.local_entrypoint()
 def main(
     queue_id: Optional[str] = None,
     url: Optional[str] = None,
+    job_id: Optional[str] = None,
+    webhook_url: Optional[str] = None,
     sample_only: bool = False,
 ):
     """
@@ -586,6 +625,8 @@ def main(
     Args:
         queue_id: Queue ID from admin panel submission
         url: Direct YouTube URL (for testing)
+        job_id: Frontend job ID for webhook callbacks
+        webhook_url: URL to POST status updates to
         sample_only: Only download and sample, skip recognition
     """
 
@@ -593,40 +634,44 @@ def main(
         print("Error: Must provide either --queue-id or --url")
         sys.exit(1)
 
-    # Create processor instance
     processor = YouTubeProcessor()
 
-    # Generate queue_id if using direct URL
     if url and not queue_id:
         import hashlib
         video_id = hashlib.md5(url.encode()).hexdigest()[:11]
         queue_id = f"yt_{video_id}_{int(time.time())}"
         youtube_url = url
     else:
-        # TODO: Fetch queue entry from KV storage to get URL
-        # For now, require URL parameter
         if not url:
             print("Error: --url required (KV integration pending)")
             sys.exit(1)
         youtube_url = url
 
+    effective_job_id = job_id or queue_id
+
     print(f"\n{'='*60}")
     print(f"YouTube Processing Pipeline")
     print(f"Queue ID: {queue_id}")
+    print(f"Job ID: {effective_job_id}")
     print(f"URL: {youtube_url}")
+    print(f"Webhook: {webhook_url or 'disabled'}")
     print(f"{'='*60}\n")
 
-    # Stage 1: Download
+    send_webhook(webhook_url, effective_job_id, status='downloading', progress=5, log='Downloading video...')
+
     print("\n[1/3] Downloading YouTube video...")
     download_result = processor.download_video.remote(youtube_url, queue_id)
 
     if not download_result['success']:
-        print(f"\n✗ Pipeline failed at Stage 1: {download_result.get('error')}")
+        error_msg = download_result.get('error', 'Download failed')
+        send_webhook(webhook_url, effective_job_id, status='failed', error=error_msg, log=f'Download failed: {error_msg}')
+        print(f"\n✗ Pipeline failed at Stage 1: {error_msg}")
         sys.exit(1)
 
+    send_webhook(webhook_url, effective_job_id, status='processing', progress=20, log='Download complete')
     print(f"✓ Stage 1 complete")
 
-    # Stage 2: Sample and detect
+    send_webhook(webhook_url, effective_job_id, progress=30, log='Starting face detection...')
     print("\n[2/3] Sampling frames and detecting faces...")
     sample_result = processor.sample_and_detect_faces.remote(
         video_path=download_result['video_path'],
@@ -636,22 +681,38 @@ def main(
     )
 
     if not sample_result['success']:
-        print(f"\n✗ Pipeline failed at Stage 2: {sample_result.get('error')}")
+        error_msg = sample_result.get('error', 'Face detection failed')
+        send_webhook(webhook_url, effective_job_id, status='failed', error=error_msg, log=f'Face detection failed: {error_msg}')
+        print(f"\n✗ Pipeline failed at Stage 2: {error_msg}")
         sys.exit(1)
 
-    print(f"✓ Stage 2 complete: {sample_result['total_faces']} faces detected")
+    total_faces = sample_result['total_faces']
+    send_webhook(webhook_url, effective_job_id, progress=60, faces_detected=total_faces, log=f'Face detection complete: {total_faces} faces')
+    print(f"✓ Stage 2 complete: {total_faces} faces detected")
 
-    # Stage 2b: Recognition (optional)
+    recognized_faces = 0
     if not sample_only:
+        send_webhook(webhook_url, effective_job_id, progress=70, log='Running face recognition...')
         print("\n[2b/3] Running face recognition...")
         recognition_result = processor.recognize_faces.remote(queue_id=queue_id)
 
         if recognition_result['success']:
-            print(f"✓ Stage 2b complete: {recognition_result['recognized_faces']} faces recognized")
+            recognized_faces = recognition_result['recognized_faces']
+            send_webhook(webhook_url, effective_job_id, progress=90, faces_recognized=recognized_faces, log=f'Face recognition complete: {recognized_faces} identified')
+            print(f"✓ Stage 2b complete: {recognized_faces} faces recognized")
         else:
+            send_webhook(webhook_url, effective_job_id, progress=90, log='Face recognition skipped (no embeddings)')
             print(f"⚠ Stage 2b skipped: {recognition_result.get('message', recognition_result.get('error'))}")
 
-    # Stage 3: User validation and embedding bootstrap
+    send_webhook(
+        webhook_url, effective_job_id,
+        status='completed',
+        progress=100,
+        faces_detected=total_faces,
+        faces_recognized=recognized_faces,
+        log='Processing finished successfully'
+    )
+
     print("\n[3/3] Ready for user validation")
     print(f"\nNext steps:")
     print(f"1. Review detected faces at: {sample_result['samples_dir']}")

@@ -1,0 +1,170 @@
+{
+  "_meta": {
+    "models": {
+      "pendingReviews": "Face detections that need human review. Each shows a detected face crop alongside its current identification for verification.",
+      "contestants": "Available contestants that can be selected as the correct identification when flagging a misidentified face.",
+      "submittedFlags": "User-submitted corrections indicating a face was misidentified, with the suggested correct contestant."
+    },
+    "relationships": [
+      "Each PendingReview is a FaceDetection that may need correction",
+      "Flags reference a FaceDetection and suggest the correct Contestant",
+      "SubmittedFlags track the history of user corrections"
+    ]
+  },
+  "pendingReviews": [
+    {
+      "id": "rev-001",
+      "detectionId": "det-101",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 245.3,
+      "faceCropUrl": "/crops/det-101.jpg",
+      "currentContestantId": "con-005",
+      "currentContestantName": "陳凱詠",
+      "currentContestantNickname": "Jace",
+      "currentContestantPhoto": "/photos/con-005.jpg",
+      "confidence": 0.72
+    },
+    {
+      "id": "rev-002",
+      "detectionId": "det-102",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 890.5,
+      "faceCropUrl": "/crops/det-102.jpg",
+      "currentContestantId": "con-003",
+      "currentContestantName": "邱彥筒",
+      "currentContestantNickname": "Marf",
+      "currentContestantPhoto": "/photos/con-003.jpg",
+      "confidence": 0.68
+    },
+    {
+      "id": "rev-003",
+      "detectionId": "det-103",
+      "videoId": "vid-002",
+      "videoTitle": "聲夢傳奇2 第14集",
+      "timestamp": 1520.8,
+      "faceCropUrl": "/crops/det-103.jpg",
+      "currentContestantId": "con-001",
+      "currentContestantName": "蘇雅琳",
+      "currentContestantNickname": "Ivy So",
+      "currentContestantPhoto": "/photos/con-001.jpg",
+      "confidence": 0.65
+    },
+    {
+      "id": "rev-004",
+      "detectionId": "det-104",
+      "videoId": "vid-002",
+      "videoTitle": "聲夢傳奇2 第14集",
+      "timestamp": 2100.2,
+      "faceCropUrl": "/crops/det-104.jpg",
+      "currentContestantId": "con-007",
+      "currentContestantName": "姚焯菲",
+      "currentContestantNickname": "Chantel",
+      "currentContestantPhoto": "/photos/con-007.jpg",
+      "confidence": 0.71
+    },
+    {
+      "id": "rev-005",
+      "detectionId": "det-105",
+      "videoId": "vid-003",
+      "videoTitle": "聲夢傳奇2 第13集",
+      "timestamp": 450.0,
+      "faceCropUrl": "/crops/det-105.jpg",
+      "currentContestantId": null,
+      "currentContestantName": null,
+      "currentContestantNickname": null,
+      "currentContestantPhoto": null,
+      "confidence": 0.42
+    },
+    {
+      "id": "rev-006",
+      "detectionId": "det-106",
+      "videoId": "vid-003",
+      "videoTitle": "聲夢傳奇2 第13集",
+      "timestamp": 1890.5,
+      "faceCropUrl": "/crops/det-106.jpg",
+      "currentContestantId": "con-010",
+      "currentContestantName": "炎明熹",
+      "currentContestantNickname": "Gigi Yim",
+      "currentContestantPhoto": "/photos/con-010.jpg",
+      "confidence": 0.58
+    }
+  ],
+  "contestants": [
+    { "id": "con-001", "chineseName": "蘇雅琳", "nickname": "Ivy So", "photoUrl": "/photos/con-001.jpg" },
+    { "id": "con-002", "chineseName": "黃雅慧", "nickname": "咖喱", "photoUrl": "/photos/con-002.jpg" },
+    { "id": "con-003", "chineseName": "邱彥筒", "nickname": "Marf", "photoUrl": "/photos/con-003.jpg" },
+    { "id": "con-004", "chineseName": "林君蓮", "nickname": "Gigi", "photoUrl": "/photos/con-004.jpg" },
+    { "id": "con-005", "chineseName": "陳凱詠", "nickname": "Jace", "photoUrl": "/photos/con-005.jpg" },
+    { "id": "con-006", "chineseName": "詹天文", "nickname": "Windy", "photoUrl": "/photos/con-006.jpg" },
+    { "id": "con-007", "chineseName": "姚焯菲", "nickname": "Chantel", "photoUrl": "/photos/con-007.jpg" },
+    { "id": "con-008", "chineseName": "鍾柔美", "nickname": "Yumi", "photoUrl": "/photos/con-008.jpg" },
+    { "id": "con-009", "chineseName": "何晉樂", "nickname": "Lokman", "photoUrl": "/photos/con-009.jpg" },
+    { "id": "con-010", "chineseName": "炎明熹", "nickname": "Gigi Yim", "photoUrl": "/photos/con-010.jpg" }
+  ],
+  "submittedFlags": [
+    {
+      "id": "flag-001",
+      "detectionId": "det-050",
+      "videoTitle": "聲夢傳奇2 第10集",
+      "originalContestantName": "陳凱詠",
+      "correctedContestantName": "炎明熹",
+      "submittedAt": "2024-01-20T15:30:00Z",
+      "status": "accepted",
+      "notes": null
+    },
+    {
+      "id": "flag-002",
+      "detectionId": "det-051",
+      "videoTitle": "聲夢傳奇2 第10集",
+      "originalContestantName": "邱彥筒",
+      "correctedContestantName": "姚焯菲",
+      "submittedAt": "2024-01-20T15:32:00Z",
+      "status": "accepted",
+      "notes": "Similar hairstyle caused confusion"
+    },
+    {
+      "id": "flag-003",
+      "detectionId": "det-052",
+      "videoTitle": "聲夢傳奇2 第11集",
+      "originalContestantName": "蘇雅琳",
+      "correctedContestantName": null,
+      "submittedAt": "2024-01-21T09:15:00Z",
+      "status": "pending",
+      "notes": "Marked as unknown - background person"
+    },
+    {
+      "id": "flag-004",
+      "detectionId": "det-053",
+      "videoTitle": "聲夢傳奇2 第12集",
+      "originalContestantName": "黃雅慧",
+      "correctedContestantName": "詹天文",
+      "submittedAt": "2024-01-21T10:45:00Z",
+      "status": "rejected",
+      "notes": null
+    },
+    {
+      "id": "flag-005",
+      "detectionId": "det-054",
+      "videoTitle": "聲夢傳奇2 第13集",
+      "originalContestantName": null,
+      "correctedContestantName": "林君蓮",
+      "submittedAt": "2024-01-22T08:00:00Z",
+      "status": "pending",
+      "notes": "Was previously unidentified"
+    }
+  ],
+  "videos": [
+    { "id": "vid-001", "title": "聲夢傳奇2 第15集" },
+    { "id": "vid-002", "title": "聲夢傳奇2 第14集" },
+    { "id": "vid-003", "title": "聲夢傳奇2 第13集" },
+    { "id": "vid-004", "title": "聲夢傳奇2 第12集" },
+    { "id": "vid-005", "title": "聲夢傳奇2 第11集" }
+  ],
+  "filterVideoId": null,
+  "filterContestantId": null,
+  "filterConfidenceThreshold": 0.75,
+  "selectedReviewIds": [],
+  "searchQuery": ""
+}

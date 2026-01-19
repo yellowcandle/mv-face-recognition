@@ -551,6 +551,28 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
     case '/videos/processed/list/':
       return await handleProcessedVideosEndpoint(env, corsHeaders);
 
+    // Public ingestion endpoints (no auth required)
+    case '/ingestion/submit':
+    case '/ingestion/submit/':
+      if (request.method === 'POST') {
+        return await handleIngestionSubmit(request, env, corsHeaders);
+      }
+      break;
+
+    case '/ingestion/jobs':
+    case '/ingestion/jobs/':
+      if (request.method === 'GET') {
+        return await handleIngestionJobs(request, env, corsHeaders);
+      }
+      break;
+
+    case '/ingestion/webhook':
+    case '/ingestion/webhook/':
+      if (request.method === 'POST') {
+        return await handleIngestionWebhook(request, env, corsHeaders);
+      }
+      break;
+
     case '/settings':
     case '/settings/':
       return await handleSettingsEndpoint(request, env, corsHeaders);
@@ -656,7 +678,12 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
       break;
 
     default:
-      // Handle dynamic routes
+      // Handle dynamic ingestion job routes
+      if (path.startsWith('/ingestion/jobs/') && path !== '/ingestion/jobs/') {
+        const jobId = path.replace('/ingestion/jobs/', '').replace(/\/$/, '');
+        return await handleIngestionJobById(jobId, env, corsHeaders);
+      }
+
       if (path.startsWith('/videos/metadata/dense/')) {
         return await handleDenseMetadata(path, env, corsHeaders);
       }
@@ -1557,6 +1584,218 @@ async function handleYoutubeBootstrap(request: Request, env: Env, corsHeaders: C
     const err = error as Error;
     logger.error('YouTube bootstrap error', { error: err.message });
     return new Response(JSON.stringify({ error: 'Failed to create bootstrap job', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleIngestionSubmit(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const data = await request.json() as { youtube_url?: string; title?: string };
+    const { youtube_url, title } = data;
+
+    if (!youtube_url) {
+      return new Response(JSON.stringify({ error: 'Missing required field: youtube_url' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)[\w-]+/;
+    if (!ytRegex.test(youtube_url)) {
+      return new Response(JSON.stringify({ error: 'Invalid YouTube URL format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    let videoId = '';
+    try {
+      const urlObj = new URL(youtube_url.includes('://') ? youtube_url : `https://${youtube_url}`);
+      if (urlObj.hostname === 'youtu.be') {
+        videoId = urlObj.pathname.slice(1);
+      } else {
+        videoId = urlObj.searchParams.get('v') || '';
+      }
+    } catch {
+      videoId = youtube_url.match(/[\w-]{11}/)?.[0] || '';
+    }
+
+    const jobId = `job-${Date.now()}`;
+    const job = {
+      id: jobId,
+      youtubeUrl: youtube_url,
+      youtubeVideoId: videoId,
+      title: title || `YouTube Video ${videoId}`,
+      status: 'pending' as const,
+      progress: 0,
+      submittedAt: new Date().toISOString(),
+      startedAt: null as string | null,
+      completedAt: null as string | null,
+      facesDetected: null as number | null,
+      facesRecognized: null as number | null,
+      error: null as string | null,
+      logs: [`[${new Date().toISOString()}] Job created`, `[${new Date().toISOString()}] Queued for processing`]
+    };
+
+    await env.METADATA_KV.put(`ingestion_job_${jobId}`, JSON.stringify(job));
+
+    const indexStr = await env.METADATA_KV.get('ingestion_jobs_index') || '[]';
+    const index = JSON.parse(indexStr) as string[];
+    index.unshift(jobId);
+    await env.METADATA_KV.put('ingestion_jobs_index', JSON.stringify(index));
+
+    logger.info(`Ingestion job created`, { jobId, videoId });
+
+    return new Response(JSON.stringify({
+      success: true,
+      job
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Ingestion submit error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to submit job', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleIngestionJobs(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const indexStr = await env.METADATA_KV.get('ingestion_jobs_index') || '[]';
+    const index = JSON.parse(indexStr) as string[];
+
+    const url = new URL(request.url);
+    const statusFilter = url.searchParams.get('status');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+
+    const jobs: Array<Record<string, unknown>> = [];
+    for (const jobId of index.slice(0, limit * 2)) {
+      const jobStr = await env.METADATA_KV.get(`ingestion_job_${jobId}`);
+      if (jobStr) {
+        const job = JSON.parse(jobStr) as Record<string, unknown>;
+        if (!statusFilter || job.status === statusFilter) {
+          jobs.push(job);
+          if (jobs.length >= limit) break;
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({
+      jobs,
+      total: jobs.length
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Ingestion jobs list error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to list jobs', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleIngestionJobById(jobId: string, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const jobStr = await env.METADATA_KV.get(`ingestion_job_${jobId}`);
+    if (!jobStr) {
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const job = JSON.parse(jobStr);
+    return new Response(JSON.stringify({ job }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Ingestion job fetch error', { error: err.message, jobId });
+    return new Response(JSON.stringify({ error: 'Failed to fetch job', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleIngestionWebhook(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  try {
+    const data = await request.json() as {
+      job_id?: string;
+      status?: string;
+      progress?: number;
+      faces_detected?: number;
+      faces_recognized?: number;
+      error?: string;
+      log?: string;
+    };
+
+    const { job_id, status, progress, faces_detected, faces_recognized, error: errorMsg, log } = data;
+
+    if (!job_id) {
+      return new Response(JSON.stringify({ error: 'Missing required field: job_id' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const jobStr = await env.METADATA_KV.get(`ingestion_job_${job_id}`);
+    if (!jobStr) {
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const job = JSON.parse(jobStr) as {
+      status: string;
+      progress: number;
+      startedAt: string | null;
+      completedAt: string | null;
+      facesDetected: number | null;
+      facesRecognized: number | null;
+      error: string | null;
+      logs: string[];
+    };
+
+    if (status) job.status = status;
+    if (progress !== undefined) job.progress = progress;
+    if (faces_detected !== undefined) job.facesDetected = faces_detected;
+    if (faces_recognized !== undefined) job.facesRecognized = faces_recognized;
+    if (errorMsg) job.error = errorMsg;
+    if (log) job.logs.push(`[${new Date().toISOString()}] ${log}`);
+
+    if (status === 'processing' && !job.startedAt) {
+      job.startedAt = new Date().toISOString();
+    }
+    if (status === 'completed' || status === 'failed') {
+      job.completedAt = new Date().toISOString();
+      job.progress = status === 'completed' ? 100 : job.progress;
+    }
+
+    await env.METADATA_KV.put(`ingestion_job_${job_id}`, JSON.stringify(job));
+
+    logger.info(`Ingestion job updated via webhook`, { job_id, status, progress });
+
+    return new Response(JSON.stringify({ success: true, job }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Ingestion webhook error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Webhook processing failed', message: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

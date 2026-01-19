@@ -89,7 +89,7 @@ class HuggingFaceDataset:
 
     def __init__(
         self,
-        repo_id: str = "yellowcandle/mv-face-recognition-data",
+        repo_id: str = "yellowcandle/mv-face-recognition-dataset",
         token: Optional[str] = None,
         local_cache_dir: Optional[str] = None,
     ):

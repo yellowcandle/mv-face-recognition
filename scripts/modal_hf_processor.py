@@ -80,7 +80,7 @@ volume = Volume.from_name("mv-face-recognition-data", create_if_missing=True)
 VOL_MOUNT_PATH = Path("/data")
 
 # HuggingFace configuration
-HF_REPO_ID = "yellowcandle/mv-face-recognition-data"
+HF_REPO_ID = "yellowcandle/mv-face-recognition-dataset"
 
 
 # --- HuggingFace Sync Function ---
@@ -117,15 +117,16 @@ def sync_from_huggingface(
         os.makedirs(VOL_MOUNT_PATH / "metadata", exist_ok=True)
         os.makedirs(VOL_MOUNT_PATH / "data/chroma_db", exist_ok=True)
 
-        # Download patterns
+        # Download patterns (matching actual HF dataset structure)
         allow_patterns = [
+            "contestants/*",
+            "contestants/embeddings/*",
             "metadata/*",
-            "embeddings/**/*",
         ]
         if include_flagged:
-            allow_patterns.append("flagged_faces/**/*")
+            allow_patterns.append("flagged_faces/*")
         if include_videos:
-            allow_patterns.append("videos/**/*")
+            allow_patterns.append("videos/*")
 
         # Download snapshot
         local_dir = snapshot_download(
@@ -138,7 +139,15 @@ def sync_from_huggingface(
 
         print(f"✅ Downloaded to: {local_dir}")
 
-        # Copy metadata
+        # Copy contestant_info.csv from contestants/ folder
+        contestant_csv_src = Path(local_dir) / "contestants" / "contestant_info.csv"
+        if contestant_csv_src.exists():
+            dst = VOL_MOUNT_PATH / "metadata" / "contestant_info.csv"
+            shutil.copy2(contestant_csv_src, dst)
+            result["files_downloaded"] += 1
+            print(f"  📄 contestant_info.csv")
+
+        # Copy metadata JSON files
         metadata_src = Path(local_dir) / "metadata"
         if metadata_src.exists():
             for file in metadata_src.glob("*"):
@@ -147,16 +156,15 @@ def sync_from_huggingface(
                 result["files_downloaded"] += 1
                 print(f"  📄 {file.name}")
 
-        # Copy embeddings to correct structure
-        embeddings_src = Path(local_dir) / "embeddings"
+        # Copy embeddings from contestants/embeddings/ (flat structure with name_embedding.npy)
+        embeddings_src = Path(local_dir) / "contestants" / "embeddings"
         if embeddings_src.exists():
-            for contestant_dir in embeddings_src.iterdir():
-                if contestant_dir.is_dir():
-                    dst_dir = VOL_MOUNT_PATH / "source/photo/contestants" / contestant_dir.name
-                    os.makedirs(dst_dir, exist_ok=True)
-                    for file in contestant_dir.glob("*"):
-                        shutil.copy2(file, dst_dir / file.name)
-                        result["files_downloaded"] += 1
+            for emb_file in embeddings_src.glob("*.npy"):
+                contestant_name = emb_file.stem.replace("_embedding", "")
+                dst_dir = VOL_MOUNT_PATH / "source/photo/contestants" / contestant_name
+                os.makedirs(dst_dir, exist_ok=True)
+                shutil.copy2(emb_file, dst_dir / "base_embedding.npy")
+                result["files_downloaded"] += 1
             print(f"  📦 Copied embeddings: {result['files_downloaded']} files")
 
         # Copy flagged faces if requested

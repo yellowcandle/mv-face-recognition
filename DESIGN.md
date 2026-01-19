@@ -12,6 +12,12 @@ This document describes the architecture and design decisions for the MV Face Re
 
 ### Pending
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
+- [ ] **User-provided video upload workflow** - Users will provide video files and metadata directly (bypasses YouTube download issues)
+- [ ] ~~Fix yt-dlp YouTube download in Modal containers~~ (deprioritized - user provides videos directly)
+  - YouTube requires JS challenge solving for video downloads
+  - **Local fix**: `yt-dlp --remote-components ejs:github --cookies-from-browser chrome`
+  - **Modal container fix**: Install deno + enable remote components in `modal_youtube_processor.py`
+  - See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
 
 ### Completed (December 2025 - Continued)
 - [x] **Video Processing Pipeline Optimization** (Phase 1)
@@ -1016,6 +1022,102 @@ cd worker && npx wrangler deploy
 
 ---
 
+## Backend Initialization & Testing (January 2025)
+
+### Quick Start: Local Development
+
+```bash
+# 1. Initialize database (load 96 contestants & embeddings)
+python scripts/init_database.py
+
+# 2. Test database setup
+python scripts/init_database.py --verify
+
+# 3. Test all health endpoints (requires backend running)
+python scripts/test_backend_health.py
+
+# 4. Start backend locally
+cd backend && uvicorn main:app --reload
+
+# 5. Check specific endpoint
+python scripts/test_backend_health.py --test status
+```
+
+### Database Initialization Script
+
+**Location**: `scripts/init_database.py`
+
+**What it does**:
+- Loads 96 contestants from `metadata/contestant_info.csv`
+- Loads face embeddings from `source/photo/contestants/`
+- Initializes ChromaDB vector database
+- Verifies data consistency (all contestants have embeddings)
+- Optionally syncs with HuggingFace XET
+
+**Usage**:
+```bash
+# Verify data only
+python scripts/init_database.py --verify
+
+# Initialize ChromaDB
+python scripts/init_database.py
+
+# Sync with HuggingFace
+python scripts/init_database.py --sync-hf
+
+# Custom paths
+python scripts/init_database.py \
+  --contestant-csv metadata/contestant_info.csv \
+  --photos-dir source/photo/contestants \
+  --chroma-path .chroma_db
+```
+
+**Output**: Database initialized with 96 contestants and face embeddings ready for recognition.
+
+### Health Testing Script
+
+**Location**: `scripts/test_backend_health.py`
+
+**Tests**:
+- Root endpoint (`/`)
+- Health check (`/health`)
+- System status (`/api/system/status/`)
+- Videos list (`/api/videos/`)
+- Contestants list (`/api/contestants/`)
+- Database initialization
+
+**Usage**:
+```bash
+# Run all tests
+python scripts/test_backend_health.py
+
+# Run specific test
+python scripts/test_backend_health.py --test status
+python scripts/test_backend_health.py --test videos
+python scripts/test_backend_health.py --test database
+
+# Custom backend URL
+python scripts/test_backend_health.py --url http://api.example.com
+```
+
+### Backend API Endpoints
+
+| Endpoint | Method | Description | Status |
+|----------|--------|-------------|--------|
+| `/` | GET | Root/health check | ✅ Working |
+| `/health` | GET | Detailed health check | ✅ Working |
+| `/api/system/status/` | GET | System status with stats | ✅ Working |
+| `/api/videos/` | GET | List all videos | ✅ Working |
+| `/api/contestants/` | GET | List all contestants | ✅ Working |
+| `/api/videos/{id}/timeline` | GET | Face detection timeline | 🔄 Planned |
+| `/api/faces/detect` | GET | Faces at timestamp | 🔄 Planned |
+| `/api/faces/flag` | POST | Flag incorrect face | 🔄 Planned |
+| `/api/faces/flagged` | GET | List flagged faces | 🔄 Planned |
+| `/api/recognition/results` | GET | Recognition results | 🔄 Planned |
+| `/api/embeddings/sync` | POST | Sync embeddings | 🔄 Planned |
+
+---
+
 ## Verification Commands
 
 ```bash
@@ -1031,6 +1133,448 @@ curl -s "https://mv.herballemon.dev/api/faces/flagged" | jq .
 # Check system status
 curl -s "https://mv.herballemon.dev/api/system/status" | jq .
 ```
+
+---
+
+## Production Deployment Guide (January 2025)
+
+### Prerequisites
+
+- Docker installed locally
+- Fly.io account (`flyctl` CLI installed)
+- Modal.com account (for GPU processing)
+- HuggingFace token (for data storage)
+- Cloudflare account (for Workers/R2/KV)
+
+### Environment Setup
+
+```bash
+# 1. Create .env file with production credentials
+cp .env.example .env
+# Edit .env with:
+# - HF_TOKEN: HuggingFace API token
+# - MODAL_TOKEN_ID: Modal.com token
+# - MODAL_TOKEN_SECRET: Modal.com secret
+# - CLOUDFLARE_API_TOKEN: Cloudflare API token
+
+# 2. Test environment variables
+python scripts/init_database.py --verify
+```
+
+### Local Testing Before Deployment
+
+```bash
+# 1. Build Docker image
+docker build -t mv-face-recognition:latest -f backend/Dockerfile .
+
+# 2. Run locally
+docker run -p 8000:8000 \
+  --env-file .env \
+  mv-face-recognition:latest
+
+# 3. Test endpoints
+python scripts/test_backend_health.py --url http://localhost:8000
+```
+
+### Deploy to Fly.io
+
+```bash
+# 1. Initialize Fly app (one time only)
+flyctl launch --name mv-face-recognition-api
+
+# 2. Set environment variables
+flyctl secrets set \
+  HF_TOKEN=$HF_TOKEN \
+  MODAL_TOKEN_ID=$MODAL_TOKEN_ID \
+  MODAL_TOKEN_SECRET=$MODAL_TOKEN_SECRET \
+  CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN
+
+# 3. Initialize database on Fly (optional, runs in Docker)
+flyctl ssh console
+python scripts/init_database.py
+
+# 4. Deploy
+flyctl deploy
+
+# 5. Verify deployment
+flyctl logs
+curl -s https://mv-face-recognition-api.fly.dev/health | jq .
+```
+
+### Deploy Frontend to Cloudflare Workers
+
+```bash
+# 1. Build SvelteKit frontend
+cd mvp-processor && npm run build && cd ..
+
+# 2. Embed assets in worker
+node scripts/update-worker-assets.js
+
+# 3. Deploy worker
+cd worker && npx wrangler deploy
+
+# 4. Verify
+curl -s https://mv-face-recognition-api.herballemon.workers.dev/ | head -20
+```
+
+### Video Processing Pipeline (Modal.com)
+
+```bash
+# 1. Initialize database with HuggingFace sync
+python scripts/init_database.py --sync-hf
+
+# 2. Run full video processing pipeline
+modal run scripts/modal_hf_processor.py --full-pipeline
+
+# 3. Individual steps
+modal run scripts/modal_hf_processor.py --sync-from-hf
+modal run scripts/modal_hf_processor.py --process-videos
+modal run scripts/modal_hf_processor.py --upload-results
+```
+
+### Monitoring & Verification
+
+```bash
+# Check Fly.io deployment status
+flyctl status
+
+# View application logs
+flyctl logs -n 100
+
+# SSH into running container
+flyctl ssh console
+
+# Check API endpoints
+curl -s https://mv-face-recognition-api.fly.dev/api/system/status/ | jq .
+curl -s https://mv-face-recognition-api.fly.dev/api/videos/ | jq .
+curl -s https://mv-face-recognition-api.fly.dev/api/contestants/ | jq .
+
+# Check Cloudflare Worker
+curl -s https://mv-face-recognition-api.herballemon.workers.dev/api/system/status/ | jq .
+```
+
+### Troubleshooting Deployment
+
+**Issue**: Database initialization fails
+```bash
+# Solution: Check HuggingFace token and path permissions
+python scripts/init_database.py --verify
+```
+
+**Issue**: Worker deployment fails
+```bash
+# Solution: Verify SvelteKit build succeeded
+cd mvp-processor && npm run build
+ls build/ | grep -E "(_app|index\.html)"
+```
+
+**Issue**: Backend endpoints return 500
+```bash
+# Solution: Check Fly.io logs
+flyctl logs -n 50
+# Check environment variables are set
+flyctl secrets list
+```
+
+**Issue**: Low API response times
+```bash
+# Solution: Scale up Fly.io instance
+flyctl scale vm dedicated-cpu-1x
+```
+
+### Rollback Procedure
+
+```bash
+# View deployment history
+flyctl releases
+
+# Rollback to previous version
+flyctl releases rollback <version>
+
+# Alternative: redeploy previous Docker image
+git log --oneline | head -5
+git checkout <commit-hash>
+flyctl deploy
+```
+
+### Monitoring Checklist
+
+- [ ] Backend health endpoint responds in <100ms
+- [ ] Database has all 96 contestants
+- [ ] Face embeddings loaded in ChromaDB
+- [ ] Videos accessible via API
+- [ ] Frontend loads and connects to API
+- [ ] Modal processing pipeline working (check queue)
+- [ ] HuggingFace sync operational
+- [ ] Cloudflare Workers serving content
+
+---
+
+## Modal.com Cloud Processing Setup (January 2025)
+
+### Quick Start: 5-Minute Setup
+
+```bash
+# 1. Test local readiness
+python scripts/test_modal_pipeline.py
+
+# 2. Set up Modal
+python scripts/setup_modal.py
+
+# 3. Configure credentials
+export HF_TOKEN=your_huggingface_token
+export MODAL_TOKEN_ID=your_modal_token_id
+export MODAL_TOKEN_SECRET=your_modal_secret
+
+# 4. Test system status
+modal run scripts/modal_app.py --check-status
+
+# 5. Run processing pipeline
+modal run scripts/modal_app.py --full-pipeline
+```
+
+### What Modal Does
+
+Modal.com provides:
+- **GPU acceleration**: Fast face detection and recognition
+- **Persistent volumes**: Shared storage for videos and metadata
+- **Distributed processing**: Parallel video processing
+- **Cost-effective**: Pay only for compute used
+- **No infrastructure**: No Docker, Kubernetes, or server management needed
+
+### Setup Steps
+
+#### Step 1: Verify Installation
+
+```bash
+python scripts/test_modal_pipeline.py
+```
+
+Expected output:
+```
+✅ System Status Check: PASS
+✅ Video Processing Readiness: PASS
+✅ Database Upload Readiness: PASS
+Summary: 3 passed, 0 failed
+```
+
+#### Step 2: Authenticate with Modal
+
+```bash
+python scripts/setup_modal.py
+```
+
+This will:
+1. Check Modal CLI installation
+2. Start authentication flow (opens browser)
+3. Create persistent volume `mv-face-recognition-data`
+4. Create secrets for HuggingFace token
+
+#### Step 3: Configure Credentials
+
+```bash
+# Get tokens from:
+# - HuggingFace: https://huggingface.co/settings/tokens
+# - Modal: https://modal.com/account/tokens
+
+export HF_TOKEN=hf_xxxxxxxxxxxxx
+export MODAL_TOKEN_ID=your_token_id
+export MODAL_TOKEN_SECRET=your_token_secret
+
+# Create Modal secrets
+modal secret create hf-secret HF_TOKEN=$HF_TOKEN
+```
+
+#### Step 4: Check System Status
+
+```bash
+modal run scripts/modal_app.py --check-status
+```
+
+Output shows:
+- ChromaDB ready with contestant count
+- InsightFace models available
+- Storage configured
+- System ready for processing
+
+### Running Video Processing
+
+#### Full Pipeline (Recommended)
+
+```bash
+modal run scripts/modal_app.py --full-pipeline
+```
+
+Runs:
+1. Sync from HuggingFace (download embeddings)
+2. Process all videos (detect faces, annotate)
+3. Upload results to HuggingFace
+
+Estimated time: 5-15 minutes depending on video count/size
+
+#### Individual Steps
+
+```bash
+# Just sync
+modal run scripts/modal_app.py --sync-embeddings
+
+# Just process
+modal run scripts/modal_app.py --process-videos
+
+# Just upload
+modal run scripts/modal_app.py --upload-results
+```
+
+### Modal App Architecture
+
+**Location**: `scripts/modal_app.py`
+
+**Functions**:
+- `sync_from_huggingface()` - Download contestant data
+- `upload_to_huggingface()` - Upload processed videos
+- `VideoBatchProcessor.process_batch()` - Parallel video processing
+- `check_system_status()` - Health check
+
+**Volumes**: `/data` - Persistent storage for videos, embeddings, metadata
+
+**Secrets**: 
+- `hf-secret` - HuggingFace API token
+- `modal-config` - Processing configuration
+
+### Modal Volume Structure
+
+After first run, Modal volume contains:
+
+```
+/data/
+├── hf-sync/                    # Downloaded from HuggingFace
+│   ├── contestant_info.csv
+│   ├── embeddings/
+│   └── flagged_faces/
+├── videos/                     # Input videos
+│   └── *.mp4
+├── chroma/                     # ChromaDB persistent storage
+│   └── chroma.sqlite3
+└── results/                    # Processed outputs
+    ├── *_annotated.mp4        # Videos with face overlays
+    ├── metadata/
+    │   └── *_dense_metadata.json
+    └── reports/
+        └── processing_report.json
+```
+
+### Performance & Costs
+
+**Processing Performance**:
+- **Small video** (1-2 min): ~30-60 seconds on GPU
+- **Medium video** (3-5 min): ~2-5 minutes on GPU
+- **Large video** (10+ min): ~5-15 minutes on GPU
+- **Batch processing**: 2-4x faster with parallel GPU workers
+
+**Estimated Costs**:
+- **GPU hour**: ~$0.50 (varies by GPU type)
+- **Storage**: $5-10/month for persistent volume
+- **3 videos processed**: ~$2-5 total
+
+### Troubleshooting
+
+**Issue**: "Unauthorized" when running Modal commands
+
+```bash
+# Solution: Re-authenticate
+rm ~/.modal/token
+python scripts/setup_modal.py
+```
+
+**Issue**: Volume not found
+
+```bash
+# Solution: Create volume manually
+modal volume create mv-face-recognition-data
+```
+
+**Issue**: HuggingFace sync fails
+
+```bash
+# Solution: Verify token
+echo $HF_TOKEN
+modal secret list | grep hf-secret
+
+# Re-create secret
+modal secret create hf-secret HF_TOKEN=$HF_TOKEN --force
+```
+
+**Issue**: Processing is slow or times out
+
+```bash
+# Solution: Check Modal logs
+modal logs <APP_ID>
+
+# Increase timeout in modal_app.py
+# Change timeout=3600 to timeout=7200
+```
+
+**Issue**: Out of memory errors
+
+```bash
+# Solution: Reduce batch size or increase GPU memory
+# Edit modal_app.py, adjust batch processing parameters
+```
+
+### Advanced: Custom Processing Pipeline
+
+To customize processing, modify `scripts/modal_app.py`:
+
+```python
+@app.function(
+    image=modal_image,
+    volumes={str(VOL_MOUNT_PATH): volume},
+    gpu="A100",  # Change GPU type
+    timeout=7200,  # Increase timeout
+)
+def custom_processor(video_path: str):
+    # Your custom processing logic
+    pass
+```
+
+GPU options: `"A100"`, `"H100"`, `"L4"`, `"T4"`
+
+### Integration with Cloudflare
+
+After Modal processing completes:
+
+```bash
+# Upload videos to Cloudflare R2
+node scripts/upload-to-r2.js
+
+# Upload metadata to KV
+node scripts/upload-metadata.js
+
+# Deploy updated Worker
+cd worker && npx wrangler deploy
+```
+
+### Monitoring & Alerts
+
+Check processing status:
+
+```bash
+# View running jobs
+modal job ls
+
+# Stream logs
+modal logs -f <APP_ID>
+
+# Check volume usage
+modal volume ls -v
+```
+
+Set up email notifications (via Modal dashboard):
+1. Go to https://modal.com
+2. Settings → Notifications
+3. Enable email on job completion
+
+---
 
 ---
 
