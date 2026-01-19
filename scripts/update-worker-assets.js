@@ -55,7 +55,12 @@ function main() {
     process.exit(1);
   }
 
-  const assets = readDirectoryRecursively(buildDir, '');\n\n  // Skip favicon if present\n  delete assets['favicon.ico'];\n\n  logger.info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
+  const assets = readDirectoryRecursively(buildDir, '');
+
+  // Skip favicon if present
+  delete assets['favicon.ico'];
+
+  logger.info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
 
   // Generate embedded-assets.js
   const embeddedAssetsContent = `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};`;

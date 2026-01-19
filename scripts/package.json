@@ -30,8 +30,12 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "roots": ["<rootDir>/tests"],
-    "testMatch": ["**/*.test.{js,ts}"],
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "testMatch": [
+      "**/*.test.{js,ts}"
+    ],
     "collectCoverageFrom": [
       "*.js",
       "!node_modules/**",
