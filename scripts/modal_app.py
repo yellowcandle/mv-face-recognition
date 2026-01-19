@@ -24,7 +24,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-from modal import App, Image, Volume, Secret, method
+from modal import web_endpoint, App, Image, Volume, Secret, method
 import click
 
 logging.basicConfig(level=logging.INFO)
@@ -341,3 +341,51 @@ if __name__ == "__main__":
         youtube_url=args.youtube_url,
         check_status=args.check_status,
     )
+
+# Add FastAPI webhook endpoint for external triggering
+@app.function(
+    image=modal_image,
+    volumes={str(VOL_MOUNT_PATH): volume},
+    secrets=[Secret.from_name("hf-secret")],
+)
+@web_endpoint(method="POST")
+def webhook_process_video(payload: dict) -> dict:
+    """Webhook endpoint to trigger video processing from external services."""
+    try:
+        video_url = payload.get("video_url")
+        video_name = payload.get("video_name", "unknown")
+        
+        if not video_url:
+            return {"status": "error", "message": "video_url is required"}
+        
+        logger.info(f"Webhook received: {video_name} - {video_url}")
+        
+        # For now, just queue the job and return immediately
+        # In production, you might want to start processing immediately
+        job_id = f"webhook_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        
+        # Store job info
+        job_data = {
+            "id": job_id,
+            "video_url": video_url,
+            "video_name": video_name,
+            "status": "queued",
+            "created_at": time.time(),
+        }
+        
+        # Here you would typically:
+        # 1. Download the video
+        # 2. Start processing with VideoProcessor
+        # 3. Upload results to HuggingFace
+        
+        # For now, return queued status
+        return {
+            "status": "queued",
+            "job_id": job_id,
+            "video_url": video_url,
+            "message": "Job queued successfully. Processing will start shortly.",
+        }
+    
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error", "message": str(e)}

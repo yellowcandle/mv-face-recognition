@@ -1,23 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 
-  // Import design system
   import '$lib/styles/design-tokens.css';
-  import { StatusIndicator, NavigationLink, IconButton } from '$lib/components';
+  import { StatusIndicator, NavigationLink, IconButton, Flex, Background } from '$lib/components';
   
-  // Create QueryClient instance
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        cacheTime: 1000 * 60 * 10, // 10 minutes
+        enabled: browser,
+        staleTime: 1000 * 60 * 5,
+        gcTime: 1000 * 60 * 10,
       }
     }
   });
   
-  // Navigation items
   const navItems = [
     { href: '/', label: 'Dashboard', icon: '🎬' },
     { href: '/video-player', label: 'Video Player', icon: '▶️' },
@@ -54,37 +53,33 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </svelte:head>
 
-<QueryClientProvider {queryClient}>
+<QueryClientProvider client={queryClient}>
   <div class="layout">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
-        <button class="mobile-menu-toggle" on:click={() => mobileMenuOpen = !mobileMenuOpen}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12h18M3 6h18M3 18h18"></path>
-          </svg>
-        </button>
-        <h1 class="app-title">MV Face Recognition</h1>
-      </div>
-      
-      <div class="header-right">
+    <Background variant="primary" radius="none" padding="none" class="header">
+      <Flex direction="row" justify="between" align="center" gap="md" padding="md" class="header-content">
+        <Flex direction="row" align="center" gap="sm">
+          <button class="mobile-menu-toggle" on:click={() => mobileMenuOpen = !mobileMenuOpen}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12h18M3 6h18M3 18h18"></path>
+            </svg>
+          </button>
+          <h1 class="app-title">MV Face Recognition</h1>
+        </Flex>
+        
         <StatusIndicator status={systemStatus} />
-      </div>
-    </header>
+      </Flex>
+    </Background>
 
-    <!-- Navigation -->
     <nav class="nav {mobileMenuOpen ? 'mobile-open' : ''}">
       {#each navItems as item}
         <NavigationLink {item} currentPath={$page.url.pathname} />
       {/each}
     </nav>
 
-    <!-- Mobile menu overlay -->
     {#if mobileMenuOpen}
       <div class="mobile-overlay" on:click={() => mobileMenuOpen = false}></div>
     {/if}
 
-    <!-- Main Content -->
     <main class="main">
       <slot />
     </main>
@@ -92,35 +87,23 @@
 </QueryClientProvider>
 
 <style>
-  .layout {
+  :global(.layout) {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
   }
 
-  .header {
-    height: 60px;
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-default);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--space-4);
+  :global(.header) {
     position: sticky;
     top: 0;
     z-index: 50;
+    border-bottom: 1px solid var(--border-medium);
+    backdrop-filter: blur(8px);
+    background-color: rgba(15, 23, 42, 0.8);
   }
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
+  :global(.header-content) {
+    height: 60px;
   }
 
   .app-title {
@@ -129,6 +112,7 @@
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
+    white-space: nowrap;
   }
 
   .mobile-menu-toggle {
@@ -138,24 +122,31 @@
     color: var(--text-primary);
     cursor: pointer;
     padding: var(--space-2);
+    border-radius: var(--radius-md);
+    transition: background-color var(--duration-fast) var(--ease-in-out);
+  }
+
+  .mobile-menu-toggle:hover {
+    background-color: var(--brand-alpha-weak);
   }
 
   .nav {
-    background-color: var(--bg-secondary);
-    border-right: 1px solid var(--border-default);
+    background-color: var(--surface-secondary);
+    border-right: 1px solid var(--border-medium);
     width: 240px;
     position: fixed;
     top: 60px;
     bottom: 0;
     overflow-y: auto;
     padding: var(--space-4) 0;
+    z-index: 40;
   }
 
   .main {
     margin-left: 240px;
     flex: 1;
     padding: var(--space-5);
-    background-color: var(--bg-primary);
+    background-color: var(--surface-primary);
   }
 
   .mobile-overlay {
@@ -165,7 +156,7 @@
     right: 0;
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 40;
+    z-index: 35;
     display: none;
   }
 
@@ -179,7 +170,7 @@
       top: 60px;
       left: -240px;
       z-index: 50;
-      transition: left 0.3s ease;
+      transition: left var(--duration-normal) var(--ease-out);
     }
 
     .nav.mobile-open {
@@ -192,11 +183,6 @@
 
     .main {
       margin-left: 0;
-      padding: var(--space-3);
-    }
-
-    .header-right {
-      gap: var(--space-2);
     }
   }
 </style>

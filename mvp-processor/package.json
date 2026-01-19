@@ -50,7 +50,7 @@
     "glob": "^11.0.0"
   },
   "dependencies": {
-    "@tanstack/svelte-query": "^6.0.14",
+    "@tanstack/svelte-query": "^5.90.2",
     "@types/node": "^24.3.1"
   }
 }
