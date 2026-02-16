@@ -587,6 +587,213 @@ class YouTubeProcessor:
         }
 
 
+    @method()
+    def process_bootstrap_job(
+        self,
+        job_id: str,
+        job_type: str,
+        video_key: Optional[str] = None,
+        contestant_ids: Optional[List[int]] = None,
+        sample_interval: float = 2.0,
+        max_samples: int = 100,
+        webhook_url: Optional[str] = None,
+    ) -> Dict:
+        """
+        Process a bootstrap job created from the admin UI.
+
+        Handles two job types:
+        - 'video_face_sampling': Download video from R2/volume, run face detection
+        - 'embedding_regeneration': Generate embeddings from uploaded photos
+
+        Args:
+            job_id: Bootstrap job ID from KV
+            job_type: 'video_face_sampling' or 'embedding_regeneration'
+            video_key: R2 key for video (for video_face_sampling)
+            contestant_ids: List of contestant IDs to regenerate (for embedding_regeneration)
+            sample_interval: Seconds between samples for video sampling
+            max_samples: Maximum samples for video sampling
+            webhook_url: Optional webhook for status updates
+
+        Returns:
+            Dictionary with processing results
+        """
+        import cv2
+        import numpy as np
+        from insightface.app import FaceAnalysis
+
+        print(f"[Bootstrap] Processing job: {job_id} (type: {job_type})")
+
+        # Initialize face detector
+        face_app = FaceAnalysis(
+            name='buffalo_l',
+            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+        )
+        face_app.prepare(ctx_id=0, det_size=(640, 640))
+
+        if job_type == 'video_face_sampling':
+            # Look for video in the volume (downloaded from R2 or already present)
+            video_path = None
+            if video_key:
+                # Try to find the video in the volume at the R2 key path
+                candidate = VOL_MOUNT_PATH / video_key
+                if candidate.exists():
+                    video_path = str(candidate)
+
+            if not video_path:
+                # Search bootstrap_videos directory
+                bootstrap_dir = VOL_MOUNT_PATH / "bootstrap_videos"
+                if bootstrap_dir.exists():
+                    videos = list(bootstrap_dir.glob("*.*"))
+                    if videos:
+                        video_path = str(videos[-1])  # Use most recent
+
+            if not video_path:
+                return {
+                    'success': False,
+                    'error': 'Video file not found in volume. Download from R2 first.',
+                    'job_id': job_id,
+                }
+
+            print(f"  Using video: {video_path}")
+
+            # Reuse existing sample_and_detect_faces logic
+            result = self.sample_and_detect_faces(
+                video_path=video_path,
+                queue_id=job_id,
+                sample_interval=sample_interval,
+                max_samples=max_samples,
+            )
+
+            if result['success']:
+                print(f"✓ Video face sampling complete: {result['total_faces']} faces detected")
+            return result
+
+        elif job_type == 'embedding_regeneration':
+            import chromadb
+
+            photos_dir = VOL_MOUNT_PATH / "source" / "photo"
+            embeddings_dir = VOL_MOUNT_PATH / "embeddings"
+            embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+            # Determine which contestants to process
+            target_dirs = []
+            if contestant_ids and contestant_ids != 'all':
+                for cid in contestant_ids:
+                    d = photos_dir / f"contestant_{cid}"
+                    if d.exists():
+                        target_dirs.append((cid, d))
+            else:
+                # Process all contestant directories
+                if photos_dir.exists():
+                    for d in sorted(photos_dir.iterdir()):
+                        if d.is_dir() and d.name.startswith("contestant_"):
+                            try:
+                                cid = int(d.name.replace("contestant_", ""))
+                                target_dirs.append((cid, d))
+                            except ValueError:
+                                continue
+
+            if not target_dirs:
+                return {
+                    'success': False,
+                    'error': 'No contestant photo directories found',
+                    'job_id': job_id,
+                }
+
+            print(f"  Processing {len(target_dirs)} contestant directories")
+
+            # Initialize ChromaDB
+            chroma_path = VOL_MOUNT_PATH / "chroma_db"
+            chroma_path.mkdir(parents=True, exist_ok=True)
+            client = chromadb.PersistentClient(path=str(chroma_path))
+
+            collection_name = "contestant_faces"
+            try:
+                collection = client.get_collection(name=collection_name)
+            except Exception:
+                collection = client.create_collection(
+                    name=collection_name,
+                    metadata={"hnsw:space": "cosine"}
+                )
+
+            updated_count = 0
+            total_photos = 0
+
+            for cid, contestant_dir in target_dirs:
+                embeddings = []
+                photo_files = list(contestant_dir.glob("*.jpg")) + list(contestant_dir.glob("*.png")) + list(contestant_dir.glob("*.webp"))
+
+                for img_path in photo_files:
+                    try:
+                        img = cv2.imread(str(img_path))
+                        if img is None:
+                            continue
+                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        faces = face_app.get(img_rgb)
+                        if faces:
+                            embeddings.append(faces[0].embedding)
+                            total_photos += 1
+                    except Exception as e:
+                        print(f"    Warning: Failed to process {img_path}: {e}")
+
+                if embeddings:
+                    avg_embedding = np.mean(embeddings, axis=0)
+
+                    # Save .npy file
+                    npy_dir = embeddings_dir / f"contestant_{cid}"
+                    npy_dir.mkdir(parents=True, exist_ok=True)
+                    npy_path = npy_dir / f"contestant_{cid}_embedding.npy"
+                    np.save(str(npy_path), avg_embedding)
+
+                    # Upsert to ChromaDB
+                    contestant_key = f"contestant_{cid}"
+                    try:
+                        collection.update(
+                            ids=[contestant_key],
+                            embeddings=[avg_embedding.tolist()],
+                            metadatas=[{
+                                'contestant_id': str(cid),
+                                'source': 'photo_bootstrap',
+                                'job_id': job_id,
+                                'num_photos': len(embeddings),
+                                'bootstrapped_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                            }]
+                        )
+                    except Exception:
+                        collection.add(
+                            ids=[contestant_key],
+                            embeddings=[avg_embedding.tolist()],
+                            metadatas=[{
+                                'contestant_id': str(cid),
+                                'source': 'photo_bootstrap',
+                                'job_id': job_id,
+                                'num_photos': len(embeddings),
+                                'bootstrapped_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                            }]
+                        )
+
+                    updated_count += 1
+                    print(f"  ✓ Contestant {cid}: {len(embeddings)} photos → embedding saved")
+
+            volume.commit()
+
+            print(f"✓ Embedding regeneration complete: {updated_count} contestants, {total_photos} photos processed")
+
+            return {
+                'success': True,
+                'contestants_updated': updated_count,
+                'total_photos_processed': total_photos,
+                'job_id': job_id,
+            }
+
+        else:
+            return {
+                'success': False,
+                'error': f'Unknown job type: {job_type}',
+                'job_id': job_id,
+            }
+
+
 def send_webhook(webhook_url: str, job_id: str, **kwargs) -> bool:
     """Send status update to webhook endpoint."""
     if not webhook_url:
@@ -721,3 +928,69 @@ def main(
     print(f"\n{'='*60}")
     print(f"Pipeline complete! Queue ID: {queue_id}")
     print(f"{'='*60}\n")
+
+
+@app.local_entrypoint()
+def bootstrap(
+    bootstrap_job: Optional[str] = None,
+    job_type: Optional[str] = None,
+    video_key: Optional[str] = None,
+    contestant_ids: Optional[str] = None,
+    webhook_url: Optional[str] = None,
+):
+    """
+    Entry point for bootstrap jobs created from the admin UI.
+
+    Args:
+        bootstrap_job: Job ID from admin panel (e.g., regen_xxx or sample_xxx)
+        job_type: Override job type ('video_face_sampling' or 'embedding_regeneration')
+        video_key: R2 key for video file (for video sampling)
+        contestant_ids: Comma-separated contestant IDs (for embedding regeneration)
+        webhook_url: Optional webhook for status updates
+    """
+    if not bootstrap_job:
+        print("Error: Must provide --bootstrap-job <JOB_ID>")
+        sys.exit(1)
+
+    # Infer job type from job ID prefix if not provided
+    if not job_type:
+        if bootstrap_job.startswith('sample_'):
+            job_type = 'video_face_sampling'
+        elif bootstrap_job.startswith('regen_'):
+            job_type = 'embedding_regeneration'
+        else:
+            job_type = 'embedding_regeneration'
+
+    # Parse contestant IDs
+    parsed_ids = None
+    if contestant_ids:
+        parsed_ids = [int(x.strip()) for x in contestant_ids.split(',') if x.strip()]
+
+    print(f"\n{'='*60}")
+    print(f"Bootstrap Job Processing")
+    print(f"Job ID: {bootstrap_job}")
+    print(f"Type: {job_type}")
+    if video_key:
+        print(f"Video Key: {video_key}")
+    if parsed_ids:
+        print(f"Contestant IDs: {parsed_ids}")
+    print(f"{'='*60}\n")
+
+    processor = YouTubeProcessor()
+
+    result = processor.process_bootstrap_job.remote(
+        job_id=bootstrap_job,
+        job_type=job_type,
+        video_key=video_key,
+        contestant_ids=parsed_ids,
+        webhook_url=webhook_url,
+    )
+
+    if result['success']:
+        print(f"\n✓ Bootstrap job completed successfully!")
+        for key, value in result.items():
+            if key not in ('success', 'job_id'):
+                print(f"  {key}: {value}")
+    else:
+        print(f"\n✗ Bootstrap job failed: {result.get('error', 'Unknown error')}")
+        sys.exit(1)

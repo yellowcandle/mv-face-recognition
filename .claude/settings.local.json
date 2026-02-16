@@ -161,11 +161,19 @@
       "Bash(git ls-tree:*)",
       "Bash(huggingface-cli whoami:*)",
       "Bash(hf auth whoami:*)",
-      "Bash(lsof:*)"
-    ]
-  },
-  "enableAllProjectMcpServers": true
-}
+      "Bash(lsof:*)",
+      "Bash(python3:*)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition count-objects -vH)",
+      "Bash(du:*)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition reflog expire:*)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition lfs ls-files)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition lfs prune --dry-run)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition gc --aggressive --prune=now)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition status)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition diff --stat)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition log --oneline -10)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition diff)",
+      "Bash(git -C /Users/yellowcandle/dev/mv-face-recognition add .claude/settings.local.json .serena/project.yml DESIGN.md mvp-processor/.serena/project.yml mvp-processor/src/routes/admin/+page.svelte scripts/modal_youtube_processor.py worker/src/index.ts)"
     ]
   },
   "enableAllProjectMcpServers": true

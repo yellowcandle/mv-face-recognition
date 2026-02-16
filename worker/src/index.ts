@@ -694,6 +694,49 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
       }
       break;
 
+    // Embedding Bootstrap endpoints
+    case '/admin/photos/upload':
+    case '/admin/photos/upload/':
+      if (request.method === 'POST') {
+        return await handlePhotoUpload(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/photos/list':
+    case '/admin/photos/list/':
+      if (request.method === 'GET') {
+        return await handlePhotoList(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/embeddings/status':
+    case '/admin/embeddings/status/':
+      if (request.method === 'GET') {
+        return await handleEmbeddingStatus(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/embeddings/regenerate':
+    case '/admin/embeddings/regenerate/':
+      if (request.method === 'POST') {
+        return await handleEmbeddingRegenerate(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/bootstrap/jobs':
+    case '/admin/bootstrap/jobs/':
+      if (request.method === 'GET') {
+        return await handleBootstrapJobs(request, env, corsHeaders);
+      }
+      break;
+
+    case '/admin/videos/sample-faces':
+    case '/admin/videos/sample-faces/':
+      if (request.method === 'POST') {
+        return await handleVideoSampleFaces(request, env, corsHeaders);
+      }
+      break;
+
     default:
       // Handle dynamic ingestion job routes
       if (path.startsWith('/ingestion/jobs/') && path !== '/ingestion/jobs/') {
@@ -2336,6 +2379,442 @@ async function handleTriggerModal(request: Request, env: Env, corsHeaders: CorsH
       error: 'Failed to trigger Modal processing',
       details: err.message
     }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// ============================================
+// Embedding Bootstrap Handler Functions
+// ============================================
+
+/**
+ * Upload contestant photos to R2
+ */
+async function handlePhotoUpload(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const formData = await request.formData();
+    const contestantId = formData.get('contestant_id') as string;
+    const photos = formData.getAll('photo') as File[];
+
+    if (!contestantId) {
+      return new Response(JSON.stringify({ error: 'Missing required field: contestant_id' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (photos.length === 0) {
+      return new Response(JSON.stringify({ error: 'No photo files provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const uploaded: Array<{ key: string; filename: string; size: number }> = [];
+
+    for (const photo of photos) {
+      if (!photo.name || photo.size === 0) continue;
+
+      // Validate file type
+      const ext = photo.name.split('.').pop()?.toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) {
+        continue;
+      }
+
+      // Validate file size (max 10MB)
+      if (photo.size > 10 * 1024 * 1024) {
+        continue;
+      }
+
+      const timestamp = Date.now();
+      const r2Key = `photos/contestant_${contestantId}/${timestamp}_${photo.name}`;
+
+      await env.VIDEOS_BUCKET.put(r2Key, photo.stream(), {
+        httpMetadata: { contentType: photo.type || 'image/jpeg' }
+      });
+
+      uploaded.push({ key: r2Key, filename: photo.name, size: photo.size });
+    }
+
+    if (uploaded.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid photos were uploaded. Accepted formats: JPG, PNG, WebP (max 10MB)' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Update photo index in KV
+    const indexKey = `photo_index_${contestantId}`;
+    const existingIndexStr = await env.METADATA_KV.get(indexKey) || '[]';
+    const existingIndex = JSON.parse(existingIndexStr) as Array<{ key: string; filename: string; size: number; uploaded_at: string }>;
+
+    for (const u of uploaded) {
+      existingIndex.push({
+        key: u.key,
+        filename: u.filename,
+        size: u.size,
+        uploaded_at: new Date().toISOString()
+      });
+    }
+    await env.METADATA_KV.put(indexKey, JSON.stringify(existingIndex));
+
+    // Update embedding status
+    const statusKey = `contestant_embedding_status_${contestantId}`;
+    const existingStatusStr = await env.METADATA_KV.get(statusKey);
+    const existingStatus = existingStatusStr ? JSON.parse(existingStatusStr) : { has_photos: false, has_embedding: false, photo_count: 0 };
+    existingStatus.has_photos = true;
+    existingStatus.photo_count = existingIndex.length;
+    existingStatus.last_photo_upload = new Date().toISOString();
+    await env.METADATA_KV.put(statusKey, JSON.stringify(existingStatus));
+
+    logger.info(`Photos uploaded for contestant ${contestantId}`, { count: uploaded.length, email: accessResult.email });
+
+    return new Response(JSON.stringify({
+      success: true,
+      contestant_id: contestantId,
+      uploaded: uploaded.length,
+      total_photos: existingIndex.length,
+      files: uploaded
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Photo upload error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to upload photos', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * List uploaded photos for a contestant
+ */
+async function handlePhotoList(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const contestantId = url.searchParams.get('contestant_id');
+
+    if (!contestantId) {
+      return new Response(JSON.stringify({ error: 'Missing required parameter: contestant_id' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const indexKey = `photo_index_${contestantId}`;
+    const indexStr = await env.METADATA_KV.get(indexKey) || '[]';
+    const photos = JSON.parse(indexStr);
+
+    return new Response(JSON.stringify({
+      contestant_id: contestantId,
+      photos,
+      total: photos.length
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Photo list error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to list photos', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Get embedding status/coverage for all contestants
+ */
+async function handleEmbeddingStatus(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const contestants: Array<{
+      id: string;
+      number: number;
+      name: string;
+      nickname: string;
+      has_photos: boolean;
+      has_embedding: boolean;
+      photo_count: number;
+      last_photo_upload: string | null;
+      last_embedding_update: string | null;
+    }> = [];
+
+    for (const c of allContestants) {
+      const statusKey = `contestant_embedding_status_${c.number}`;
+      const statusStr = await env.METADATA_KV.get(statusKey);
+      const status = statusStr ? JSON.parse(statusStr) as {
+        has_photos?: boolean;
+        has_embedding?: boolean;
+        photo_count?: number;
+        last_photo_upload?: string;
+        last_embedding_update?: string;
+      } : null;
+
+      contestants.push({
+        id: c.id,
+        number: c.number,
+        name: c.name,
+        nickname: c.nickname,
+        has_photos: status?.has_photos ?? c.has_photos,
+        has_embedding: status?.has_embedding ?? c.has_embedding,
+        photo_count: status?.photo_count ?? 0,
+        last_photo_upload: status?.last_photo_upload ?? null,
+        last_embedding_update: status?.last_embedding_update ?? null
+      });
+    }
+
+    const withPhotos = contestants.filter(c => c.has_photos).length;
+    const withEmbeddings = contestants.filter(c => c.has_embedding).length;
+
+    return new Response(JSON.stringify({
+      contestants,
+      total: contestants.length,
+      with_photos: withPhotos,
+      with_embeddings: withEmbeddings,
+      coverage_pct: contestants.length > 0 ? Math.round((withEmbeddings / contestants.length) * 100) : 0
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Embedding status error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to get embedding status', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Create embedding regeneration job
+ */
+async function handleEmbeddingRegenerate(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const data = await request.json() as {
+      contestant_ids?: number[];
+      source?: string;
+    };
+
+    const { contestant_ids, source = 'photos' } = data;
+
+    const jobId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const job = {
+      id: jobId,
+      type: 'embedding_regeneration',
+      contestant_ids: contestant_ids || 'all',
+      source,
+      status: 'queued',
+      created_by: accessResult.email,
+      created_at: new Date().toISOString(),
+      completed_at: null as string | null,
+      error: null as string | null
+    };
+
+    await env.METADATA_KV.put(`bootstrap_job_${jobId}`, JSON.stringify(job));
+
+    // Add to bootstrap queue index
+    const queueStr = await env.METADATA_KV.get('bootstrap_queue_index') || '[]';
+    const queue = JSON.parse(queueStr) as string[];
+    queue.push(jobId);
+    await env.METADATA_KV.put('bootstrap_queue_index', JSON.stringify(queue));
+
+    logger.info('Embedding regeneration job created', { jobId, contestant_ids, email: accessResult.email });
+
+    return new Response(JSON.stringify({
+      success: true,
+      job_id: jobId,
+      job,
+      message: 'Regeneration job queued. Run: modal run scripts/modal_youtube_processor.py --bootstrap-job ' + jobId
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Embedding regeneration error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to create regeneration job', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * List all bootstrap/regeneration jobs
+ */
+async function handleBootstrapJobs(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const statusFilter = url.searchParams.get('status');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+
+    const queueStr = await env.METADATA_KV.get('bootstrap_queue_index') || '[]';
+    const queue = JSON.parse(queueStr) as string[];
+
+    const jobs: Array<Record<string, unknown>> = [];
+    for (const jobId of queue) {
+      const jobStr = await env.METADATA_KV.get(`bootstrap_job_${jobId}`);
+      if (jobStr) {
+        const job = JSON.parse(jobStr) as Record<string, unknown>;
+        if (!statusFilter || job.status === statusFilter) {
+          jobs.push(job);
+          if (jobs.length >= limit) break;
+        }
+      }
+    }
+
+    // Sort newest first
+    jobs.sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
+
+    return new Response(JSON.stringify({
+      jobs,
+      total: jobs.length,
+      filter: statusFilter
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Bootstrap jobs list error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to list bootstrap jobs', message: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Upload video for face sampling (bootstrap from user-provided video)
+ */
+async function handleVideoSampleFaces(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
+  const accessResult = await verifyCloudflareAccess(request, env);
+  if (!accessResult.verified) {
+    return new Response(JSON.stringify({ error: 'Unauthorized', message: accessResult.error }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    const formData = await request.formData();
+    const videoFile = formData.get('video') as File;
+    const sampleInterval = parseFloat(formData.get('sample_interval') as string || '2.0');
+    const maxSamples = parseInt(formData.get('max_samples') as string || '100');
+
+    if (!videoFile || videoFile.size === 0) {
+      return new Response(JSON.stringify({ error: 'No video file provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Store video in R2
+    const timestamp = Date.now();
+    const r2Key = `bootstrap_videos/${timestamp}_${videoFile.name}`;
+
+    await env.VIDEOS_BUCKET.put(r2Key, videoFile.stream(), {
+      httpMetadata: { contentType: videoFile.type || 'video/mp4' }
+    });
+
+    // Create face sampling job
+    const jobId = `sample_${timestamp}_${Math.random().toString(36).substring(2, 8)}`;
+    const job = {
+      id: jobId,
+      type: 'video_face_sampling',
+      video_key: r2Key,
+      video_filename: videoFile.name,
+      video_size: videoFile.size,
+      sample_interval: sampleInterval,
+      max_samples: maxSamples,
+      status: 'queued',
+      created_by: accessResult.email,
+      created_at: new Date().toISOString(),
+      completed_at: null as string | null,
+      error: null as string | null,
+      detections_count: null as number | null
+    };
+
+    await env.METADATA_KV.put(`bootstrap_job_${jobId}`, JSON.stringify(job));
+
+    // Add to bootstrap queue
+    const queueStr = await env.METADATA_KV.get('bootstrap_queue_index') || '[]';
+    const queue = JSON.parse(queueStr) as string[];
+    queue.push(jobId);
+    await env.METADATA_KV.put('bootstrap_queue_index', JSON.stringify(queue));
+
+    logger.info('Video face sampling job created', {
+      jobId,
+      filename: videoFile.name,
+      size: videoFile.size,
+      sampleInterval,
+      maxSamples,
+      email: accessResult.email
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      job_id: jobId,
+      job,
+      message: 'Video uploaded and sampling job queued. Run: modal run scripts/modal_youtube_processor.py --bootstrap-job ' + jobId
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Video sample faces error', { error: err.message });
+    return new Response(JSON.stringify({ error: 'Failed to create sampling job', message: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

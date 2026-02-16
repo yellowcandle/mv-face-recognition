@@ -42,6 +42,22 @@
   let comparisonData: any = null;
   let loadingComparison = false;
 
+  // Embedding Bootstrap state
+  let bootstrapActiveSubTab: 'status' | 'photos' | 'video' | 'jobs' = 'status';
+  let embeddingStatuses: Array<{
+    id: string; number: number; name: string; nickname: string;
+    has_photos: boolean; has_embedding: boolean; photo_count: number;
+    last_photo_upload: string | null; last_embedding_update: string | null;
+  }> = [];
+  let embeddingCoverage = { with_photos: 0, with_embeddings: 0, coverage_pct: 0, total: 0 };
+  let bootstrapJobs: Array<Record<string, any>> = [];
+  let selectedContestantForUpload: number | null = null;
+  let photoFiles: FileList | null = null;
+  let bootstrapVideoFile: File | null = null;
+  let sampleInterval = 2.0;
+  let maxSamples = 100;
+  let loadingBootstrap = false;
+
   // Get unique contestant IDs from flagged faces
   $: contestantsWithFlags = [...new Set(flaggedFaces.map(f => f.contestant_id))].sort((a, b) => a - b);
 
@@ -266,6 +282,170 @@
     error = '';
     success = '';
   }
+
+  // Embedding Bootstrap functions
+  async function loadEmbeddingStatus() {
+    loadingBootstrap = true;
+    error = '';
+    try {
+      const response = await fetch('/api/admin/embeddings/status');
+      if (response.ok) {
+        const data = await response.json();
+        embeddingStatuses = data.contestants || [];
+        embeddingCoverage = {
+          with_photos: data.with_photos || 0,
+          with_embeddings: data.with_embeddings || 0,
+          coverage_pct: data.coverage_pct || 0,
+          total: data.total || 0
+        };
+      } else {
+        error = 'Failed to load embedding status';
+      }
+    } catch (e) {
+      error = 'Network error loading embedding status';
+    } finally {
+      loadingBootstrap = false;
+    }
+  }
+
+  async function loadBootstrapJobs() {
+    loadingBootstrap = true;
+    error = '';
+    try {
+      const response = await fetch('/api/admin/bootstrap/jobs');
+      if (response.ok) {
+        const data = await response.json();
+        bootstrapJobs = data.jobs || [];
+      } else {
+        error = 'Failed to load bootstrap jobs';
+      }
+    } catch (e) {
+      error = 'Network error loading bootstrap jobs';
+    } finally {
+      loadingBootstrap = false;
+    }
+  }
+
+  async function uploadPhotos() {
+    if (!selectedContestantForUpload || !photoFiles || photoFiles.length === 0) {
+      error = 'Please select a contestant and photo files';
+      return;
+    }
+
+    loadingBootstrap = true;
+    error = '';
+    success = '';
+
+    try {
+      const formData = new FormData();
+      formData.append('contestant_id', String(selectedContestantForUpload));
+      for (let i = 0; i < photoFiles.length; i++) {
+        formData.append('photo', photoFiles[i]);
+      }
+
+      const response = await fetch('/api/admin/photos/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        success = `Uploaded ${data.uploaded} photo(s) for contestant #${selectedContestantForUpload}. Total: ${data.total_photos}`;
+        photoFiles = null;
+        await loadEmbeddingStatus();
+      } else {
+        error = data.error || 'Failed to upload photos';
+      }
+    } catch (e) {
+      error = 'Network error during photo upload';
+    } finally {
+      loadingBootstrap = false;
+    }
+  }
+
+  async function uploadBootstrapVideo() {
+    if (!bootstrapVideoFile) {
+      error = 'Please select a video file';
+      return;
+    }
+
+    loadingBootstrap = true;
+    error = '';
+    success = '';
+
+    try {
+      const formData = new FormData();
+      formData.append('video', bootstrapVideoFile);
+      formData.append('sample_interval', String(sampleInterval));
+      formData.append('max_samples', String(maxSamples));
+
+      const response = await fetch('/api/admin/videos/sample-faces', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        success = `Video uploaded and sampling job created. Job ID: ${data.job_id}`;
+        bootstrapVideoFile = null;
+        await loadBootstrapJobs();
+      } else {
+        error = data.error || 'Failed to upload video';
+      }
+    } catch (e) {
+      error = 'Network error during video upload';
+    } finally {
+      loadingBootstrap = false;
+    }
+  }
+
+  async function triggerRegeneration(contestantIds?: number[]) {
+    loadingBootstrap = true;
+    error = '';
+    success = '';
+
+    try {
+      const response = await fetch('/api/admin/embeddings/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contestant_ids: contestantIds,
+          source: 'photos'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        success = `Regeneration job created: ${data.job_id}. Run: modal run scripts/modal_youtube_processor.py --bootstrap-job ${data.job_id}`;
+        await loadBootstrapJobs();
+      } else {
+        error = data.error || 'Failed to create regeneration job';
+      }
+    } catch (e) {
+      error = 'Network error triggering regeneration';
+    } finally {
+      loadingBootstrap = false;
+    }
+  }
+
+  function handlePhotoFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      photoFiles = input.files;
+      error = '';
+    }
+  }
+
+  function handleBootstrapVideoSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      bootstrapVideoFile = input.files[0];
+      error = '';
+    }
+  }
 </script>
 
 <svelte:head>
@@ -316,6 +496,13 @@
       on:click={() => activeTab = 'processing'}
     >
       Video Processing
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === 'bootstrap'}
+      on:click={() => { activeTab = 'bootstrap'; loadEmbeddingStatus(); loadBootstrapJobs(); }}
+    >
+      Embedding Bootstrap
     </button>
   </div>
 
@@ -739,6 +926,278 @@
             </div>
           </Card>
         </div>
+      </div>
+    </Card>
+  {/if}
+
+  <!-- Embedding Bootstrap Tab -->
+  {#if activeTab === 'bootstrap'}
+    <Card class="panel">
+      <div class="panel-inner">
+        <h2>Embedding Bootstrap</h2>
+        <p class="panel-description">Upload contestant photos, generate embeddings, and bootstrap from videos</p>
+
+        <!-- Sub-tab navigation -->
+        <div class="sub-tabs">
+          <button class="sub-tab" class:active={bootstrapActiveSubTab === 'status'} on:click={() => { bootstrapActiveSubTab = 'status'; loadEmbeddingStatus(); }}>
+            Status Dashboard
+          </button>
+          <button class="sub-tab" class:active={bootstrapActiveSubTab === 'photos'} on:click={() => { bootstrapActiveSubTab = 'photos'; loadEmbeddingStatus(); }}>
+            Photo Upload
+          </button>
+          <button class="sub-tab" class:active={bootstrapActiveSubTab === 'video'} on:click={() => bootstrapActiveSubTab = 'video'}>
+            Video Bootstrap
+          </button>
+          <button class="sub-tab" class:active={bootstrapActiveSubTab === 'jobs'} on:click={() => { bootstrapActiveSubTab = 'jobs'; loadBootstrapJobs(); }}>
+            Jobs Monitor
+          </button>
+        </div>
+
+        <!-- Sub-Tab A: Status Dashboard -->
+        {#if bootstrapActiveSubTab === 'status'}
+          <div class="sync-stats">
+            <Card variant="bordered">
+              <div class="stat-card-content">
+                <div class="stat-value">{embeddingCoverage.with_photos}</div>
+                <div class="stat-label">With Photos</div>
+              </div>
+            </Card>
+            <Card variant="bordered">
+              <div class="stat-card-content">
+                <div class="stat-value">{embeddingCoverage.with_embeddings}</div>
+                <div class="stat-label">With Embeddings</div>
+              </div>
+            </Card>
+            <Card variant="bordered">
+              <div class="stat-card-content">
+                <div class="stat-value">{embeddingCoverage.coverage_pct}%</div>
+                <div class="stat-label">Coverage</div>
+              </div>
+            </Card>
+          </div>
+
+          <div class="filter-row">
+            <Button variant="secondary" size="sm" on:click={loadEmbeddingStatus}>Refresh</Button>
+            <Button variant="primary" size="sm" on:click={() => triggerRegeneration()} disabled={loadingBootstrap}>
+              {loadingBootstrap ? 'Processing...' : 'Regenerate All Embeddings'}
+            </Button>
+          </div>
+
+          {#if embeddingStatuses.length === 0}
+            <p class="empty-message">Loading contestant status...</p>
+          {:else}
+            <div class="contestant-status-grid">
+              {#each embeddingStatuses as contestant}
+                <div class="contestant-status-card">
+                  <div class="contestant-status-header">
+                    <span class="contestant-number">#{contestant.number}</span>
+                    <span class="contestant-name">{contestant.nickname || contestant.name}</span>
+                  </div>
+                  <div class="contestant-status-badges">
+                    <Badge variant={contestant.has_photos ? 'success' : 'neutral'}>
+                      {contestant.has_photos ? `${contestant.photo_count} photos` : 'No photos'}
+                    </Badge>
+                    <Badge variant={contestant.has_embedding ? 'success' : 'warning'}>
+                      {contestant.has_embedding ? 'Embedding' : 'No embedding'}
+                    </Badge>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+
+        <!-- Sub-Tab B: Photo Upload -->
+        {#if bootstrapActiveSubTab === 'photos'}
+          <div class="form">
+            <div class="form-group">
+              <label for="contestant-upload-select">Contestant</label>
+              <select
+                id="contestant-upload-select"
+                bind:value={selectedContestantForUpload}
+                class="select"
+              >
+                <option value={null}>-- Select Contestant --</option>
+                {#each embeddingStatuses as c}
+                  <option value={c.number}>#{c.number} - {c.nickname || c.name} ({c.photo_count} photos)</option>
+                {/each}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="photo-upload-input">Photos (JPG/PNG, max 10MB each)</label>
+              <div class="file-input-wrapper">
+                <input
+                  type="file"
+                  id="photo-upload-input"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  on:change={handlePhotoFileSelect}
+                  disabled={loadingBootstrap}
+                />
+                <label for="photo-upload-input" class="file-input-label">
+                  {photoFiles ? `${photoFiles.length} file(s) selected` : 'Choose Photos'}
+                </label>
+                {#if photoFiles}
+                  <Badge variant="success">
+                    {Array.from(photoFiles).reduce((sum, f) => sum + f.size, 0) / (1024 * 1024) | 0} MB total
+                  </Badge>
+                {/if}
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              on:click={uploadPhotos}
+              disabled={!selectedContestantForUpload || !photoFiles || loadingBootstrap}
+            >
+              {loadingBootstrap ? 'Uploading...' : 'Upload Photos'}
+            </Button>
+          </div>
+
+          {#if selectedContestantForUpload}
+            <div class="divider"></div>
+            <div class="modal-info">
+              <p><strong>After uploading photos, generate embeddings:</strong></p>
+              <Button
+                variant="success"
+                size="sm"
+                on:click={() => triggerRegeneration([selectedContestantForUpload])}
+                disabled={loadingBootstrap}
+              >
+                Generate Embedding for #{selectedContestantForUpload}
+              </Button>
+              <div class="warning-text" style="margin-top: 12px;">
+                After triggering, run: <code>modal run scripts/modal_youtube_processor.py --bootstrap-job &lt;JOB_ID&gt;</code>
+              </div>
+            </div>
+          {/if}
+        {/if}
+
+        <!-- Sub-Tab C: Video Bootstrap -->
+        {#if bootstrapActiveSubTab === 'video'}
+          <div class="processing-workflow">
+            <!-- Step 1: Video file selection -->
+            <Card variant="bordered" padding="none">
+              <div class="step-section">
+                <div class="step-header">
+                  <div class="step-number" class:completed={bootstrapVideoFile}>1</div>
+                  <div>
+                    <h3>Select Video File</h3>
+                    <p>Choose a video to sample faces from</p>
+                  </div>
+                </div>
+                <div class="file-input-wrapper">
+                  <input
+                    type="file"
+                    id="bootstrap-video-upload"
+                    accept="video/mp4,video/avi,video/mov,video/mkv"
+                    on:change={handleBootstrapVideoSelect}
+                    disabled={loadingBootstrap}
+                  />
+                  <label for="bootstrap-video-upload" class="file-input-label">
+                    {bootstrapVideoFile ? bootstrapVideoFile.name : 'Choose Video File'}
+                  </label>
+                  {#if bootstrapVideoFile}
+                    <Badge variant="success">
+                      {(bootstrapVideoFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </Badge>
+                  {/if}
+                </div>
+              </div>
+            </Card>
+
+            <!-- Step 2: Sampling configuration -->
+            <Card variant="bordered" padding="none">
+              <div class="step-section">
+                <div class="step-header">
+                  <div class="step-number" class:completed={bootstrapVideoFile}>2</div>
+                  <div>
+                    <h3>Configure Sampling</h3>
+                    <p>Set face sampling parameters</p>
+                  </div>
+                </div>
+                <div class="form" style="max-width: 300px;">
+                  <div class="form-group">
+                    <label for="sample-interval">Sample Interval (seconds)</label>
+                    <input id="sample-interval" type="number" class="input" bind:value={sampleInterval} min="0.5" max="30" step="0.5" />
+                  </div>
+                  <div class="form-group">
+                    <label for="max-samples">Max Samples</label>
+                    <input id="max-samples" type="number" class="input" bind:value={maxSamples} min="10" max="1000" step="10" />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <!-- Step 3: Upload & start -->
+            <Card variant="bordered" padding="none">
+              <div class="step-section">
+                <div class="step-header">
+                  <div class="step-number">3</div>
+                  <div>
+                    <h3>Upload & Start Sampling</h3>
+                    <p>Upload video and create face sampling job</p>
+                  </div>
+                </div>
+                <Button
+                  variant="success"
+                  on:click={uploadBootstrapVideo}
+                  disabled={!bootstrapVideoFile || loadingBootstrap}
+                >
+                  {loadingBootstrap ? 'Uploading...' : 'Upload & Start Face Sampling'}
+                </Button>
+                <div class="modal-info" style="margin-top: 16px;">
+                  <p><strong>After uploading, process with Modal:</strong></p>
+                  <code class="command-code">
+                    modal run scripts/modal_youtube_processor.py --bootstrap-job &lt;JOB_ID&gt;
+                  </code>
+                </div>
+              </div>
+            </Card>
+          </div>
+        {/if}
+
+        <!-- Sub-Tab D: Jobs Monitor -->
+        {#if bootstrapActiveSubTab === 'jobs'}
+          <div class="filter-row">
+            <Button variant="secondary" size="sm" on:click={loadBootstrapJobs}>Refresh</Button>
+            <Badge variant="neutral">{bootstrapJobs.length} jobs</Badge>
+          </div>
+
+          {#if bootstrapJobs.length === 0}
+            <p class="empty-message">No bootstrap jobs found</p>
+          {:else}
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Job ID</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Completed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each bootstrapJobs as job}
+                    <tr>
+                      <td><span class="video-id">{job.id}</span></td>
+                      <td>{job.type || 'bootstrap'}</td>
+                      <td>
+                        <Badge variant={job.status === 'completed' ? 'success' : job.status === 'queued' ? 'neutral' : job.status === 'processing' ? 'warning' : 'error'}>
+                          {job.status}
+                        </Badge>
+                      </td>
+                      <td>{formatDate(job.created_at)}</td>
+                      <td>{formatDate(job.completed_at)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        {/if}
       </div>
     </Card>
   {/if}
@@ -2300,5 +2759,97 @@
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
+  }
+
+  /* Embedding Bootstrap Sub-tabs */
+  .sub-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    padding: 4px;
+  }
+
+  .sub-tab {
+    flex: 1;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: var(--text-body-sm-size);
+    font-weight: var(--text-label-weight);
+    border-radius: var(--radius-sm);
+    transition: all var(--duration-normal);
+    text-align: center;
+  }
+
+  .sub-tab:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-tertiary);
+  }
+
+  .sub-tab.active {
+    color: var(--text-primary);
+    background-color: var(--color-primary-600);
+  }
+
+  /* Contestant Status Grid */
+  .contestant-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .contestant-status-card {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px;
+  }
+
+  .contestant-status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .contestant-number {
+    font-weight: var(--text-h6-weight);
+    color: var(--color-primary-400);
+    font-size: var(--text-body-sm-size);
+    font-family: var(--font-mono);
+  }
+
+  .contestant-name {
+    color: var(--text-primary);
+    font-size: var(--text-body-sm-size);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .contestant-status-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .input {
+    padding: 10px 14px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: var(--text-body-sm-size);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: var(--focus-ring);
   }
 </style>

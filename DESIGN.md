@@ -29,12 +29,23 @@ This document describes the architecture and design decisions for the MV Face Re
 
 #### System Improvements
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
-- [ ] **User-provided video upload workflow** - Users will provide video files and metadata directly (bypasses YouTube download issues)
+- [x] **User-provided video upload workflow** - Users can upload videos directly via admin UI bootstrap tab
+- [x] **Embedding Bootstrap System** - Admin UI for photo upload, embedding regeneration, and video face sampling
 - [ ] ~~Fix yt-dlp YouTube download in Modal containers~~ (deprioritized - user provides videos directly)
   - YouTube requires JS challenge solving for video downloads
   - **Local fix**: `yt-dlp --remote-components ejs:github --cookies-from-browser chrome`
   - **Modal container fix**: Install deno + enable remote components in `modal_youtube_processor.py`
   - See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+
+### Completed (February 2026)
+
+#### Embedding Bootstrap Admin System
+- [x] Backend: 6 new Worker API endpoints (`/admin/photos/upload`, `/admin/photos/list`, `/admin/embeddings/status`, `/admin/embeddings/regenerate`, `/admin/bootstrap/jobs`, `/admin/videos/sample-faces`)
+- [x] Frontend: "Embedding Bootstrap" tab in `/admin` page with 4 sub-tabs (Status Dashboard, Photo Upload, Video Bootstrap, Jobs Monitor)
+- [x] Modal: `process_bootstrap_job()` method + `bootstrap` CLI entrypoint in `modal_youtube_processor.py`
+- [x] Photo upload stores to R2, tracks in KV; embedding status shows coverage across 96 contestants
+- [x] Video bootstrap: upload video → R2, create face sampling job → process with Modal
+- [x] Embedding regeneration: reads photos from R2/volume, generates embeddings with InsightFace, updates ChromaDB + .npy files
 
 ### Completed (January 2026)
 
