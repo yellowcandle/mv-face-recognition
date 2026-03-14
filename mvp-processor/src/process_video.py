@@ -154,6 +154,8 @@ class VideoProcessingPipeline:
 
         logger.info(f"Processing {len(frames_list)} frames...")
 
+        unmatched_faces = []
+
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
         ):
@@ -169,6 +171,12 @@ class VideoProcessingPipeline:
                 # Recognize faces
                 recognitions = self.face_recognizer.recognize_faces(detections)
                 all_recognitions.extend(recognitions)
+
+                # Collect unmatched detections (detected but not recognized)
+                matched_detections = {id(r.detection) for r in recognitions}
+                for det in detections:
+                    if id(det) not in matched_detections:
+                        unmatched_faces.append(det)
 
                 # Store frame data
                 frame_data.append(
@@ -190,13 +198,18 @@ class VideoProcessingPipeline:
                     }
                 )
 
+        # Save unmatched face embeddings for clustering
+        if unmatched_faces:
+            self._save_unmatched_embeddings(unmatched_faces, output_name)
+
         # Filter low-confidence recognitions
         filtered_recognitions = self.face_recognizer.filter_recognitions(
             all_recognitions, min_confidence=0.5
         )
 
         logger.info(
-            f"Processing complete: {len(filtered_recognitions)} recognitions found"
+            f"Processing complete: {len(filtered_recognitions)} recognitions found, "
+            f"{len(unmatched_faces)} unmatched faces saved"
         )
 
         # Generate metadata
@@ -258,6 +271,35 @@ class VideoProcessingPipeline:
         }
 
         return upload_package
+
+    def _save_unmatched_embeddings(self, unmatched_faces, output_name: str):
+        """Save unmatched face embeddings and index for later clustering."""
+        import numpy as np
+
+        unmatched_dir = Path("../data/unmatched_faces") / output_name
+        unmatched_dir.mkdir(parents=True, exist_ok=True)
+
+        index = []
+        for i, det in enumerate(unmatched_faces):
+            filename = f"face_{det.frame_number}_{i}.npy"
+            np.save(str(unmatched_dir / filename), det.encoding)
+            index.append({
+                "file": filename,
+                "frame_number": int(det.frame_number),
+                "timestamp": float(det.timestamp),
+                "location": [int(x) for x in det.location],
+                "confidence": float(det.confidence),
+            })
+
+        index_path = unmatched_dir / "unmatched_index.json"
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "video": output_name,
+                "total_unmatched": len(index),
+                "faces": index,
+            }, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Saved {len(index)} unmatched face embeddings to {unmatched_dir}")
 
     def convert_video_formats(self, input_path: Path, output_name: str) -> List[str]:
         """Convert video to multiple formats"""
