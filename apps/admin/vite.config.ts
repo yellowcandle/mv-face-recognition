@@ -17,10 +17,6 @@ export default defineConfig({
         target: 'https://mv-face-recognition-api.herballemon.workers.dev',
         changeOrigin: true,
       },
-      '/data': {
-        target: 'http://localhost:5173',
-        rewrite: () => '',
-      },
     },
     fs: {
       allow: ['..'],

@@ -1,0 +1,265 @@
+{
+  "pairs": [
+    {
+      "contestant_a": {
+        "id": "21",
+        "name": "謝裕鈴",
+        "nickname": "Ling"
+      },
+      "contestant_b": {
+        "id": "96",
+        "name": "郭嘉盈",
+        "nickname": "3 妹"
+      },
+      "similarity": 0.91879
+    },
+    {
+      "contestant_a": {
+        "id": "55",
+        "name": "蔡舒文",
+        "nickname": "舒文"
+      },
+      "contestant_b": {
+        "id": "64",
+        "name": "林泳怡",
+        "nickname": "Vicky"
+      },
+      "similarity": 0.41132
+    },
+    {
+      "contestant_a": {
+        "id": "23",
+        "name": "陳祖兒",
+        "nickname": "陳祖"
+      },
+      "contestant_b": {
+        "id": "47",
+        "name": "周曉欣",
+        "nickname": "Ace"
+      },
+      "similarity": 0.348159
+    },
+    {
+      "contestant_a": {
+        "id": "1",
+        "name": "蘇雅琳",
+        "nickname": "Ivy So"
+      },
+      "contestant_b": {
+        "id": "70",
+        "name": "郭東彩",
+        "nickname": "東東"
+      },
+      "similarity": 0.341878
+    },
+    {
+      "contestant_a": {
+        "id": "37",
+        "name": "利佩佩",
+        "nickname": "Puipui"
+      },
+      "contestant_b": {
+        "id": "52",
+        "name": "吳倩怡",
+        "nickname": "Sinnie"
+      },
+      "similarity": 0.334569
+    },
+    {
+      "contestant_a": {
+        "id": "1",
+        "name": "蘇雅琳",
+        "nickname": "Ivy So"
+      },
+      "contestant_b": {
+        "id": "87",
+        "name": "葛綽瑤",
+        "nickname": "Yoyo"
+      },
+      "similarity": 0.327317
+    },
+    {
+      "contestant_a": {
+        "id": "15",
+        "name": "李晞彤",
+        "nickname": "Carina"
+      },
+      "contestant_b": {
+        "id": "60",
+        "name": "楊安妮",
+        "nickname": "Win Win"
+      },
+      "similarity": 0.314563
+    },
+    {
+      "contestant_a": {
+        "id": "39",
+        "name": "葉倩彤",
+        "nickname": "Stella"
+      },
+      "contestant_b": {
+        "id": "74",
+        "name": "蘇芷晴",
+        "nickname": "So Ching"
+      },
+      "similarity": 0.314308
+    },
+    {
+      "contestant_a": {
+        "id": "9",
+        "name": "羅洛家",
+        "nickname": "Carmina"
+      },
+      "contestant_b": {
+        "id": "46",
+        "name": "歐穎芝",
+        "nickname": "Chloe Au"
+      },
+      "similarity": 0.308854
+    },
+    {
+      "contestant_a": {
+        "id": "48",
+        "name": "劉綺婷",
+        "nickname": "Yanny"
+      },
+      "contestant_b": {
+        "id": "53",
+        "name": "房婷婷",
+        "nickname": "丁丁"
+      },
+      "similarity": 0.302863
+    },
+    {
+      "contestant_a": {
+        "id": "29",
+        "name": "鄺采彤",
+        "nickname": "Emi"
+      },
+      "contestant_b": {
+        "id": "52",
+        "name": "吳倩怡",
+        "nickname": "Sinnie"
+      },
+      "similarity": 0.301207
+    },
+    {
+      "contestant_a": {
+        "id": "28",
+        "name": "王家晴",
+        "nickname": "Candy"
+      },
+      "contestant_b": {
+        "id": "57",
+        "name": "張瑞芝",
+        "nickname": "Ariels"
+      },
+      "similarity": 0.301205
+    },
+    {
+      "contestant_a": {
+        "id": "36",
+        "name": "陳曉藍",
+        "nickname": "精靈"
+      },
+      "contestant_b": {
+        "id": "92",
+        "name": "郭曉妍",
+        "nickname": "阿 Yo"
+      },
+      "similarity": 0.29762
+    },
+    {
+      "contestant_a": {
+        "id": "8",
+        "name": "陳玥伶",
+        "nickname": "小砂"
+      },
+      "contestant_b": {
+        "id": "40",
+        "name": "李芯駖",
+        "nickname": "芯駖"
+      },
+      "similarity": 0.297366
+    },
+    {
+      "contestant_a": {
+        "id": "14",
+        "name": "鄭芷淇",
+        "nickname": "Elka"
+      },
+      "contestant_b": {
+        "id": "52",
+        "name": "吳倩怡",
+        "nickname": "Sinnie"
+      },
+      "similarity": 0.293584
+    },
+    {
+      "contestant_a": {
+        "id": "9",
+        "name": "羅洛家",
+        "nickname": "Carmina"
+      },
+      "contestant_b": {
+        "id": "71",
+        "name": "莫家琪",
+        "nickname": "家琪"
+      },
+      "similarity": 0.293067
+    },
+    {
+      "contestant_a": {
+        "id": "8",
+        "name": "陳玥伶",
+        "nickname": "小砂"
+      },
+      "contestant_b": {
+        "id": "52",
+        "name": "吳倩怡",
+        "nickname": "Sinnie"
+      },
+      "similarity": 0.285838
+    },
+    {
+      "contestant_a": {
+        "id": "49",
+        "name": "溫彩玲",
+        "nickname": "Jolin"
+      },
+      "contestant_b": {
+        "id": "59",
+        "name": "張嘉慧",
+        "nickname": "嘉嘉"
+      },
+      "similarity": 0.284867
+    },
+    {
+      "contestant_a": {
+        "id": "17",
+        "name": "黃詠霖",
+        "nickname": "阿蛋"
+      },
+      "contestant_b": {
+        "id": "92",
+        "name": "郭曉妍",
+        "nickname": "阿 Yo"
+      },
+      "similarity": 0.284224
+    },
+    {
+      "contestant_a": {
+        "id": "8",
+        "name": "陳玥伶",
+        "nickname": "小砂"
+      },
+      "contestant_b": {
+        "id": "56",
+        "name": "鍾心悅",
+        "nickname": "米線"
+      },
+      "similarity": 0.283426
+    }
+  ],
+  "total_pairs": 4560
+}
