@@ -18,10 +18,13 @@
   });
   
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: '🎬' },
-    { href: '/video-player', label: 'Video Player', icon: '▶️' },
-    { href: '/processing', label: 'Processing', icon: '⚙️' },
-    { href: '/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/', label: 'Dashboard', icon: '📊' },
+    { href: '/player', label: 'Video Player', icon: '▶️' },
+    { href: '/contestants', label: 'Contestants', icon: '👥' },
+    { href: '/ingestion', label: 'Ingestion', icon: '📤' },
+    { href: '/analytics', label: 'Analytics', icon: '📈' },
+    { href: '/flagging', label: 'Flagging', icon: '🚩' },
+    { href: '/processing', label: 'Processing', icon: '⚙️', separator: true },
     { href: '/admin', label: 'Admin', icon: '🔐' }
   ];
   
@@ -72,7 +75,12 @@
 
     <nav class="nav {mobileMenuOpen ? 'mobile-open' : ''}">
       {#each navItems as item}
-        <NavigationLink {item} currentPath={$page.url.pathname} />
+        {#if item.separator}
+          <div class="nav-separator"></div>
+        {/if}
+        <NavigationLink href={item.href} active={$page.url.pathname === item.href} icon={item.icon}>
+          {item.label}
+        </NavigationLink>
       {/each}
     </nav>
 
@@ -140,6 +148,12 @@
     overflow-y: auto;
     padding: var(--space-4) 0;
     z-index: 40;
+  }
+
+  .nav-separator {
+    height: 1px;
+    background-color: var(--border-medium);
+    margin: var(--space-2) var(--space-4);
   }
 
   .main {

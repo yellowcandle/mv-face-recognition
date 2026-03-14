@@ -37,7 +37,39 @@ This document describes the architecture and design decisions for the MV Face Re
   - **Modal container fix**: Install deno + enable remote components in `modal_youtube_processor.py`
   - See: https://github.com/yt-dlp/yt-dlp/wiki/EJS
 
+### Completed (March 2026)
+
+#### Player Overlay Port + Nav Unification
+- [x] Fixed bbox format bug in `/player` — was `[x,y,w,h]`, now `[x1,y1,x2,y2]` (matching backend)
+- [x] Ported canvas annotation overlay from `/video-player` → `/player` (HiDPI, 10-color palette, letterbox offset)
+- [x] Ported original-vs-annotated video toggle with playback position preservation
+- [x] Added show/hide annotations button
+- [x] Unified navigation: 8 routes with separator (Dashboard, Player, Contestants, Ingestion, Analytics, Flagging | Processing, Admin)
+- [x] Fixed `NavigationLink` prop passing in `+layout.svelte`
+- **Files**: `mvp-processor/src/routes/player/+page.svelte`, `mvp-processor/src/routes/+layout.svelte`
+
+#### Stage 6: Annotated Video Output
+- [x] `VideoProcessor.create_annotated_video()` — re-reads source video frame-by-frame, draws bounding boxes + labels from `frame_data`, writes via `cv2.VideoWriter`, then muxes original audio with MoviePy
+- [x] CJK text rendering via Pillow (`PIL.ImageDraw`) with PingFang/NotoSansCJK font fallback; falls back to `cv2.putText` with nickname/ID if Pillow unavailable
+- [x] Carry-forward: between sampled frames, last known recognitions persist; confidence display fades over ~30 frames
+- [x] Pipeline integration in `VideoProcessingPipeline.process_video()` — called after format conversion, adds annotated path to `upload_package`
+- [x] `--no-annotate` CLI flag to skip annotation
+- [x] Config block in `processing_config.yaml` (`annotated_video:` with `label_font_scale`, `box_color`, `box_thickness`, `quality`)
+- [x] Design mockup for config UI panel in `untitled.pen`
+- **Files**: `mvp-processor/src/video_processor.py`, `mvp-processor/src/process_video.py`, `mvp-processor/config/processing_config.yaml`
+
 ### Completed (February 2026)
+
+#### Video Player Annotation Overlay (Stage 6)
+- [x] Fixed `getBboxStyle()` — was interpreting `[x1,y1,x2,y2]` as `[x,y,w,h]`, causing misaligned boxes
+- [x] Added `object-fit: contain` letterbox/pillarbox offset calculation (`getVideoRenderRect()`)
+- [x] Added `<canvas>` overlay layer for rendering bounding boxes + contestant name labels with confidence %
+- [x] Per-contestant color coding (10-color palette, assigned by first appearance)
+- [x] HiDPI canvas rendering (`devicePixelRatio` scaling)
+- [x] Toggle button to show/hide annotation boxes
+- [x] Transparent div hit targets remain on top for click-to-flag interactivity
+- [x] Fixed `extractFaceThumbnail()` to use `[x1,y1,x2,y2]` format
+- **File**: `mvp-processor/src/routes/video-player/+page.svelte`
 
 #### Embedding Bootstrap Admin System
 - [x] Backend: 6 new Worker API endpoints (`/admin/photos/upload`, `/admin/photos/list`, `/admin/embeddings/status`, `/admin/embeddings/regenerate`, `/admin/bootstrap/jobs`, `/admin/videos/sample-faces`)

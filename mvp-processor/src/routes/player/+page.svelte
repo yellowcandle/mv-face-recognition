@@ -10,6 +10,7 @@
   let selectedVideo: any = null;
   let videoElement: HTMLVideoElement;
   let videoContainer: HTMLDivElement;
+  let annotationCanvas: HTMLCanvasElement;
 
   let isPlaying = false;
   let currentTime = 0;
@@ -42,7 +43,13 @@
 
   // Video metadata
   let videoMetadata: any = null;
-  
+
+  // Video source toggle (original vs annotated)
+  let showOriginalVideo = false;
+
+  // Annotation overlay toggle
+  let showAnnotations = true;
+
   // Timeline filter state
   let filterContestantId: number | null = null;
   let contestantAppearances: { timestamp: number; duration: number }[] = [];
@@ -406,15 +413,18 @@
     if (!videoElement || !face.bbox || face.bbox.length < 4) return null;
 
     try {
-      const [x, y, w, h] = face.bbox;
+      // bbox format: [x1, y1, x2, y2]
+      const [x1, y1, x2, y2] = face.bbox;
+      const w = x2 - x1;
+      const h = y2 - y1;
 
       // Add padding around the face (20% on each side)
       const padding = 0.2;
       const padX = w * padding;
       const padY = h * padding;
 
-      const cropX = Math.max(0, x - padX);
-      const cropY = Math.max(0, y - padY);
+      const cropX = Math.max(0, x1 - padX);
+      const cropY = Math.max(0, y1 - padY);
       const cropW = Math.min(videoElement.videoWidth - cropX, w + 2 * padX);
       const cropH = Math.min(videoElement.videoHeight - cropY, h + 2 * padY);
 
@@ -449,27 +459,174 @@
     }
   }
 
-  // Calculate bounding box position relative to video
+  // Video source: original local file vs processed/annotated from R2
+  function getVideoSource(): string {
+    if (!selectedVideo) return '';
+
+    if (showOriginalVideo) {
+      const filename = selectedVideo.filename || `${selectedVideo.id}.mp4`;
+      return `/source/videos/${filename}`;
+    } else {
+      return `${API_BASE}${selectedVideo.stream_url}`;
+    }
+  }
+
+  function toggleVideoSource() {
+    if (!videoElement) return;
+
+    const savedTime = videoElement.currentTime;
+    const wasPlaying = isPlaying;
+
+    showOriginalVideo = !showOriginalVideo;
+
+    const newSource = getVideoSource();
+    if (videoElement.src !== newSource) {
+      videoElement.src = newSource;
+      videoElement.addEventListener('loadedmetadata', () => {
+        videoElement.currentTime = savedTime;
+        if (wasPlaying) videoElement.play();
+      }, { once: true });
+    }
+  }
+
+  // Calculate video render rect accounting for object-fit: contain letterbox/pillarbox
+  function getVideoRenderRect(): { offsetX: number; offsetY: number; renderW: number; renderH: number } {
+    if (!videoElement || !videoContainer) return { offsetX: 0, offsetY: 0, renderW: 0, renderH: 0 };
+
+    const containerRect = videoContainer.getBoundingClientRect();
+    const containerW = containerRect.width;
+    const containerH = containerRect.height;
+    const videoW = videoElement.videoWidth || 1920;
+    const videoH = videoElement.videoHeight || 1080;
+    const videoAspect = videoW / videoH;
+    const containerAspect = containerW / containerH;
+
+    let renderW: number, renderH: number, offsetX = 0, offsetY = 0;
+
+    if (videoAspect > containerAspect) {
+      // Pillarbox (black bars top/bottom)
+      renderW = containerW;
+      renderH = containerW / videoAspect;
+      offsetX = 0;
+      offsetY = (containerH - renderH) / 2;
+    } else {
+      // Letterbox (black bars left/right)
+      renderH = containerH;
+      renderW = containerH * videoAspect;
+      offsetX = (containerW - renderW) / 2;
+      offsetY = 0;
+    }
+    return { offsetX, offsetY, renderW, renderH };
+  }
+
+  // Calculate bounding box position relative to video (with letterbox offset)
   function getBboxStyle(bbox: number[]): string {
     if (!bbox || bbox.length < 4 || !videoElement) return '';
 
-    const [x, y, w, h] = bbox;
-    const videoRect = videoElement.getBoundingClientRect();
-    const scaleX = videoRect.width / (videoElement.videoWidth || 1920);
-    const scaleY = videoRect.height / (videoElement.videoHeight || 1080);
+    const [x1, y1, x2, y2] = bbox;
+    const videoW = videoElement.videoWidth || 1920;
+    const videoH = videoElement.videoHeight || 1080;
+    const { offsetX, offsetY, renderW, renderH } = getVideoRenderRect();
+    const scaleX = renderW / videoW;
+    const scaleY = renderH / videoH;
 
     return `
-      left: ${x * scaleX}px;
-      top: ${y * scaleY}px;
-      width: ${w * scaleX}px;
-      height: ${h * scaleY}px;
+      left: ${offsetX + x1 * scaleX}px;
+      top: ${offsetY + y1 * scaleY}px;
+      width: ${(x2 - x1) * scaleX}px;
+      height: ${(y2 - y1) * scaleY}px;
     `;
+  }
+
+  // Draw annotation boxes + labels on the canvas overlay
+  function drawAnnotations() {
+    if (!annotationCanvas || !videoElement) return;
+
+    const containerRect = videoContainer.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    // Size canvas to match container
+    annotationCanvas.width = containerRect.width * dpr;
+    annotationCanvas.height = containerRect.height * dpr;
+    annotationCanvas.style.width = `${containerRect.width}px`;
+    annotationCanvas.style.height = `${containerRect.height}px`;
+
+    const ctx = annotationCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, containerRect.width, containerRect.height);
+
+    if (!showAnnotations || detectedFaces.length === 0) return;
+
+    const videoW = videoElement.videoWidth || 1920;
+    const videoH = videoElement.videoHeight || 1080;
+    const { offsetX, offsetY, renderW, renderH } = getVideoRenderRect();
+    const scaleX = renderW / videoW;
+    const scaleY = renderH / videoH;
+
+    // Color palette for different contestants
+    const colors = [
+      '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+      '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
+    ];
+    const colorMap = new Map<string, string>();
+
+    for (const face of detectedFaces) {
+      const [x1, y1, x2, y2] = face.bbox || [0, 0, 0, 0];
+      if (x2 <= x1 || y2 <= y1) continue;
+
+      const name = face.contestant_name || 'Unknown';
+      if (!colorMap.has(name)) {
+        colorMap.set(name, colors[colorMap.size % colors.length]);
+      }
+      const color = colorMap.get(name)!;
+      const confidence = face.confidence ?? 0;
+
+      // Scaled coordinates
+      const sx = offsetX + x1 * scaleX;
+      const sy = offsetY + y1 * scaleY;
+      const sw = (x2 - x1) * scaleX;
+      const sh = (y2 - y1) * scaleY;
+
+      // Draw bounding box
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx, sy, sw, sh);
+
+      // Draw label background + text
+      const label = `${name}  ${(confidence * 100).toFixed(0)}%`;
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      const textMetrics = ctx.measureText(label);
+      const textH = 20;
+      const textW = textMetrics.width + 10;
+      const labelY = sy - textH - 2;
+      const finalLabelY = labelY < offsetY ? sy : labelY;
+
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(sx, finalLabelY, textW, textH);
+      ctx.globalAlpha = 1.0;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, sx + 5, finalLabelY + textH / 2);
+    }
+  }
+
+  // Redraw annotations whenever detectedFaces change
+  $: if (detectedFaces && annotationCanvas) {
+    drawAnnotations();
   }
 
   onMount(() => {
     loadVideos();
     loadContestants();
     loadFlaggedFaces();
+
+    // Redraw canvas on window resize
+    const handleResize = () => drawAnnotations();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   });
 
   onDestroy(() => {
@@ -517,7 +674,7 @@
           {#if selectedVideo}
             <video
               bind:this={videoElement}
-              src="{API_BASE}{selectedVideo.stream_url}"
+              src={getVideoSource()}
               on:timeupdate={handleTimeUpdate}
               on:loadedmetadata={handleLoadedMetadata}
               on:play={() => { isPlaying = true; startFacePolling(); }}
@@ -528,7 +685,13 @@
               <track kind="captions" />
             </video>
 
-            <!-- Face Overlay Layer -->
+            <!-- Canvas Annotation Layer (bounding boxes + labels) -->
+            <canvas
+              bind:this={annotationCanvas}
+              class="annotation-canvas"
+            ></canvas>
+
+            <!-- Face Overlay Layer (transparent hit targets for flagging) -->
             <div class="face-overlay">
               {#each detectedFaces as face, i}
                 <button
@@ -625,6 +788,22 @@
 
         <!-- Detection Info Bar -->
         <div class="detection-bar">
+          <button
+            class="video-source-toggle"
+            class:active={!showOriginalVideo}
+            on:click={toggleVideoSource}
+            title={showOriginalVideo ? 'Switch to Annotated Video' : 'Switch to Original Video'}
+          >
+            {showOriginalVideo ? '📹 Original' : '🎨 Annotated'}
+          </button>
+          <button
+            class="video-source-toggle"
+            class:active={showAnnotations}
+            on:click={() => { showAnnotations = !showAnnotations; drawAnnotations(); }}
+            title={showAnnotations ? 'Hide face annotations' : 'Show face annotations'}
+          >
+            {showAnnotations ? '👁 Boxes ON' : '👁‍🗨 Boxes OFF'}
+          </button>
           <span>👥 Detected Faces: {detectedFaces.length}</span>
           <span>📍 Current Frame: {Math.floor(currentTime * (videoMetadata?.video_info?.fps || 25))}</span>
           {#if detectedFaces.length > 0}
@@ -1026,6 +1205,16 @@
     object-fit: contain;
   }
 
+  .annotation-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   .face-overlay {
     position: absolute;
     top: 0;
@@ -1033,6 +1222,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+    z-index: 2;
   }
 
   .face-bbox {
@@ -1227,6 +1417,28 @@
   .detection-bar .hint {
     color: var(--color-primary-500);
     margin-left: auto;
+  }
+
+  .video-source-toggle {
+    background: #334155;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s ease;
+  }
+
+  .video-source-toggle:hover {
+    background: #475569;
+    color: #e2e8f0;
+  }
+
+  .video-source-toggle.active {
+    background: #1d4ed8;
+    border-color: #3b82f6;
+    color: #ffffff;
   }
 
   .info-panel {

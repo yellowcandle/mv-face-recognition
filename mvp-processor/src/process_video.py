@@ -110,7 +110,8 @@ class VideoProcessingPipeline:
         )
 
     def process_video(
-        self, video_path: Path, output_name: Optional[str] = None
+        self, video_path: Path, output_name: Optional[str] = None,
+        no_annotate: bool = False,
     ) -> Dict:
         """
         Process a single video through the complete pipeline
@@ -225,6 +226,26 @@ class VideoProcessingPipeline:
         # Convert video formats
         processed_videos = self.convert_video_formats(video_path, output_name)
 
+        # Generate annotated video with bounding boxes and labels
+        annotated_video_path = None
+        if not no_annotate and frame_data:
+            output_dir = Path(self.config["output"]["processed_dir"])
+            annotated_filename = f"{output_name}_annotated.mp4"
+            annotated_output = output_dir / annotated_filename
+
+            annotated_config = self.config.get("annotated_video", {})
+            try:
+                annotated_video_path = self.video_processor.create_annotated_video(
+                    str(video_path),
+                    str(annotated_output),
+                    frame_data,
+                    annotated_config,
+                )
+                processed_videos.append(annotated_video_path)
+                logger.info(f"Annotated video created: {annotated_video_path}")
+            except Exception as e:
+                logger.warning(f"Failed to create annotated video: {e}")
+
         # Prepare upload package
         upload_package = {
             "video_info": video_info,
@@ -233,6 +254,7 @@ class VideoProcessingPipeline:
             "processed_videos": processed_videos,
             "thumbnails": thumbnail_paths,
             "metadata_file": str(metadata_path),
+            "annotated_video": annotated_video_path,
         }
 
         return upload_package
@@ -293,6 +315,7 @@ class VideoProcessingPipeline:
 )
 @click.option("--output-dir", help="Custom base output directory for local-only mode")
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
+@click.option("--no-annotate", is_flag=True, help="Skip annotated video generation")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
     input: str,
@@ -302,6 +325,7 @@ def main(
     local_only: bool,
     output_dir: str,
     rebuild_db: bool,
+    no_annotate: bool,
     debug: bool,
 ):
     """Process video through face recognition pipeline"""
@@ -364,7 +388,7 @@ def main(
             pipeline.initialize_database(force_rebuild=rebuild_db)
 
             # Process video
-            upload_package = pipeline.process_video(video_path, output_name)
+            upload_package = pipeline.process_video(video_path, output_name, no_annotate=no_annotate)
 
             # Upload to Cloudflare (unless disabled or in local-only mode)
             if not (no_upload or local_only) and pipeline.cloudflare_uploader:

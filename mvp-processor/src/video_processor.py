@@ -537,6 +537,240 @@ class VideoProcessor:
             raise VideoProcessingError(f"Conversion failed: {e}")
 
 
+    def create_annotated_video(
+        self,
+        video_path: str,
+        output_path: str,
+        frame_data: list,
+        annotated_config: dict = None,
+    ) -> str:
+        """
+        Create annotated video with bounding boxes and labels on recognized faces.
+
+        Re-reads the source video frame by frame, draws annotations on sampled frames
+        that have recognition data, carries forward the last known recognitions for
+        frames between samples, then muxes the original audio back on.
+
+        Args:
+            video_path: Path to the original source video
+            output_path: Path for the annotated output video
+            frame_data: List of dicts from the processing loop with recognition info
+            annotated_config: Optional config overrides for annotation appearance
+
+        Returns:
+            Path to the annotated video file
+        """
+        cfg = {
+            "label_font_scale": 0.6,
+            "box_color": (0, 255, 0),
+            "box_thickness": 2,
+            "quality": "high",
+        }
+        if annotated_config:
+            cfg.update(annotated_config)
+
+        # Build lookup: sampled_frame_number -> recognitions list
+        recognition_lookup = {}
+        for fd in frame_data:
+            recognition_lookup[fd["frame_number"]] = fd["recognitions"]
+
+        # Determine which frame numbers were sampled
+        sampled_frame_numbers = sorted(recognition_lookup.keys())
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise VideoProcessingError(f"Cannot open video for annotation: {video_path}")
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        # Write to a temp file (no audio), then mux audio later
+        import tempfile
+        temp_dir = tempfile.mkdtemp()
+        temp_video = str(Path(temp_dir) / "annotated_noaudio.mp4")
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(temp_video, fourcc, fps, (width, height))
+
+        if not writer.isOpened():
+            cap.release()
+            raise VideoProcessingError("Failed to create VideoWriter for annotation")
+
+        frame_number = 0
+        last_recognitions = []
+
+        logger.info(f"Creating annotated video: {output_path}")
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_number in recognition_lookup:
+                # Sampled frame with recognition data
+                last_recognitions = recognition_lookup[frame_number]
+
+            # Draw current recognitions (either fresh or carried-forward)
+            if last_recognitions:
+                frame = self._draw_annotations(
+                    frame, last_recognitions, cfg,
+                    sampled_frame_numbers, frame_number,
+                )
+
+            writer.write(frame)
+            frame_number += 1
+
+        writer.release()
+        cap.release()
+
+        logger.info(f"Wrote {frame_number} annotated frames, muxing audio...")
+
+        # Mux original audio onto annotated video
+        self._mux_audio(video_path, temp_video, output_path, cfg)
+
+        # Cleanup temp
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        logger.info(f"Annotated video saved: {output_path}")
+        return output_path
+
+    def _draw_annotations(
+        self,
+        frame: np.ndarray,
+        recognitions: list,
+        cfg: dict,
+        sampled_frame_numbers: list,
+        current_frame: int,
+    ) -> np.ndarray:
+        """Draw bounding boxes and labels for all recognitions on a frame."""
+        # Calculate confidence fade based on distance from nearest sampled frame
+        fade_factor = 1.0
+        if sampled_frame_numbers:
+            import bisect
+            idx = bisect.bisect_right(sampled_frame_numbers, current_frame)
+            if idx > 0:
+                dist = current_frame - sampled_frame_numbers[idx - 1]
+                # Fade over 30 frames (~1s at 30fps)
+                fade_factor = max(0.3, 1.0 - (dist / 30.0))
+
+        box_color = cfg["box_color"]
+        thickness = cfg["box_thickness"]
+        font_scale = cfg["label_font_scale"]
+
+        for rec in recognitions:
+            loc = rec["face_location"]  # [top, right, bottom, left]
+            top, right, bottom, left = loc
+
+            # Fade box alpha by adjusting color brightness
+            faded_color = tuple(int(c * fade_factor) for c in box_color)
+
+            cv2.rectangle(frame, (left, top), (right, bottom), faded_color, thickness)
+
+            # Build label
+            name = rec.get("contestant_name", "")
+            nickname = rec.get("contestant_nickname", "")
+            confidence = rec.get("confidence", 0.0)
+            display_conf = confidence * fade_factor
+
+            label = name or nickname or rec.get("contestant_id", "?")
+            label_text = f"{label} ({display_conf:.0%})"
+
+            # Try CJK rendering with Pillow, fall back to cv2
+            frame = self._draw_label(
+                frame, label_text, (left, top - 10),
+                font_scale, faded_color, nickname or rec.get("contestant_id", "?"),
+                display_conf,
+            )
+
+        return frame
+
+    def _draw_label(
+        self,
+        frame: np.ndarray,
+        label_text: str,
+        position: tuple,
+        font_scale: float,
+        color: tuple,
+        fallback_label: str,
+        confidence: float,
+    ) -> np.ndarray:
+        """Draw text label, using Pillow for CJK characters with cv2 fallback."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            # Check if label contains CJK characters
+            if any('\u4e00' <= ch <= '\u9fff' for ch in label_text):
+                pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                draw = ImageDraw.Draw(pil_img)
+
+                font_size = int(font_scale * 30)
+                try:
+                    font = ImageFont.truetype("/System/Library/Fonts/PingFang.ttc", font_size)
+                except OSError:
+                    try:
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", font_size)
+                    except OSError:
+                        font = ImageFont.load_default()
+
+                # Convert BGR color to RGB for Pillow
+                rgb_color = (color[2], color[1], color[0])
+                x, y = position
+                y = max(y, font_size)  # Don't draw above frame
+                draw.text((x, y - font_size), label_text, font=font, fill=rgb_color)
+
+                frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+                return frame
+        except ImportError:
+            pass
+
+        # Fallback: cv2.putText with ASCII-safe label
+        fallback_text = f"{fallback_label} ({confidence:.0%})"
+        x, y = position
+        y = max(y, 15)
+        cv2.putText(
+            frame, fallback_text, (x, y),
+            cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, 2,
+        )
+        return frame
+
+    @staticmethod
+    def _mux_audio(
+        original_video: str,
+        annotated_video: str,
+        output_path: str,
+        cfg: dict,
+    ):
+        """Merge original audio onto the annotated video using MoviePy."""
+        try:
+            from moviepy import VideoFileClip, AudioFileClip
+
+            annotated_clip = VideoFileClip(annotated_video)
+            original_clip = VideoFileClip(original_video)
+
+            if original_clip.audio is not None:
+                annotated_clip = annotated_clip.with_audio(original_clip.audio)
+
+            bitrate_map = {"low": "1000k", "medium": "3000k", "high": "6000k"}
+            bitrate = bitrate_map.get(cfg.get("quality", "high"), "6000k")
+
+            annotated_clip.write_videofile(
+                output_path,
+                codec="libx264",
+                audio_codec="aac",
+                bitrate=bitrate,
+                logger=None,
+            )
+
+            annotated_clip.close()
+            original_clip.close()
+
+        except ImportError:
+            logger.warning("MoviePy not available, copying video without audio")
+            import shutil
+            shutil.copy2(annotated_video, output_path)
+
+
 class FrameProcessor:
     """Utility class for frame-level processing"""
 
