@@ -25,6 +25,7 @@
     { href: '/analytics', label: 'Analytics', icon: '📈' },
     { href: '/flagging', label: 'Flagging', icon: '🚩' },
     { href: '/processing', label: 'Processing', icon: '⚙️', separator: true },
+    { href: '/embedding-workbench', label: 'Embeddings', icon: '🧬' },
     { href: '/admin', label: 'Admin', icon: '🔐' }
   ];
   
