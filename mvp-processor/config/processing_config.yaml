@@ -30,8 +30,8 @@ face_detection:
 # Face Recognition with ChromaDB Integration
 face_recognition:
   similarity_threshold: 0.7  # Confidence threshold
-  tolerance: 0.6  # Lower = more strict matching
-  max_distance: 0.6  # Maximum face distance for recognition
+  tolerance: 0.4  # Cosine distance threshold for InsightFace (lower = stricter)
+  max_distance: 0.4  # Maximum face distance for recognition
   high_confidence_threshold: 0.85  # Early termination threshold (optimization)
   use_existing_embeddings: true
   embeddings_path: "../source/photo/contestants"

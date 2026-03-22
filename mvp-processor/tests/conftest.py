@@ -32,7 +32,14 @@ except Exception:
 try:
     from moto import mock_aws as mock_s3
 except ImportError:
-    from moto import mock_s3
+    try:
+        from moto import mock_s3
+    except ImportError:
+        from contextlib import contextmanager
+
+        @contextmanager
+        def mock_s3():
+            yield
 
 
 @pytest.fixture

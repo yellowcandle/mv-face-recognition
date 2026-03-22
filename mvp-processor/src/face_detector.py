@@ -1,9 +1,10 @@
 """
 Face Detection and Recognition Module
 Handles face detection, encoding, and recognition against contestant database
+Using InsightFace buffalo_l model for 512-dim ArcFace embeddings
 """
 
-import face_recognition
+import cv2
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -12,6 +13,21 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# Module-level singleton for InsightFace model
+_insightface_app = None
+
+
+def _get_insightface_app():
+    """Get or initialize the InsightFace FaceAnalysis singleton."""
+    global _insightface_app
+    if _insightface_app is None:
+        from insightface.app import FaceAnalysis
+        providers = ['CoreMLExecutionProvider', 'CPUExecutionProvider']
+        _insightface_app = FaceAnalysis(name='buffalo_l', providers=providers)
+        _insightface_app.prepare(ctx_id=0, det_size=(640, 640))
+        logger.info("InsightFace buffalo_l model initialized")
+    return _insightface_app
 
 
 @dataclass
@@ -84,6 +100,19 @@ class ContestantDatabase:
                     encoding = np.load(str(embedding_path))
                     # Ensure encoding is 1D (flatten if needed)
                     encoding = encoding.flatten()
+
+                    # Validate norm (skip zero-norm embeddings)
+                    if np.linalg.norm(encoding) == 0:
+                        logger.warning(f"Zero-norm embedding for {nickname}, skipping")
+                        continue
+
+                    # Validate dimension
+                    if encoding.shape[0] != 512:
+                        logger.warning(
+                            f"Unexpected embedding dimension {encoding.shape[0]} for {nickname}, expected 512. Skipping."
+                        )
+                        continue
+
                     self.face_encodings[contestant_id] = encoding
                     self.contestant_names.append(contestant_id)
                     logger.debug(f"Loaded embedding for contestant {contestant_id} ({nickname}), shape: {encoding.shape}")
@@ -91,17 +120,19 @@ class ContestantDatabase:
                 except Exception as e:
                     logger.warning(f"Failed to load embedding for {nickname}: {e}")
 
-            # Fall back to generating from photos in photos/contestant_{id}/
+            # Fall back to generating from photos in photos/contestant_{id}/ using InsightFace
             photos_subdir = contestants_dir / "photos" / f"contestant_{contestant_id}"
             if photos_subdir.exists():
                 encodings = []
                 for photo_path in photos_subdir.glob("*.jpg"):
                     try:
-                        image = face_recognition.load_image_file(str(photo_path))
-                        face_encs = face_recognition.face_encodings(image)
-                        if face_encs:
-                            encodings.append(face_encs[0])
-                            logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id}")
+                        app = _get_insightface_app()
+                        image = cv2.imread(str(photo_path))
+                        if image is not None:
+                            faces = app.get(image)
+                            if faces:
+                                encodings.append(faces[0].normed_embedding)
+                                logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id}")
                     except Exception as e:
                         logger.warning(f"Failed to encode {photo_path}: {e}")
 
@@ -120,11 +151,10 @@ class ContestantDatabase:
 
 
 class FaceDetector:
-    """Handles face detection in video frames using face_recognition"""
+    """Handles face detection in video frames using InsightFace"""
 
     def __init__(self, config: dict):
         self.config = config
-        self.model = config["face_detection"]["model"]
         self.min_confidence = config["face_detection"]["min_confidence"]
         self.min_face_size = config["face_detection"].get("min_face_size", 20)  # Minimum face size in pixels
         self.prev_frame_hash = None  # For frame difference detection
@@ -133,10 +163,10 @@ class FaceDetector:
         self, frame: np.ndarray, timestamp: float, frame_number: int
     ) -> List[FaceDetection]:
         """
-        Detect faces in a frame using face_recognition with size filtering
+        Detect faces in a frame using InsightFace with size filtering
 
         Args:
-            frame: RGB frame array
+            frame: BGR frame array (as read by cv2)
             timestamp: Frame timestamp in seconds
             frame_number: Frame number in video
 
@@ -144,36 +174,34 @@ class FaceDetector:
             List of FaceDetection objects
         """
         try:
-            face_locations = face_recognition.face_locations(frame, model=self.model)
+            app = _get_insightface_app()
+            faces = app.get(frame)
 
-            # Filter out faces that are too small (optimization)
-            filtered_locations = []
-            for (top, right, bottom, left) in face_locations:
-                face_width = right - left
-                face_height = bottom - top
-                if face_width >= self.min_face_size and face_height >= self.min_face_size:
-                    filtered_locations.append((top, right, bottom, left))
-                else:
+            if not faces:
+                return []
+
+            detections = []
+            for face in faces:
+                x1, y1, x2, y2 = face.bbox.astype(int)
+                face_width = x2 - x1
+                face_height = y2 - y1
+
+                # Filter out faces that are too small
+                if face_width < self.min_face_size or face_height < self.min_face_size:
                     logger.debug(
                         f"Skipped small face ({face_width}x{face_height}px) at frame {frame_number}"
                     )
+                    continue
 
-            if not filtered_locations:
-                return []
+                # Map InsightFace bbox [x1, y1, x2, y2] to (top, right, bottom, left)
+                top, right, bottom, left = y1, x2, y2, x1
 
-            # Generate encodings only for valid faces
-            face_encodings = face_recognition.face_encodings(frame, filtered_locations)
-
-            detections = []
-            for (top, right, bottom, left), encoding in zip(
-                filtered_locations, face_encodings
-            ):
                 detection = FaceDetection(
                     location=(top, right, bottom, left),
-                    encoding=encoding,
+                    encoding=face.normed_embedding,
                     timestamp=timestamp,
                     frame_number=frame_number,
-                    confidence=1.0,  # face_recognition doesn't provide confidence, assume 1.0
+                    confidence=float(face.det_score),
                 )
                 detections.append(detection)
 
@@ -227,7 +255,7 @@ class FaceRecognizer:
 
     def recognize_faces(self, detections: List[FaceDetection]) -> List[FaceRecognition]:
         """
-        Recognize detected faces against contestant database with optimizations
+        Recognize detected faces against contestant database using cosine distance
 
         Args:
             detections: List of FaceDetection objects
@@ -244,57 +272,30 @@ class FaceRecognizer:
         known_encodings = list(self.contestant_db.face_encodings.values())
         known_names = list(self.contestant_db.face_encodings.keys())
 
-        # Check if embedding dimensions match
-        detection_encoding_dim = detections[0].encoding.shape[0] if len(detections) > 0 else 0
-        known_encoding_dim = known_encodings[0].shape[0] if known_encodings else 0
-        dimensions_match = detection_encoding_dim == known_encoding_dim
-
-        # Use higher tolerance when dimensions don't match (cosine similarity on subset of features)
-        effective_tolerance = self.tolerance if dimensions_match else min(self.tolerance * 1.5, 0.9)
-
         for detection in detections:
             try:
-                # Handle dimension mismatch between stored embeddings and current face_recognition model
-                if not dimensions_match:
-                    # Compute distances manually using cosine similarity
-                    detection_norm = detection.encoding / np.linalg.norm(detection.encoding)
-                    
-                    best_match_idx = -1
-                    best_distance = float('inf')
-                    
-                    for idx, known_encoding in enumerate(known_encodings):
-                        # Flatten and normalize known encoding
-                        known_flat = known_encoding.flatten()
-                        known_norm = known_flat / np.linalg.norm(known_flat)
-                        
-                        # Use cosine distance (1 - cosine similarity)
-                        # Handle different lengths by using minimum common length
-                        min_len = min(len(detection_norm), len(known_norm))
-                        cosine_dist = 1 - np.sum(detection_norm[:min_len] * known_norm[:min_len])
-                        
-                        if cosine_dist < best_distance:
-                            best_distance = cosine_dist
-                            best_match_idx = idx
-                    
-                    min_distance = best_distance
-                    matched_index = best_match_idx
-                else:
-                    # Use built-in face_distance when dimensions match
-                    matches = face_recognition.face_distance(
-                        known_encodings, detection.encoding
-                    )
-                    min_distance = float(np.min(matches))
-                    matched_index = int(np.argmin(matches))
+                # Cosine distance: both detection.encoding and known_encoding
+                # are already L2-normalized from InsightFace normed_embedding
+                best_match_idx = -1
+                best_distance = float('inf')
 
-                # Early termination: if we have a very high confidence match, accept immediately
-                if min_distance < effective_tolerance:
+                for idx, known_encoding in enumerate(known_encodings):
+                    distance = 1 - np.dot(detection.encoding, known_encoding)
+                    if distance < best_distance:
+                        best_distance = distance
+                        best_match_idx = idx
+
+                min_distance = best_distance
+                matched_index = best_match_idx
+
+                if min_distance < self.tolerance:
                     contestant_id = known_names[matched_index]
                     contestant_info = self.contestant_db.get_contestant_info(
                         contestant_id
                     )
 
                     # Convert distance to confidence (lower distance = higher confidence)
-                    confidence = 1 - (min_distance / effective_tolerance)
+                    confidence = 1 - (min_distance / self.tolerance)
 
                     recognition = FaceRecognition(
                         detection=detection,
@@ -352,11 +353,10 @@ class FaceRecognizer:
             # Batch process all detections in this frame
             detection_encodings = np.array([d.encoding for d in frame_detections])
 
-            # Compute all distances at once using matrix operations
-            distances = np.linalg.norm(
-                detection_encodings[:, np.newaxis, :] - known_encodings[np.newaxis, :, :],
-                axis=2
-            )
+            # Cosine similarity matrix (all pairs at once)
+            # Both detection and known encodings are L2-normalized from InsightFace
+            similarities = detection_encodings @ known_encodings.T
+            distances = 1 - similarities
 
             # Find best match for each detection
             for det_idx, detection in enumerate(frame_detections):
@@ -421,17 +421,16 @@ def regenerate_embeddings_from_contestant_photos(
     expected_dim: int = 512,
 ) -> RegenerationResult:
     """
-    Regenerate face embeddings from contestant photos using current face_recognition library.
+    Regenerate face embeddings from contestant photos using InsightFace buffalo_l.
 
-    This function creates 512-dimensional embeddings (matching current face_recognition library)
-    from contestant photos. It handles dimension mismatch by regenerating rather than using
-    outdated embeddings.
+    This function creates 512-dimensional ArcFace embeddings from contestant photos,
+    matching the embeddings used during video processing for consistent recognition.
 
     Args:
         photo_base_dir: Base directory containing photos (expects photos/ subdirectory)
         embeddings_output_dir: Directory to save regenerated embeddings
         contestants_csv_path: Path to contestant_info.csv with contestant metadata
-        expected_dim: Expected embedding dimension (default: 512 for current face_recognition)
+        expected_dim: Expected embedding dimension (default: 512 for InsightFace ArcFace)
 
     Returns:
         RegenerationResult with count of successful/failed regenerations
@@ -510,15 +509,21 @@ def regenerate_embeddings_from_contestant_photos(
             })
             continue
 
-        # Encode all photos
+        # Encode all photos using InsightFace
         encodings = []
         for photo_path in photo_files:
             try:
-                image = face_recognition.load_image_file(str(photo_path))
-                face_encs = face_recognition.face_encodings(image)
-                if face_encs:
-                    encodings.append(face_encs[0])
-                    logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id} ({nickname})")
+                app = _get_insightface_app()
+                image = cv2.imread(str(photo_path))
+                if image is not None:
+                    faces = app.get(image)
+                    if faces:
+                        encodings.append(faces[0].normed_embedding)
+                        logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id} ({nickname})")
+                    else:
+                        logger.warning(f"No face detected in {photo_path}")
+                else:
+                    logger.warning(f"Failed to read image {photo_path}")
             except Exception as e:
                 logger.warning(f"Failed to encode {photo_path}: {e}")
                 failed_contestants.append({
@@ -586,4 +591,3 @@ def regenerate_embeddings_from_contestant_photos(
     logger.info(f"{'=' * 60}\n")
 
     return result
-
