@@ -15,6 +15,17 @@ from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
 from cloudflare_uploader import CloudflareUploader
+from src.supervision_annotator import (
+    insightface_to_sv_detections,
+    create_tracker,
+    create_annotator_pipeline,
+    annotate_frame,
+    build_contestant_id_map,
+    get_color_for_contestant,
+)
+import shutil
+import numpy as np
+import supervision as sv
 
 # Setup logging
 logging.basicConfig(
@@ -156,6 +167,12 @@ class VideoProcessingPipeline:
 
         unmatched_faces = []
 
+        # Initialize ByteTrack for persistent face tracking
+        tracker = create_tracker(frame_rate=self.config["video"]["fps_sample_rate"])
+        contestant_id_map = build_contestant_id_map(self.contestant_db.contestants_info)
+        screen_time = {}  # nickname → cumulative seconds
+        frame_interval = 1.0 / self.config["video"]["fps_sample_rate"]
+
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
         ):
@@ -198,6 +215,24 @@ class VideoProcessingPipeline:
                     }
                 )
 
+                # Run ByteTrack for persistent tracking
+                sv_detections = insightface_to_sv_detections(
+                    recognitions,
+                    [det for det in detections if id(det) not in matched_detections],
+                    contestant_id_map,
+                )
+                if len(sv_detections) > 0:
+                    tracked = tracker.update_with_detections(sv_detections)
+                    # Store tracker IDs in frame_data
+                    if frame_data:
+                        frame_data[-1]["tracker_ids"] = tracked.tracker_id.tolist() if tracked.tracker_id is not None else []
+
+                    # Accumulate screen time for recognized contestants
+                    labels = tracked.data.get("labels", [])
+                    for label in labels:
+                        if label != "Unknown":
+                            screen_time[label] = screen_time.get(label, 0) + frame_interval
+
         # Save unmatched face embeddings for clustering
         if unmatched_faces:
             self._save_unmatched_embeddings(unmatched_faces, output_name)
@@ -239,21 +274,103 @@ class VideoProcessingPipeline:
         # Convert video formats
         processed_videos = self.convert_video_formats(video_path, output_name)
 
-        # Generate annotated video with bounding boxes and labels
+        # Generate annotated video with Supervision
         annotated_video_path = None
         if not no_annotate and frame_data:
             output_dir = Path(self.config["output"]["processed_dir"])
             annotated_filename = f"{output_name}_annotated.mp4"
             annotated_output = output_dir / annotated_filename
 
-            annotated_config = self.config.get("annotated_video", {})
             try:
-                annotated_video_path = self.video_processor.create_annotated_video(
-                    str(video_path),
-                    str(annotated_output),
-                    frame_data,
-                    annotated_config,
+                annotators = create_annotator_pipeline()
+
+                # Build color map for timeline bar
+                color_map = {}
+                for nickname, cid in contestant_id_map.items():
+                    color_map[nickname] = get_color_for_contestant(cid)
+
+                # Re-read video and annotate each frame
+                cap = cv2.VideoCapture(str(video_path))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+                video_info_sv = sv.VideoInfo(
+                    width=width, height=height, fps=fps,
                 )
+
+                # Create a frame_number → frame_data lookup
+                frame_lookup = {fd["frame_number"]: fd for fd in frame_data}
+
+                with sv.VideoSink(str(annotated_output), video_info_sv) as sink:
+                    sample_rate = self.config["video"]["fps_sample_rate"]
+                    frame_idx = 0
+
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+
+                        # Check if this frame was processed (sampled)
+                        sampled_frame_num = int(frame_idx * sample_rate / fps) if fps > 0 else frame_idx
+                        fd = frame_lookup.get(sampled_frame_num)
+
+                        if fd and fd.get("recognitions"):
+                            # Reconstruct detections from stored frame_data
+                            xyxy_list = []
+                            labels = []
+                            confidences = []
+                            class_ids = []
+
+                            for r in fd["recognitions"]:
+                                top, right, bottom, left = r["face_location"]
+                                xyxy_list.append([left, top, right, bottom])
+                                labels.append(r["contestant_nickname"])
+                                confidences.append(r["confidence"])
+                                class_ids.append(contestant_id_map.get(r["contestant_nickname"], -1))
+
+                            detections = sv.Detections(
+                                xyxy=np.array(xyxy_list, dtype=np.float32),
+                                confidence=np.array(confidences, dtype=np.float32),
+                                class_id=np.array(class_ids, dtype=int),
+                                data={"labels": labels},
+                            )
+
+                            # Set tracker IDs if available
+                            tracker_ids = fd.get("tracker_ids", [])
+                            if tracker_ids and len(tracker_ids) == len(detections):
+                                detections.tracker_id = np.array(tracker_ids, dtype=int)
+                        else:
+                            detections = sv.Detections.empty()
+
+                        frame = annotate_frame(frame, detections, annotators, screen_time, color_map)
+                        sink.write_frame(frame)
+                        frame_idx += 1
+
+                cap.release()
+
+                # Merge audio from original video
+                if shutil.which("ffmpeg"):
+                    final_output = output_dir / f"{output_name}_annotated_audio.mp4"
+                    import subprocess
+                    result = subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", str(annotated_output),
+                        "-i", str(video_path),
+                        "-c", "copy",
+                        "-map", "0:v:0", "-map", "1:a:0",
+                        str(final_output),
+                    ], capture_output=True)
+                    if result.returncode == 0:
+                        annotated_output.unlink()  # Remove video-only version
+                        final_output.rename(annotated_output)  # Rename to expected name
+                        logger.info(f"Audio merged into annotated video")
+                    else:
+                        logger.warning(f"FFmpeg audio merge failed: {result.stderr.decode()[:200]}")
+                else:
+                    logger.warning("FFmpeg not found — annotated video has no audio")
+
+                annotated_video_path = str(annotated_output)
                 processed_videos.append(annotated_video_path)
                 logger.info(f"Annotated video created: {annotated_video_path}")
             except Exception as e:
