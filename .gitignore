@@ -243,3 +243,4 @@ mvp-processor/build/
 # Archive directories - no dependencies needed
 archive/**/node_modules/
 archive/**/package-lock.json
+youtube_cookies.txt

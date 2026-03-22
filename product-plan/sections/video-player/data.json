@@ -1,0 +1,162 @@
+{
+  "_meta": {
+    "models": {
+      "videos": "A processed video with face recognition metadata, ready for viewing. Contains information about duration, source, and serves as the container for all face detections.",
+      "contestants": "A person who can be identified in videos. Each contestant has a photo used for recognition and display in thumbnails.",
+      "faceDetections": "A detected face at a specific frame and timestamp within a video. Includes bounding box coordinates and which contestant was identified."
+    },
+    "relationships": [
+      "Each Video contains many FaceDetections (the recognized faces throughout playback)",
+      "Each FaceDetection belongs to one Video and identifies one Contestant",
+      "Contestants appear across multiple Videos via their FaceDetections"
+    ]
+  },
+  "videos": [
+    {
+      "id": "vid-001",
+      "title": "聲夢傳奇2 第15集",
+      "youtubeUrl": "https://youtube.com/watch?v=abc123",
+      "duration": 5420,
+      "thumbnailUrl": "/thumbnails/vid-001.jpg",
+      "processedAt": "2024-01-15T14:30:00Z",
+      "faceCount": 847
+    },
+    {
+      "id": "vid-002",
+      "title": "聲夢傳奇2 第14集",
+      "youtubeUrl": "https://youtube.com/watch?v=def456",
+      "duration": 5180,
+      "thumbnailUrl": "/thumbnails/vid-002.jpg",
+      "processedAt": "2024-01-08T10:15:00Z",
+      "faceCount": 723
+    },
+    {
+      "id": "vid-003",
+      "title": "聲夢傳奇2 第13集",
+      "youtubeUrl": "https://youtube.com/watch?v=ghi789",
+      "duration": 5340,
+      "thumbnailUrl": "/thumbnails/vid-003.jpg",
+      "processedAt": "2024-01-01T09:00:00Z",
+      "faceCount": 891
+    },
+    {
+      "id": "vid-004",
+      "title": "聲夢傳奇2 第12集",
+      "youtubeUrl": "https://youtube.com/watch?v=jkl012",
+      "duration": 5100,
+      "thumbnailUrl": "/thumbnails/vid-004.jpg",
+      "processedAt": "2023-12-25T16:45:00Z",
+      "faceCount": 654
+    },
+    {
+      "id": "vid-005",
+      "title": "聲夢傳奇2 第11集",
+      "youtubeUrl": "https://youtube.com/watch?v=mno345",
+      "duration": 5280,
+      "thumbnailUrl": "/thumbnails/vid-005.jpg",
+      "processedAt": "2023-12-18T11:20:00Z",
+      "faceCount": 812
+    }
+  ],
+  "contestants": [
+    {
+      "id": "con-001",
+      "chineseName": "蘇雅琳",
+      "nickname": "Ivy So",
+      "age": 20,
+      "photoUrl": "/photos/con-001.jpg"
+    },
+    {
+      "id": "con-002",
+      "chineseName": "黃雅慧",
+      "nickname": "咖喱",
+      "age": 27,
+      "photoUrl": "/photos/con-002.jpg"
+    },
+    {
+      "id": "con-003",
+      "chineseName": "邱彥筒",
+      "nickname": "Marf",
+      "age": 19,
+      "photoUrl": "/photos/con-003.jpg"
+    },
+    {
+      "id": "con-004",
+      "chineseName": "林君蓮",
+      "nickname": "Gigi",
+      "age": 22,
+      "photoUrl": "/photos/con-004.jpg"
+    },
+    {
+      "id": "con-005",
+      "chineseName": "陳凱詠",
+      "nickname": "Jace",
+      "age": 21,
+      "photoUrl": "/photos/con-005.jpg"
+    }
+  ],
+  "faceDetections": [
+    {
+      "id": "det-001",
+      "videoId": "vid-001",
+      "contestantId": "con-001",
+      "timestamp": 45.2,
+      "frameNumber": 1356,
+      "boundingBox": { "x": 320, "y": 180, "width": 120, "height": 150 },
+      "confidence": 0.94
+    },
+    {
+      "id": "det-002",
+      "videoId": "vid-001",
+      "contestantId": "con-003",
+      "timestamp": 45.2,
+      "frameNumber": 1356,
+      "boundingBox": { "x": 580, "y": 200, "width": 110, "height": 140 },
+      "confidence": 0.91
+    },
+    {
+      "id": "det-003",
+      "videoId": "vid-001",
+      "contestantId": "con-001",
+      "timestamp": 48.5,
+      "frameNumber": 1455,
+      "boundingBox": { "x": 340, "y": 175, "width": 125, "height": 155 },
+      "confidence": 0.96
+    },
+    {
+      "id": "det-004",
+      "videoId": "vid-001",
+      "contestantId": "con-002",
+      "timestamp": 120.8,
+      "frameNumber": 3624,
+      "boundingBox": { "x": 450, "y": 160, "width": 115, "height": 145 },
+      "confidence": 0.89
+    },
+    {
+      "id": "det-005",
+      "videoId": "vid-001",
+      "contestantId": "con-004",
+      "timestamp": 120.8,
+      "frameNumber": 3624,
+      "boundingBox": { "x": 200, "y": 190, "width": 100, "height": 130 },
+      "confidence": 0.87
+    },
+    {
+      "id": "det-006",
+      "videoId": "vid-001",
+      "contestantId": "con-005",
+      "timestamp": 245.3,
+      "frameNumber": 7359,
+      "boundingBox": { "x": 380, "y": 170, "width": 130, "height": 160 },
+      "confidence": 0.93
+    }
+  ],
+  "currentVideo": {
+    "id": "vid-001",
+    "currentTime": 45.2,
+    "playbackSpeed": 1,
+    "isPlaying": false
+  },
+  "visibleContestants": ["con-001", "con-003"],
+  "filterContestantId": null
+}

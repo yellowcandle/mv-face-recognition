@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans TC", system-ui, sans-serif;
+
+  --color-surface-primary: #0f172a;
+  --color-surface-secondary: #1e293b;
+  --color-accent: #ff8400;
+}

@@ -101,6 +101,13 @@ integration:
   scripts_dir: "../scripts"
   auto_deploy_worker: false  # Manual deployment step
 
+# Annotated Video Output (bounding boxes + labels)
+annotated_video:
+  label_font_scale: 0.6
+  box_color: [0, 255, 0]  # BGR green
+  box_thickness: 2
+  quality: "high"  # low, medium, high (bitrate)
+
 # Audio Preservation (FFmpeg Integration)
 audio:
   preserve_audio: true

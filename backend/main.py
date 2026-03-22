@@ -5,13 +5,21 @@ Separated from UI for Vue.js frontend integration.
 """
 
 import logging
+import uuid
+import re
+from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from typing import Dict, Optional
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import uvicorn
 
 from app.core.config import get_settings
+
+# In-memory job storage for local development
+ingestion_jobs: Dict[str, dict] = {}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +64,95 @@ app.include_router(videos.router, prefix="/api")
 app.include_router(health.router)
 
 
-# Basic system status endpoint
+class IngestionSubmitRequest(BaseModel):
+    url: str
+
+class WebhookPayload(BaseModel):
+    job_id: str
+    status: str
+    progress: Optional[int] = None
+    message: Optional[str] = None
+    faces_detected: Optional[int] = None
+    faces_recognized: Optional[int] = None
+    video_url: Optional[str] = None
+    metadata_url: Optional[str] = None
+    error: Optional[str] = None
+
+
+def validate_youtube_url(url: str) -> bool:
+    patterns = [
+        r'^https?://(www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'^https?://(www\.)?youtu\.be/[\w-]+',
+        r'^https?://(www\.)?youtube\.com/shorts/[\w-]+'
+    ]
+    return any(re.match(p, url) for p in patterns)
+
+
+@app.post("/api/ingestion/submit")
+async def submit_ingestion_job(request: IngestionSubmitRequest):
+    if not validate_youtube_url(request.url):
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    
+    job_id = f"job-{uuid.uuid4().hex[:12]}"
+    job = {
+        "id": job_id,
+        "url": request.url,
+        "status": "pending",
+        "progress": 0,
+        "message": "Job submitted, waiting for processing",
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    ingestion_jobs[job_id] = job
+    logger.info(f"Created ingestion job: {job_id} for URL: {request.url}")
+    return job
+
+
+@app.get("/api/ingestion/jobs")
+async def list_ingestion_jobs(status: Optional[str] = None):
+    jobs = list(ingestion_jobs.values())
+    if status:
+        jobs = [j for j in jobs if j.get("status") == status]
+    jobs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return jobs
+
+
+@app.get("/api/ingestion/jobs/{job_id}")
+async def get_ingestion_job(job_id: str):
+    job = ingestion_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@app.post("/api/ingestion/webhook")
+async def ingestion_webhook(payload: WebhookPayload):
+    job = ingestion_jobs.get(payload.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job["status"] = payload.status
+    job["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    
+    if payload.progress is not None:
+        job["progress"] = payload.progress
+    if payload.message:
+        job["message"] = payload.message
+    if payload.faces_detected is not None:
+        job["faces_detected"] = payload.faces_detected
+    if payload.faces_recognized is not None:
+        job["faces_recognized"] = payload.faces_recognized
+    if payload.video_url:
+        job["video_url"] = payload.video_url
+    if payload.metadata_url:
+        job["metadata_url"] = payload.metadata_url
+    if payload.error:
+        job["error"] = payload.error
+    
+    logger.info(f"Webhook update for job {payload.job_id}: status={payload.status}, progress={payload.progress}")
+    return {"success": True, "job": job}
+
+
 @app.get("/api/system/status/")
 async def get_system_status():
     """Get system status."""

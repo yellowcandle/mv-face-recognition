@@ -1,0 +1,203 @@
+{
+  "_meta": {
+    "models": {
+      "leaderboardEntries": "A row in the screen time leaderboard showing a contestant's total screen time, appearance count, and average time per video.",
+      "coAppearances": "A pair of contestants who appeared together on screen, ranked by their shared screen time.",
+      "trendDataPoints": "A data point showing a contestant's screen time for a specific video, used to plot trends over time."
+    },
+    "relationships": [
+      "LeaderboardEntries aggregate FaceDetection data per Contestant",
+      "CoAppearances track pairs of Contestants who appear in the same frames",
+      "TrendDataPoints link Contestants to Videos with their screen time for charting"
+    ]
+  },
+  "leaderboardEntries": [
+    {
+      "contestantId": "con-010",
+      "chineseName": "炎明熹",
+      "nickname": "Gigi Yim",
+      "photoUrl": "/photos/con-010.jpg",
+      "totalScreenTime": 7120,
+      "appearanceCount": 68,
+      "avgPerVideo": 1424
+    },
+    {
+      "contestantId": "con-005",
+      "chineseName": "陳凱詠",
+      "nickname": "Jace",
+      "photoUrl": "/photos/con-005.jpg",
+      "totalScreenTime": 6340,
+      "appearanceCount": 61,
+      "avgPerVideo": 1268
+    },
+    {
+      "contestantId": "con-007",
+      "chineseName": "姚焯菲",
+      "nickname": "Chantel",
+      "photoUrl": "/photos/con-007.jpg",
+      "totalScreenTime": 5890,
+      "appearanceCount": 58,
+      "avgPerVideo": 1178
+    },
+    {
+      "contestantId": "con-003",
+      "chineseName": "邱彥筒",
+      "nickname": "Marf",
+      "photoUrl": "/photos/con-003.jpg",
+      "totalScreenTime": 5210,
+      "appearanceCount": 52,
+      "avgPerVideo": 1042
+    },
+    {
+      "contestantId": "con-001",
+      "chineseName": "蘇雅琳",
+      "nickname": "Ivy So",
+      "photoUrl": "/photos/con-001.jpg",
+      "totalScreenTime": 4520,
+      "appearanceCount": 47,
+      "avgPerVideo": 904
+    },
+    {
+      "contestantId": "con-006",
+      "chineseName": "詹天文",
+      "nickname": "Windy",
+      "photoUrl": "/photos/con-006.jpg",
+      "totalScreenTime": 4180,
+      "appearanceCount": 43,
+      "avgPerVideo": 836
+    },
+    {
+      "contestantId": "con-002",
+      "chineseName": "黃雅慧",
+      "nickname": "咖喱",
+      "photoUrl": "/photos/con-002.jpg",
+      "totalScreenTime": 3890,
+      "appearanceCount": 38,
+      "avgPerVideo": 778
+    },
+    {
+      "contestantId": "con-008",
+      "chineseName": "鍾柔美",
+      "nickname": "Yumi",
+      "photoUrl": "/photos/con-008.jpg",
+      "totalScreenTime": 3450,
+      "appearanceCount": 35,
+      "avgPerVideo": 690
+    },
+    {
+      "contestantId": "con-004",
+      "chineseName": "林君蓮",
+      "nickname": "Gigi",
+      "photoUrl": "/photos/con-004.jpg",
+      "totalScreenTime": 2150,
+      "appearanceCount": 24,
+      "avgPerVideo": 430
+    },
+    {
+      "contestantId": "con-009",
+      "chineseName": "何晉樂",
+      "nickname": "Lokman",
+      "photoUrl": "/photos/con-009.jpg",
+      "totalScreenTime": 1820,
+      "appearanceCount": 19,
+      "avgPerVideo": 364
+    }
+  ],
+  "coAppearances": [
+    {
+      "contestant1Id": "con-010",
+      "contestant1Name": "炎明熹",
+      "contestant1Nickname": "Gigi Yim",
+      "contestant1Photo": "/photos/con-010.jpg",
+      "contestant2Id": "con-005",
+      "contestant2Name": "陳凱詠",
+      "contestant2Nickname": "Jace",
+      "contestant2Photo": "/photos/con-005.jpg",
+      "sharedScreenTime": 2450
+    },
+    {
+      "contestant1Id": "con-007",
+      "contestant1Name": "姚焯菲",
+      "contestant1Nickname": "Chantel",
+      "contestant1Photo": "/photos/con-007.jpg",
+      "contestant2Id": "con-003",
+      "contestant2Name": "邱彥筒",
+      "contestant2Nickname": "Marf",
+      "contestant2Photo": "/photos/con-003.jpg",
+      "sharedScreenTime": 2180
+    },
+    {
+      "contestant1Id": "con-001",
+      "contestant1Name": "蘇雅琳",
+      "contestant1Nickname": "Ivy So",
+      "contestant1Photo": "/photos/con-001.jpg",
+      "contestant2Id": "con-003",
+      "contestant2Name": "邱彥筒",
+      "contestant2Nickname": "Marf",
+      "contestant2Photo": "/photos/con-003.jpg",
+      "sharedScreenTime": 1920
+    },
+    {
+      "contestant1Id": "con-010",
+      "contestant1Name": "炎明熹",
+      "contestant1Nickname": "Gigi Yim",
+      "contestant1Photo": "/photos/con-010.jpg",
+      "contestant2Id": "con-007",
+      "contestant2Name": "姚焯菲",
+      "contestant2Nickname": "Chantel",
+      "contestant2Photo": "/photos/con-007.jpg",
+      "sharedScreenTime": 1780
+    },
+    {
+      "contestant1Id": "con-002",
+      "contestant1Name": "黃雅慧",
+      "contestant1Nickname": "咖喱",
+      "contestant1Photo": "/photos/con-002.jpg",
+      "contestant2Id": "con-006",
+      "contestant2Name": "詹天文",
+      "contestant2Nickname": "Windy",
+      "contestant2Photo": "/photos/con-006.jpg",
+      "sharedScreenTime": 1540
+    }
+  ],
+  "trendDataPoints": [
+    { "contestantId": "con-010", "videoId": "vid-005", "videoTitle": "第11集", "screenTime": 1280 },
+    { "contestantId": "con-010", "videoId": "vid-004", "videoTitle": "第12集", "screenTime": 1350 },
+    { "contestantId": "con-010", "videoId": "vid-003", "videoTitle": "第13集", "screenTime": 1420 },
+    { "contestantId": "con-010", "videoId": "vid-002", "videoTitle": "第14集", "screenTime": 1510 },
+    { "contestantId": "con-010", "videoId": "vid-001", "videoTitle": "第15集", "screenTime": 1560 },
+    { "contestantId": "con-005", "videoId": "vid-005", "videoTitle": "第11集", "screenTime": 1180 },
+    { "contestantId": "con-005", "videoId": "vid-004", "videoTitle": "第12集", "screenTime": 1220 },
+    { "contestantId": "con-005", "videoId": "vid-003", "videoTitle": "第13集", "screenTime": 1340 },
+    { "contestantId": "con-005", "videoId": "vid-002", "videoTitle": "第14集", "screenTime": 1250 },
+    { "contestantId": "con-005", "videoId": "vid-001", "videoTitle": "第15集", "screenTime": 1350 },
+    { "contestantId": "con-007", "videoId": "vid-005", "videoTitle": "第11集", "screenTime": 1050 },
+    { "contestantId": "con-007", "videoId": "vid-004", "videoTitle": "第12集", "screenTime": 1120 },
+    { "contestantId": "con-007", "videoId": "vid-003", "videoTitle": "第13集", "screenTime": 1280 },
+    { "contestantId": "con-007", "videoId": "vid-002", "videoTitle": "第14集", "screenTime": 1190 },
+    { "contestantId": "con-007", "videoId": "vid-001", "videoTitle": "第15集", "screenTime": 1250 }
+  ],
+  "videos": [
+    { "id": "vid-001", "title": "聲夢傳奇2 第15集" },
+    { "id": "vid-002", "title": "聲夢傳奇2 第14集" },
+    { "id": "vid-003", "title": "聲夢傳奇2 第13集" },
+    { "id": "vid-004", "title": "聲夢傳奇2 第12集" },
+    { "id": "vid-005", "title": "聲夢傳奇2 第11集" }
+  ],
+  "contestants": [
+    { "id": "con-001", "chineseName": "蘇雅琳", "nickname": "Ivy So" },
+    { "id": "con-002", "chineseName": "黃雅慧", "nickname": "咖喱" },
+    { "id": "con-003", "chineseName": "邱彥筒", "nickname": "Marf" },
+    { "id": "con-004", "chineseName": "林君蓮", "nickname": "Gigi" },
+    { "id": "con-005", "chineseName": "陳凱詠", "nickname": "Jace" },
+    { "id": "con-006", "chineseName": "詹天文", "nickname": "Windy" },
+    { "id": "con-007", "chineseName": "姚焯菲", "nickname": "Chantel" },
+    { "id": "con-008", "chineseName": "鍾柔美", "nickname": "Yumi" },
+    { "id": "con-009", "chineseName": "何晉樂", "nickname": "Lokman" },
+    { "id": "con-010", "chineseName": "炎明熹", "nickname": "Gigi Yim" }
+  ],
+  "filterVideoId": null,
+  "selectedContestantIds": ["con-010", "con-005"],
+  "sortColumn": "totalScreenTime",
+  "sortDirection": "desc"
+}

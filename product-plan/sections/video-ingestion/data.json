@@ -1,0 +1,145 @@
+{
+  "_meta": {
+    "models": {
+      "processingJobs": "A YouTube video submission queued for face detection processing. Tracks the source URL, processing status, progress, and produces a Video when successfully completed.",
+      "processedVideos": "Videos that have completed processing and are ready for viewing in the Video Player."
+    },
+    "relationships": [
+      "Each ProcessingJob produces one Video when completed successfully",
+      "ProcessedVideos are the result of successful ProcessingJobs"
+    ]
+  },
+  "processingJobs": [
+    {
+      "id": "job-001",
+      "youtubeUrl": "https://youtube.com/watch?v=xyz789",
+      "title": "聲夢傳奇2 第16集",
+      "status": "processing",
+      "progress": 67,
+      "submittedAt": "2024-01-22T09:30:00Z",
+      "startedAt": "2024-01-22T09:31:15Z",
+      "completedAt": null,
+      "errorMessage": null
+    },
+    {
+      "id": "job-002",
+      "youtubeUrl": "https://youtube.com/watch?v=uvw456",
+      "title": "聲夢傳奇2 第17集",
+      "status": "pending",
+      "progress": 0,
+      "submittedAt": "2024-01-22T10:15:00Z",
+      "startedAt": null,
+      "completedAt": null,
+      "errorMessage": null
+    },
+    {
+      "id": "job-003",
+      "youtubeUrl": "https://youtube.com/watch?v=rst123",
+      "title": "聲夢傳奇2 花絮特輯",
+      "status": "failed",
+      "progress": 23,
+      "submittedAt": "2024-01-21T14:00:00Z",
+      "startedAt": "2024-01-21T14:01:30Z",
+      "completedAt": "2024-01-21T14:15:45Z",
+      "errorMessage": "Video unavailable: This video has been removed by the uploader"
+    },
+    {
+      "id": "job-004",
+      "youtubeUrl": "https://youtube.com/watch?v=abc123",
+      "title": "聲夢傳奇2 第15集",
+      "status": "completed",
+      "progress": 100,
+      "submittedAt": "2024-01-15T13:00:00Z",
+      "startedAt": "2024-01-15T13:02:00Z",
+      "completedAt": "2024-01-15T14:30:00Z",
+      "errorMessage": null
+    },
+    {
+      "id": "job-005",
+      "youtubeUrl": "https://youtube.com/watch?v=def456",
+      "title": "聲夢傳奇2 第14集",
+      "status": "completed",
+      "progress": 100,
+      "submittedAt": "2024-01-08T08:45:00Z",
+      "startedAt": "2024-01-08T08:46:30Z",
+      "completedAt": "2024-01-08T10:15:00Z",
+      "errorMessage": null
+    }
+  ],
+  "processedVideos": [
+    {
+      "id": "vid-001",
+      "title": "聲夢傳奇2 第15集",
+      "youtubeUrl": "https://youtube.com/watch?v=abc123",
+      "duration": 5420,
+      "thumbnailUrl": "/thumbnails/vid-001.jpg",
+      "processedAt": "2024-01-15T14:30:00Z",
+      "faceCount": 847
+    },
+    {
+      "id": "vid-002",
+      "title": "聲夢傳奇2 第14集",
+      "youtubeUrl": "https://youtube.com/watch?v=def456",
+      "duration": 5180,
+      "thumbnailUrl": "/thumbnails/vid-002.jpg",
+      "processedAt": "2024-01-08T10:15:00Z",
+      "faceCount": 723
+    },
+    {
+      "id": "vid-003",
+      "title": "聲夢傳奇2 第13集",
+      "youtubeUrl": "https://youtube.com/watch?v=ghi789",
+      "duration": 5340,
+      "thumbnailUrl": "/thumbnails/vid-003.jpg",
+      "processedAt": "2024-01-01T09:00:00Z",
+      "faceCount": 891
+    },
+    {
+      "id": "vid-004",
+      "title": "聲夢傳奇2 第12集",
+      "youtubeUrl": "https://youtube.com/watch?v=jkl012",
+      "duration": 5100,
+      "thumbnailUrl": "/thumbnails/vid-004.jpg",
+      "processedAt": "2023-12-25T16:45:00Z",
+      "faceCount": 654
+    },
+    {
+      "id": "vid-005",
+      "title": "聲夢傳奇2 第11集",
+      "youtubeUrl": "https://youtube.com/watch?v=mno345",
+      "duration": 5280,
+      "thumbnailUrl": "/thumbnails/vid-005.jpg",
+      "processedAt": "2023-12-18T11:20:00Z",
+      "faceCount": 812
+    }
+  ],
+  "processingLogs": [
+    {
+      "jobId": "job-003",
+      "timestamp": "2024-01-21T14:01:30Z",
+      "level": "info",
+      "message": "Starting video download from YouTube..."
+    },
+    {
+      "jobId": "job-003",
+      "timestamp": "2024-01-21T14:05:45Z",
+      "level": "info",
+      "message": "Download complete. Beginning frame extraction..."
+    },
+    {
+      "jobId": "job-003",
+      "timestamp": "2024-01-21T14:10:20Z",
+      "level": "warning",
+      "message": "Low quality frames detected, adjusting detection threshold..."
+    },
+    {
+      "jobId": "job-003",
+      "timestamp": "2024-01-21T14:15:45Z",
+      "level": "error",
+      "message": "Video unavailable: This video has been removed by the uploader"
+    }
+  ],
+  "urlInput": "",
+  "selectedJobId": null,
+  "showLogsModal": false
+}

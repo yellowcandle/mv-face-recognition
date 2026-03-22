@@ -1,0 +1,172 @@
+{
+  "_meta": {
+    "models": {
+      "contestants": "A person who can be identified in videos. Each contestant has a photo, Chinese name, nickname, and age. The system tracks their total screen time and appearance count.",
+      "appearances": "A record of when a contestant appeared in a specific video, including the timestamp and duration of their appearance."
+    },
+    "relationships": [
+      "Each Contestant has many Appearances across different Videos",
+      "Each Appearance links a Contestant to a specific Video at a specific timestamp"
+    ]
+  },
+  "contestants": [
+    {
+      "id": "con-001",
+      "chineseName": "蘇雅琳",
+      "nickname": "Ivy So",
+      "age": 20,
+      "photoUrl": "/photos/con-001.jpg",
+      "totalScreenTime": 4520,
+      "appearanceCount": 47
+    },
+    {
+      "id": "con-002",
+      "chineseName": "黃雅慧",
+      "nickname": "咖喱",
+      "age": 27,
+      "photoUrl": "/photos/con-002.jpg",
+      "totalScreenTime": 3890,
+      "appearanceCount": 38
+    },
+    {
+      "id": "con-003",
+      "chineseName": "邱彥筒",
+      "nickname": "Marf",
+      "age": 19,
+      "photoUrl": "/photos/con-003.jpg",
+      "totalScreenTime": 5210,
+      "appearanceCount": 52
+    },
+    {
+      "id": "con-004",
+      "chineseName": "林君蓮",
+      "nickname": "Gigi",
+      "age": 22,
+      "photoUrl": "/photos/con-004.jpg",
+      "totalScreenTime": 2150,
+      "appearanceCount": 24
+    },
+    {
+      "id": "con-005",
+      "chineseName": "陳凱詠",
+      "nickname": "Jace",
+      "age": 21,
+      "photoUrl": "/photos/con-005.jpg",
+      "totalScreenTime": 6340,
+      "appearanceCount": 61
+    },
+    {
+      "id": "con-006",
+      "chineseName": "詹天文",
+      "nickname": "Windy",
+      "age": 23,
+      "photoUrl": "/photos/con-006.jpg",
+      "totalScreenTime": 4180,
+      "appearanceCount": 43
+    },
+    {
+      "id": "con-007",
+      "chineseName": "姚焯菲",
+      "nickname": "Chantel",
+      "age": 18,
+      "photoUrl": "/photos/con-007.jpg",
+      "totalScreenTime": 5890,
+      "appearanceCount": 58
+    },
+    {
+      "id": "con-008",
+      "chineseName": "鍾柔美",
+      "nickname": "Yumi",
+      "age": 17,
+      "photoUrl": "/photos/con-008.jpg",
+      "totalScreenTime": 3450,
+      "appearanceCount": 35
+    },
+    {
+      "id": "con-009",
+      "chineseName": "何晉樂",
+      "nickname": "Lokman",
+      "age": 24,
+      "photoUrl": "/photos/con-009.jpg",
+      "totalScreenTime": 1820,
+      "appearanceCount": 19
+    },
+    {
+      "id": "con-010",
+      "chineseName": "炎明熹",
+      "nickname": "Gigi Yim",
+      "age": 16,
+      "photoUrl": "/photos/con-010.jpg",
+      "totalScreenTime": 7120,
+      "appearanceCount": 68
+    }
+  ],
+  "appearances": [
+    {
+      "id": "app-001",
+      "contestantId": "con-001",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 45.2,
+      "duration": 180
+    },
+    {
+      "id": "app-002",
+      "contestantId": "con-001",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 1240.5,
+      "duration": 95
+    },
+    {
+      "id": "app-003",
+      "contestantId": "con-001",
+      "videoId": "vid-002",
+      "videoTitle": "聲夢傳奇2 第14集",
+      "timestamp": 320.8,
+      "duration": 210
+    },
+    {
+      "id": "app-004",
+      "contestantId": "con-001",
+      "videoId": "vid-003",
+      "videoTitle": "聲夢傳奇2 第13集",
+      "timestamp": 890.2,
+      "duration": 145
+    },
+    {
+      "id": "app-005",
+      "contestantId": "con-003",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 45.2,
+      "duration": 180
+    },
+    {
+      "id": "app-006",
+      "contestantId": "con-003",
+      "videoId": "vid-002",
+      "videoTitle": "聲夢傳奇2 第14集",
+      "timestamp": 1580.0,
+      "duration": 240
+    },
+    {
+      "id": "app-007",
+      "contestantId": "con-005",
+      "videoId": "vid-001",
+      "videoTitle": "聲夢傳奇2 第15集",
+      "timestamp": 2100.5,
+      "duration": 320
+    },
+    {
+      "id": "app-008",
+      "contestantId": "con-005",
+      "videoId": "vid-003",
+      "videoTitle": "聲夢傳奇2 第13集",
+      "timestamp": 450.0,
+      "duration": 280
+    }
+  ],
+  "searchQuery": "",
+  "selectedContestantId": null
+}
