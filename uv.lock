@@ -1311,11 +1311,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/fb/5307bd3612eb0f0e62c3a916ae531d3a31e58fb5c82b58e3ebf7fd6f47a1/huggingface_hub-0.33.1-py3-none-any.whl", hash = "sha256:ec8d7444628210c0ba27e968e3c4c973032d44dcea59ca0d78ef3f612196f095", size = 515377, upload-time = "2025-06-25T12:02:55.611Z" },
 ]
 
-[package.optional-dependencies]
-hf-xet = [
-    { name = "hf-xet" },
-]
-
 [[package]]
 name = "humanfriendly"
 version = "10.0"
@@ -1978,7 +1973,6 @@ dependencies = [
     { name = "ffmpeg-python" },
     { name = "filelock" },
     { name = "fonttools" },
-    { name = "huggingface-hub", extra = ["hf-xet"] },
     { name = "insightface" },
     { name = "modal" },
     { name = "nicegui" },
@@ -2031,14 +2025,8 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "ffmpeg-python", specifier = ">=0.2.0" },
-<<<<<<< HEAD
-    { name = "filelock", specifier = ">=3.20.1" },
-    { name = "fonttools", specifier = ">=4.60.2" },
-    { name = "huggingface-hub", extras = ["hf-xet"], specifier = ">=0.33.1" },
-=======
     { name = "filelock", specifier = ">=3.18.0" },
     { name = "fonttools", specifier = ">=4.61.1" },
->>>>>>> f80adbc28cec12f45403dfaada8899ef1f0da66d
     { name = "insightface", specifier = ">=0.7.3" },
     { name = "modal", specifier = ">=0.64.0" },
     { name = "nicegui", specifier = ">=3.5.0" },

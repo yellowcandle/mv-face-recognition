@@ -9,8 +9,8 @@ function logger(prefix = 'update-worker-assets') {
   return {
     info: (msg, data) => console.log(`[INFO] ${msg}`, data ? JSON.stringify(data) : ''),
     debug: (msg, data) => console.log(`[DEBUG] ${msg}`, data ? JSON.stringify(data) : ''),
-    warn: (msg, data) => warn(`[WARN] ${msg}`, data ? JSON.stringify(data) : ''),
-    error: (msg, data) => error(`[ERROR] ${msg}`, data ? JSON.stringify(data) : ''),
+    warn: (msg, data) => console.warn(`[WARN] ${msg}`, data ? JSON.stringify(data) : ''),
+    error: (msg, data) => console.error(`[ERROR] ${msg}`, data ? JSON.stringify(data) : ''),
   };
 }
 
@@ -33,9 +33,9 @@ function readDirectoryRecursively(dir, baseDir = '') {
       try {
         const content = fs.readFileSync(itemPath, 'utf8');
         assets[relativePath] = content;
-        debug(`Added asset file`, { file: relativePath });
+        logger.debug(`Added asset file`, { file: relativePath });
       } catch (err) {
-        warn(`Could not read asset file as text`, { file: relativePath, error: err.message });
+        logger.warn(`Could not read asset file as text`, { file: relativePath, error: err.message });
       }
     }
   }
@@ -44,17 +44,14 @@ function readDirectoryRecursively(dir, baseDir = '') {
 }
 
 function main() {
-  info('Updating worker embedded assets');
+  logger.info('Updating worker embedded assets');
 
-  // Prefer React viewer build, fall back to legacy SvelteKit build
-  const viewerBuildDir = path.join(__dirname, '../apps/viewer/dist');
-  const legacyBuildDir = path.join(__dirname, '../mvp-processor/build');
-  const buildDir = fs.existsSync(viewerBuildDir) ? viewerBuildDir : legacyBuildDir;
+  const buildDir = path.join(__dirname, '../mvp-processor/build');
   const workerDir = path.join(__dirname, '../worker');
   const embeddedAssetsFile = path.join(workerDir, 'embedded-assets.js');
 
   if (!fs.existsSync(buildDir)) {
-    error('Frontend build directory not found', { buildDir });
+    logger.error('Frontend build directory not found', { buildDir });
     process.exit(1);
   }
 
@@ -63,14 +60,14 @@ function main() {
   // Skip favicon if present
   delete assets['favicon.ico'];
 
-  info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
+  logger.info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
 
   // Generate embedded-assets.js
   const embeddedAssetsContent = `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};`;
   
   fs.writeFileSync(embeddedAssetsFile, embeddedAssetsContent, 'utf8');
 
-  info('Embedded assets updated successfully', {
+  logger.info('Embedded assets updated successfully', {
     assetCount: Object.keys(assets).length,
     outputFile: embeddedAssetsFile
   });
