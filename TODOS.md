@@ -16,3 +16,9 @@
 - **Options:** (a) Use contestant_id-based fixed colors via class_id. (b) Use a perceptually-distinct palette of 20 colors and accept collisions. (c) Use contestant's theme color if one exists.
 - **Depends on:** Supervision integration landing first
 - **Added:** 2026-03-23 via /plan-eng-review
+
+### ~~Fix timeline bar "TOP" error~~ FIXED
+- **Fixed:** 2026-03-23 — Two issues: (1) CJK text rendered via cv2.putText which can't display Chinese → switched to PIL+PingFang. (2) screen_time accumulated from ByteTrack tracked labels which drops custom data → accumulate from original sv_detections labels instead.
+
+### ~~Fix bbox displaying early (ahead of face position)~~ FIXED
+- **Fixed:** 2026-03-23 — Changed from nearest-timestamp matching (bisect_left + neighbor comparison) to floor-only matching (bisect_right, pick idx-1). Bboxes now only appear after the detection, never before.
