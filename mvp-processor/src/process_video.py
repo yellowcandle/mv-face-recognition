@@ -15,7 +15,7 @@ from video_processor import VideoProcessor, FrameProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
 from cloudflare_uploader import CloudflareUploader
-from src.supervision_annotator import (
+from supervision_annotator import (
     insightface_to_sv_detections,
     create_tracker,
     create_annotator_pipeline,
@@ -24,6 +24,7 @@ from src.supervision_annotator import (
     get_color_for_contestant,
 )
 import shutil
+import cv2
 import numpy as np
 import supervision as sv
 
@@ -227,9 +228,9 @@ class VideoProcessingPipeline:
                     if frame_data:
                         frame_data[-1]["tracker_ids"] = tracked.tracker_id.tolist() if tracked.tracker_id is not None else []
 
-                    # Accumulate screen time for recognized contestants
-                    labels = tracked.data.get("labels", [])
-                    for label in labels:
+                    # Accumulate screen time from original detections (not tracked — ByteTrack may drop custom data)
+                    orig_labels = sv_detections.data.get("labels", [])
+                    for label in orig_labels:
                         if label != "Unknown":
                             screen_time[label] = screen_time.get(label, 0) + frame_interval
 
@@ -239,7 +240,7 @@ class VideoProcessingPipeline:
 
         # Filter low-confidence recognitions
         filtered_recognitions = self.face_recognizer.filter_recognitions(
-            all_recognitions, min_confidence=0.5
+            all_recognitions, min_confidence=0.15
         )
 
         logger.info(
@@ -292,18 +293,23 @@ class VideoProcessingPipeline:
                 # Re-read video and annotate each frame
                 cap = cv2.VideoCapture(str(video_path))
                 fps = cap.get(cv2.CAP_PROP_FPS)
-                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+                # Detection was done on resized frames — compute scale factor
+                detect_width = self.config["video"]["resize_width"]
+                bbox_scale = orig_width / detect_width if detect_width < orig_width else 1.0
 
                 video_info_sv = sv.VideoInfo(
-                    width=width, height=height, fps=fps,
+                    width=orig_width, height=orig_height, fps=fps,
                 )
 
-                # Create a frame_number → frame_data lookup
-                frame_lookup = {fd["frame_number"]: fd for fd in frame_data}
+                # Build timestamp → frame_data lookup for nearest-match
+                # Each sampled frame has a timestamp; we match video frames to the closest one
+                sorted_fd = sorted(frame_data, key=lambda fd: fd["timestamp"])
+                fd_timestamps = [fd["timestamp"] for fd in sorted_fd]
 
                 with sv.VideoSink(str(annotated_output), video_info_sv) as sink:
-                    sample_rate = self.config["video"]["fps_sample_rate"]
                     frame_idx = 0
 
                     while True:
@@ -311,9 +317,17 @@ class VideoProcessingPipeline:
                         if not ret:
                             break
 
-                        # Check if this frame was processed (sampled)
-                        sampled_frame_num = int(frame_idx * sample_rate / fps) if fps > 0 else frame_idx
-                        fd = frame_lookup.get(sampled_frame_num)
+                        # Map video frame to most recent past detection (floor, not nearest)
+                        # This prevents bboxes appearing before the face arrives
+                        video_ts = frame_idx / fps if fps > 0 else 0
+                        import bisect
+                        idx = bisect.bisect_right(fd_timestamps, video_ts)
+                        # bisect_right gives insertion point after matching timestamps
+                        # so idx-1 is the most recent detection at or before video_ts
+                        if idx == 0:
+                            fd = None  # no detection yet at this point in the video
+                        else:
+                            fd = sorted_fd[idx - 1]
 
                         if fd and fd.get("recognitions"):
                             # Reconstruct detections from stored frame_data
@@ -324,7 +338,8 @@ class VideoProcessingPipeline:
 
                             for r in fd["recognitions"]:
                                 top, right, bottom, left = r["face_location"]
-                                xyxy_list.append([left, top, right, bottom])
+                                # Scale bbox from detection resolution to original video resolution
+                                xyxy_list.append([left * bbox_scale, top * bbox_scale, right * bbox_scale, bottom * bbox_scale])
                                 labels.append(r["contestant_nickname"])
                                 confidences.append(r["confidence"])
                                 class_ids.append(contestant_id_map.get(r["contestant_nickname"], -1))

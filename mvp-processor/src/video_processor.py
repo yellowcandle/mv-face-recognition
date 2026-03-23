@@ -10,7 +10,7 @@ from typing import Tuple, Generator, List
 
 import logging
 
-from src.exceptions import (
+from exceptions import (
     VideoProcessingError,
     VideoNotFoundError,
     CorruptedVideoError,

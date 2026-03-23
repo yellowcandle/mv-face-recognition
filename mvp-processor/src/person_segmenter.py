@@ -4,7 +4,7 @@ from typing import List, Optional
 from pathlib import Path
 import logging
 
-from src.roi import ROI
+from roi import ROI
 
 logger = logging.getLogger(__name__)
 

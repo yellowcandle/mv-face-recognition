@@ -10,13 +10,47 @@ Replaces the legacy cv2.rectangle/putText annotation with:
 """
 
 import logging
+import os
 import numpy as np
 import cv2
+from PIL import Image, ImageDraw, ImageFont
 from typing import List, Dict, Optional, Tuple
 
 import supervision as sv
 
 logger = logging.getLogger(__name__)
+
+# --- CJK Font Support ---
+_cjk_font_cache = {}
+
+def _get_cjk_font(size: int) -> ImageFont.FreeTypeFont:
+    """Get a CJK-compatible font, cached by size."""
+    if size in _cjk_font_cache:
+        return _cjk_font_cache[size]
+    # Try macOS, then Linux, then fallback
+    font_paths = [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    ]
+    for fp in font_paths:
+        if os.path.exists(fp):
+            font = ImageFont.truetype(fp, size=size)
+            _cjk_font_cache[size] = font
+            return font
+    font = ImageFont.load_default()
+    _cjk_font_cache[size] = font
+    return font
+
+
+def _put_cjk_text(frame, text, position, font_size=24, color=(255, 255, 255)):
+    """Draw CJK-compatible text on a BGR frame using PIL."""
+    img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+    font = _get_cjk_font(font_size)
+    draw.text(position, text, font=font, fill=color)
+    return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
 
 def insightface_to_sv_detections(recognitions, unmatched, contestant_id_map):
@@ -107,31 +141,31 @@ def draw_timeline_bar(frame, active_contestants, screen_time, color_map):
     cv2.rectangle(overlay, (0, bar_top), (w, h), (20, 20, 20), -1)
     frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
+    # Use PIL for CJK-compatible text rendering
+    img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+    font = _get_cjk_font(28)
+    font_small = _get_cjk_font(22)
+
     # Draw active contestant names with their colors
     x_offset = 10
     for name in active_contestants:
-        color = color_map.get(name, (128, 128, 128))
-        cv2.putText(
-            frame, name, (x_offset, bar_top + 25),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1,
-        )
-        text_width = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0][0]
-        x_offset += text_width + 20
+        bgr_color = color_map.get(name, (128, 128, 128))
+        rgb_color = (bgr_color[2], bgr_color[1], bgr_color[0])
+        draw.text((x_offset, bar_top + 8), name, font=font, fill=rgb_color)
+        bbox = font.getbbox(name)
+        text_width = bbox[2] - bbox[0] if bbox else len(name) * 20
+        x_offset += text_width + 25
 
     # Show screen time summary
     if screen_time:
         top_name = max(screen_time, key=screen_time.get)
         top_time = screen_time[top_name]
         mins, secs = divmod(int(top_time), 60)
-        summary = (
-            f"On screen: {len(active_contestants)} | "
-            f"Top: {top_name} {mins}:{secs:02d}"
-        )
-        cv2.putText(
-            frame, summary, (10, bar_top + 50),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1,
-        )
+        summary = f"On screen: {len(active_contestants)} | Top: {top_name} {mins}:{secs:02d}"
+        draw.text((10, bar_top + 38), summary, font=font_small, fill=(180, 180, 180))
 
+    frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
     return frame
 
 
@@ -157,9 +191,24 @@ def annotate_frame(frame, detections, annotators, screen_time=None, color_map=No
     labels = detections.data.get("labels", [])
 
     frame = annotators["box"].annotate(scene=frame, detections=detections)
-    frame = annotators["label"].annotate(
-        scene=frame, detections=detections, labels=labels
-    )
+
+    # Draw labels with PIL for CJK support (Supervision's LabelAnnotator can't render CJK)
+    if labels:
+        img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+        font = _get_cjk_font(28)
+        for i, label in enumerate(labels):
+            if i >= len(detections.xyxy):
+                break
+            x1, y1, x2, y2 = detections.xyxy[i].astype(int)
+            conf = detections.confidence[i] if detections.confidence is not None else 0
+            text = f"{label} ({conf:.2f})"
+            bbox = font.getbbox(text)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            # Draw label background
+            draw.rectangle([x1, y1 - th - 8, x1 + tw + 8, y1], fill=(0, 0, 0, 180))
+            draw.text((x1 + 4, y1 - th - 6), text, font=font, fill=(255, 255, 255))
+        frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
     # TraceAnnotator requires tracker_id — skip if not available
     if detections.tracker_id is not None:
         frame = annotators["trace"].annotate(scene=frame, detections=detections)
