@@ -195,6 +195,51 @@ async def clear_completed():
 
 # ─── Data endpoints (for Embedding Workbench) ───
 
+@app.get("/api/videos/metadata/dense/{video_id}")
+async def get_dense_metadata(video_id: str):
+    """Return full dense metadata JSON for a processed video."""
+    import json
+    metadata_dir = Path("../local_output/metadata")
+    # Try exact match, then with _metadata suffix
+    for pattern in [f"{video_id}_metadata.json", f"{video_id}.json"]:
+        meta_path = metadata_dir / pattern
+        if meta_path.exists():
+            with open(meta_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    raise HTTPException(status_code=404, detail=f"Metadata not found for {video_id}")
+
+
+@app.get("/api/faces/detect")
+async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
+    """Return faces at a given timestamp from pre-computed metadata."""
+    import json
+    metadata_dir = Path("../local_output/metadata")
+    meta_path = metadata_dir / f"{video_id}_metadata.json"
+    if not meta_path.exists():
+        return {"faces": []}
+    with open(meta_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    # Find nearest frame
+    frame_data = data.get("frame_data", [])
+    if not frame_data:
+        return {"faces": []}
+    nearest = min(frame_data, key=lambda fd: abs(fd["timestamp"] - timestamp))
+    faces = []
+    for r in nearest.get("recognitions", []):
+        top, right, bottom, left = r["face_location"]
+        faces.append({
+            "bbox": [left, top, right, bottom],
+            "confidence": r["confidence"],
+            "contestant_name": r["contestant_nickname"],
+            "contestant_id": r.get("contestant_id"),
+            "contestant_nickname": r["contestant_nickname"],
+            "detection_confidence": r["confidence"],
+            "recognition_confidence": r["confidence"],
+            "matched": True,
+        })
+    return {"faces": faces}
+
+
 @app.get("/api/faces/flagged")
 async def get_flagged_faces(details: bool = False):
     """Return flagged faces (stub — returns empty for now)."""
