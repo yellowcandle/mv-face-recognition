@@ -9,6 +9,8 @@ import { PlayerControls } from './PlayerControls';
 import { DetectionBar } from './DetectionBar';
 import { FlagDialog } from './FlagDialog';
 import { getVideoRenderRect } from './useAnnotations';
+import { useViewerMetadata } from '../../hooks/useViewerMetadata';
+import { ContestantTimeline } from './ContestantTimeline';
 
 interface PlayerProps {
   mode: 'admin' | 'viewer';
@@ -64,6 +66,11 @@ export function Player({ mode, apiBase }: PlayerProps) {
   const [contestantAppearances, setContestantAppearances] = useState<
     { timestamp: number; duration: number }[]
   >([]);
+
+  // Viewer mode: load metadata locally instead of polling API
+  // Hook is always called (React rules) but videoId is null when not in viewer mode
+  const viewerVideoId = mode === 'viewer' && selectedVideo ? selectedVideo.id : null;
+  const viewerMeta = useViewerMetadata(apiBase, viewerVideoId);
 
   // Auto-select first video
   useEffect(() => {
@@ -455,8 +462,11 @@ export function Player({ mode, apiBase }: PlayerProps) {
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
-    startPolling();
-  }, [startPolling]);
+    // Only poll API in admin mode
+    if (mode === 'admin') {
+      startPolling();
+    }
+  }, [mode, startPolling]);
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
@@ -467,6 +477,13 @@ export function Player({ mode, apiBase }: PlayerProps) {
     setIsPlaying(false);
     stopPolling();
   }, [stopPolling]);
+
+  // Viewer mode: get faces from pre-loaded metadata
+  useEffect(() => {
+    if (mode !== 'viewer' || !viewerMeta.metadata) return;
+    const faces = viewerMeta.getFacesAtTime(currentTime);
+    setDetectedFaces(faces);
+  }, [mode, currentTime, viewerMeta]);
 
   // --- Render ---
 
@@ -601,6 +618,22 @@ export function Player({ mode, apiBase }: PlayerProps) {
             onToggleSource={handleToggleSource}
             onToggleAnnotations={handleToggleAnnotations}
           />
+
+          {/* Contestant Timeline (viewer mode) */}
+          {mode === 'viewer' && viewerMeta.metadata?.contestant_timeline && (
+            <ContestantTimeline
+              contestantTimeline={viewerMeta.metadata.contestant_timeline}
+              duration={duration}
+              currentTime={currentTime}
+              onSeek={(t) => {
+                const video = getVideoEl();
+                if (video) {
+                  video.currentTime = t;
+                  setCurrentTime(t);
+                }
+              }}
+            />
+          )}
 
           {/* Batch controls */}
           <div className="flex items-center gap-2">
