@@ -9,24 +9,32 @@ import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import logging
+import threading
 from dataclasses import dataclass, field
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Module-level singleton for InsightFace model
+# Module-level singleton for InsightFace model.
+# Init is locked because `local_api.py` runs the pipeline via asyncio.to_thread,
+# which can race two threads through the `is None` check on first request.
 _insightface_app = None
+_insightface_lock = threading.Lock()
 
 
 def _get_insightface_app():
     """Get or initialize the InsightFace FaceAnalysis singleton."""
     global _insightface_app
-    if _insightface_app is None:
-        from insightface.app import FaceAnalysis
-        providers = ['CoreMLExecutionProvider', 'CPUExecutionProvider']
-        _insightface_app = FaceAnalysis(name='buffalo_l', providers=providers)
-        _insightface_app.prepare(ctx_id=0, det_size=(640, 640))
-        logger.info("InsightFace buffalo_l model initialized")
+    if _insightface_app is not None:
+        return _insightface_app
+    with _insightface_lock:
+        if _insightface_app is None:
+            from insightface.app import FaceAnalysis
+            providers = ['CoreMLExecutionProvider', 'CPUExecutionProvider']
+            app = FaceAnalysis(name='buffalo_l', providers=providers)
+            app.prepare(ctx_id=0, det_size=(640, 640))
+            _insightface_app = app
+            logger.info("InsightFace buffalo_l model initialized")
     return _insightface_app
 
 

@@ -11,6 +11,7 @@ Usage:
 import asyncio
 import json
 import logging
+import re
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -18,6 +19,18 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _safe_child(base: Path, name: str) -> Path:
+    """Resolve `name` under `base` and reject traversal or absolute paths."""
+    if "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(400, "Invalid name")
+    candidate = (base / name).resolve()
+    if not candidate.is_relative_to(base.resolve()):
+        raise HTTPException(400, "Path escapes base directory")
+    return candidate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -122,7 +135,9 @@ async def trigger_processing(req: ProcessRequest):
     job_id = str(uuid.uuid4())[:8]
 
     if req.video:
-        video_path = SOURCE_DIR / req.video
+        video_path = _safe_child(SOURCE_DIR, req.video)
+        if video_path.suffix.lower() not in (".mp4", ".avi", ".mov", ".mkv"):
+            raise HTTPException(400, f"Unsupported video format: {req.video}")
         if not video_path.exists():
             raise HTTPException(404, f"Video not found: {req.video}")
         video_files = [video_path]
@@ -198,9 +213,9 @@ async def clear_completed():
 @app.get("/api/videos/metadata/dense/{video_id}")
 async def get_dense_metadata(video_id: str):
     """Return full dense metadata JSON for a processed video."""
-    import json
+    if not _VIDEO_ID_RE.match(video_id):
+        raise HTTPException(400, "Invalid video_id")
     metadata_dir = Path("../local_output/metadata")
-    # Try exact match, then with _metadata suffix
     for pattern in [f"{video_id}_metadata.json", f"{video_id}.json"]:
         meta_path = metadata_dir / pattern
         if meta_path.exists():
@@ -212,14 +227,14 @@ async def get_dense_metadata(video_id: str):
 @app.get("/api/faces/detect")
 async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
     """Return faces at a given timestamp from pre-computed metadata."""
-    import json
+    if not _VIDEO_ID_RE.match(video_id):
+        raise HTTPException(400, "Invalid video_id")
     metadata_dir = Path("../local_output/metadata")
     meta_path = metadata_dir / f"{video_id}_metadata.json"
     if not meta_path.exists():
         return {"faces": []}
     with open(meta_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Find nearest frame
     frame_data = data.get("frame_data", [])
     if not frame_data:
         return {"faces": []}
@@ -318,4 +333,7 @@ def _now_ts() -> float:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Bind to loopback only — endpoints are unauthenticated and accept paths
+    # under SOURCE_DIR / metadata_dir. LAN exposure would be a path-traversal
+    # vector. Override with `uvicorn ... --host 0.0.0.0` if you've added auth.
+    uvicorn.run(app, host="127.0.0.1", port=8000)

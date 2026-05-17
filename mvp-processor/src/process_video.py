@@ -3,10 +3,13 @@ Main Video Processing Script
 Orchestrates the complete video processing pipeline
 """
 
+import bisect
 import click
 import yaml
 import json
 import logging
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 from tqdm import tqdm
@@ -23,7 +26,6 @@ from supervision_annotator import (
     build_contestant_id_map,
     get_color_for_contestant,
 )
-import shutil
 import cv2
 import numpy as np
 import supervision as sv
@@ -33,6 +35,15 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def _json_default(obj):
+    """Encode numpy scalars/arrays as native types so json.dump doesn't choke."""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 class VideoProcessingPipeline:
@@ -262,7 +273,7 @@ class VideoProcessingPipeline:
             Path(self.config["output"]["metadata_dir"]) / f"{output_name}_metadata.json"
         )
         with open(metadata_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+            json.dump(metadata, f, indent=2, ensure_ascii=False, default=_json_default)
 
         # Generate galleries
         gallery_data = self.metadata_generator.generate_face_galleries(
@@ -320,7 +331,6 @@ class VideoProcessingPipeline:
                         # Map video frame to most recent past detection (floor, not nearest)
                         # This prevents bboxes appearing before the face arrives
                         video_ts = frame_idx / fps if fps > 0 else 0
-                        import bisect
                         idx = bisect.bisect_right(fd_timestamps, video_ts)
                         # bisect_right gives insertion point after matching timestamps
                         # so idx-1 is the most recent detection at or before video_ts
@@ -367,7 +377,6 @@ class VideoProcessingPipeline:
                 # Merge audio from original video
                 if shutil.which("ffmpeg"):
                     final_output = output_dir / f"{output_name}_annotated_audio.mp4"
-                    import subprocess
                     result = subprocess.run([
                         "ffmpeg", "-y",
                         "-i", str(annotated_output),
@@ -381,7 +390,8 @@ class VideoProcessingPipeline:
                         final_output.rename(annotated_output)  # Rename to expected name
                         logger.info(f"Audio merged into annotated video")
                     else:
-                        logger.warning(f"FFmpeg audio merge failed: {result.stderr.decode()[:200]}")
+                        stderr_text = result.stderr.decode("utf-8", errors="replace")[:200]
+                        logger.warning(f"FFmpeg audio merge failed: {stderr_text}")
                 else:
                     logger.warning("FFmpeg not found — annotated video has no audio")
 
@@ -429,7 +439,7 @@ class VideoProcessingPipeline:
                 "video": output_name,
                 "total_unmatched": len(index),
                 "faces": index,
-            }, f, indent=2, ensure_ascii=False)
+            }, f, indent=2, ensure_ascii=False, default=_json_default)
 
         logger.info(f"Saved {len(index)} unmatched face embeddings to {unmatched_dir}")
 
@@ -460,7 +470,7 @@ class VideoProcessingPipeline:
         gallery_path = galleries_dir / f"{output_name}_gallery.json"
 
         with open(gallery_path, "w", encoding="utf-8") as f:
-            json.dump(gallery_data, f, indent=2, ensure_ascii=False)
+            json.dump(gallery_data, f, indent=2, ensure_ascii=False, default=_json_default)
 
         logger.info(f"Gallery data saved to: {gallery_path}")
 
