@@ -71,6 +71,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
   // Hook is always called (React rules) but videoId is null when not in viewer mode
   const viewerVideoId = mode === 'viewer' && selectedVideo ? selectedVideo.id : null;
   const viewerMeta = useViewerMetadata(apiBase, viewerVideoId);
+  const lastViewerFrameRef = useRef<string | null>(null);
 
   // Auto-select first video
   useEffect(() => {
@@ -106,9 +107,8 @@ export function Player({ mode, apiBase }: PlayerProps) {
     async (timestamp: number, video: Video | null = selectedVideo) => {
       if (!video) return;
       try {
-        const numericId = video.id.match(/^(\d+)/)?.[1] || video.id;
         const res = await fetch(
-          `${apiBase}/api/faces/detect?video_id=${numericId}&timestamp=${timestamp}`,
+          `${apiBase}/api/faces/detect?video_id=${encodeURIComponent(video.id)}&timestamp=${timestamp}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -124,8 +124,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
   const loadVideoMetadata = useCallback(
     async (videoId: string) => {
       try {
-        const numericId = videoId.match(/^(\d+)/)?.[1] || videoId;
-        const res = await fetch(`${apiBase}/api/videos/metadata/dense/${numericId}`);
+        const res = await fetch(`${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
         if (res.ok) {
           setVideoMetadata(await res.json());
         }
@@ -428,9 +427,8 @@ export function Player({ mode, apiBase }: PlayerProps) {
       setContestantAppearances([]);
       if (cId === null || !selectedVideo) return;
       try {
-        const numericId = selectedVideo.id.match(/^(\d+)/)?.[1] || selectedVideo.id;
         const res = await fetch(
-          `${apiBase}/api/recognition/results?video_id=${numericId}&contestant_id=${cId}`,
+          `${apiBase}/api/recognition/results?video_id=${encodeURIComponent(selectedVideo.id)}&contestant_id=${cId}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -478,12 +476,17 @@ export function Player({ mode, apiBase }: PlayerProps) {
     stopPolling();
   }, [stopPolling]);
 
-  // Viewer mode: get faces from pre-loaded metadata
+  // Viewer mode: get faces from pre-loaded metadata.
+  // Only update state when the underlying metadata frame changes — setting a
+  // fresh array on every render would loop (state update → render → effect).
   useEffect(() => {
     if (mode !== 'viewer' || !viewerMeta.metadata) return;
-    const faces = viewerMeta.getFacesAtTime(currentTime);
-    setDetectedFaces(faces);
-  }, [mode, currentTime, viewerMeta]);
+    const frame = viewerMeta.getFrameAtTime(currentTime);
+    const frameKey = `${viewerVideoId}:${frame?.frame_number ?? -1}`;
+    if (frameKey === lastViewerFrameRef.current) return;
+    lastViewerFrameRef.current = frameKey;
+    setDetectedFaces(viewerMeta.getFacesAtTime(currentTime));
+  }, [mode, currentTime, viewerMeta, viewerVideoId]);
 
   // --- Render ---
 
@@ -764,19 +767,19 @@ export function Player({ mode, apiBase }: PlayerProps) {
                   <div className="flex justify-between">
                     <span className="text-slate-500">Unique Contestants</span>
                     <span className="text-slate-300">
-                      {videoMetadata?.recognition_summary?.unique_contestants ?? 0}
+                      {videoMetadata?.processing_summary?.unique_contestants ?? 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Faces Detected</span>
                     <span className="text-slate-300">
-                      {videoMetadata?.recognition_summary?.total_faces_detected ?? 0}
+                      {videoMetadata?.processing_summary?.total_faces_detected ?? 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Faces Recognized</span>
                     <span className="text-slate-300">
-                      {videoMetadata?.recognition_summary?.total_faces_recognized ?? 0}
+                      {videoMetadata?.processing_summary?.total_recognitions ?? 0}
                     </span>
                   </div>
                 </div>

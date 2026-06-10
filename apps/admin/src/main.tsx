@@ -8,7 +8,6 @@ import { Player } from '@/pages/Player';
 import { EmbeddingWorkbench } from '@/pages/EmbeddingWorkbench';
 import { Contestants } from '@/pages/Contestants';
 import { Flagging } from '@/pages/Flagging';
-import { Ingestion } from '@/pages/Ingestion';
 import { Processing } from '@/pages/Processing';
 import './app.css';
 
@@ -30,7 +29,9 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Dashboard />} />
             <Route path="player" element={<Player />} />
             <Route path="contestants" element={<Contestants />} />
-            <Route path="ingestion" element={<Ingestion />} />
+            {/* Ingestion page disabled: its /api/ingestion/* backend no longer
+                exists (worker routes deleted, local_api never had them).
+                Re-enable once local ingestion endpoints are implemented — see TODO.md. */}
             <Route path="analytics" element={<div className="text-slate-400">Analytics — coming soon</div>} />
             <Route path="flagging" element={<Flagging />} />
             <Route path="processing" element={<Processing />} />

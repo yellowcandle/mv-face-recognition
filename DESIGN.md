@@ -30,6 +30,15 @@ This document describes the architecture and design decisions for the MV Face Re
 #### System Improvements
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
 
+### Completed (June 2026) — deploy-ui-rewrite shippability pass
+
+- [x] `scripts/update-worker-assets.js` embeds `apps/viewer/dist/` (React) instead of the deleted SvelteKit build; binary assets base64-encoded via a `BINARY_ASSETS` manifest the worker decodes; fixed unreachable `main()` and `logger.*` TypeError
+- [x] `local_api.py`: video streaming with HTTP Range, flag persistence (`local_output/flagged_faces.json`), recognition results, contestant photos, `has_embedding` on contestants; `fastapi`/`uvicorn` added to deps (were missing entirely)
+- [x] Video IDs: CJK/space IDs round-trip end-to-end (traversal-checked instead of regex-rejected; Player no longer strips numeric prefixes); all metadata reads unified on `local_output/metadata/`
+- [x] Bbox contract: stored `face_location` stays `[top,right,bottom,left]`, every serving path emits canonical `[x1,y1,x2,y2]`; worker face-detect/recognition-results handlers rewritten off mock shapes onto real `frame_data`/`contestant_timeline`
+- [x] Pipeline: `bbox_scale` covers upscaled sources; tracker IDs stored per-recognition (ByteTrack in-place assignment) so traces can't land on the wrong contestant; effective on next reprocess
+- [x] Admin Ingestion page disabled until its backend exists (routes deleted from worker; never in local_api)
+
 ### Completed (January 2026)
 
 #### Automatic Embedding Regeneration System

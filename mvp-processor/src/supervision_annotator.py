@@ -209,9 +209,13 @@ def annotate_frame(frame, detections, annotators, screen_time=None, color_map=No
             draw.rectangle([x1, y1 - th - 8, x1 + tw + 8, y1], fill=(0, 0, 0, 180))
             draw.text((x1 + 4, y1 - th - 6), text, font=font, fill=(255, 255, 255))
         frame = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-    # TraceAnnotator requires tracker_id — skip if not available
+    # TraceAnnotator requires tracker_id — skip if not available.
+    # -1 is the "no track" placeholder; tracing it would smear one trace
+    # across unrelated untracked faces.
     if detections.tracker_id is not None:
-        frame = annotators["trace"].annotate(scene=frame, detections=detections)
+        tracked = detections[detections.tracker_id != -1]
+        if len(tracked) > 0:
+            frame = annotators["trace"].annotate(scene=frame, detections=tracked)
 
     # Draw timeline bar
     active = [l for l in labels if l != "Unknown"]

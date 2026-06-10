@@ -1,185 +1,69 @@
 # TODO
 
-## Pending
+Project backlog, last tidied 2026-06-10 after a full code review of the
+`deploy-ui-rewrite` branch (React admin/viewer rewrite). Dated engineering
+notes for in-flight work live in [TODOS.md](TODOS.md).
 
-### Priority 1: Production Modal Integration (January 2026)
+## Now — make `deploy-ui-rewrite` shippable
 
-#### Worker Backend - Modal API Integration
-- [ ] Add `MODAL_JOBS` KV namespace binding to wrangler.toml
-- [ ] Add `MODAL_TOKEN` secret for Modal API authentication
-- [ ] Integrate Worker Modal routes into main index.ts router
-- [ ] Replace simulated Modal execution with actual Modal API calls
-- [ ] Add job result persistence to R2 bucket
+All "Now" items from the 2026-06-10 review were fixed on 2026-06-11 (see Done).
+Remaining before the branch lands:
 
-#### Modal Script Enhancements
-- [ ] Add HTTP webhook endpoint to modal_hf_processor.py for job status callbacks
-- [ ] Implement job progress reporting via Modal's `modal.web_endpoint`
-- [ ] Add structured JSON output for job results parsing
+- [ ] Production `wrangler deploy` + live smoke test (local `wrangler dev` already serves the React viewer end-to-end; deploy needs user approval)
+- [ ] Reprocess videos so stored metadata picks up the new per-recognition `tracker_id` field and post-BGR-fix embeddings (annotated-video traces and the accuracy track both depend on this)
+- [ ] `scripts/modal_youtube_processor.py` lost `youtube_cookies.txt` support (age-restricted downloads now fail) and all webhook progress reporting — restore or consciously retire (deferred 2026-06-11: the admin Ingestion page that drove it is disabled until ingestion endpoints exist)
 
-**Context**: Frontend Modal integration UI is complete. Backend needs actual Modal API integration to replace simulated job execution.
+## Next — cleanup confirmed in review
 
-### Priority 2: System Improvements
+- [ ] Route the pipeline through the vectorized `recognize_faces_batch` (currently zero callers) instead of the per-detection pure-Python loop over ~95 embeddings
+- [ ] Export one `formatTime` from `@mv/shared` (currently copy-pasted 5×: Player, PlayerControls, Flagging, Contestants, Analytics)
+- [ ] Extract a shared `projectBbox` helper — `FaceOverlay.getBboxStyle` and `useAnnotations.drawAnnotations` duplicate the projection math with different dimension sources (overlay buttons can drift from drawn boxes)
+- [ ] Anchor Python data paths on `Path(__file__)` via one shared paths/config module — scripts currently use cwd-relative `Path("../…")` and silently break when run from the repo root; same module should own the `{nickname}_embedding.npy` convention (duplicated 5+ places)
+- [ ] Move hardcoded thresholds into `processing_config.yaml`: `min_confidence=0.15` (process_video), coverage quality cutoffs 0.4/0.25, clustering `distance_threshold=0.8`; also de-hardcode InsightFace providers/det_size (CoreML is baked in — Modal GPU runs fall back to CPU)
+- [ ] Serve coverage/similarity data from `local_api` instead of committed snapshots in `apps/admin/public/data/` (11k+ lines of generated JSON that goes stale after every reprocessing run)
+- [ ] Player component: replace scattered `mode === 'admin' | 'viewer'` branches with capability props (annotation source, canFlag, timeline visibility)
+- [ ] One `flagFace()` helper + `Promise.allSettled` for batch flagging (two ~50-line copy-pasted callbacks, sequential awaits)
+- [ ] Shared `useInterval` hook to replace the three hand-rolled setInterval/ref patterns (Player, Ingestion, Processing)
+- [ ] `Contestants.tsx`: derive `stats` from `appearances` with `useMemo` instead of parallel state reset in three places
+- [ ] `Processing.tsx`: drop or implement the request fields `ProcessRequest` silently discards (`mode`, `similarity_threshold`, …) — "Embedding Update" currently queues the same job as "Initial Processing"
+- [ ] `ContestantTimeline`: isolate the playhead into its own component so `currentTime` updates stop re-rendering every contestant row
+- [ ] `supervision_annotator.annotate_frame`: single BGR→PIL→BGR round trip per frame (currently two, doubling annotation cost)
 
-#### Automatic Reprocessing Pipeline
-- [ ] Implement Cloudflare Queue for embedding update triggers
-- [ ] Create scheduled Cron job for batch reprocessing
-- [ ] Add webhook endpoint for HuggingFace dataset updates
-- [ ] Implement video reprocessing after embedding changes
+## Recognition accuracy track
 
-#### Error Handling & Monitoring
-- [ ] Add Sentry/error tracking integration
-- [ ] Implement job failure retry logic with exponential backoff
-- [ ] Add alerting for failed processing jobs
-- [ ] Create admin dashboard for job monitoring
+- [ ] Reprocess a test video and re-measure recognition rate now that the BGR/RGB swap is fixed (pre-fix baseline: ~35-37%)
+- [ ] Re-collect distance distribution and tune `tolerance` in `processing_config.yaml` (see TODOS.md)
+- [ ] Re-run `generate_coverage.py` / `compute_similarity.py` on post-fix data, refresh workbench JSON
+- [ ] Embedding Workbench remaining phases: save unmatched embeddings (T0.4), HDBSCAN clustering (T0.5), face crops via canvas (Phase 3), unmatched-faces UI (Phase 5) — see `openspec/changes/embedding-workbench/`
 
-#### Performance Optimization
-- [ ] Implement video chunking for files >2GB to prevent OOM errors during processing
-- [ ] Add GPU utilization monitoring and auto-scaling thresholds in Modal containers
-- [ ] Implement Redis-based caching for face recognition results (reduce ChromaDB queries by 60%)
-- [ ] Optimize ChromaDB queries with proper indexing on contestant IDs and timestamps
-- [ ] Add parallel video processing pipeline with configurable worker counts
+## Tests
 
-#### Security & Compliance
-- [ ] Conduct comprehensive security audit using OWASP ZAP on all 21 API endpoints
-- [ ] Implement API rate limiting using Cloudflare Workers rate limiting features
-- [ ] Create data retention and privacy compliance framework (GDPR-like policies)
-- [ ] Enhance access control with role-based permissions (admin, operator, viewer)
-- [ ] Audit and strengthen input validation across all API endpoints
+- [ ] Fix 8 pre-existing unit-test failures (5 in `test_video_processor.py` — draw_face_box ×3, extract_frames_invalid_video, integration pipeline — and 3 in `test_frame_optimizer.py`; all verified failing on clean HEAD 2026-06-11)
+- [ ] Make pytest runnable without manual `PYTHONPATH=$PWD:$PWD/src` (src-layout imports are inconsistent: `from src.x` in tests vs flat `from x` in src)
+- [ ] Add tests for the React apps (none exist for `apps/`; the old frontend test suite was deleted with SvelteKit)
 
-### Priority 3: Modal Video Processing Enhancements
+## Later / icebox
 
-#### Batch Processing
-- [ ] Frontend: Multi-file upload component with drag-and-drop
-- [ ] Backend: Batch job creation endpoint
-- [ ] Modal: Parallel video processing with `starmap()`
-- [ ] Progress tracking for batch jobs (individual + overall)
+Kept from the old backlog only where still plausible post-rewrite; everything
+referencing deleted SvelteKit/worker code was dropped.
 
-#### Result Notifications
-- [ ] Email notification service (SendGrid/Resend integration)
-- [ ] Webhook callback system for external integrations
-- [ ] In-app notification system with bell icon
-- [ ] Slack/Discord integration (optional)
+- Modal production integration: real Modal API calls from the worker, job persistence, webhook status endpoint (`modal.web_endpoint`) — needs redesign now that the worker's job routes were removed
+- Error tracking (Sentry) + retry/alerting for processing jobs
+- API rate limiting and an input-validation pass on worker endpoints
+- Batch/multi-video processing UX and notifications
+- Mobile/touch video player polish, accessibility pass
+- Automated reprocessing after embedding updates (queue/cron)
 
-#### User Experience & Accessibility
-- [ ] Optimize video player for mobile devices with touch controls and responsive design
-- [ ] Achieve WCAG 2.1 AA accessibility compliance across all components
-- [ ] Implement internationalization (i18n) framework for multi-language support
-- [ ] Add offline functionality with service workers for cached video metadata
-- [ ] Convert to Progressive Web App (PWA) with offline capabilities
+## Done
 
-#### Monitoring & Observability
-- [ ] Integrate Application Performance Monitoring (DataDog/New Relic) for production metrics
-- [ ] Implement real-time error tracking with Sentry for both frontend and backend
-- [ ] Create usage analytics dashboard for processing jobs, API usage, and system performance
-- [ ] Add comprehensive health checks with dependency monitoring (ChromaDB, R2, KV)
-- [ ] Implement log aggregation pipeline with structured logging and analysis
-
-### Priority 4: Testing & Quality Assurance
-
-#### Modal Integration Tests
-- [ ] Unit tests for job management API endpoints
-- [ ] Integration tests for Modal job lifecycle
-- [ ] E2E tests for processing page UI
-- [ ] Load testing for concurrent job handling
-
-#### CI/CD Pipeline Updates
-- [ ] Add Modal deployment to GitHub Actions
-- [ ] Automated KV namespace setup for preview deployments
-- [ ] Staging environment with separate Modal app
-
-#### Developer Experience
-- [ ] Auto-generate OpenAPI/Swagger documentation from TypeScript interfaces
-- [ ] Develop SDK/Client library for external integrations with face recognition API
-- [ ] Create improved local development setup with Docker Compose for all services
-- [ ] Add advanced debugging tools with profiling for video processing pipeline
-- [ ] Build component library documentation site with live examples
-
-#### Infrastructure & DevOps
-- [ ] Implement multi-region Cloudflare Workers deployment for global latency reduction
-- [ ] Create automated backup and disaster recovery procedures for R2 and KV
-- [ ] Add cost optimization monitoring and alerts for cloud resources
-- [ ] Develop Infrastructure as Code using Terraform for reproducible deployments
-- [ ] Implement blue-green deployment pipeline for zero-downtime updates
-
-### Priority 5: Documentation & DevX
-
-#### Developer Documentation
-- [ ] Modal integration setup guide
-- [ ] API documentation for job management endpoints
-- [ ] Troubleshooting guide for common issues
-- [ ] Architecture diagram updates
-
-#### Data Management
-- [ ] Implement automated data retention policies for processed videos and metadata
-- [ ] Create database migration and versioning system for ChromaDB schemas
-- [ ] Build data quality assurance pipelines for embedding consistency
-- [ ] Add automated backup verification and integrity checking
-- [ ] Develop data archiving strategies for long-term storage optimization
-
-#### Advanced Testing & Quality Assurance
-- [ ] Implement load testing for 100+ concurrent video processing jobs
-- [ ] Conduct security penetration testing on Modal integration endpoints
-- [ ] Add performance regression testing with automated alerts
-- [ ] Implement automated accessibility testing with axe-core integration
-- [ ] Create cross-browser compatibility testing suite for video player
-
----
-
-## In Progress
-
-### Modal-Frontend Integration (PR #29)
-- [x] Frontend API routes for job management
-- [x] Enhanced processing page with dual modes
-- [x] Real-time job monitoring via WebSocket
-- [x] Worker backend structure (pending actual Modal integration)
-- [ ] **Pending merge and production testing**
-
----
-
-## Completed
-
-### Completed (December 2025 - Continued)
-- [x] **Video Processing Pipeline Optimization** (Phase 1)
-  - [x] Frame difference detection (3 methods: histogram, MSE, structural)
-  - [x] Face tracking across frames (IoU-based matching)
-  - [x] Batch face recognition module
-  - [x] Metadata compression (delta encoding + gzip)
-  - [x] Confidence-based filtering
-  - [x] Frame optimizer utility
-
-### Completed (December 2025 - Frontend)
-- [x] Complete design system refactoring (7 components, 112 spacing tokens)
-- [x] All TypeScript/svelte-check errors resolved (0 errors)
-- [x] Reusable component library with design tokens
-
-### Completed (December 2025 - Initial)
-- [x] Implement Cloudflare Zero Trust for Admin UI
-- [x] Admin UI: YouTube video ingestion
-- [x] Batch flagging for multiple faces
-- [x] Face thumbnail extraction for flagged faces
-- [x] Embedding comparison visualization
-- [x] Flagging approval workflow for admins
-- [x] Face flagging system and HuggingFace XET integration
-- [x] Modal cloud processing with HuggingFace sync
-- [x] Pipeline documentation
-- [x] Worker: migrate to TypeScript entrypoint (wrangler main=src/index.ts)
-- [x] Backend: replace remaining print() usage with logging
-- [x] Repo cleanup: archive/move legacy root scripts (gradio, debug, benchmarks, legacy video_processor)
-- [x] Python: rename src/logging.py -> src/secure_logging.py (avoid shadowing stdlib logging; enable ty)
-
-### Completed (January 2026)
-- [x] **Modal-Frontend Integration** - Complete cloud processing control from web UI
-  - [x] Frontend API routes for job management (trigger, status, cancel, list)
-  - [x] Enhanced processing page with dual modes (Initial & Embedding Update)
-  - [x] Real-time job monitoring via WebSocket
-  - [x] Progress bars and visual status indicators
-  - [x] Job cancellation support
-  - [x] Worker backend with KV-based job persistence
-  - [x] Integration with existing Modal scripts (modal_hf_processor.py)
-
-### Completed (July 2025)
-- [x] Comprehensive video player with face recognition overlays
-- [x] SvelteKit migration with proper routing
-- [x] Critical deployment fixes (SvelteKit vs legacy Vite conflicts)
-- [x] All frontend routes working (/, /video-player, /face-recognition, /analytics, /settings)
-- [x] 21 API endpoints functional
+- **2026-06-11** — All "Now" blockers from the 2026-06-10 review fixed:
+  - *Deploy path*: `scripts/update-worker-assets.js` rewritten for `apps/viewer/dist/` (also fixed the never-firing `process.argv[1] === import.meta.url` entrypoint guard and the `logger.info` TypeError); binary assets now base64-encoded with a `BINARY_ASSETS` manifest the worker decodes. Verified end-to-end with `wrangler dev`: `/`, hashed assets, and SPA routes all serve the React viewer. `wrangler deploy --dry-run` bundles clean.
+  - *Local API*: added `fastapi`/`uvicorn` to `mvp-processor` deps (they were missing — the admin backend couldn't even start). Implemented `GET /api/videos/stream/{id}` (Range-capable FileResponse), flag persistence to `local_output/flagged_faces.json` (`POST /api/faces/flag`, `GET /api/faces/flagged`, `PATCH /api/faces/flagged/{id}`, `DELETE /api/faces/flagged/{id}`, `POST /api/faces/flag/update`), `GET /api/recognition/results`, and `GET /api/contestants/{id}/photo`; `/api/contestants` now reports `has_embedding`/`quality`. All endpoints smoke-tested against real data.
+  - *Metadata dirs / video IDs*: everything reads `local_output/metadata/`; `_VIDEO_ID_RE` replaced with `_safe_child` traversal checks so CJK/space IDs work; removed Player's numeric-prefix stripping (IDs now round-trip; worker still maps numeric-prefix KV keys server-side). Dense metadata responses are mtime-cached; `/api/faces/detect` uses floor (bisect) matching like the annotator.
+  - *Bbox contract*: canonical wire order `[x1,y1,x2,y2]` derived from stored `face_location` `[top,right,bottom,left]` at every serving boundary; worker `handleFaceDetection` rewritten to read `frame_data` (was reading a nonexistent `detailed_timeline.bbox` shape); worker `handleRecognitionResults` mock data replaced with real KV-backed appearances; contract documented in `apps/shared/types`.
+  - *Pipeline*: `bbox_scale` now handles upscaled (<1920) sources; tracker IDs keyed per-recognition via ByteTrack's in-place index-aligned assignment (verified against supervision 0.25 semantics) instead of positional zip against the filtered tracker output; `annotate_frame` traces only real tracks (`tracker_id != -1`). Takes effect on next reprocess.
+  - *Ingestion*: page + nav entry disabled (backend routes don't exist anywhere); code kept for revival.
+- **2026-06-10** — Code review of `deploy-ui-rewrite` (16 confirmed findings). Fixed: BGR/RGB channel swap in `process_video.py` (frames now reach InsightFace in BGR, matching gallery embeddings); viewer-mode infinite render loop (`useViewerMetadata` memoized return + frame-change guard in Player); frontend metadata schema aligned with real Python output (`processing_summary`, `average_confidence`, `first_appearance`/`last_appearance`) across shared types, Player info panel, and viewer Analytics.
+- **2026-03** — React rewrite: SvelteKit frontend deleted; pnpm monorepo with `apps/admin` (local), `apps/viewer` (Cloudflare), `apps/shared` (Player, UI kit, hooks, types). InsightFace + supervision/ByteTrack integration; CJK label rendering via PIL+PingFang; Embedding Workbench Phases 0-1; `local_api.py` FastAPI backend for the admin app.
+- **2026-01** — HuggingFace XET migration for photos/embeddings; Modal-frontend integration (SvelteKit era); contestant Instagram handles.
+- **2025** — Original SvelteKit system: video player with overlays, flagging workflow, 21-endpoint worker, Zero Trust admin, processing pipeline optimization. Superseded by the rewrite; history in git.

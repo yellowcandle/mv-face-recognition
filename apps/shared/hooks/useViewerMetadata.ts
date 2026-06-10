@@ -1,41 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-
-interface FrameData {
-  frame_number: number;
-  timestamp: number;
-  detections_count: number;
-  recognitions_count: number;
-  recognitions: Array<{
-    contestant_id: string;
-    contestant_name: string;
-    contestant_nickname: string;
-    confidence: number;
-    face_location: [number, number, number, number]; // [top, right, bottom, left]
-  }>;
-}
-
-interface VideoMetadataFull {
-  video_info: {
-    filename: string;
-    fps: number;
-    frame_count: number;
-    width: number;
-    height: number;
-    duration: number;
-  };
-  processing_summary: {
-    frames_processed: number;
-    total_faces_detected: number;
-    total_recognitions: number;
-    unique_contestants: number;
-    recognition_rate: number;
-  };
-  contestant_timeline: Record<string, any>;
-  frame_data: FrameData[];
-}
+import type { FrameData, VideoMetadata } from '../types';
 
 export function useViewerMetadata(apiBase: string, videoId: string | null) {
-  const [metadata, setMetadata] = useState<VideoMetadataFull | null>(null);
+  const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,11 +75,9 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
     });
   }, [getFrameAtTime]);
 
-  return {
-    metadata,
-    loading,
-    error,
-    getFrameAtTime,
-    getFacesAtTime,
-  };
+  // Stable identity so consumers can safely use the result in effect deps
+  return useMemo(
+    () => ({ metadata, loading, error, getFrameAtTime, getFacesAtTime }),
+    [metadata, loading, error, getFrameAtTime, getFacesAtTime],
+  );
 }

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from tqdm import tqdm
 
-from video_processor import VideoProcessor, FrameProcessor
+from video_processor import VideoProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
 from cloudflare_uploader import CloudflareUploader
@@ -188,12 +188,10 @@ class VideoProcessingPipeline:
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
         ):
-            # Preprocess frame
-            rgb_frame = FrameProcessor.preprocess_frame(frame)
-
-            # Detect faces
+            # Detect faces (InsightFace expects BGR frames as read by cv2;
+            # gallery embeddings are built from BGR cv2.imread photos)
             detections = self.face_detector.detect_faces(
-                rgb_frame, timestamp, frame_idx
+                frame, timestamp, frame_idx
             )
 
             if detections:
@@ -234,10 +232,16 @@ class VideoProcessingPipeline:
                     contestant_id_map,
                 )
                 if len(sv_detections) > 0:
-                    tracked = tracker.update_with_detections(sv_detections)
-                    # Store tracker IDs in frame_data
-                    if frame_data:
-                        frame_data[-1]["tracker_ids"] = tracked.tracker_id.tolist() if tracked.tracker_id is not None else []
+                    tracker.update_with_detections(sv_detections)
+                    # update_with_detections assigns tracker_id onto the *input*
+                    # detections, index-aligned with how sv_detections was built:
+                    # recognitions first, then unmatched; -1 means no track.
+                    # Key tracker IDs by recognition identity, not position in
+                    # the (filtered, reordered) tracker output.
+                    if sv_detections.tracker_id is not None:
+                        for i, rec in enumerate(frame_data[-1]["recognitions"]):
+                            tid = int(sv_detections.tracker_id[i])
+                            rec["tracker_id"] = tid if tid >= 0 else None
 
                     # Accumulate screen time from original detections (not tracked — ByteTrack may drop custom data)
                     orig_labels = sv_detections.data.get("labels", [])
@@ -307,9 +311,11 @@ class VideoProcessingPipeline:
                 orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-                # Detection was done on resized frames — compute scale factor
+                # Detection was done on resized frames — compute scale factor.
+                # extract_frames resizes any source whose width != resize_width
+                # (upscaling narrow sources too), so scale both directions.
                 detect_width = self.config["video"]["resize_width"]
-                bbox_scale = orig_width / detect_width if detect_width < orig_width else 1.0
+                bbox_scale = orig_width / detect_width
 
                 video_info_sv = sv.VideoInfo(
                     width=orig_width, height=orig_height, fps=fps,
@@ -361,10 +367,14 @@ class VideoProcessingPipeline:
                                 data={"labels": labels},
                             )
 
-                            # Set tracker IDs if available
-                            tracker_ids = fd.get("tracker_ids", [])
-                            if tracker_ids and len(tracker_ids) == len(detections):
-                                detections.tracker_id = np.array(tracker_ids, dtype=int)
+                            # Per-recognition tracker IDs (None → -1 placeholder;
+                            # annotate_frame only traces real tracks)
+                            tracker_ids = [r.get("tracker_id") for r in fd["recognitions"]]
+                            if any(t is not None for t in tracker_ids):
+                                detections.tracker_id = np.array(
+                                    [t if t is not None else -1 for t in tracker_ids],
+                                    dtype=int,
+                                )
                         else:
                             detections = sv.Detections.empty()
 

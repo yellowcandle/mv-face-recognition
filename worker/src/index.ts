@@ -2,7 +2,7 @@
  * Cloudflare Worker for MV Face Recognition
  * Serves static frontend and provides API for metadata/videos
  */
-import { EMBEDDED_ASSETS } from '../embedded-assets.js';
+import { EMBEDDED_ASSETS, BINARY_ASSETS } from '../embedded-assets.js';
 import { logger } from './lib/logger';
 import { 
   AppError, 
@@ -1043,54 +1043,59 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
     });
   }
 
-  const denseMetadata = await env.METADATA_KV.get(`metadata_dense_${videoId}`);
+  // Pipeline metadata is keyed by numeric prefix in KV (e.g. "5-《...》" → "5")
+  const numericMatch = videoId.match(/^(\d+)-/);
+  const metadataKey = numericMatch ? numericMatch[1] : videoId;
+  const denseMetadata = await env.METADATA_KV.get(`metadata_dense_${metadataKey}`);
 
   if (denseMetadata) {
     const parsed = JSON.parse(denseMetadata) as {
-      video_info?: { fps?: number };
-      contestant_timeline?: Record<string, {
-        detailed_timeline?: Array<{
-          timestamp: number;
+      frame_data?: Array<{
+        timestamp: number;
+        frame_number?: number;
+        recognitions?: Array<{
+          contestant_id?: string;
+          contestant_name?: string;
+          contestant_nickname?: string;
           confidence?: number;
-          bbox?: number[];
-          frame?: number;
+          // Stored as [top, right, bottom, left] (face_recognition convention)
+          face_location?: number[];
         }>;
       }>;
     };
-    const fps = parsed.video_info?.fps || 25;
-    const frameNumber = Math.floor(timestamp * fps);
 
-    const faces: Array<{
-      contestant_name: string;
-      confidence: number;
-      bbox: number[] | null;
-      timestamp: number;
-      frame: number;
-    }> = [];
-    
-    for (const [contestantName, timeline] of Object.entries(parsed.contestant_timeline || {})) {
-      if (!timeline) continue;
-
-      const appearances = timeline.detailed_timeline || [];
-      for (const appearance of appearances) {
-        if (!appearance || typeof appearance.timestamp !== 'number') continue;
-
-        if (Math.abs(appearance.timestamp - timestamp) < 0.2) {
-          faces.push({
-            contestant_name: contestantName,
-            confidence: appearance.confidence ?? 0,
-            bbox: appearance.bbox || null,
-            timestamp: appearance.timestamp,
-            frame: appearance.frame ?? 0
-          });
-        }
-      }
+    // Floor match: most recent frame at or before the timestamp, so boxes
+    // never appear ahead of the face (same convention as local_api.py).
+    const frames = (parsed.frame_data || [])
+      .filter(fd => typeof fd.timestamp === 'number')
+      .sort((a, b) => a.timestamp - b.timestamp);
+    let frame: typeof frames[number] | null = null;
+    for (const fd of frames) {
+      if (fd.timestamp <= timestamp) frame = fd;
+      else break;
     }
+
+    // Wire format is canonical [x1, y1, x2, y2], derived from face_location
+    const faces = (frame?.recognitions || [])
+      .filter(r => Array.isArray(r.face_location) && r.face_location.length === 4)
+      .map(r => {
+        const [top, right, bottom, left] = r.face_location as number[];
+        return {
+          bbox: [left, top, right, bottom],
+          confidence: r.confidence ?? 0,
+          contestant_name: r.contestant_nickname || r.contestant_name || null,
+          contestant_id: r.contestant_id,
+          contestant_nickname: r.contestant_nickname,
+          detection_confidence: r.confidence ?? 0,
+          recognition_confidence: r.confidence ?? 0,
+          matched: true,
+        };
+      });
 
     return new Response(JSON.stringify({
       video_id: videoId,
       timestamp: timestamp,
-      frame: frameNumber,
+      frame: frame?.frame_number ?? null,
       faces: faces
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -1112,41 +1117,51 @@ async function handleRecognitionResults(request: Request, env: Env, corsHeaders:
   const videoIdFilter = url.searchParams.get('video_id');
   const contestantIdFilter = url.searchParams.get('contestant_id');
   
-  // Mock recognition results
-  const allRecognitionResults = [
-    { confidence: 0.89, video_id: "1", contestant_id: "1", timestamp: 12.5, bounding_box: { x: 120, y: 80, width: 180, height: 240 } },
-    { confidence: 0.92, video_id: "1", contestant_id: "2", timestamp: 18.3, bounding_box: { x: 350, y: 120, width: 170, height: 220 } },
-    { confidence: 0.85, video_id: "1", contestant_id: "3", timestamp: 24.7, bounding_box: { x: 200, y: 150, width: 160, height: 210 } },
-    { confidence: 0.91, video_id: "1", contestant_id: "1", timestamp: 45.2, bounding_box: { x: 100, y: 50, width: 150, height: 200 } },
-    { confidence: 0.87, video_id: "1", contestant_id: "4", timestamp: 52.8, bounding_box: { x: 380, y: 90, width: 165, height: 215 } },
-    { confidence: 0.93, video_id: "1", contestant_id: "2", timestamp: 67.4, bounding_box: { x: 300, y: 75, width: 140, height: 180 } },
-    { confidence: 0.88, video_id: "2", contestant_id: "1", timestamp: 15.6, bounding_box: { x: 150, y: 100, width: 175, height: 230 } },
-    { confidence: 0.84, video_id: "2", contestant_id: "5", timestamp: 28.9, bounding_box: { x: 250, y: 110, width: 155, height: 195 } },
-    { confidence: 0.90, video_id: "2", contestant_id: "3", timestamp: 41.3, bounding_box: { x: 180, y: 85, width: 170, height: 225 } },
-    { confidence: 0.86, video_id: "3", contestant_id: "2", timestamp: 8.7, bounding_box: { x: 320, y: 60, width: 145, height: 185 } },
-    { confidence: 0.94, video_id: "3", contestant_id: "6", timestamp: 33.1, bounding_box: { x: 110, y: 140, width: 180, height: 240 } },
-    { confidence: 0.82, video_id: "3", contestant_id: "1", timestamp: 48.5, bounding_box: { x: 270, y: 95, width: 160, height: 205 } },
-    { confidence: 0.95, video_id: "4", contestant_id: "7", timestamp: 22.4, bounding_box: { x: 140, y: 70, width: 175, height: 235 } },
-    { confidence: 0.83, video_id: "4", contestant_id: "2", timestamp: 56.8, bounding_box: { x: 360, y: 130, width: 150, height: 190 } },
-    { confidence: 0.88, video_id: "5", contestant_id: "8", timestamp: 11.2, bounding_box: { x: 190, y: 55, width: 165, height: 220 } },
-    { confidence: 0.91, video_id: "5", contestant_id: "3", timestamp: 39.6, bounding_box: { x: 310, y: 105, width: 155, height: 200 } }
-  ];
-  
-  let filteredResults = allRecognitionResults;
-  
+  if (!contestantIdFilter) {
+    return new Response(JSON.stringify({ error: 'contestant_id required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Pipeline metadata in KV is keyed by numeric prefix (e.g. "5-《...》" → "5")
+  let metadataKeys: string[];
   if (videoIdFilter) {
-    filteredResults = filteredResults.filter(result => result.video_id === videoIdFilter);
+    const numericMatch = videoIdFilter.match(/^(\d+)-/);
+    metadataKeys = [`metadata_dense_${numericMatch ? numericMatch[1] : videoIdFilter}`];
+  } else {
+    const listing = await env.METADATA_KV.list({ prefix: 'metadata_dense_' });
+    metadataKeys = listing.keys.map(k => k.name);
   }
-  
-  if (contestantIdFilter) {
-    filteredResults = filteredResults.filter(result => result.contestant_id === contestantIdFilter);
+
+  type Appearance = { timestamp?: number; confidence?: number; frame_number?: number };
+  const results: Array<{ video_id: string; timestamp: number; confidence: number; frame_number?: number }> = [];
+
+  for (const key of metadataKeys) {
+    const stored = await env.METADATA_KV.get(key);
+    if (!stored) continue;
+    try {
+      const parsed = JSON.parse(stored) as {
+        contestant_timeline?: Record<string, { appearances?: Appearance[] }>;
+      };
+      const entry = parsed.contestant_timeline?.[contestantIdFilter];
+      if (!entry?.appearances) continue;
+      const videoId = videoIdFilter || key.replace('metadata_dense_', '');
+      for (const appearance of entry.appearances) {
+        results.push({
+          video_id: videoId,
+          timestamp: appearance.timestamp ?? 0,
+          confidence: appearance.confidence ?? 0,
+          frame_number: appearance.frame_number,
+        });
+      }
+    } catch {
+      continue;
+    }
   }
-  
-  const storageKey = `recognition_results${videoIdFilter ? `_video_${videoIdFilter}` : ''}${contestantIdFilter ? `_contestant_${contestantIdFilter}` : ''}`;
-  const storedResults = await env.METADATA_KV?.get(storageKey);
-  
-  const results = storedResults ? JSON.parse(storedResults) : filteredResults;
-  
+
+  results.sort((a, b) => a.video_id.localeCompare(b.video_id) || a.timestamp - b.timestamp);
+
   return new Response(JSON.stringify({
     results: results,
     total: results.length,
@@ -2126,11 +2141,16 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
   
   if (embeddedAssets[assetKey]) {
     logger.debug(`Successfully serving embedded asset: ${assetKey}`);
-    
+
     const contentType = getContentType(finalPath);
     const cacheControl = finalPath.includes('assets/') ? 'public, max-age=31536000' : 'public, max-age=3600';
-    
-    return new Response(embeddedAssets[assetKey], {
+
+    // Binary assets are stored base64-encoded by scripts/update-worker-assets.js
+    const body = BINARY_ASSETS.has(assetKey)
+      ? Uint8Array.from(atob(embeddedAssets[assetKey]), c => c.charCodeAt(0))
+      : embeddedAssets[assetKey];
+
+    return new Response(body, {
       headers: {
         ...corsHeaders,
         'Content-Type': contentType,

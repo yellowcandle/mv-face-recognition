@@ -28,6 +28,11 @@ export interface VideoInfo {
   duration: number;
 }
 
+// Bbox contract: stored metadata keeps `face_location` as [top, right, bottom, left]
+// (face_recognition convention, written by mvp-processor). Every serving path
+// (local_api.py, worker handleFaceDetection, useViewerMetadata) converts it to
+// canonical wire/display order [x1, y1, x2, y2] at the boundary — readers of
+// FaceDetection.bbox must never reorder it again.
 export interface FaceDetection {
   bbox: [number, number, number, number]; // [x1, y1, x2, y2]
   confidence: number;
@@ -39,28 +44,50 @@ export interface FaceDetection {
   matched: boolean;
 }
 
+// Matches the JSON emitted by mvp-processor (metadata_generator.py / process_video.py)
+export interface FrameRecognition {
+  contestant_id: string;
+  contestant_name: string;
+  contestant_nickname: string;
+  confidence: number;
+  face_location: [number, number, number, number]; // [top, right, bottom, left]
+}
+
+export interface FrameData {
+  frame_number: number;
+  timestamp: number;
+  detections_count: number;
+  recognitions_count: number;
+  recognitions: FrameRecognition[];
+}
+
+export interface ContestantTimelineEntry {
+  appearances: Array<{
+    timestamp: number;
+    frame_number: number;
+    confidence: number;
+    face_location: [number, number, number, number]; // [top, right, bottom, left]
+  }>;
+  total_appearances: number;
+  average_confidence: number;
+  first_appearance: number;
+  last_appearance: number;
+  contestant_info: { id: string; name: string; nickname: string };
+}
+
 export interface VideoMetadata {
   video_info: VideoInfo;
-  processing_date: string;
-  recognition_summary: {
-    total_frames_processed: number;
+  processing_summary: {
+    frames_processed: number;
     total_faces_detected: number;
-    total_faces_recognized: number;
-    recognition_rate: number;
+    total_recognitions: number;
     unique_contestants: number;
+    recognition_rate: number;
+    confidence_stats?: { average: number; minimum: number; maximum: number };
+    processing_timestamp?: string;
   };
-  contestant_timeline: Record<string, {
-    total_appearances: number;
-    avg_confidence: number;
-    max_confidence: number;
-    first_appearance_time: number;
-    last_appearance_time: number;
-  }>;
-  frame_data: Array<{
-    frame_number: number;
-    timestamp: number;
-    faces: FaceDetection[];
-  }>;
+  contestant_timeline: Record<string, ContestantTimelineEntry>;
+  frame_data: FrameData[];
 }
 
 export interface CoverageSummary {

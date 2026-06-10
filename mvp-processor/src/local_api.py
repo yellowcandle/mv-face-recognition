@@ -11,16 +11,14 @@ Usage:
 import asyncio
 import json
 import logging
-import re
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def _safe_child(base: Path, name: str) -> Path:
@@ -44,16 +42,79 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Paths (run from mvp-processor/, see module docstring) ───
+
+SOURCE_DIR = Path("../source/videos")
+OUTPUT_DIR = Path("../local_output")
+METADATA_DIR = OUTPUT_DIR / "metadata"
+PROCESSED_DIR = OUTPUT_DIR / "processed_videos"
+FLAGS_PATH = OUTPUT_DIR / "flagged_faces.json"
+PHOTOS_DIR = Path("../source/photo/contestants/photos")
+EMBEDDINGS_DIR = Path("../source/photo/contestants")
+CONTESTANT_CSV = Path("../metadata/contestant_info.csv")
+CONFIG_PATH = "config/processing_config.yaml"
+
+VIDEO_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv")
+
 # ─── In-memory job store ───
 
 jobs: dict[str, dict] = {}
-SOURCE_DIR = Path("../source/videos")
-CONFIG_PATH = "config/processing_config.yaml"
 
 
 class ProcessRequest(BaseModel):
     video: Optional[str] = None  # specific video filename, or None for all
     no_annotate: bool = False
+
+
+class FlagRequest(BaseModel):
+    contestant_id: int
+    video_id: str
+    timestamp: float
+    bbox: Optional[list[float]] = None  # [x1, y1, x2, y2]
+    confidence: Optional[float] = None
+    user_label: Optional[str] = None
+    thumbnail: Optional[str] = None  # base64 JPEG
+
+
+class FlagStatusUpdate(BaseModel):
+    status: str  # pending | accepted | rejected
+
+
+class FlagReassign(BaseModel):
+    face_id: str
+    contestant_id: int
+
+
+# ─── Cached JSON loading (metadata files are re-read often during playback) ───
+
+_json_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _load_json_cached(path: Path) -> dict:
+    """Load a JSON file, cached by mtime."""
+    key = str(path)
+    mtime = path.stat().st_mtime
+    hit = _json_cache.get(key)
+    if hit and hit[0] == mtime:
+        return hit[1]
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    _json_cache[key] = (mtime, data)
+    return data
+
+
+def _metadata_path(video_id: str) -> Path:
+    return _safe_child(METADATA_DIR, f"{video_id}_metadata.json")
+
+
+def _iter_metadata_files():
+    """Yield (video_id, path) for each plain metadata file in METADATA_DIR."""
+    if not METADATA_DIR.exists():
+        return
+    for f in sorted(METADATA_DIR.glob("*_metadata.json")):
+        if "_dense_" in f.name or "_annotated_" in f.name:
+            continue
+        yield f.stem[: -len("_metadata")], f
 
 
 # ─── Video listing ───
@@ -66,7 +127,7 @@ async def list_local_videos():
 
     videos = []
     for f in sorted(SOURCE_DIR.iterdir()):
-        if f.suffix.lower() in (".mp4", ".avi", ".mov", ".mkv"):
+        if f.suffix.lower() in VIDEO_EXTENSIONS:
             videos.append({
                 "filename": f.name,
                 "path": str(f),
@@ -77,54 +138,77 @@ async def list_local_videos():
 
 @app.get("/api/videos/processed/list")
 async def list_processed_videos():
-    """List processed video metadata from metadata/ dir."""
-    metadata_dir = Path("../metadata")
-    if not metadata_dir.exists():
-        return []
-
+    """List processed videos from local_output/metadata/."""
     videos = []
-    for f in sorted(metadata_dir.glob("*_metadata.json")):
-        if "_dense_" in f.name or "_annotated_" in f.name:
-            continue
+    for name, path in _iter_metadata_files():
         try:
-            with open(f, encoding="utf-8") as fh:
-                data = json.load(fh)
-            vi = data.get("video_info", {})
-            name = f.stem.replace("_metadata", "")
-            videos.append({
-                "id": name,
-                "name": name,
-                "stream_url": f"/api/videos/stream/{name}",
-                "duration": vi.get("duration", 0),
-                "width": vi.get("width", 0),
-                "height": vi.get("height", 0),
-            })
+            data = _load_json_cached(path)
         except (json.JSONDecodeError, OSError):
             continue
-
+        vi = data.get("video_info", {})
+        source_file = SOURCE_DIR / f"{name}.mp4"
+        videos.append({
+            "id": name,
+            "name": name,
+            "stream_url": f"/api/videos/stream/{name}",
+            "filename": source_file.name if source_file.exists() else None,
+            "duration": vi.get("duration", 0),
+            "width": vi.get("width", 0),
+            "height": vi.get("height", 0),
+        })
     return videos
+
+
+@app.get("/api/videos/stream/{video_id}")
+async def stream_video(video_id: str):
+    """Stream a processed video (FileResponse handles HTTP Range)."""
+    candidates = [
+        _safe_child(PROCESSED_DIR, f"{video_id}_1080p.mp4"),
+        _safe_child(PROCESSED_DIR, f"{video_id}_720p.mp4"),
+        _safe_child(PROCESSED_DIR, f"{video_id}_annotated.mp4"),
+    ] + [_safe_child(SOURCE_DIR, f"{video_id}{ext}") for ext in VIDEO_EXTENSIONS]
+
+    for path in candidates:
+        if path.exists():
+            return FileResponse(path, media_type="video/mp4")
+    raise HTTPException(404, f"No video file found for {video_id}")
 
 
 @app.get("/api/contestants")
 async def list_contestants():
-    """List contestants from CSV."""
+    """List contestants from CSV, with embedding availability."""
     import csv
-    csv_path = Path("../metadata/contestant_info.csv")
-    if not csv_path.exists():
+    if not CONTESTANT_CSV.exists():
         return []
 
     contestants = []
-    with open(csv_path, encoding="utf-8") as f:
+    with open(CONTESTANT_CSV, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            nickname = row["暱稱"].strip()
+            has_embedding = (EMBEDDINGS_DIR / f"{nickname}_embedding.npy").exists()
             contestants.append({
                 "id": row["編號"].strip(),
                 "number": int(row["編號"].strip()),
                 "name": row["姓名"].strip(),
-                "nickname": row["暱稱"].strip(),
+                "nickname": nickname,
                 "age": int(row["年齡"]) if row.get("年齡", "").strip() else None,
+                "has_embedding": has_embedding,
+                "quality": "good" if has_embedding else "missing",
             })
     return contestants
+
+
+@app.get("/api/contestants/{contestant_id}/photo")
+async def contestant_photo(contestant_id: int):
+    """Serve a reference photo for a contestant."""
+    photo_dir = PHOTOS_DIR / f"contestant_{contestant_id}"
+    if photo_dir.is_dir():
+        for photo in sorted(photo_dir.iterdir()):
+            if photo.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                media_type = "image/png" if photo.suffix.lower() == ".png" else "image/jpeg"
+                return FileResponse(photo, media_type=media_type)
+    raise HTTPException(404, f"No photo for contestant {contestant_id}")
 
 
 # ─── Processing ───
@@ -136,7 +220,7 @@ async def trigger_processing(req: ProcessRequest):
 
     if req.video:
         video_path = _safe_child(SOURCE_DIR, req.video)
-        if video_path.suffix.lower() not in (".mp4", ".avi", ".mov", ".mkv"):
+        if video_path.suffix.lower() not in VIDEO_EXTENSIONS:
             raise HTTPException(400, f"Unsupported video format: {req.video}")
         if not video_path.exists():
             raise HTTPException(404, f"Video not found: {req.video}")
@@ -146,7 +230,7 @@ async def trigger_processing(req: ProcessRequest):
             raise HTTPException(404, "No source/videos directory")
         video_files = sorted(
             f for f in SOURCE_DIR.iterdir()
-            if f.suffix.lower() in (".mp4", ".avi", ".mov", ".mkv")
+            if f.suffix.lower() in VIDEO_EXTENSIONS
         )
 
     jobs[job_id] = {
@@ -208,39 +292,43 @@ async def clear_completed():
     return {"cleared": len(to_remove)}
 
 
-# ─── Data endpoints (for Embedding Workbench) ───
+# ─── Metadata / face data ───
 
 @app.get("/api/videos/metadata/dense/{video_id}")
 async def get_dense_metadata(video_id: str):
     """Return full dense metadata JSON for a processed video."""
-    if not _VIDEO_ID_RE.match(video_id):
-        raise HTTPException(400, "Invalid video_id")
-    metadata_dir = Path("../local_output/metadata")
-    for pattern in [f"{video_id}_metadata.json", f"{video_id}.json"]:
-        meta_path = metadata_dir / pattern
-        if meta_path.exists():
-            with open(meta_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-    raise HTTPException(status_code=404, detail=f"Metadata not found for {video_id}")
+    meta_path = _metadata_path(video_id)
+    if not meta_path.exists():
+        raise HTTPException(404, f"Metadata not found for {video_id}")
+    return _load_json_cached(meta_path)
 
 
 @app.get("/api/faces/detect")
 async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
-    """Return faces at a given timestamp from pre-computed metadata."""
-    if not _VIDEO_ID_RE.match(video_id):
-        raise HTTPException(400, "Invalid video_id")
-    metadata_dir = Path("../local_output/metadata")
-    meta_path = metadata_dir / f"{video_id}_metadata.json"
+    """Return faces at a given timestamp from pre-computed metadata.
+
+    Floor matching: returns the most recent frame at or before the timestamp,
+    so boxes never appear ahead of the face (same convention as the annotator).
+    """
+    import bisect
+
+    meta_path = _metadata_path(video_id)
     if not meta_path.exists():
         return {"faces": []}
-    with open(meta_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = _load_json_cached(meta_path)
     frame_data = data.get("frame_data", [])
     if not frame_data:
         return {"faces": []}
-    nearest = min(frame_data, key=lambda fd: abs(fd["timestamp"] - timestamp))
+
+    frames = sorted(frame_data, key=lambda fd: fd["timestamp"])
+    timestamps = [fd["timestamp"] for fd in frames]
+    idx = bisect.bisect_right(timestamps, timestamp)
+    if idx == 0:
+        return {"faces": []}
+    frame = frames[idx - 1]
+
     faces = []
-    for r in nearest.get("recognitions", []):
+    for r in frame.get("recognitions", []):
         top, right, bottom, left = r["face_location"]
         faces.append({
             "bbox": [left, top, right, bottom],
@@ -255,10 +343,131 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
     return {"faces": faces}
 
 
+@app.get("/api/recognition/results")
+async def recognition_results(contestant_id: str, video_id: Optional[str] = None):
+    """Appearances of a contestant, across all videos or within one."""
+    if video_id is not None:
+        targets = [(video_id, _metadata_path(video_id))]
+    else:
+        targets = list(_iter_metadata_files())
+
+    results = []
+    for vid, path in targets:
+        if not path.exists():
+            continue
+        try:
+            data = _load_json_cached(path)
+        except (json.JSONDecodeError, OSError):
+            continue
+        entry = data.get("contestant_timeline", {}).get(str(contestant_id))
+        if not entry:
+            continue
+        for appearance in entry.get("appearances", []):
+            results.append({
+                "video_id": vid,
+                "timestamp": appearance.get("timestamp", 0),
+                "confidence": appearance.get("confidence", 0),
+                "frame_number": appearance.get("frame_number"),
+            })
+
+    results.sort(key=lambda r: (r["video_id"], r["timestamp"]))
+    return {"results": results}
+
+
+# ─── Face flagging (persisted to local_output/flagged_faces.json) ───
+
+_flags_lock = asyncio.Lock()
+
+
+def _load_flags() -> list[dict]:
+    if not FLAGS_PATH.exists():
+        return []
+    try:
+        with open(FLAGS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Could not read %s — starting with empty flag list", FLAGS_PATH)
+        return []
+
+
+def _save_flags(flags: list[dict]) -> None:
+    FLAGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = FLAGS_PATH.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(flags, f, ensure_ascii=False, indent=2)
+    tmp.replace(FLAGS_PATH)
+
+
+@app.post("/api/faces/flag")
+async def flag_face(req: FlagRequest):
+    """Flag a face for review."""
+    record = {
+        "id": uuid.uuid4().hex[:12],
+        "contestant_id": req.contestant_id,
+        "video_id": req.video_id,
+        "timestamp": req.timestamp,
+        "confidence": req.confidence if req.confidence is not None else 0,
+        "bbox": req.bbox,
+        "status": "pending",
+        "user_label": req.user_label,
+        "thumbnail": req.thumbnail,
+        "created_at": _now(),
+    }
+    async with _flags_lock:
+        flags = _load_flags()
+        flags.append(record)
+        _save_flags(flags)
+    return record
+
+
 @app.get("/api/faces/flagged")
 async def get_flagged_faces(details: bool = False):
-    """Return flagged faces (stub — returns empty for now)."""
-    return {"flagged_faces": []}
+    """Return flagged faces; thumbnails only when details=true."""
+    flags = _load_flags()
+    if not details:
+        flags = [{k: v for k, v in f.items() if k != "thumbnail"} for f in flags]
+    return {"flagged_faces": flags}
+
+
+@app.patch("/api/faces/flagged/{face_id}")
+async def update_flag_status(face_id: str, req: FlagStatusUpdate):
+    """Accept or reject a flagged face."""
+    if req.status not in ("pending", "accepted", "rejected"):
+        raise HTTPException(400, f"Invalid status: {req.status}")
+    async with _flags_lock:
+        flags = _load_flags()
+        for f in flags:
+            if f["id"] == face_id:
+                f["status"] = req.status
+                _save_flags(flags)
+                return f
+    raise HTTPException(404, "Flagged face not found")
+
+
+@app.delete("/api/faces/flagged/{face_id}")
+async def delete_flagged_face(face_id: str):
+    """Remove a flagged face."""
+    async with _flags_lock:
+        flags = _load_flags()
+        remaining = [f for f in flags if f["id"] != face_id]
+        if len(remaining) == len(flags):
+            raise HTTPException(404, "Flagged face not found")
+        _save_flags(remaining)
+    return {"deleted": face_id}
+
+
+@app.post("/api/faces/flag/update")
+async def reassign_flagged_face(req: FlagReassign):
+    """Reassign a flagged face to a different contestant."""
+    async with _flags_lock:
+        flags = _load_flags()
+        for f in flags:
+            if f["id"] == req.face_id:
+                f["contestant_id"] = req.contestant_id
+                f["status"] = "pending"
+                _save_flags(flags)
+                return f
+    raise HTTPException(404, "Flagged face not found")
 
 
 @app.get("/api/system/status")

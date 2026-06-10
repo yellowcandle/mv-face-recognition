@@ -5,7 +5,7 @@ const navItems = [
   { to: '/', icon: '📊', label: 'Dashboard' },
   { to: '/player', icon: '▶️', label: 'Video Player' },
   { to: '/contestants', icon: '👥', label: 'Contestants' },
-  { to: '/ingestion', icon: '📤', label: 'Ingestion' },
+  // Ingestion hidden until its backend endpoints exist again (see TODO.md)
   { to: '/analytics', icon: '📈', label: 'Analytics' },
   { to: '/flagging', icon: '🚩', label: 'Flagging' },
   { separator: true },

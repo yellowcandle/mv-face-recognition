@@ -38,12 +38,12 @@ export function Analytics() {
     return Object.entries(metadata.contestant_timeline)
       .map(([key, info]) => ({
         nickname: key,
-        name: key,
+        name: info.contestant_info?.name ?? key,
         appearances: info.total_appearances,
-        avgConfidence: info.avg_confidence,
-        maxConfidence: info.max_confidence,
-        firstSeen: info.first_appearance_time,
-        lastSeen: info.last_appearance_time,
+        avgConfidence: info.average_confidence,
+        maxConfidence: Math.max(0, ...(info.appearances ?? []).map((a) => a.confidence)),
+        firstSeen: info.first_appearance,
+        lastSeen: info.last_appearance,
       }))
       .sort((a, b) =>
         sortBy === 'appearances'
@@ -52,7 +52,7 @@ export function Analytics() {
       );
   }, [metadata, sortBy]);
 
-  const summary = metadata?.recognition_summary;
+  const summary = metadata?.processing_summary;
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
@@ -75,9 +75,9 @@ export function Analytics() {
       {summary && (
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Frames', value: summary.total_frames_processed.toLocaleString() },
+            { label: 'Frames', value: summary.frames_processed.toLocaleString() },
             { label: 'Faces Detected', value: summary.total_faces_detected.toLocaleString() },
-            { label: 'Recognized', value: summary.total_faces_recognized.toLocaleString() },
+            { label: 'Recognized', value: summary.total_recognitions.toLocaleString() },
             { label: 'Unique Contestants', value: summary.unique_contestants },
           ].map((s) => (
             <Card key={s.label}>
