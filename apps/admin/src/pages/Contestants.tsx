@@ -233,7 +233,9 @@ export function Contestants() {
                       <span className="text-xs text-slate-500">{selectedContestant.age} years old</span>
                     )}
                     {selectedContestant.has_embedding && (
-                      <Badge variant="success" size="sm">Has Embedding</Badge>
+                      <Badge variant="success" size="sm">
+                        {selectedContestant.reference_count} reference{selectedContestant.reference_count === 1 ? '' : 's'}
+                      </Badge>
                     )}
                   </div>
                 </div>

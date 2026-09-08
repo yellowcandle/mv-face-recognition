@@ -30,11 +30,10 @@ face_detection:
 # Face Recognition with ChromaDB Integration
 face_recognition:
   similarity_threshold: 0.7  # Confidence threshold
-  tolerance: 0.68  # Cosine distance threshold for InsightFace (lower = stricter). Typical same-person: 0.3-0.5, cross-person: 0.6-1.0
-  max_distance: 0.68  # Maximum face distance for recognition
+  tolerance: 0.55  # Cosine DISTANCE (1 - cosine similarity), so this accepts above 0.45 cosine. Lower = stricter. Provisional until ground truth exists.
+  max_distance: 0.55  # Maximum cosine distance for recognition
   high_confidence_threshold: 0.85  # Early termination threshold (optimization)
   use_existing_embeddings: true
-  embeddings_path: "../source/photo/contestants"
   enable_interpolation: true  # Linear interpolation between detections
   confidence_decay: 0.95  # For interpolated frames
   enable_batch_processing: true  # Batch process multiple frames (optimization)
@@ -42,7 +41,6 @@ face_recognition:
 # Contestant Database (Critical Files)
 contestants:
   photo_dir: "../source/photo/contestants"  # 95 contestant photos and embeddings
-  embeddings_cache: "data/embeddings_cache.pkl"
   info_csv: "../source/contestant_info.csv"  # Essential contestant mapping
   chroma_db_path: "../database/chroma_db"
 

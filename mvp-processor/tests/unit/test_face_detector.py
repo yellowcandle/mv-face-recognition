@@ -4,9 +4,9 @@ All InsightFace model calls are mocked so tests run without the 300MB model.
 """
 
 import sys
+import json
 import pytest
 import numpy as np
-import logging
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock
 
@@ -46,6 +46,46 @@ def _similar_vec(base, noise_scale=0.02, seed=None):
     rng = np.random.RandomState(seed)
     noisy = base + rng.randn(*base.shape).astype(np.float32) * noise_scale
     return noisy / np.linalg.norm(noisy)
+
+
+def _write_reference_cache(photo_dir, contestant_ids, embeddings, reference_count=None):
+    """Write a synthetic reference_embeddings.npz + reference_manifest.json pair.
+
+    *reference_count* defaults to the true row count; pass a different value to fake a
+    stale manifest.
+    """
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    embeddings = np.asarray(embeddings, dtype=np.float32)
+    n = len(contestant_ids)
+    np.savez(
+        photo_dir / "reference_embeddings.npz",
+        embeddings=embeddings,
+        contestant_ids=np.array(contestant_ids, dtype="U8"),
+        photo_paths=np.array([f"contestant_{c}/photo_{i}.jpg" for i, c in enumerate(contestant_ids)]),
+        n_faces=np.ones(n, dtype=np.int32),
+        det_scores=np.full(n, 0.9, dtype=np.float32),
+    )
+    manifest = {
+        "generated_at": "2026-09-08T00:00:00+00:00",
+        "photo_count": n,
+        "reference_count": len(embeddings) if reference_count is None else reference_count,
+        "contestant_count": len(set(contestant_ids)),
+        "photo_list_sha256": "0" * 64,
+        "dropped": {},
+        "references_per_contestant": {c: contestant_ids.count(c) for c in set(contestant_ids)},
+    }
+    (photo_dir / "reference_manifest.json").write_text(json.dumps(manifest))
+
+
+def _cache_config(sample_config, photo_dir, tmp_path):
+    """sample_config with contestants.photo_dir pointed at a synthetic cache directory."""
+    config = dict(sample_config)
+    config["contestants"] = {
+        "photo_dir": str(photo_dir),
+        "embeddings_cache": str(tmp_path / "cache.pkl"),
+        "info_csv": str(tmp_path / "info.csv"),
+    }
+    return config
 
 
 # ---------------------------------------------------------------------------
@@ -234,10 +274,16 @@ class TestFaceDetector:
 class TestFaceRecognizer:
 
     def _make_db(self, sample_config, encodings_dict, info_dict=None):
-        """Helper to build a ContestantDatabase with preset encodings."""
+        """Build a ContestantDatabase with a preset reference set.
+
+        *encodings_dict* maps contestant_id -> (K, 512) reference block. Flattening goes
+        through the real flatten_references() so the flat lists the recognizer reads are
+        built exactly as production builds them.
+        """
         db = ContestantDatabase(sample_config)
-        db.face_encodings = encodings_dict
-        db.contestant_names = list(encodings_dict.keys())
+        db.face_encodings = {cid: np.atleast_2d(v) for cid, v in encodings_dict.items()}
+        db.contestant_names = list(db.face_encodings)
+        db.flatten_references()
         if info_dict:
             db.contestants_info = info_dict
         return db
@@ -299,6 +345,48 @@ class TestFaceRecognizer:
         results = recognizer.recognize_faces([det])
         assert results == []
 
+    def test_matches_nearest_reference_photo_not_the_average(self, sample_config):
+        """A contestant with 3 reference photos matches on ANY ONE of them.
+
+        This is the whole point of the reference-set migration: the query is close to the
+        third reference and far from the other two, which is exactly the case a single
+        averaged vector per contestant gets wrong.
+        """
+        refs = np.stack([_normalized_vec(seed=s) for s in (1, 2, 3)])
+        known = {
+            "7": refs,
+            "8": np.atleast_2d(_normalized_vec(seed=400)),
+        }
+        info = {
+            "7": {"name": "Multi", "nickname": "M", "age": "21"},
+            "8": {"name": "Other", "nickname": "O", "age": "23"},
+        }
+        db = self._make_db(sample_config, known, info)
+        recognizer = FaceRecognizer(sample_config, db)
+
+        query = _similar_vec(refs[2], noise_scale=0.01, seed=555)
+        # Far from the other two references of the same contestant.
+        tolerance = sample_config["face_recognition"]["tolerance"]
+        assert 1 - np.dot(query, refs[0]) > tolerance
+        assert 1 - np.dot(query, refs[1]) > tolerance
+        # And the old averaged-vector representation would have rejected it outright.
+        averaged = refs.mean(axis=0)
+        averaged /= np.linalg.norm(averaged)
+        assert 1 - np.dot(query, averaged) > tolerance
+
+        det = FaceDetection(
+            location=(50, 200, 180, 100),
+            encoding=query,
+            timestamp=3.0,
+            frame_number=90,
+            confidence=0.9,
+        )
+
+        results = recognizer.recognize_faces([det])
+        assert len(results) == 1
+        assert results[0].contestant_id == "7"
+        assert results[0].contestant_name == "Multi"
+
 
 # ---------------------------------------------------------------------------
 # ⑪ – ⑫  Batch recognition tests
@@ -309,12 +397,12 @@ class TestBatchRecognition:
 
     def test_batch_matches_single_path(self, sample_config, base_embedding):
         """⑪ recognize_faces_batch() produces the same match as recognize_faces()."""
-        known = {"1": base_embedding}
         info = {"1": {"name": "Bob", "nickname": "B", "age": "25"}}
         db = ContestantDatabase(sample_config)
-        db.face_encodings = known
+        db.face_encodings = {"1": np.atleast_2d(base_embedding)}
         db.contestant_names = ["1"]
         db.contestants_info = info
+        db.flatten_references()
 
         recognizer = FaceRecognizer(sample_config, db)
 
@@ -337,12 +425,12 @@ class TestBatchRecognition:
 
     def test_batch_uses_cosine_distance(self, sample_config, base_embedding):
         """⑫ Batch path computes cosine distances (not L2)."""
-        known = {"1": base_embedding}
         info = {"1": {"name": "Carol", "nickname": "C", "age": "22"}}
         db = ContestantDatabase(sample_config)
-        db.face_encodings = known
+        db.face_encodings = {"1": np.atleast_2d(base_embedding)}
         db.contestant_names = ["1"]
         db.contestants_info = info
+        db.flatten_references()
 
         recognizer = FaceRecognizer(sample_config, db)
 
@@ -372,90 +460,94 @@ class TestBatchRecognition:
 @pytest.mark.unit
 class TestContestantDatabase:
 
-    def test_load_npy_embeddings_512dim(self, sample_config, tmp_path, base_embedding):
-        """⑬ A 512-dim .npy file is loaded correctly into face_encodings."""
-        # Set up directory and files
+    def test_load_reference_cache(self, sample_config, tmp_path):
+        """⑬ The consolidated .npz cache loads as a per-contestant reference set."""
         photo_dir = tmp_path / "contestants"
-        photo_dir.mkdir()
-        nickname = "TestNick"
-        npy_path = photo_dir / f"{nickname}_embedding.npy"
-        np.save(str(npy_path), base_embedding)
+        ids = ["1", "1", "1", "2", "42"]
+        embeddings = np.stack([_normalized_vec(seed=s) for s in range(len(ids))])
+        _write_reference_cache(photo_dir, ids, embeddings)
 
-        config = dict(sample_config)
-        config["contestants"] = {
-            "photo_dir": str(photo_dir),
-            "embeddings_cache": str(tmp_path / "cache.pkl"),
-            "info_csv": str(tmp_path / "info.csv"),
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
+        db.contestants_info = {
+            c: {"id": c, "name": f"Name{c}", "nickname": f"Nick{c}", "age": "20"}
+            for c in ("1", "2", "42")
         }
-
-        db = ContestantDatabase(config)
-        db.contestants_info = {"1": {"id": "1", "name": "Test", "nickname": nickname, "age": "20"}}
 
         db.build_face_encodings()
 
-        assert "1" in db.face_encodings
-        assert db.face_encodings["1"].shape == (512,)
-        np.testing.assert_allclose(db.face_encodings["1"], base_embedding, atol=1e-6)
+        assert set(db.face_encodings) == {"1", "2", "42"}
+        assert db.face_encodings["1"].shape == (3, 512)
+        assert db.face_encodings["2"].shape == (1, 512)
+        assert db.face_encodings["42"].shape == (1, 512)
+        np.testing.assert_allclose(db.face_encodings["1"], embeddings[:3], atol=1e-6)
+        assert sorted(db.contestant_names) == ["1", "2", "42"]
 
-    def test_photo_fallback_produces_512dim(self, sample_config, tmp_path, base_embedding):
-        """⑭ When no .npy exists, InsightFace encodes photos and produces 512-dim embedding."""
+    def test_reference_set_is_not_flattened(self, sample_config, tmp_path):
+        """⑭ An (N, 512) block stays N separate references — not 1, and not one 1536-vector.
+
+        Regression guard for the trap in ADR 0001: the old loader flattened before checking
+        the dimension, so a 3-photo contestant became a (1536,) vector, failed the `== 512`
+        check, and was silently dropped.
+        """
         photo_dir = tmp_path / "contestants"
-        photos_subdir = photo_dir / "photos" / "contestant_1"
-        photos_subdir.mkdir(parents=True)
+        ids = ["1", "1", "1"]
+        embeddings = np.stack([_normalized_vec(seed=s) for s in (10, 11, 12)])
+        _write_reference_cache(photo_dir, ids, embeddings)
 
-        # Create a dummy jpg (content doesn't matter since we mock InsightFace)
-        dummy_jpg = photos_subdir / "face.jpg"
-        dummy_jpg.write_bytes(b"\xff\xd8\xff" + b"\x00" * 100)
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
+        db.build_face_encodings()
 
-        config = dict(sample_config)
-        config["contestants"] = {
-            "photo_dir": str(photo_dir),
-            "embeddings_cache": str(tmp_path / "cache.pkl"),
-            "info_csv": str(tmp_path / "info.csv"),
-        }
+        assert len(db.reference_encodings) == 3
+        assert db.reference_ids == ["1", "1", "1"]
+        assert all(ref.shape == (512,) for ref in db.reference_encodings)
+        np.testing.assert_allclose(np.asarray(db.reference_encodings), embeddings, atol=1e-6)
 
-        db = ContestantDatabase(config)
-        db.contestants_info = {"1": {"id": "1", "name": "Test", "nickname": "NoEmbedding", "age": "20"}}
+    def test_stale_manifest_raises(self, sample_config, tmp_path):
+        """A manifest whose reference_count disagrees with the .npz is a loud failure."""
+        photo_dir = tmp_path / "contestants"
+        ids = ["1", "2"]
+        embeddings = np.stack([_normalized_vec(seed=s) for s in (20, 21)])
+        _write_reference_cache(photo_dir, ids, embeddings, reference_count=663)
 
-        mock_face = MockFace(bbox=[0, 0, 100, 100], det_score=0.95, normed_embedding=base_embedding)
-        mock_app = MagicMock()
-        mock_app.get.return_value = [mock_face]
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
 
-        with patch("src.face_detector._get_insightface_app", return_value=mock_app):
-            with patch("cv2.imread", return_value=np.zeros((100, 100, 3), dtype=np.uint8)):
-                db.build_face_encodings()
-
-        assert "1" in db.face_encodings
-        assert db.face_encodings["1"].shape == (512,)
+        with pytest.raises(ValueError, match="Stale reference cache"):
+            db.build_face_encodings()
 
 
 # ---------------------------------------------------------------------------
-# ⑮  Embedding validation
+# ⑮  Reference cache validation — a bad cache raises, it never loads empty
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
 class TestEmbeddingValidation:
 
-    def test_zero_vector_embedding_skipped(self, sample_config, tmp_path, caplog):
-        """⑮ A .npy with all zeros is skipped and a warning is logged."""
+    def test_missing_cache_raises(self, sample_config, tmp_path):
+        """⑮ No cache file at all raises instead of quietly recognising nobody."""
         photo_dir = tmp_path / "contestants"
         photo_dir.mkdir()
-        nickname = "ZeroVec"
-        npy_path = photo_dir / f"{nickname}_embedding.npy"
-        np.save(str(npy_path), np.zeros(512, dtype=np.float32))
 
-        config = dict(sample_config)
-        config["contestants"] = {
-            "photo_dir": str(photo_dir),
-            "embeddings_cache": str(tmp_path / "cache.pkl"),
-            "info_csv": str(tmp_path / "info.csv"),
-        }
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
 
-        db = ContestantDatabase(config)
-        db.contestants_info = {"1": {"id": "1", "name": "Zero", "nickname": nickname, "age": "20"}}
-
-        with caplog.at_level(logging.WARNING, logger="src.face_detector"):
+        with pytest.raises(FileNotFoundError, match="Reference embedding cache not found"):
             db.build_face_encodings()
 
-        assert "1" not in db.face_encodings
-        assert any("Zero-norm" in msg or "zero-norm" in msg.lower() or "Zero" in msg for msg in caplog.messages)
+    def test_wrong_dimension_cache_raises(self, sample_config, tmp_path):
+        """A cache with the wrong embedding width raises rather than loading garbage."""
+        photo_dir = tmp_path / "contestants"
+        _write_reference_cache(photo_dir, ["1", "2"], np.zeros((2, 128), dtype=np.float32))
+
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
+
+        with pytest.raises(ValueError, match=r"expected \(N, 512\)"):
+            db.build_face_encodings()
+
+    def test_empty_cache_raises(self, sample_config, tmp_path):
+        """A well-formed but empty cache raises — recognition would match nobody."""
+        photo_dir = tmp_path / "contestants"
+        _write_reference_cache(photo_dir, [], np.zeros((0, 512), dtype=np.float32))
+
+        db = ContestantDatabase(_cache_config(sample_config, photo_dir, tmp_path))
+
+        with pytest.raises(ValueError, match="zero reference embeddings"):
+            db.build_face_encodings()

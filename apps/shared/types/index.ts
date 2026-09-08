@@ -4,7 +4,7 @@ export interface Contestant {
   nickname: string;
   age: number | null;
   has_embedding: boolean;
-  embedding_dim: number;
+  reference_count: number;
   avg_confidence: number;
   max_confidence: number;
   detection_count: number;

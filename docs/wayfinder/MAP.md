@@ -70,14 +70,20 @@ The map does **not** deploy. It ends at deploy-ready.
   not migrated; `embedding_dim` → `reference_count`; HuggingFace stops holding embeddings.
   See [ADR 0001](../adr/0001-reference-embeddings-are-a-derived-cache.md).
 
+- [Triage the embedding-convention call sites](tickets/004-triage-the-embedding-convention-call-sites.md):
+  the blast radius is **11 sites, not ~40** — the count was inflated by two `.claude/worktrees/`
+  repo copies. Live Python is only `face_detector.py` and `local_api.py` plus two artifact-
+  producing scripts; 8 files are duplicates or cannot be imported at all and get deleted.
+
+- [Migrate the reference-embedding convention](tickets/012-migrate-the-reference-embedding-convention.md):
+  done. Matcher scores by max cosine over 663 per-photo references (94 contestants) from the new
+  cache; averaging and 95 legacy `.npy` deleted; `face_detector.py` 629 → 439 lines; threshold
+  0.68 → 0.55. Tests 19/19. Leave-one-out shows **no regression** (impostor @0.45 still 1.1%).
+
 ## Not yet specified
 
-- **Implementing** the reference-embedding migration. The shape is now settled (ADR 0001); the
-  blast radius still isn't, so this stays fog until *Triage the embedding-convention call
-  sites* closes. Known to be in it regardless: `face_detector.py:105-155` (both the loader and
-  the dead-`photos/` fallback), `local_api.py:189`, `generate_coverage.py:46-58`,
-  `compute_similarity.py:68`, `test_face_detector.py:376-460`, and deleting the 96 legacy
-  `.npy` files.
+_(The reference-embedding migration is no longer fog — shape settled by ADR 0001, blast radius
+enumerated by the triage. It is now specifiable work, not an open question.)_
 - **Backing up the reference photos.** Raised while closing the storage-shape ticket and left
   unanswered: the 964 photos exist only on the user's Mac. Whether this belongs to this map at
   all is a scoping call the user has not yet made.

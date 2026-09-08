@@ -302,8 +302,8 @@ export function EmbeddingWorkbench() {
                             <strong className="text-slate-200">{selectedContestant.videos_seen_in}</strong>
                           </div>
                           <div className="flex justify-between py-2 text-[13px] text-slate-400">
-                            <span>Embedding Dim</span>
-                            <strong className="text-slate-200">{selectedContestant.embedding_dim}</strong>
+                            <span>Reference Photos</span>
+                            <strong className="text-slate-200">{selectedContestant.reference_count}</strong>
                           </div>
                         </div>
                       </Card>

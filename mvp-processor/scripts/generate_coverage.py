@@ -15,7 +15,6 @@ import argparse
 import csv
 import json
 import logging
-import numpy as np
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -43,22 +42,21 @@ def load_contestants(csv_path: Path) -> list[dict]:
     return contestants
 
 
-def check_embedding(embeddings_dir: Path, nickname: str) -> dict:
-    """Check if a nickname embedding exists and get its properties."""
-    path = embeddings_dir / f"{nickname}_embedding.npy"
-    if not path.exists():
-        return {"exists": False, "dim": 0, "path": None}
+def load_reference_counts(embeddings_dir: Path) -> dict[str, int]:
+    """Read references-per-contestant from the cache manifest, keyed by contestant number.
 
-    try:
-        arr = np.load(str(path))
-        return {
-            "exists": True,
-            "dim": int(arr.flatten().shape[0]),
-            "path": str(path),
-        }
-    except Exception as e:
-        logger.warning(f"Failed to load embedding for {nickname}: {e}")
-        return {"exists": False, "dim": 0, "path": None}
+    The manifest is the committed record of what the reference cache contains; see
+    docs/adr/0001-reference-embeddings-are-a-derived-cache.md. Contestants absent from it
+    simply have no references.
+    """
+    path = embeddings_dir / "reference_manifest.json"
+    if not path.exists():
+        raise SystemExit(
+            f"{path} not found. Run: python scripts/build_reference_cache.py"
+        )
+    with open(path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    return {str(k): int(v) for k, v in manifest.get("references_per_contestant", {}).items()}
 
 
 def aggregate_metadata(metadata_dir: Path) -> dict:
@@ -135,6 +133,7 @@ def generate_coverage(
     """Generate the full coverage report."""
     contestants = load_contestants(csv_path)
     meta_stats = aggregate_metadata(metadata_dir)
+    ref_counts = load_reference_counts(embeddings_dir)
 
     results = []
     good_count = 0
@@ -144,7 +143,9 @@ def generate_coverage(
     conf_count = 0
 
     for c in contestants:
-        emb = check_embedding(embeddings_dir, c["nickname"])
+        # Reference sets are keyed by contestant number: nicknames are display labels and are
+        # not stable (7 of 96 differ by whitespace across sources).
+        reference_count = ref_counts.get(c["id"], 0)
 
         # Look up metadata stats by nickname (primary key in contestant_timeline)
         m = meta_stats.get(c["nickname"], {
@@ -154,7 +155,7 @@ def generate_coverage(
             "videos_seen_in": [],
         })
 
-        quality = classify_quality(emb["exists"], m["avg_confidence"], m["detection_count"])
+        quality = classify_quality(reference_count > 0, m["avg_confidence"], m["detection_count"])
 
         if quality == "good":
             good_count += 1
@@ -172,8 +173,8 @@ def generate_coverage(
             "name": c["name"],
             "nickname": c["nickname"],
             "age": c["age"],
-            "has_embedding": emb["exists"],
-            "embedding_dim": emb["dim"],
+            "has_embedding": reference_count > 0,
+            "reference_count": reference_count,
             "avg_confidence": round(m["avg_confidence"], 4),
             "max_confidence": round(m["max_confidence"], 4),
             "detection_count": m["detection_count"],

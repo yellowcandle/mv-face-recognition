@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -49,8 +50,9 @@ OUTPUT_DIR = Path("../local_output")
 METADATA_DIR = OUTPUT_DIR / "metadata"
 PROCESSED_DIR = OUTPUT_DIR / "processed_videos"
 FLAGS_PATH = OUTPUT_DIR / "flagged_faces.json"
-PHOTOS_DIR = Path("../source/photo/contestants/photos")
+PHOTOS_DIR = Path("../source/photo/contestants/ig_photos")
 EMBEDDINGS_DIR = Path("../source/photo/contestants")
+REFERENCE_MANIFEST = EMBEDDINGS_DIR / "reference_manifest.json"
 CONTESTANT_CSV = Path("../metadata/contestant_info.csv")
 CONFIG_PATH = "config/processing_config.yaml"
 
@@ -174,27 +176,43 @@ async def stream_video(video_id: str):
     raise HTTPException(404, f"No video file found for {video_id}")
 
 
+@lru_cache(maxsize=1)
+def _references_per_contestant() -> dict[str, int]:
+    """Reference-photo counts from the embedding-cache manifest, keyed by contestant number.
+
+    Read once per process; the manifest only changes when the cache is rebuilt.
+    """
+    try:
+        manifest = json.loads(REFERENCE_MANIFEST.read_text(encoding="utf-8"))
+        return manifest["references_per_contestant"]
+    except (OSError, KeyError, json.JSONDecodeError) as e:
+        logger.warning(f"Cannot read {REFERENCE_MANIFEST} ({e}); reporting 0 references for all")
+        return {}
+
+
 @app.get("/api/contestants")
 async def list_contestants():
-    """List contestants from CSV, with embedding availability."""
+    """List contestants from CSV, with reference-embedding availability."""
     import csv
     if not CONTESTANT_CSV.exists():
         return []
 
+    counts = _references_per_contestant()
     contestants = []
     with open(CONTESTANT_CSV, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            nickname = row["暱稱"].strip()
-            has_embedding = (EMBEDDINGS_DIR / f"{nickname}_embedding.npy").exists()
+            contestant_id = row["編號"].strip()
+            reference_count = int(counts.get(contestant_id, 0))
             contestants.append({
-                "id": row["編號"].strip(),
-                "number": int(row["編號"].strip()),
+                "id": contestant_id,
+                "number": int(contestant_id),
                 "name": row["姓名"].strip(),
-                "nickname": nickname,
+                "nickname": row["暱稱"].strip(),
                 "age": int(row["年齡"]) if row.get("年齡", "").strip() else None,
-                "has_embedding": has_embedding,
-                "quality": "good" if has_embedding else "missing",
+                "has_embedding": reference_count > 0,
+                "reference_count": reference_count,
+                "quality": "good" if reference_count else "missing",
             })
     return contestants
 

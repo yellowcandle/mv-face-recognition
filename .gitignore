@@ -21,6 +21,10 @@ source/photo/contestants/**/*.jpeg
 
 # Embedding files and model artifacts
 *.npy
+# Derived reference-embedding cache: regenerate with
+# mvp-processor/scripts/build_reference_cache.py (see docs/adr/0001).
+# The committed reference_manifest.json is what detects staleness.
+source/photo/contestants/reference_embeddings.npz
 *.pkl
 *.joblib
 *.h5

@@ -5,6 +5,7 @@ Using InsightFace buffalo_l model for 512-dim ArcFace embeddings
 """
 
 import cv2
+import json
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -63,15 +64,19 @@ class FaceRecognition:
 class ContestantDatabase:
     """Manages contestant photos and face encodings"""
 
+    EMBED_DIM = 512
+
     def __init__(self, config: dict):
         self.config = config
         self.photo_dir = Path(config["contestants"]["photo_dir"])
-        self.embeddings_cache = config["contestants"]["embeddings_cache"]
         self.info_csv = config["contestants"]["info_csv"]
 
         self.contestants_info = {}
-        self.face_encodings = {}
+        self.face_encodings = {}  # contestant_id -> (K, 512), one row per reference photo
         self.contestant_names = []
+        # Flat, parallel lists — one entry per reference photo. Built once, read every frame.
+        self.reference_encodings: List[np.ndarray] = []
+        self.reference_ids: List[str] = []
 
     def load_contestants_info(self):
         """Load contestant information from CSV"""
@@ -89,69 +94,89 @@ class ContestantDatabase:
         except Exception as e:
             logger.error(f"Failed to load contestants info: {e}")
 
+    def flatten_references(self):
+        """Flatten contestant -> (K, 512) into parallel lists, one entry per reference photo.
+
+        Built once at load time so the recognition loop's argmin over these entries *is*
+        max cosine over every reference photo of every contestant.
+        """
+        self.reference_encodings = []
+        self.reference_ids = []
+        for contestant_id, refs in self.face_encodings.items():
+            rows = np.atleast_2d(refs)
+            self.reference_encodings.extend(rows)
+            self.reference_ids.extend([contestant_id] * len(rows))
+
     def build_face_encodings(self, force_rebuild: bool = False):
-        """Build face encodings for all contestants from local photos or existing embeddings"""
-        logger.info("Building face encodings from local photos or embeddings...")
+        """Load per-photo reference embeddings from the consolidated cache.
 
-        self.face_encodings = {}
-        self.contestant_names = []
+        The cache is derived data regenerated from the photos in `ig_photos/` by
+        `scripts/build_reference_cache.py`; see
+        docs/adr/0001-reference-embeddings-are-a-derived-cache.md. It is keyed by contestant
+        number, never nickname — 7 of 96 nicknames differ from the CSV by whitespace alone.
+        """
+        cache_path = self.photo_dir / "reference_embeddings.npz"
+        manifest_path = self.photo_dir / "reference_manifest.json"
+        rebuild_hint = f"Rebuild it with: python scripts/build_reference_cache.py"
 
-        contestants_dir = self.photo_dir
+        if not cache_path.exists():
+            raise FileNotFoundError(
+                f"Reference embedding cache not found at {cache_path}. {rebuild_hint}"
+            )
 
-        for contestant_id, info in self.contestants_info.items():
-            nickname = info.get("nickname", "")
+        with np.load(cache_path, allow_pickle=False) as cache:
+            embeddings = cache["embeddings"]
+            contestant_ids = cache["contestant_ids"].astype(str)
 
-            # First, try to load existing embedding from {nickname}_embedding.npy
-            embedding_path = contestants_dir / f"{nickname}_embedding.npy"
-            if embedding_path.exists():
-                try:
-                    encoding = np.load(str(embedding_path))
-                    # Ensure encoding is 1D (flatten if needed)
-                    encoding = encoding.flatten()
+        # Validate the 2-D shape directly. Do NOT flatten first: an (N, 512) array flattens to
+        # (N*512,) and would fail a `shape[0] != 512` test, silently dropping every reference.
+        if embeddings.ndim != 2 or embeddings.shape[1] != self.EMBED_DIM:
+            raise ValueError(
+                f"Reference cache {cache_path} holds embeddings of shape {embeddings.shape}, "
+                f"expected (N, {self.EMBED_DIM}). {rebuild_hint}"
+            )
+        if len(contestant_ids) != len(embeddings):
+            raise ValueError(
+                f"Reference cache {cache_path} has {len(embeddings)} embeddings but "
+                f"{len(contestant_ids)} contestant ids. {rebuild_hint}"
+            )
 
-                    # Validate norm (skip zero-norm embeddings)
-                    if np.linalg.norm(encoding) == 0:
-                        logger.warning(f"Zero-norm embedding for {nickname}, skipping")
-                        continue
+        # Count check only — hashing the photos on every load would be far too slow.
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            if manifest.get("reference_count") != len(embeddings):
+                raise ValueError(
+                    f"Stale reference cache: {manifest_path} records "
+                    f"{manifest.get('reference_count')} references but {cache_path} holds "
+                    f"{len(embeddings)}. {rebuild_hint}"
+                )
+        else:
+            logger.warning(f"No reference manifest at {manifest_path}; cannot verify cache freshness")
 
-                    # Validate dimension
-                    if encoding.shape[0] != 512:
-                        logger.warning(
-                            f"Unexpected embedding dimension {encoding.shape[0]} for {nickname}, expected 512. Skipping."
-                        )
-                        continue
+        self.face_encodings = {
+            contestant_id: embeddings[contestant_ids == contestant_id]
+            for contestant_id in np.unique(contestant_ids).tolist()
+        }
+        self.contestant_names = list(self.face_encodings)
+        self.flatten_references()
 
-                    self.face_encodings[contestant_id] = encoding
-                    self.contestant_names.append(contestant_id)
-                    logger.debug(f"Loaded embedding for contestant {contestant_id} ({nickname}), shape: {encoding.shape}")
-                    continue
-                except Exception as e:
-                    logger.warning(f"Failed to load embedding for {nickname}: {e}")
+        if not self.reference_encodings:
+            raise ValueError(
+                f"Loaded zero reference embeddings from {cache_path} — recognition would match "
+                f"nobody. {rebuild_hint}"
+            )
 
-            # Fall back to generating from photos in photos/contestant_{id}/ using InsightFace
-            photos_subdir = contestants_dir / "photos" / f"contestant_{contestant_id}"
-            if photos_subdir.exists():
-                encodings = []
-                for photo_path in photos_subdir.glob("*.jpg"):
-                    try:
-                        app = _get_insightface_app()
-                        image = cv2.imread(str(photo_path))
-                        if image is not None:
-                            faces = app.get(image)
-                            if faces:
-                                encodings.append(faces[0].normed_embedding)
-                                logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id}")
-                    except Exception as e:
-                        logger.warning(f"Failed to encode {photo_path}: {e}")
+        unknown = set(self.face_encodings) - set(self.contestants_info)
+        if unknown:
+            logger.warning(
+                f"{len(unknown)} contestant ids in the cache are absent from {self.info_csv}: "
+                f"{sorted(unknown)[:10]}"
+            )
 
-                if encodings:
-                    # Average multiple encodings if available
-                    avg_encoding = np.mean(encodings, axis=0)
-                    self.face_encodings[contestant_id] = avg_encoding
-                    self.contestant_names.append(contestant_id)
-                    logger.info(f"Built encoding for contestant {contestant_id} ({nickname}) from {len(encodings)} photos")
-
-        logger.info(f"Built {len(self.face_encodings)} face encodings for {len(self.contestant_names)} contestants")
+        logger.info(
+            f"Loaded {len(self.reference_encodings)} reference embeddings "
+            f"for {len(self.face_encodings)} contestants from {cache_path}"
+        )
 
     def get_contestant_info(self, contestant_id: str) -> Dict:
         """Get contestant information by ID"""
@@ -273,12 +298,14 @@ class FaceRecognizer:
         """
         recognitions = []
 
-        if not self.contestant_db.face_encodings:
+        if not self.contestant_db.reference_encodings:
             logger.warning("No contestant encodings available for recognition")
             return recognitions
 
-        known_encodings = list(self.contestant_db.face_encodings.values())
-        known_names = list(self.contestant_db.face_encodings.keys())
+        # One entry per reference photo, with the contestant id repeated, so the argmin below
+        # is max cosine over that contestant's whole reference set.
+        known_encodings = self.contestant_db.reference_encodings
+        known_names = self.contestant_db.reference_ids
 
         for detection in detections:
             try:
@@ -342,12 +369,12 @@ class FaceRecognizer:
         Returns:
             List of recognition lists, one per frame
         """
-        if not self.contestant_db.face_encodings:
+        if not self.contestant_db.reference_encodings:
             logger.warning("No contestant encodings available for recognition")
             return [[] for _ in detections_batch]
 
-        known_encodings = np.array(list(self.contestant_db.face_encodings.values()))
-        known_names = list(self.contestant_db.face_encodings.keys())
+        known_encodings = np.asarray(self.contestant_db.reference_encodings)
+        known_names = self.contestant_db.reference_ids
 
         results = []
 
@@ -409,193 +436,3 @@ class FaceRecognizer:
         )
         return filtered
 
-
-@dataclass
-class RegenerationResult:
-    """Result of embedding regeneration."""
-    success: bool
-    regenerated_count: int
-    failed_count: int
-    failed_contestants: List[Dict[str, str]] = field(default_factory=list)
-    embedding_dir: Optional[Path] = None
-    duration_seconds: float = 0.0
-    dimension: int = 512
-
-
-def regenerate_embeddings_from_contestant_photos(
-    photo_base_dir: Path,
-    embeddings_output_dir: Path,
-    contestants_csv_path: Path,
-    expected_dim: int = 512,
-) -> RegenerationResult:
-    """
-    Regenerate face embeddings from contestant photos using InsightFace buffalo_l.
-
-    This function creates 512-dimensional ArcFace embeddings from contestant photos,
-    matching the embeddings used during video processing for consistent recognition.
-
-    Args:
-        photo_base_dir: Base directory containing photos (expects photos/ subdirectory)
-        embeddings_output_dir: Directory to save regenerated embeddings
-        contestants_csv_path: Path to contestant_info.csv with contestant metadata
-        expected_dim: Expected embedding dimension (default: 512 for InsightFace ArcFace)
-
-    Returns:
-        RegenerationResult with count of successful/failed regenerations
-
-    Example:
-        >>> result = regenerate_embeddings_from_contestant_photos(
-        ...     photo_base_dir=Path("source/photo/contestants"),
-        ...     embeddings_output_dir=Path("source/photo/contestants"),
-        ...     contestants_csv_path=Path("metadata/contestant_info.csv"),
-        ... )
-        >>> print(f"Regenerated {result.regenerated_count} embeddings")
-    """
-    import time
-
-    start_time = time.time()
-    failed_contestants = []
-    regenerated_count = 0
-
-    # Ensure output directory exists
-    embeddings_output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Load contestant info
-    contestants_info = {}
-    try:
-        df = pd.read_csv(contestants_csv_path)
-        for _, row in df.iterrows():
-            contestant_id = str(row["編號"])
-            contestants_info[contestant_id] = {
-                "id": contestant_id,
-                "name": row["姓名"],
-                "nickname": row["暱稱"],
-                "age": str(row["年齡"]),
-            }
-        logger.info(f"Loaded {len(contestants_info)} contestants from CSV")
-    except Exception as e:
-        logger.error(f"Failed to load contestants CSV: {e}")
-        return RegenerationResult(
-            success=False,
-            regenerated_count=0,
-            failed_count=0,
-            failed_contestants=[{"id": "all", "reason": f"CSV load failed: {e}"}],
-            embedding_dir=embeddings_output_dir,
-            duration_seconds=time.time() - start_time,
-        )
-
-    # Process each contestant
-    for contestant_id, info in contestants_info.items():
-        nickname = info.get("nickname", "")
-        if not nickname:
-            logger.warning(f"Contestant {contestant_id} has no nickname, skipping")
-            continue
-
-        photos_subdir = photo_base_dir / "photos" / f"contestant_{contestant_id}"
-        if not photos_subdir.exists():
-            logger.warning(f"Photos directory not found: {photos_subdir}")
-            failed_contestants.append({
-                "contestant_id": contestant_id,
-                "nickname": nickname,
-                "reason": "photos_directory_not_found",
-            })
-            continue
-
-        # Find photo files
-        photo_extensions = {".jpg", ".jpeg", ".png"}
-        photo_files = [
-            f for f in photos_subdir.iterdir()
-            if f.suffix.lower() in photo_extensions
-        ]
-
-        if not photo_files:
-            logger.warning(f"No photos found in {photos_subdir}")
-            failed_contestants.append({
-                "contestant_id": contestant_id,
-                "nickname": nickname,
-                "reason": "no_photos_found",
-            })
-            continue
-
-        # Encode all photos using InsightFace
-        encodings = []
-        for photo_path in photo_files:
-            try:
-                app = _get_insightface_app()
-                image = cv2.imread(str(photo_path))
-                if image is not None:
-                    faces = app.get(image)
-                    if faces:
-                        encodings.append(faces[0].normed_embedding)
-                        logger.debug(f"Encoded {photo_path.name} for contestant {contestant_id} ({nickname})")
-                    else:
-                        logger.warning(f"No face detected in {photo_path}")
-                else:
-                    logger.warning(f"Failed to read image {photo_path}")
-            except Exception as e:
-                logger.warning(f"Failed to encode {photo_path}: {e}")
-                failed_contestants.append({
-                    "contestant_id": contestant_id,
-                    "nickname": nickname,
-                    "reason": f"encode_failed: {e}",
-                })
-
-        if encodings:
-            # Average multiple encodings for robustness
-            avg_encoding = np.mean(encodings, axis=0)
-
-            # Verify dimension
-            actual_dim = avg_encoding.shape[0] if avg_encoding.ndim == 1 else avg_encoding.shape[1]
-            if actual_dim != expected_dim:
-                logger.warning(
-                    f"Embedding dimension mismatch for {nickname}: "
-                    f"got {actual_dim}, expected {expected_dim}"
-                )
-
-            # Save embedding
-            embedding_path = embeddings_output_dir / f"{nickname}_embedding.npy"
-            try:
-                np.save(str(embedding_path), avg_encoding)
-                regenerated_count += 1
-                logger.info(
-                    f"Saved embedding for {nickname} ({contestant_id}): "
-                    f"{len(encodings)} photos, dim={actual_dim}"
-                )
-            except Exception as e:
-                logger.error(f"Failed to save embedding for {nickname}: {e}")
-                failed_contestants.append({
-                    "contestant_id": contestant_id,
-                    "nickname": nickname,
-                    "reason": f"save_failed: {e}",
-                })
-        else:
-            logger.warning(f"No valid encodings for contestant {contestant_id} ({nickname})")
-            failed_contestants.append({
-                "contestant_id": contestant_id,
-                "nickname": nickname,
-                "reason": "no_valid_encodings",
-            })
-
-    duration = time.time() - start_time
-    success = regenerated_count > 0 and len(failed_contestants) < len(contestants_info)
-
-    result = RegenerationResult(
-        success=success,
-        regenerated_count=regenerated_count,
-        failed_count=len(failed_contestants),
-        failed_contestants=failed_contestants,
-        embedding_dir=embeddings_output_dir,
-        duration_seconds=duration,
-        dimension=expected_dim,
-    )
-
-    logger.info(f"\n{'=' * 60}")
-    logger.info(f"Embedding Regeneration Summary:")
-    logger.info(f"  Total contestants: {len(contestants_info)}")
-    logger.info(f"  Successfully regenerated: {result.regenerated_count}")
-    logger.info(f"  Failed: {result.failed_count}")
-    logger.info(f"  Dimension: {result.dimension}")
-    logger.info(f"  Duration: {result.duration_seconds:.2f}s")
-    logger.info(f"{'=' * 60}\n")
-
-    return result
