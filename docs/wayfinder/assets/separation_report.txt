@@ -1,0 +1,102 @@
+photos embedded 672 / 741 on disk | contestants 83 / 96 | no face detected 69
+group-shot contamination: 232/672 photos (34.5%) have >1 face, and faces[0] picks by detection score, not identity
+
+  id nickname         n    mean     min     max
+   1 Ivy So           8   0.324  -0.073   0.708  4 multi-face
+   2 咖喱               9   0.418   0.038   0.711  0 multi-face
+   3 Marf             9   0.278  -0.034   0.943  2 multi-face
+   4 穎蕎               8   0.205  -0.098   0.648  3 multi-face
+   5 莎莎               9   0.514   0.345   0.714  3 multi-face
+   6 Hannah           5   0.393  -0.037   0.751  2 multi-face
+   7 Catrina          8   0.180  -0.101   0.664  5 multi-face
+   9 Carmina          9   0.560   0.361   0.815  0 multi-face
+  10 Zoe              9   0.467   0.111   0.696  2 multi-face
+  11 Dru              6   0.183  -0.102   0.518  2 multi-face
+  12 Sica             6   0.280  -0.047   0.488  1 multi-face
+  14 Elka             8   0.296  -0.066   0.677  2 multi-face
+  15 Carina           9   0.493   0.198   0.662  2 multi-face
+  16 子涓               6   0.542   0.460   0.617  0 multi-face
+  17 阿蛋               8   0.352  -0.074   0.719  2 multi-face
+  18 蘇菲               8   0.335  -0.055   0.715  4 multi-face
+  19 筠兒               9   0.294  -0.016   0.628  4 multi-face
+  20 Karen            9   0.121  -0.136   0.645  6 multi-face
+  21 Ling             9   0.119  -0.118   0.587  5 multi-face
+  22 暐翹               8   0.096  -0.155   0.401  5 multi-face
+  24 Ariel            9   0.404  -0.014   0.744  1 multi-face
+  25 Emiko            9   0.215  -0.067   0.661  5 multi-face
+  26 WINKA            8   0.296  -0.073   0.616  1 multi-face
+  27 Ada 仔            8   0.417   0.002   0.734  1 multi-face
+  28 Candy            8   0.246  -0.105   0.693  2 multi-face
+  29 Emi              9   0.272  -0.078   0.690  4 multi-face
+  30 Caca             8   0.256  -0.065   0.595  2 multi-face
+  31 阿杰               9   0.180  -0.068   0.646  5 multi-face
+  32 Kay              8   0.367  -0.059   0.705  2 multi-face
+  33 阿妹               8   0.388  -0.157   0.690  2 multi-face
+  34 CK               7   0.093  -0.086   0.599  3 multi-face
+  35 Ana              9   0.341  -0.031   0.722  4 multi-face
+  37 Puipui           8   0.281  -0.046   0.648  1 multi-face
+  38 Gao              8   0.077  -0.047   0.505  6 multi-face
+  39 Stella           8   0.267  -0.076   0.649  5 multi-face
+  40 芯駖               8   0.141  -0.164   0.512  5 multi-face
+  41 Man C            8   0.107  -0.112   0.618  7 multi-face
+  42 2Ling            9   0.193  -0.059   0.748  8 multi-face
+  43 Tengie           9   0.490  -0.006   0.785  3 multi-face
+  44 Mei Mei          9   0.517   0.270   0.682  1 multi-face
+  46 Chloe Au         9   0.577   0.362   0.737  2 multi-face
+  47 Ace              8   0.162  -0.049   0.513  7 multi-face
+  48 Yanny            8   0.348  -0.006   0.636  4 multi-face
+  49 Jolin            9   0.194  -0.050   0.686  3 multi-face
+  50 鐵鐵               9   0.535   0.378   0.704  2 multi-face
+  51 Bubu             9   0.332  -0.019   1.000  2 multi-face
+  52 Sinnie           9   0.413   0.068   0.632  3 multi-face
+  55 舒文               9   0.458   0.207   0.715  0 multi-face
+  56 米線               7   0.477   0.166   0.680  2 multi-face
+  57 Ariels           9   0.336   0.063   0.626  0 multi-face
+  59 嘉嘉               8   0.217  -0.061   0.588  3 multi-face
+  60 Win Win          8   0.037  -0.173   0.191  7 multi-face
+  62 榛綦               9   0.397   0.181   0.683  1 multi-face
+  63 露髀               8   0.213  -0.045   0.602  2 multi-face
+  64 Vicky            8   0.225  -0.103   0.719  3 multi-face
+  65 阿 Wing           4   0.238  -0.004   0.539  2 multi-face
+  68 阿 J              8   0.435   0.252   0.574  1 multi-face
+  70 東東               7   0.478   0.310   0.596  1 multi-face
+  71 家琪               6   0.221  -0.004   0.582  1 multi-face
+  72 Ika              4   0.090  -0.100   0.226  2 multi-face
+  73 Tania            9   0.396  -0.085   0.661  2 multi-face
+  74 So Ching         8   0.076  -0.101   0.460  5 multi-face
+  75 May May          9   0.225  -0.049   0.697  4 multi-face
+  76 Winkie           9   0.371  -0.023   0.766  4 multi-face
+  77 TABI             1   single photo, no within-person pair
+  78 馬欣               9   0.226  -0.044   0.631  1 multi-face
+  79 超酸               9   0.352  -0.066   0.747  6 multi-face
+  80 方方               7   0.084  -0.108   0.377  3 multi-face
+  81 Ash              9   0.543   0.412   0.676  1 multi-face
+  82 阿 Mic            9   0.574   0.399   0.745  1 multi-face
+  83 何佩               6   0.151  -0.016   0.560  1 multi-face
+  84 VAL              9   0.208  -0.143   0.537  5 multi-face
+  85 阿 bee            9   0.200  -0.074   0.664  5 multi-face
+  87 Yoyo             9   0.396   0.222   0.625  0 multi-face
+  88 Jackie           9   0.357  -0.013   0.645  1 multi-face
+  89 安希婷              8   0.329  -0.055   0.691  5 multi-face
+  90 Christine        9   0.322  -0.001   0.612  4 multi-face
+  91 Day              9   0.145  -0.135   0.448  5 multi-face
+  92 阿 Yo             8   0.186  -0.076   0.630  4 multi-face
+  93 Liu 哥            8   0.236  -0.055   0.674  3 multi-face
+  94 Yanis            9   0.437   0.011   0.708  1 multi-face
+  95 Alice            9   0.575   0.210   0.816  0 multi-face
+  96 3 妹              8   0.514  -0.018   0.782  0 multi-face
+
+within-person pairs    n=  4922 mean=0.318 sd=0.243 min=-0.173 max=1.000 | p5=-0.039 p50=0.365 p95=0.664 p99=0.740
+between-person pairs   n=445990 mean=0.034 sd=0.079 min=-0.280 max=1.000 | p5=-0.087 p50=0.030 p95=0.169 p99=0.235
+
+per-contestant within-person MAX : mean=0.646 median=0.662 min=0.191 max=1.000
+per-contestant within-person MEAN: mean=0.308 median=0.296 min=0.037 max=0.577
+contestants whose within-person max  >= 0.45: 77/82
+contestants whose within-person mean >= 0.45: 16/82
+between-person pairs above 0.2: 2.4%
+between-person pairs above production accept cosine 0.32: 0.1%
+single-photo contestants: 77
+
+GATE (matched mean >= 0.45, cross-person <= 0.2)
+  by within-person MAX per contestant : 0.646 vs cross 0.034 -> CLEARS
+  by within-person MEAN per contestant: 0.308 vs cross 0.034 -> FAILS
