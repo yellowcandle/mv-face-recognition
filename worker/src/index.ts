@@ -476,15 +476,6 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
     case '/recognition/results/':
       return await handleRecognitionResults(request, env, corsHeaders);
 
-    // Admin endpoints
-
-
-
-
-
-
-
-
     default:
       // Handle dynamic routes
       if (path.startsWith('/videos/metadata/dense/')) {
