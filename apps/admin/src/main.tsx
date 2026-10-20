@@ -8,7 +8,7 @@ import { Player } from '@/pages/Player';
 import { EmbeddingWorkbench } from '@/pages/EmbeddingWorkbench';
 import { Contestants } from '@/pages/Contestants';
 import { Flagging } from '@/pages/Flagging';
-import { Ingestion } from '@/pages/Ingestion';
+import { Labelling } from '@/pages/Labelling';
 import { Processing } from '@/pages/Processing';
 import './app.css';
 
@@ -30,12 +30,15 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Dashboard />} />
             <Route path="player" element={<Player />} />
             <Route path="contestants" element={<Contestants />} />
-            <Route path="ingestion" element={<Ingestion />} />
-            <Route path="analytics" element={<div className="text-slate-400">Analytics — coming soon</div>} />
+            {/* Ingestion page disabled: its /api/ingestion/* backend no longer
+                exists (worker routes deleted, local_api never had them).
+                Re-enable once local ingestion endpoints are implemented — see TODO.md. */}
+            <Route path="analytics" element={<div className="text-carbon-soft">Analytics — coming soon</div>} />
             <Route path="flagging" element={<Flagging />} />
+            <Route path="labelling" element={<Labelling />} />
             <Route path="processing" element={<Processing />} />
             <Route path="embedding-workbench" element={<EmbeddingWorkbench />} />
-            <Route path="admin" element={<div className="text-slate-400">Admin — coming soon</div>} />
+            <Route path="admin" element={<div className="text-carbon-soft">Admin — coming soon</div>} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { FaceDetection } from '../../types';
+import { bandFor } from '../../lib/bands';
 
 const COLOR_PALETTE = [
   '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
 ];
+
+/** Unmatched detections are neither a contestant nor a band — they get slate. */
+const UNMATCHED_COLOR = '#94a3b8';
 
 export interface VideoRenderRect {
   offsetX: number;
@@ -72,11 +76,9 @@ export function useAnnotations(
 
     if (!showAnnotations || faces.length === 0) return;
 
-    const videoW = video.videoWidth || 1920;
-    const videoH = video.videoHeight || 1080;
+    // Projection is exactly fractions × the rendered element's size. The video's own
+    // videoWidth/videoHeight are not a scale factor for a stored box.
     const { offsetX, offsetY, renderW, renderH } = getVideoRenderRect(video, container);
-    const scaleX = renderW / videoW;
-    const scaleY = renderH / videoH;
 
     const colorMap = new Map<string, string>();
 
@@ -84,25 +86,28 @@ export function useAnnotations(
       const [x1, y1, x2, y2] = face.bbox || [0, 0, 0, 0];
       if (x2 <= x1 || y2 <= y1) continue;
 
-      const name = face.contestant_name || 'Unknown';
-      if (!colorMap.has(name)) {
-        colorMap.set(name, COLOR_PALETTE[colorMap.size % COLOR_PALETTE.length]);
+      const name = face.contestant_name || 'Unmatched';
+      let color = UNMATCHED_COLOR;
+      if (face.matched) {
+        if (!colorMap.has(name)) {
+          colorMap.set(name, COLOR_PALETTE[colorMap.size % COLOR_PALETTE.length]);
+        }
+        color = colorMap.get(name)!;
       }
-      const color = colorMap.get(name)!;
-      const confidence = face.confidence ?? 0;
 
-      const sx = offsetX + x1 * scaleX;
-      const sy = offsetY + y1 * scaleY;
-      const sw = (x2 - x1) * scaleX;
-      const sh = (y2 - y1) * scaleY;
+      const sx = offsetX + x1 * renderW;
+      const sy = offsetY + y1 * renderH;
+      const sw = (x2 - x1) * renderW;
+      const sh = (y2 - y1) * renderH;
 
       // Bounding box
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.strokeRect(sx, sy, sw, sh);
 
-      // Label
-      const label = `${name}  ${(confidence * 100).toFixed(0)}%`;
+      // Band, not a percentage: 0.51 is a cosine, and "51%" would read as certainty.
+      // The raw cosine lives in the overlay button's tooltip.
+      const label = face.matched ? `${name}  ${bandFor(face.match_score)}` : 'Unmatched';
       ctx.font = 'bold 13px system-ui, sans-serif';
       const textMetrics = ctx.measureText(label);
       const textH = 20;

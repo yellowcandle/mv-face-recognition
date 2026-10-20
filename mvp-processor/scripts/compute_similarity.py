@@ -40,43 +40,54 @@ def load_contestants(csv_path: Path) -> list[dict]:
     return contestants
 
 
-def load_embeddings(contestants: list[dict], embeddings_dir: Path) -> tuple[list[dict], np.ndarray]:
-    """
-    Load embeddings for all contestants that have them.
+def load_reference_sets(
+    contestants: list[dict], embeddings_dir: Path
+) -> tuple[list[dict], list[np.ndarray]]:
+    """Load each contestant's reference set from the cache, keyed by contestant number.
 
-    Returns:
-        Tuple of (contestant list with embeddings, embedding matrix NxD)
+    A contestant is a *set* of per-photo reference embeddings, not one averaged vector; see
+    docs/adr/0001-reference-embeddings-are-a-derived-cache.md. Sets are ragged (1-16 photos),
+    so this returns a list of (K,512) arrays rather than a stacked matrix.
     """
-    valid = []
-    vectors = []
+    path = embeddings_dir / "reference_embeddings.npz"
+    if not path.exists():
+        raise SystemExit(f"{path} not found. Run: python scripts/build_reference_cache.py")
 
+    data = np.load(str(path), allow_pickle=False)
+    embeddings = data["embeddings"].astype(np.float32)
+    embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+    cids = data["contestant_ids"]
+
+    valid, sets = [], []
     for c in contestants:
-        path = embeddings_dir / f"{c['nickname']}_embedding.npy"
-        if not path.exists():
+        rows = embeddings[cids == c["id"]]
+        if len(rows) == 0:
             continue
+        valid.append(c)
+        sets.append(rows)
 
-        try:
-            vec = np.load(str(path)).flatten().astype(np.float32)
-            valid.append(c)
-            vectors.append(vec)
-        except Exception as e:
-            logger.warning(f"Failed to load {c['nickname']}: {e}")
-
-    if not vectors:
-        return [], np.array([])
-
-    return valid, np.stack(vectors)
+    if not sets:
+        return [], []
+    logger.info(
+        "Loaded %d reference sets (%d references total)", len(sets), sum(len(s) for s in sets)
+    )
+    return valid, sets
 
 
-def cosine_similarity_matrix(embeddings: np.ndarray) -> np.ndarray:
-    """Compute NxN cosine similarity matrix."""
-    # Normalize rows to unit vectors
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1, norms)  # avoid division by zero
-    normalized = embeddings / norms
+def cosine_similarity_matrix(sets: list[np.ndarray]) -> np.ndarray:
+    """Contestant-by-contestant similarity, as max cosine between their reference sets.
 
-    # Cosine similarity = dot product of normalized vectors
-    return normalized @ normalized.T
+    Max, not mean, because that is how the matcher scores: a face is matched to the single
+    closest reference. Cell (i,j) therefore reads as "the best case for confusing i with j",
+    which is what the Workbench heatmap is for.
+    """
+    n = len(sets)
+    matrix = np.ones((n, n), dtype=np.float32)
+    for i in range(n):
+        for j in range(i + 1, n):
+            v = float((sets[i] @ sets[j].T).max())
+            matrix[i, j] = matrix[j, i] = v
+    return matrix
 
 
 def extract_top_pairs(
@@ -120,14 +131,13 @@ def main():
     contestants = load_contestants(args.csv)
     logger.info(f"Loaded {len(contestants)} contestants from CSV")
 
-    valid_contestants, embeddings = load_embeddings(contestants, args.embeddings)
-    logger.info(f"Loaded {len(valid_contestants)} embeddings (shape: {embeddings.shape})")
+    valid_contestants, reference_sets = load_reference_sets(contestants, args.embeddings)
 
     if len(valid_contestants) < 2:
-        logger.error("Need at least 2 embeddings to compute similarity")
+        logger.error("Need at least 2 contestants with references to compute similarity")
         return
 
-    matrix = cosine_similarity_matrix(embeddings)
+    matrix = cosine_similarity_matrix(reference_sets)
     logger.info(f"Computed {matrix.shape[0]}x{matrix.shape[1]} similarity matrix")
 
     # Labels for the heatmap

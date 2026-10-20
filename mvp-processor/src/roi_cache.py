@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 import logging
 
-from src.roi import ROI
+from roi import ROI
 
 logger = logging.getLogger(__name__)
 

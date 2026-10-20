@@ -1,0 +1,14 @@
+{
+  "name": "mv-labeller",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "import-labels": "node import_labels.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251225.0",
+    "typescript": "^5.9.3"
+  }
+}

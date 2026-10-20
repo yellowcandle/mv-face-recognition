@@ -1,23 +1,36 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Badge } from '@mv/shared';
 import { useVideos } from '@mv/shared';
-import type { VideoMetadata } from '@mv/shared';
+import { BAND_STAMP, bandFor, formatMmSs } from '@mv/shared';
+import type { Band, VideoMetadata } from '@mv/shared';
 
 interface ContestantStat {
+  id: string;
   nickname: string;
   name: string;
   appearances: number;
-  avgConfidence: number;
-  maxConfidence: number;
+  avgMatchScore: number;
+  maxMatchScore: number;
   firstSeen: number;
   lastSeen: number;
 }
 
+function BandStamp({ band, title }: { band: Band; title: string }) {
+  return (
+    <span
+      title={title}
+      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
+    >
+      {BAND_STAMP[band].word}
+    </span>
+  );
+}
+
+/** 紀錄 — the ledger of who was filed, per reel. Same data, read as a filing record. */
 export function Analytics() {
   const { data: videos = [] } = useVideos();
   const [selectedVideoId, setSelectedVideoId] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'appearances' | 'avgConfidence'>('appearances');
+  const [sortBy, setSortBy] = useState<'appearances' | 'avgMatchScore'>('appearances');
 
   const videoId = selectedVideoId || videos[0]?.id || '';
   const numericId = videoId.match(/^(\d+)/)?.[1] || videoId;
@@ -37,121 +50,166 @@ export function Analytics() {
     if (!metadata?.contestant_timeline) return [];
     return Object.entries(metadata.contestant_timeline)
       .map(([key, info]) => ({
-        nickname: key,
-        name: key,
+        id: key,
+        nickname: info.contestant_info?.nickname ?? key,
+        name: info.contestant_info?.name ?? key,
         appearances: info.total_appearances,
-        avgConfidence: info.avg_confidence,
-        maxConfidence: info.max_confidence,
-        firstSeen: info.first_appearance_time,
-        lastSeen: info.last_appearance_time,
+        avgMatchScore: info.average_match_score,
+        maxMatchScore: Math.max(0, ...(info.appearances ?? []).map((a) => a.match_score)),
+        firstSeen: info.first_appearance,
+        lastSeen: info.last_appearance,
       }))
       .sort((a, b) =>
         sortBy === 'appearances'
           ? b.appearances - a.appearances
-          : b.avgConfidence - a.avgConfidence
+          : b.avgMatchScore - a.avgMatchScore,
       );
   }, [metadata, sortBy]);
 
-  const summary = metadata?.recognition_summary;
+  const summary = metadata?.processing_summary;
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">Analytics</h1>
-        <select
-          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          value={selectedVideoId}
-          onChange={(e) => setSelectedVideoId(e.target.value)}
-        >
-          {videos.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Summary cards */}
-      {summary && (
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Frames', value: summary.total_frames_processed.toLocaleString() },
-            { label: 'Faces Detected', value: summary.total_faces_detected.toLocaleString() },
-            { label: 'Recognized', value: summary.total_faces_recognized.toLocaleString() },
-            { label: 'Unique Contestants', value: summary.unique_contestants },
-          ].map((s) => (
-            <Card key={s.label}>
-              <div className="text-2xl font-semibold text-slate-100">{s.value}</div>
-              <div className="text-xs text-slate-500 mt-1">{s.label}</div>
-            </Card>
-          ))}
+    <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
+      <div className="flex flex-row items-end justify-between gap-6">
+        <div className="flex flex-col gap-1.5">
+          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
+            MV FACE RECOGNITION · 全民造星 IV
+          </div>
+          <div className="flex flex-row items-baseline gap-3.5">
+            <h1 className="font-serif text-[46px] font-black leading-none tracking-[0.06em] text-carbon">
+              紀錄
+            </h1>
+            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">RECOGNITION LEDGER</span>
+          </div>
         </div>
-      )}
-
-      {/* Sort controls */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-sm text-slate-400">Sort by:</span>
-        <button
-          className={`px-3 py-1 rounded-full text-xs transition-colors ${
-            sortBy === 'appearances' ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
-          onClick={() => setSortBy('appearances')}
-        >
-          Appearances
-        </button>
-        <button
-          className={`px-3 py-1 rounded-full text-xs transition-colors ${
-            sortBy === 'avgConfidence' ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
-          onClick={() => setSortBy('avgConfidence')}
-        >
-          Confidence
-        </button>
-      </div>
-
-      {/* Contestant table */}
-      {isLoading ? (
-        <div className="text-center py-12 text-slate-500">Loading analytics...</div>
-      ) : stats.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No recognition data for this video.</div>
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
-                <th className="text-left px-4 py-3">Contestant</th>
-                <th className="text-right px-4 py-3">Appearances</th>
-                <th className="text-right px-4 py-3">Avg Confidence</th>
-                <th className="text-right px-4 py-3">Max Confidence</th>
-                <th className="text-right px-4 py-3">Screen Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.map((s) => (
-                <tr key={s.nickname} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                  <td className="px-4 py-3 font-medium text-slate-200">{s.nickname}</td>
-                  <td className="px-4 py-3 text-right text-slate-300">{s.appearances}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Badge variant={s.avgConfidence > 0.4 ? 'success' : s.avgConfidence > 0.25 ? 'warning' : 'error'}>
-                      {(s.avgConfidence * 100).toFixed(0)}%
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-300">{(s.maxConfidence * 100).toFixed(0)}%</td>
-                  <td className="px-4 py-3 text-right text-slate-400">
-                    {formatTime(s.firstSeen)} – {formatTime(s.lastSeen)}
-                  </td>
-                </tr>
+        <div className="flex flex-row items-center gap-4 pb-1">
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
+            <select
+              className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
+              value={selectedVideoId}
+              onChange={(e) => setSelectedVideoId(e.target.value)}
+            >
+              {videos.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 h-px bg-carbon/45" />
+
+      {summary && (
+        <div className="flex flex-row items-end gap-10 py-3.5">
+          {[
+            { label: 'FRAMES', value: summary.frames_processed.toLocaleString() },
+            { label: 'FACES DETECTED', value: summary.total_faces_detected.toLocaleString() },
+            { label: 'RECOGNISED', value: summary.total_recognitions.toLocaleString() },
+            { label: 'CONTESTANTS', value: String(summary.unique_contestants) },
+          ].map((s) => (
+            <div key={s.label} className="flex flex-col gap-1">
+              <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">{s.label}</span>
+              <span className="font-mono text-[22px] leading-none text-carbon">{s.value}</span>
+            </div>
+          ))}
         </div>
       )}
+      <div className="h-px bg-carbon/20" />
+
+      <div className="flex flex-row items-center gap-4 py-2.5">
+        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">SORT</span>
+        {(
+          [
+            ['appearances', '出場次數'],
+            ['avgMatchScore', '平均分'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSortBy(key)}
+            className={`border px-2 py-0.5 font-kai text-[11px] tracking-[0.1em] ${
+              sortBy === key
+                ? '-rotate-1 border-stamp text-stamp'
+                : 'border-carbon/25 text-carbon-soft hover:border-carbon/50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱紀錄…</div>
+      ) : stats.length === 0 ? (
+        <div className="mt-1 border border-dashed border-carbon/35 px-4 py-14 text-center font-kai text-[13px] text-carbon-soft">
+          這卷影片沒有可核對的紀錄。
+        </div>
+      ) : (
+        <div className="overflow-hidden border border-carbon/35">
+          <div className="flex flex-row items-center border-b border-carbon/40 bg-paper-dark px-4 py-2.5">
+            <span className="w-[52px] font-mono text-[8px] tracking-[0.18em] text-ledger">NO.</span>
+            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">CONTESTANT</span>
+            <span className="w-[110px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+              APPEARANCES
+            </span>
+            <span className="w-[120px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+              AVG
+            </span>
+            <span className="w-[120px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+              MAX
+            </span>
+            <span className="w-[150px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+              SCREEN TIME
+            </span>
+          </div>
+
+          {stats.map((s) => {
+            const avgBand = bandFor(s.avgMatchScore);
+            const maxBand = bandFor(s.maxMatchScore);
+            return (
+              <div
+                key={s.id}
+                className="flex flex-row items-center border-b border-carbon/15 px-4 py-2.5 last:border-b-0 hover:bg-paper-light"
+              >
+                <span className="w-[52px] font-mono text-[11px] text-carbon-soft">
+                  {String(s.id).padStart(2, '0')}
+                </span>
+                <span className="flex flex-1 items-baseline gap-2">
+                  <span className="font-kai text-[15px] font-bold text-carbon-deep">{s.nickname}</span>
+                  <span className="font-mono text-[9px] text-ledger">#{s.id}</span>
+                </span>
+                <span className="w-[110px] text-right font-mono text-[12px] text-carbon">
+                  {s.appearances}
+                </span>
+                <span className="flex w-[120px] justify-end">
+                  <BandStamp
+                    band={avgBand}
+                    title={`${s.avgMatchScore.toFixed(2)} cosine average`}
+                  />
+                </span>
+                <span className="flex w-[120px] justify-end">
+                  <BandStamp band={maxBand} title={`${s.maxMatchScore.toFixed(2)} cosine max`} />
+                </span>
+                <span className="w-[150px] text-right font-mono text-[10px] text-carbon-soft">
+                  {formatMmSs(s.firstSeen)} — {formatMmSs(s.lastSeen)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex-1" />
+      <div className="flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
+        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
+          分級為暫定值，依實測誤配率調整
+        </span>
+        <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>
+      </div>
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }

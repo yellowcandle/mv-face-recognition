@@ -1,5 +1,6 @@
 export { Player } from './Player';
 export { VideoCanvas } from './VideoCanvas';
+export type { VideoCanvasHandle } from './VideoCanvas';
 export { FaceOverlay } from './FaceOverlay';
 export { PlayerControls } from './PlayerControls';
 export { DetectionBar } from './DetectionBar';

@@ -20,15 +20,37 @@
 # HUGGINGFACE XET DATA STORAGE - MIGRATION COMPLETE
 ## ⚠️ CONTESTANT DATA NOW ON HUGGINGFACE XET (January 2026) ⚠️
 
+## 🛑 CORRECTION (verified 2026-09-08): THE PHOTO MIGRATION FAILED
+
+**The photo half of this migration uploaded Git-LFS pointer text, not images.** Everything
+below about photos on HuggingFace is wrong and must not be relied on. Embeddings and metadata
+did migrate correctly. Verified by direct inspection:
+
+- HuggingFace `photos/` = **160 files totalling 0.02 MB** — 131-byte LFS pointers, not the
+  claimed "196 photos (3.97 MB)". `file` reports them as ASCII text.
+- Local `source/photo/contestants/photos/` = the same 160 pointers across 84 contestant dirs.
+- `git lfs pull` fetches nothing; the LFS objects are **not on the GitHub remote**.
+- Branch `backup-before-hf-migration` has **nothing** at `source/photo/contestants/photos/`,
+  and no blob for those files exists anywhere in git history.
+- **The real photos are unrecoverable from git, LFS, and HuggingFace.** The only real image
+  bytes in this repo are in `source/photo/contestants/ig_photos/contestant_{id}/`
+  (741 JPEGs across 96 dirs, 13 of which are empty).
+
 **CRITICAL MIGRATION COMPLETED:**
 Contestant photos and embeddings have been migrated from Git to HuggingFace XET storage for efficient large file management.
 
 ### ✅ CURRENT DATA STORAGE STATE:
 - **HuggingFace Repository**: https://huggingface.co/datasets/yellowcandle/mv-face-recognition-data
-- **Photos**: 196 contestant photos (3.97 MB) - JPG/PNG format
-- **Embeddings**: 95 face recognition embeddings (.npy files)
-- **Metadata**: contestant_info.csv with 96 contestant records
-- **Git Status**: Photos removed from Git repository (backed up in `backup-before-hf-migration` branch)
+- **Photos**: ~~196 contestant photos (3.97 MB) - JPG/PNG format~~ **WRONG — 160 LFS pointer
+  files, 0.02 MB, zero usable images. See the correction above.**
+- **Embeddings**: 338 `.npy` files, each exactly 2176 bytes (one `(512,)` vector). Real, but
+  they follow the **obsolete** one-vector-per-contestant convention that
+  `docs/wayfinder/tickets/002-choose-the-matching-strategy.md` replaced with max-cosine over
+  per-photo reference embeddings.
+- **Metadata**: contestant_info.csv with 96 contestant records (and an `instagram` column
+  populated for all 96)
+- **Git Status**: Photos removed from Git repository (the `backup-before-hf-migration` branch
+  does **not** actually contain them — see the correction above)
 - **Local Files**: Photos and embeddings remain on local filesystem but excluded from Git
 
 ### 📦 DATASET STRUCTURE ON HUGGINGFACE:
@@ -62,9 +84,12 @@ python scripts/upload_dataset_to_hf.py --upload
 
 1. **NEVER RESTORE PHOTOS TO GIT**:
    - Photos are intentionally removed from Git repository
-   - Backup branch `backup-before-hf-migration` preserves original state
+   - ~~Backup branch `backup-before-hf-migration` preserves original state~~ **It does not.
+     That branch has nothing at `source/photo/contestants/photos/`.**
    - DO NOT run: `git checkout backup-before-hf-migration -- source/photo/contestants/`
-   - USE HuggingFace as single source of truth
+     (it would restore nothing anyway)
+   - ~~USE HuggingFace as single source of truth~~ **Do NOT — HuggingFace holds no usable
+     photos. `ig_photos/` on the local filesystem is the only real photo source.**
 
 2. **.GITIGNORE CONFIGURATION**:
    - `source/photo/contestants/**/*.jpg` is excluded
@@ -74,17 +99,23 @@ python scripts/upload_dataset_to_hf.py --upload
 
 3. **DOWNLOAD BEFORE PROCESSING**:
    - Face recognition requires photos to be present locally
-   - If `source/photo/contestants/` is empty, download from HuggingFace first
-   - Check photo availability before running video processing
+   - ~~If `source/photo/contestants/` is empty, download from HuggingFace first~~
+     **This silently produces a broken state — the download yields LFS pointer text, and
+     `cv2.imread` returns `None` on every file.** Read photos from
+     `source/photo/contestants/ig_photos/contestant_{id}/` instead.
+   - Check photo availability by confirming files are **larger than 2 KB**, not merely present.
+     A 131-byte "photo" is a pointer.
 
 4. **RATE LIMIT OPTIMIZATION**:
    - Upload script uses `upload_folder()` for batch operations
    - Avoids HuggingFace rate limit (256 commits/hour)
    - Screenshot files are automatically filtered during upload
 
-5. **ROLLBACK PROCEDURE** (Only if absolutely necessary):
+5. **ROLLBACK PROCEDURE** — **DOES NOT WORK. There is nothing to roll back to.**
+   The commands below are kept only so nobody wastes time rediscovering that
+   `backup-before-hf-migration` holds no photos.
    ```bash
-   # Step 1: Restore from backup branch
+   # Step 1: Restore from backup branch   <- restores nothing; branch has no photos
    git checkout backup-before-hf-migration -- source/photo/contestants/
 
    # Step 2: Update .gitignore to remove exclusions
@@ -93,9 +124,13 @@ python scripts/upload_dataset_to_hf.py --upload
 
 ### 📊 MIGRATION STATISTICS:
 - **Date**: January 2026
-- **Photos Migrated**: 196 files (3.97 MB)
-- **Embeddings Migrated**: 95 files
-- **Verification**: 100% of sample files matched checksums
+- **Photos Migrated**: ~~196 files (3.97 MB)~~ **0 usable — 160 LFS pointer files, 0.02 MB**
+- **Embeddings Migrated**: ~~95 files~~ **338 files, all 2176 bytes (real, but obsolete
+  single-vector-per-contestant convention)**
+- **Verification**: ~~100% of sample files matched checksums~~ **The verification compared
+  pointer text to pointer text, so it passed while the images were absent. Any future
+  migration check must assert file size and decodability (`cv2.imread` is not `None`), not
+  checksum equality.**
 - **Repository Size Reduction**: ~4 MB
 
 # CRITICAL DEPLOYMENT CONFIGURATION - DO NOT BREAK
@@ -182,11 +217,11 @@ curl -s "https://mv-face-recognition-api.herballemon.workers.dev/" | head -10
 - **NEVER DELETE metadata/contestant_info.csv**
 - **NEVER RESTORE frontend-legacy-backup/ directory as frontend/**
 - **NEVER RESTORE src/main.js.backup or src/App.svelte.backup**
-- **FRONTEND IS NOW IN mvp-processor/ DIRECTORY - DO NOT REVERT**
+- **FRONTEND IS NOW IN apps/viewer AND apps/admin (React) - DO NOT REVERT**
 - **ALWAYS CHECK CLAUDE.md BEFORE MAKING BUILD CONFIGURATION CHANGES**
 - **VERIFY SVELTEKIT DEPLOYMENT AFTER ANY FRONTEND CHANGES**
 - **THE USER EXPECTS FACE RECOGNITION DASHBOARD, NOT SIMPLE VIDEO PLAYER**
-- **mvp-processor/ IS THE SINGLE SOURCE OF TRUTH FOR FRONTEND**
+- **apps/viewer AND apps/admin (sharing apps/shared) ARE THE SINGLE SOURCE OF TRUTH FOR FRONTEND**
 
 # 🧪 COMPREHENSIVE TEST SUITE - PRODUCTION READY
 ## ✅ TESTING INFRASTRUCTURE COMPLETE (January 2025)

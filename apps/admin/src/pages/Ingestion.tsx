@@ -175,62 +175,62 @@ export function Ingestion() {
 
   const stats = [
     { icon: '\u23F3', value: pendingCount, label: 'Pending', accent: '' },
-    { icon: '\u26A1', value: processingCount, label: 'Processing', accent: 'border-orange-500/30 bg-orange-500/5' },
-    { icon: '\u2705', value: completedCount, label: 'Completed', accent: 'border-green-500/30 bg-green-500/5' },
-    { icon: '\u274C', value: failedCount, label: 'Failed', accent: 'border-red-500/30 bg-red-500/5' },
+    { icon: '\u26A1', value: processingCount, label: 'Processing', accent: 'border-stamp/30 bg-stamp/5' },
+    { icon: '\u2705', value: completedCount, label: 'Completed', accent: 'border-carbon/30 bg-carbon/5' },
+    { icon: '\u274C', value: failedCount, label: 'Failed', accent: 'border-stamp/30 bg-stamp/5' },
   ];
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Video Ingestion</h1>
-        <p className="text-slate-400 text-sm mt-1">Submit YouTube videos for face recognition processing</p>
+        <h1 className="text-2xl font-bold text-carbon-deep">Video Ingestion</h1>
+        <p className="text-carbon-soft text-sm mt-1">Submit YouTube videos for face recognition processing</p>
       </div>
 
       {/* URL Form */}
       <Card padding="lg">
-        <h2 className="text-base font-semibold text-slate-200 mb-4">Add New Video</h2>
+        <h2 className="text-base font-semibold text-carbon-deep mb-4">Add New Video</h2>
         <form onSubmit={submitUrl} className="flex gap-3 items-start">
           <div className="flex-1 space-y-1">
-            <div className={`flex items-center bg-slate-800 border-2 rounded-lg px-4 transition-colors focus-within:border-orange-500 ${urlError ? 'border-red-500' : 'border-slate-700'}`}>
+            <div className={`flex items-center bg-paper-dark border-2 rounded-none px-4 transition-colors focus-within:border-stamp ${urlError ? 'border-stamp' : 'border-paper-deep'}`}>
               <span className="text-lg mr-3">{'\uD83D\uDD17'}</span>
               <input
                 type="text"
                 value={youtubeUrl}
                 onChange={(e) => { setYoutubeUrl(e.target.value); if (urlError) validateUrl(e.target.value); }}
                 placeholder="Paste YouTube URL (e.g., https://youtube.com/watch?v=...)"
-                className="flex-1 bg-transparent border-none py-3 text-slate-200 text-sm placeholder-slate-500 outline-none"
+                className="flex-1 bg-transparent border-none py-3 text-carbon-deep text-sm placeholder-ledger outline-none"
               />
             </div>
-            {urlError && <span className="text-xs text-red-400">{urlError}</span>}
+            {urlError && <span className="text-xs text-stamp">{urlError}</span>}
           </div>
           <Button type="submit" variant="primary" size="lg" disabled={isSubmitting}>
             {isSubmitting ? 'Submitting...' : 'Start Processing'}
           </Button>
         </form>
-        <p className="text-xs text-slate-500 mt-3">Videos will be downloaded and processed for face detection and recognition.</p>
+        <p className="text-xs text-ledger mt-3">Videos will be downloaded and processed for face detection and recognition.</p>
       </Card>
 
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-4">
         {stats.map((s) => (
-          <div key={s.label} className={`flex flex-col items-center p-4 bg-slate-900 border border-slate-800 rounded-lg ${s.accent}`}>
+          <div key={s.label} className={`flex flex-col items-center p-4 bg-paper-light border border-paper-dark rounded-none ${s.accent}`}>
             <span className="text-2xl mb-2">{s.icon}</span>
-            <span className="text-2xl font-bold text-slate-100">{s.value}</span>
-            <span className="text-xs text-slate-400">{s.label}</span>
+            <span className="text-2xl font-bold text-carbon-deep">{s.value}</span>
+            <span className="text-xs text-carbon-soft">{s.label}</span>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-800">
+      <div className="flex gap-2 border-b border-paper-dark">
         <button
           onClick={() => setActiveTab('queue')}
           className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'queue'
-              ? 'text-orange-500 border-orange-500'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
+              ? 'text-stamp border-stamp'
+              : 'text-carbon-soft border-transparent hover:text-carbon-deep'
           }`}
         >
           Processing Queue ({queue.length})
@@ -239,8 +239,8 @@ export function Ingestion() {
           onClick={() => setActiveTab('library')}
           className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'library'
-              ? 'text-orange-500 border-orange-500'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
+              ? 'text-stamp border-stamp'
+              : 'text-carbon-soft border-transparent hover:text-carbon-deep'
           }`}
         >
           Video Library ({videos.length})
@@ -251,9 +251,9 @@ export function Ingestion() {
       {activeTab === 'queue' ? (
         <Card padding="lg">
           {queue.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
+            <div className="text-center py-10 text-carbon-soft">
               <span className="text-5xl block mb-4">{'\uD83D\uDCED'}</span>
-              <h3 className="text-lg font-semibold text-slate-200 mb-2">No videos in queue</h3>
+              <h3 className="text-lg font-semibold text-carbon-deep mb-2">No videos in queue</h3>
               <p className="text-sm">Submit a YouTube URL above to start processing.</p>
             </div>
           ) : (
@@ -261,16 +261,16 @@ export function Ingestion() {
               {queue.map((job) => (
                 <div
                   key={job.id}
-                  className={`p-4 bg-slate-950 rounded-lg border-2 transition-colors ${
+                  className={`p-4 bg-paper rounded-none border-2 transition-colors ${
                     job.status === 'processing' || job.status === 'downloading'
-                      ? 'border-orange-500'
+                      ? 'border-stamp'
                       : 'border-transparent'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-semibold text-slate-200 truncate">{job.title}</h4>
-                      <p className="text-xs text-slate-500 break-all mt-0.5">{job.youtubeUrl}</p>
+                      <h4 className="text-sm font-semibold text-carbon-deep truncate">{job.title}</h4>
+                      <p className="text-xs text-ledger break-all mt-0.5">{job.youtubeUrl}</p>
                     </div>
                     <Badge variant={getStatusVariant(job.status)} size="md">
                       {job.status.toUpperCase()}
@@ -279,18 +279,18 @@ export function Ingestion() {
 
                   {(job.status === 'processing' || job.status === 'downloading') && (
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2 bg-paper-dark rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-orange-500 rounded-full transition-all"
+                          className="h-full bg-stamp rounded-full transition-all"
                           style={{ width: `${job.progress}%` }}
                         />
                       </div>
-                      <span className="text-xs font-semibold text-slate-300 min-w-[40px]">{Math.round(job.progress)}%</span>
+                      <span className="text-xs font-semibold text-carbon min-w-[40px]">{Math.round(job.progress)}%</span>
                     </div>
                   )}
 
                   {job.status === 'completed' && (
-                    <div className="flex flex-wrap gap-4 mb-3 text-xs text-slate-400">
+                    <div className="flex flex-wrap gap-4 mb-3 text-xs text-carbon-soft">
                       <span>{job.facesDetected} detected</span>
                       <span>{job.facesRecognized} recognized</span>
                       <span>{formatDuration(job.duration || 0)}</span>
@@ -298,7 +298,7 @@ export function Ingestion() {
                   )}
 
                   {job.error && (
-                    <p className="text-xs text-red-400 mb-3">{job.error}</p>
+                    <p className="text-xs text-stamp mb-3">{job.error}</p>
                   )}
 
                   <div className="flex gap-2">
@@ -324,20 +324,20 @@ export function Ingestion() {
       ) : (
         <Card padding="lg">
           {videosLoading ? (
-            <div className="flex flex-col items-center py-10 text-slate-400">
-              <div className="w-10 h-10 border-3 border-slate-700 border-t-orange-500 rounded-full animate-spin mb-4" />
+            <div className="flex flex-col items-center py-10 text-carbon-soft">
+              <div className="w-10 h-10 border-3 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
               <p>Loading video library...</p>
             </div>
           ) : videos.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
+            <div className="text-center py-10 text-carbon-soft">
               <span className="text-5xl block mb-4">{'\uD83C\uDFAC'}</span>
-              <h3 className="text-lg font-semibold text-slate-200 mb-2">No videos in library</h3>
+              <h3 className="text-lg font-semibold text-carbon-deep mb-2">No videos in library</h3>
               <p className="text-sm">Processed videos will appear here.</p>
             </div>
           ) : (
             <div>
               {/* Table Header */}
-              <div className="hidden md:grid grid-cols-[2fr_100px_120px_150px_120px] gap-4 px-4 py-3 bg-slate-950 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+              <div className="hidden md:grid grid-cols-[2fr_100px_120px_150px_120px] gap-4 px-4 py-3 bg-paper rounded-none text-xs font-semibold text-ledger uppercase tracking-wider mb-1">
                 <span>Title</span>
                 <span>Duration</span>
                 <span>Faces</span>
@@ -348,15 +348,15 @@ export function Ingestion() {
               {videos.map((video) => (
                 <div
                   key={video.id}
-                  className="grid grid-cols-1 md:grid-cols-[2fr_100px_120px_150px_120px] gap-2 md:gap-4 px-4 py-3 items-center border-b border-slate-800/50 hover:bg-slate-950/50 transition-colors"
+                  className="grid grid-cols-1 md:grid-cols-[2fr_100px_120px_150px_120px] gap-2 md:gap-4 px-4 py-3 items-center border-b border-paper-dark/50 hover:bg-paper/50 transition-colors"
                 >
-                  <span className="text-sm text-slate-200 flex items-center gap-2 truncate">
+                  <span className="text-sm text-carbon-deep flex items-center gap-2 truncate">
                     <span className="text-lg">{'\uD83D\uDCF9'}</span>
                     {video.name}
                   </span>
-                  <span className="text-xs text-slate-400">--</span>
-                  <span className="text-xs text-slate-400">--</span>
-                  <span className="text-xs text-slate-400">--</span>
+                  <span className="text-xs text-carbon-soft">--</span>
+                  <span className="text-xs text-carbon-soft">--</span>
+                  <span className="text-xs text-carbon-soft">--</span>
                   <span className="flex gap-2">
                     <a href={`/player?video=${video.id}`}>
                       <Button variant="secondary" size="sm">Play</Button>
@@ -376,26 +376,26 @@ export function Ingestion() {
           onClick={() => setLogModal(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]"
+            className="bg-paper-light border border-paper-deep rounded-none w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-4 border-b border-slate-800">
-              <h3 className="text-lg font-semibold text-slate-100">Processing Logs</h3>
-              <button onClick={() => setLogModal(null)} className="text-slate-500 hover:text-slate-300 text-xl">&times;</button>
+            <div className="flex justify-between items-center p-4 border-b border-paper-dark">
+              <h3 className="text-lg font-semibold text-carbon-deep">Processing Logs</h3>
+              <button onClick={() => setLogModal(null)} className="text-ledger hover:text-carbon text-xl">&times;</button>
             </div>
             <div className="p-4 overflow-y-auto flex-1">
               <div className="flex items-center gap-3 mb-4">
                 <Badge variant={getStatusVariant(logModal.status)} size="md">{logModal.status.toUpperCase()}</Badge>
-                <span className="text-sm text-slate-300 font-medium">{logModal.title}</span>
+                <span className="text-sm text-carbon font-medium">{logModal.title}</span>
               </div>
-              <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs text-slate-400 max-h-96 overflow-y-auto">
+              <div className="bg-paper rounded-none p-4 font-mono text-xs text-carbon-soft max-h-96 overflow-y-auto">
                 {logModal.logs.length > 0
                   ? logModal.logs.map((line, i) => <div key={i} className="py-0.5 break-all">{line}</div>)
-                  : <p className="text-slate-600">No logs available.</p>
+                  : <p className="text-carbon">No logs available.</p>
                 }
               </div>
             </div>
-            <div className="flex justify-end p-4 border-t border-slate-800">
+            <div className="flex justify-end p-4 border-t border-paper-dark">
               <Button variant="secondary" size="sm" onClick={() => setLogModal(null)}>Close</Button>
             </div>
           </div>

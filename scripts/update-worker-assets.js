@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function logger(prefix = 'update-worker-assets') {
+function createLogger() {
   return {
     info: (msg, data) => console.log(`[INFO] ${msg}`, data ? JSON.stringify(data) : ''),
     debug: (msg, data) => console.log(`[DEBUG] ${msg}`, data ? JSON.stringify(data) : ''),
@@ -14,65 +14,82 @@ function logger(prefix = 'update-worker-assets') {
   };
 }
 
-const { info, debug, warn, error } = logger();
+const logger = createLogger();
+
+// Extensions safe to embed as UTF-8 text; everything else is base64-encoded
+// and listed in BINARY_ASSETS so the worker knows to decode before serving.
+const TEXT_EXTENSIONS = new Set([
+  '.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.map',
+  '.webmanifest', '.xml',
+]);
 
 function readDirectoryRecursively(dir, baseDir = '') {
   const assets = {};
+  const binaryAssets = [];
   const items = fs.readdirSync(dir);
 
   for (const item of items) {
     const itemPath = path.join(dir, item);
     const relativePath = baseDir ? `${baseDir}/${item}` : item;
-    
+
     if (fs.statSync(itemPath).isDirectory()) {
-      // Recursively read subdirectories
-      const subAssets = readDirectoryRecursively(itemPath, relativePath);
-      Object.assign(assets, subAssets);
+      const sub = readDirectoryRecursively(itemPath, relativePath);
+      Object.assign(assets, sub.assets);
+      binaryAssets.push(...sub.binaryAssets);
     } else {
-      // Read file content
-      try {
-        const content = fs.readFileSync(itemPath, 'utf8');
-        assets[relativePath] = content;
-        logger.debug(`Added asset file`, { file: relativePath });
-      } catch (err) {
-        logger.warn(`Could not read asset file as text`, { file: relativePath, error: err.message });
+      const ext = path.extname(item).toLowerCase();
+      if (TEXT_EXTENSIONS.has(ext)) {
+        assets[relativePath] = fs.readFileSync(itemPath, 'utf8');
+      } else {
+        assets[relativePath] = fs.readFileSync(itemPath).toString('base64');
+        binaryAssets.push(relativePath);
       }
+      logger.debug('Added asset file', { file: relativePath });
     }
   }
 
-  return assets;
+  return { assets, binaryAssets };
 }
 
 function main() {
   logger.info('Updating worker embedded assets');
 
-  const buildDir = path.join(__dirname, '../mvp-processor/build');
+  const buildDir = path.join(__dirname, '../apps/viewer/dist');
   const workerDir = path.join(__dirname, '../worker');
   const embeddedAssetsFile = path.join(workerDir, 'embedded-assets.js');
 
   if (!fs.existsSync(buildDir)) {
-    logger.error('Frontend build directory not found', { buildDir });
+    logger.error('Viewer build directory not found — run `pnpm --filter @mv/viewer build` first', { buildDir });
     process.exit(1);
   }
 
-  const assets = readDirectoryRecursively(buildDir, '');
+  if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
+    logger.error('Viewer build has no index.html — incomplete build?', { buildDir });
+    process.exit(1);
+  }
 
-  // Skip favicon if present
-  delete assets['favicon.ico'];
+  const { assets, binaryAssets } = readDirectoryRecursively(buildDir, '');
 
-  logger.info('Assets collected from entire build/', { count: Object.keys(assets).length, keys: Object.keys(assets).slice(0, 10) });
+  logger.info('Assets collected from viewer dist/', {
+    count: Object.keys(assets).length,
+    binaryCount: binaryAssets.length,
+    keys: Object.keys(assets).slice(0, 10),
+  });
 
-  // Generate embedded-assets.js
-  const embeddedAssetsContent = `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};`;
-  
+  const embeddedAssetsContent =
+    `export const EMBEDDED_ASSETS = ${JSON.stringify(assets, null, 2)};\n\n` +
+    `// Paths stored base64-encoded; the worker decodes these before serving.\n` +
+    `/** @type {Set<string>} */\n` +
+    `export const BINARY_ASSETS = new Set(${JSON.stringify(binaryAssets, null, 2)});\n`;
+
   fs.writeFileSync(embeddedAssetsFile, embeddedAssetsContent, 'utf8');
 
   logger.info('Embedded assets updated successfully', {
     assetCount: Object.keys(assets).length,
-    outputFile: embeddedAssetsFile
+    outputFile: embeddedAssetsFile,
   });
 }
 
-if (process.argv[1] === import.meta.url) {
+if (process.argv[1] === __filename) {
   main();
-} 
+}

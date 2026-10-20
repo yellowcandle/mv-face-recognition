@@ -6,12 +6,12 @@
       "nickname": "Ivy So",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3337,
-      "max_confidence": 0.6,
-      "detection_count": 65,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "2",
@@ -19,12 +19,12 @@
       "nickname": "咖喱",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2459,
-      "max_confidence": 0.6,
-      "detection_count": 64,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "3",
@@ -32,12 +32,12 @@
       "nickname": "Marf",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.249,
-      "max_confidence": 0.3207,
-      "detection_count": 12,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "4",
@@ -45,12 +45,12 @@
       "nickname": "穎蕎",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2676,
-      "max_confidence": 0.8,
-      "detection_count": 58,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "5",
@@ -58,12 +58,12 @@
       "nickname": "莎莎",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3327,
-      "max_confidence": 0.8,
-      "detection_count": 91,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.4581,
+      "max_match_score": 0.4657,
+      "detection_count": 3,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "6",
@@ -71,12 +71,12 @@
       "nickname": "Hannah",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2396,
-      "max_confidence": 0.8,
-      "detection_count": 196,
+      "reference_count": 3,
+      "avg_match_score": 0.5354,
+      "max_match_score": 0.5787,
+      "detection_count": 2,
       "videos_seen_in": 1,
-      "quality": "good"
+      "quality": "weak"
     },
     {
       "id": "7",
@@ -84,12 +84,12 @@
       "nickname": "Catrina",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1988,
-      "max_confidence": 0.3217,
-      "detection_count": 32,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "8",
@@ -97,12 +97,12 @@
       "nickname": "小砂",
       "age": 29,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2236,
-      "max_confidence": 0.2963,
-      "detection_count": 18,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "9",
@@ -110,12 +110,12 @@
       "nickname": "Carmina",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2495,
-      "max_confidence": 0.8,
-      "detection_count": 58,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "10",
@@ -123,11 +123,11 @@
       "nickname": "Zoe",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3325,
-      "max_confidence": 0.6,
-      "detection_count": 39,
-      "videos_seen_in": 2,
+      "reference_count": 16,
+      "avg_match_score": 0.523,
+      "max_match_score": 0.6117,
+      "detection_count": 20,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -136,12 +136,12 @@
       "nickname": "Dru",
       "age": 28,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2938,
-      "max_confidence": 0.8,
-      "detection_count": 275,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 10,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "12",
@@ -149,12 +149,12 @@
       "nickname": "Sica",
       "age": 21,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2692,
-      "max_confidence": 0.8,
-      "detection_count": 63,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 12,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "13",
@@ -162,11 +162,11 @@
       "nickname": "Ashi",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3082,
-      "max_confidence": 0.6,
-      "detection_count": 68,
-      "videos_seen_in": 2,
+      "reference_count": 5,
+      "avg_match_score": 0.492,
+      "max_match_score": 0.5454,
+      "detection_count": 15,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -175,12 +175,12 @@
       "nickname": "Elka",
       "age": 18,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2969,
-      "max_confidence": 0.8,
-      "detection_count": 124,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 15,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "15",
@@ -188,12 +188,12 @@
       "nickname": "Carina",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3551,
-      "max_confidence": 0.8,
-      "detection_count": 192,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 15,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "16",
@@ -201,12 +201,12 @@
       "nickname": "子涓",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3167,
-      "max_confidence": 0.8,
-      "detection_count": 362,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 16,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "17",
@@ -214,12 +214,12 @@
       "nickname": "阿蛋",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3554,
-      "max_confidence": 0.8,
-      "detection_count": 56,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 13,
+      "avg_match_score": 0.5832,
+      "max_match_score": 0.6434,
+      "detection_count": 8,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "18",
@@ -227,12 +227,12 @@
       "nickname": "蘇菲",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2858,
-      "max_confidence": 0.8,
-      "detection_count": 357,
-      "videos_seen_in": 3,
-      "quality": "good"
+      "reference_count": 15,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "19",
@@ -240,12 +240,12 @@
       "nickname": "筠兒",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3136,
-      "max_confidence": 0.6,
-      "detection_count": 18,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 16,
+      "avg_match_score": 0.4567,
+      "max_match_score": 0.459,
+      "detection_count": 2,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "20",
@@ -253,12 +253,12 @@
       "nickname": "Karen",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2951,
-      "max_confidence": 0.8,
-      "detection_count": 147,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 11,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "21",
@@ -266,9 +266,9 @@
       "nickname": "Ling",
       "age": 39,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.0,
-      "max_confidence": 0.0,
+      "reference_count": 11,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
       "detection_count": 0,
       "videos_seen_in": 0,
       "quality": "weak"
@@ -279,12 +279,12 @@
       "nickname": "暐翹",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2484,
-      "max_confidence": 0.8,
-      "detection_count": 243,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 12,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "23",
@@ -292,12 +292,12 @@
       "nickname": "陳祖",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2487,
-      "max_confidence": 0.75,
-      "detection_count": 28,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "24",
@@ -305,12 +305,12 @@
       "nickname": "Ariel",
       "age": 16,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2684,
-      "max_confidence": 0.8,
-      "detection_count": 268,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 16,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "25",
@@ -318,12 +318,12 @@
       "nickname": "Emiko",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2582,
-      "max_confidence": 0.8,
-      "detection_count": 19,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "26",
@@ -331,12 +331,12 @@
       "nickname": "WINKA",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2398,
-      "max_confidence": 0.6,
-      "detection_count": 69,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 16,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "27",
@@ -344,12 +344,12 @@
       "nickname": "Ada 仔",
       "age": 21,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3206,
-      "max_confidence": 0.8,
-      "detection_count": 352,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 13,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "28",
@@ -357,11 +357,11 @@
       "nickname": "Candy",
       "age": 18,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2522,
-      "max_confidence": 0.6,
-      "detection_count": 9,
-      "videos_seen_in": 1,
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
       "quality": "weak"
     },
     {
@@ -370,11 +370,11 @@
       "nickname": "Emi",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1901,
-      "max_confidence": 0.2876,
-      "detection_count": 8,
-      "videos_seen_in": 1,
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
       "quality": "weak"
     },
     {
@@ -383,12 +383,12 @@
       "nickname": "Caca",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1818,
-      "max_confidence": 0.2315,
-      "detection_count": 15,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "31",
@@ -396,12 +396,12 @@
       "nickname": "阿杰",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2958,
-      "max_confidence": 0.8,
-      "detection_count": 121,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "32",
@@ -409,12 +409,12 @@
       "nickname": "Kay",
       "age": 29,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3777,
-      "max_confidence": 0.8,
-      "detection_count": 134,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "33",
@@ -422,12 +422,12 @@
       "nickname": "阿妹",
       "age": 16,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3967,
-      "max_confidence": 0.8,
-      "detection_count": 163,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.4962,
+      "max_match_score": 0.5416,
+      "detection_count": 5,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "34",
@@ -435,12 +435,12 @@
       "nickname": "CK",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2596,
-      "max_confidence": 0.6,
-      "detection_count": 93,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "35",
@@ -448,12 +448,12 @@
       "nickname": "Ana",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2843,
-      "max_confidence": 0.8,
-      "detection_count": 239,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "36",
@@ -461,12 +461,12 @@
       "nickname": "精靈",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1992,
-      "max_confidence": 0.6,
-      "detection_count": 36,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "37",
@@ -474,12 +474,12 @@
       "nickname": "Puipui",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2721,
-      "max_confidence": 0.8,
-      "detection_count": 127,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "38",
@@ -487,12 +487,12 @@
       "nickname": "Gao",
       "age": 28,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2725,
-      "max_confidence": 0.8,
-      "detection_count": 128,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 2,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "39",
@@ -500,12 +500,12 @@
       "nickname": "Stella",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2107,
-      "max_confidence": 0.6,
-      "detection_count": 65,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "40",
@@ -513,12 +513,12 @@
       "nickname": "芯駖",
       "age": 35,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3044,
-      "max_confidence": 0.6,
-      "detection_count": 101,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "41",
@@ -526,12 +526,12 @@
       "nickname": "Man C",
       "age": 29,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2265,
-      "max_confidence": 0.6,
-      "detection_count": 11,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 1,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "42",
@@ -539,12 +539,12 @@
       "nickname": "2Ling",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2411,
-      "max_confidence": 0.8,
-      "detection_count": 44,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 1,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "43",
@@ -552,12 +552,12 @@
       "nickname": "Tengie",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2248,
-      "max_confidence": 0.8,
-      "detection_count": 102,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "44",
@@ -565,11 +565,11 @@
       "nickname": "Mei Mei",
       "age": 29,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2344,
-      "max_confidence": 0.2559,
-      "detection_count": 7,
-      "videos_seen_in": 2,
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
       "quality": "weak"
     },
     {
@@ -578,12 +578,12 @@
       "nickname": "Jade Chan",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1816,
-      "max_confidence": 0.2432,
-      "detection_count": 33,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "46",
@@ -591,12 +591,12 @@
       "nickname": "Chloe Au",
       "age": 18,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2333,
-      "max_confidence": 0.8,
-      "detection_count": 230,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "47",
@@ -604,12 +604,12 @@
       "nickname": "Ace",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2072,
-      "max_confidence": 0.8,
-      "detection_count": 234,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 1,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "48",
@@ -617,12 +617,12 @@
       "nickname": "Yanny",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3907,
-      "max_confidence": 0.8,
-      "detection_count": 269,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.4754,
+      "max_match_score": 0.4903,
+      "detection_count": 3,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "49",
@@ -630,12 +630,12 @@
       "nickname": "Jolin",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3439,
-      "max_confidence": 0.8,
-      "detection_count": 302,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "50",
@@ -643,12 +643,12 @@
       "nickname": "鐵鐵",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2424,
-      "max_confidence": 0.4316,
-      "detection_count": 16,
-      "videos_seen_in": 3,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "51",
@@ -656,12 +656,12 @@
       "nickname": "Bubu",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2294,
-      "max_confidence": 0.8,
-      "detection_count": 98,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "52",
@@ -669,12 +669,12 @@
       "nickname": "Sinnie",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3491,
-      "max_confidence": 0.6,
-      "detection_count": 45,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.469,
+      "max_match_score": 0.488,
+      "detection_count": 4,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "53",
@@ -682,11 +682,11 @@
       "nickname": "丁丁",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3275,
-      "max_confidence": 0.8,
-      "detection_count": 68,
-      "videos_seen_in": 2,
+      "reference_count": 8,
+      "avg_match_score": 0.5259,
+      "max_match_score": 0.6279,
+      "detection_count": 18,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -695,12 +695,12 @@
       "nickname": "Miko",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2328,
-      "max_confidence": 0.8,
-      "detection_count": 540,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "55",
@@ -708,12 +708,12 @@
       "nickname": "舒文",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2655,
-      "max_confidence": 0.6,
-      "detection_count": 21,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "56",
@@ -721,12 +721,12 @@
       "nickname": "米線",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2224,
-      "max_confidence": 0.6,
-      "detection_count": 65,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "57",
@@ -734,12 +734,12 @@
       "nickname": "Ariels",
       "age": 17,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2454,
-      "max_confidence": 0.8,
-      "detection_count": 233,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "58",
@@ -747,12 +747,12 @@
       "nickname": "Kinki",
       "age": 17,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2074,
-      "max_confidence": 0.8,
-      "detection_count": 70,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "59",
@@ -760,12 +760,12 @@
       "nickname": "嘉嘉",
       "age": 17,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2467,
-      "max_confidence": 0.8,
-      "detection_count": 176,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "60",
@@ -773,12 +773,12 @@
       "nickname": "Win Win",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2329,
-      "max_confidence": 0.6,
-      "detection_count": 35,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 1,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "61",
@@ -786,12 +786,12 @@
       "nickname": "燒賣",
       "age": 16,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1939,
-      "max_confidence": 0.8,
-      "detection_count": 78,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "62",
@@ -799,12 +799,12 @@
       "nickname": "榛綦",
       "age": 18,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3314,
-      "max_confidence": 0.8,
-      "detection_count": 345,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "63",
@@ -812,12 +812,12 @@
       "nickname": "露髀",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2848,
-      "max_confidence": 0.8,
-      "detection_count": 243,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "64",
@@ -825,12 +825,12 @@
       "nickname": "Vicky",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2961,
-      "max_confidence": 0.4101,
-      "detection_count": 34,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "65",
@@ -838,12 +838,12 @@
       "nickname": "阿 Wing",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2492,
-      "max_confidence": 0.8,
-      "detection_count": 30,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 2,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "66",
@@ -851,25 +851,25 @@
       "nickname": "Sam",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.1806,
-      "max_confidence": 0.2525,
-      "detection_count": 19,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "67",
       "name": "楊芷程",
       "nickname": "Sarah",
       "age": 22,
-      "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2705,
-      "max_confidence": 0.6,
-      "detection_count": 85,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "has_embedding": false,
+      "reference_count": 0,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "missing"
     },
     {
       "id": "68",
@@ -877,12 +877,12 @@
       "nickname": "阿 J",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2104,
-      "max_confidence": 0.6,
-      "detection_count": 38,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "69",
@@ -890,12 +890,12 @@
       "nickname": "鉦貽",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2821,
-      "max_confidence": 0.8,
-      "detection_count": 520,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "70",
@@ -903,12 +903,12 @@
       "nickname": "東東",
       "age": 21,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.282,
-      "max_confidence": 0.8,
-      "detection_count": 172,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 6,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "71",
@@ -916,12 +916,12 @@
       "nickname": "家琪",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2658,
-      "max_confidence": 0.8,
-      "detection_count": 130,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "72",
@@ -929,12 +929,12 @@
       "nickname": "Ika",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2764,
-      "max_confidence": 0.8,
-      "detection_count": 194,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 2,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "73",
@@ -942,12 +942,12 @@
       "nickname": "Tania",
       "age": 18,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3461,
-      "max_confidence": 0.8,
-      "detection_count": 86,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 7,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "74",
@@ -955,12 +955,12 @@
       "nickname": "So Ching",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2093,
-      "max_confidence": 0.8,
-      "detection_count": 42,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "75",
@@ -968,12 +968,12 @@
       "nickname": "May May",
       "age": 20,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2696,
-      "max_confidence": 0.6,
-      "detection_count": 31,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "76",
@@ -981,25 +981,25 @@
       "nickname": "Winkie",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2107,
-      "max_confidence": 0.3034,
-      "detection_count": 38,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "77",
       "name": "吳秀明",
       "nickname": "TABI",
       "age": 28,
-      "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2421,
-      "max_confidence": 0.8,
-      "detection_count": 121,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "has_embedding": false,
+      "reference_count": 0,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "missing"
     },
     {
       "id": "78",
@@ -1007,12 +1007,12 @@
       "nickname": "馬欣",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3116,
-      "max_confidence": 0.8,
-      "detection_count": 143,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "79",
@@ -1020,12 +1020,12 @@
       "nickname": "超酸",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2839,
-      "max_confidence": 0.8,
-      "detection_count": 103,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "80",
@@ -1033,12 +1033,12 @@
       "nickname": "方方",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2808,
-      "max_confidence": 0.8,
-      "detection_count": 160,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "81",
@@ -1046,11 +1046,11 @@
       "nickname": "Ash",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3723,
-      "max_confidence": 0.8,
-      "detection_count": 106,
-      "videos_seen_in": 2,
+      "reference_count": 8,
+      "avg_match_score": 0.5019,
+      "max_match_score": 0.5679,
+      "detection_count": 12,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -1059,12 +1059,12 @@
       "nickname": "阿 Mic",
       "age": 23,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.28,
-      "max_confidence": 0.8,
-      "detection_count": 151,
-      "videos_seen_in": 3,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "83",
@@ -1072,11 +1072,11 @@
       "nickname": "何佩",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3573,
-      "max_confidence": 0.8,
-      "detection_count": 147,
-      "videos_seen_in": 3,
+      "reference_count": 5,
+      "avg_match_score": 0.5176,
+      "max_match_score": 0.6157,
+      "detection_count": 15,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -1085,12 +1085,12 @@
       "nickname": "VAL",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2144,
-      "max_confidence": 0.6,
-      "detection_count": 38,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "85",
@@ -1098,12 +1098,12 @@
       "nickname": "阿 bee",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2309,
-      "max_confidence": 0.6,
-      "detection_count": 20,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "86",
@@ -1111,12 +1111,12 @@
       "nickname": "Michelle",
       "age": 25,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.231,
-      "max_confidence": 0.6,
-      "detection_count": 19,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 12,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "87",
@@ -1124,11 +1124,11 @@
       "nickname": "Yoyo",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3529,
-      "max_confidence": 0.8,
-      "detection_count": 223,
-      "videos_seen_in": 4,
+      "reference_count": 9,
+      "avg_match_score": 0.5291,
+      "max_match_score": 0.5971,
+      "detection_count": 12,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -1137,12 +1137,12 @@
       "nickname": "Jackie",
       "age": 27,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.322,
-      "max_confidence": 0.8,
-      "detection_count": 131,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.5048,
+      "max_match_score": 0.5465,
+      "detection_count": 8,
+      "videos_seen_in": 1,
+      "quality": "weak"
     },
     {
       "id": "89",
@@ -1150,12 +1150,12 @@
       "nickname": "安希婷",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.229,
-      "max_confidence": 0.6,
-      "detection_count": 33,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 3,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "90",
@@ -1163,12 +1163,12 @@
       "nickname": "Christine",
       "age": 28,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2221,
-      "max_confidence": 0.2688,
-      "detection_count": 32,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "91",
@@ -1176,11 +1176,11 @@
       "nickname": "Day",
       "age": 19,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.3745,
-      "max_confidence": 0.8,
-      "detection_count": 453,
-      "videos_seen_in": 2,
+      "reference_count": 4,
+      "avg_match_score": 0.5304,
+      "max_match_score": 0.5857,
+      "detection_count": 12,
+      "videos_seen_in": 1,
       "quality": "good"
     },
     {
@@ -1189,12 +1189,12 @@
       "nickname": "阿 Yo",
       "age": 16,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2808,
-      "max_confidence": 0.8,
-      "detection_count": 209,
-      "videos_seen_in": 3,
-      "quality": "good"
+      "reference_count": 4,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "93",
@@ -1202,12 +1202,12 @@
       "nickname": "Liu 哥",
       "age": 24,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2515,
-      "max_confidence": 0.8,
-      "detection_count": 157,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 5,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "94",
@@ -1215,12 +1215,12 @@
       "nickname": "Yanis",
       "age": 17,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2393,
-      "max_confidence": 0.8,
-      "detection_count": 186,
-      "videos_seen_in": 1,
-      "quality": "good"
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "95",
@@ -1228,12 +1228,12 @@
       "nickname": "Alice",
       "age": 22,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.2839,
-      "max_confidence": 0.8,
-      "detection_count": 217,
-      "videos_seen_in": 2,
-      "quality": "good"
+      "reference_count": 9,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
+      "detection_count": 0,
+      "videos_seen_in": 0,
+      "quality": "weak"
     },
     {
       "id": "96",
@@ -1241,9 +1241,9 @@
       "nickname": "3 妹",
       "age": 26,
       "has_embedding": true,
-      "embedding_dim": 512,
-      "avg_confidence": 0.0,
-      "max_confidence": 0.0,
+      "reference_count": 8,
+      "avg_match_score": 0.0,
+      "max_match_score": 0.0,
       "detection_count": 0,
       "videos_seen_in": 0,
       "quality": "weak"
@@ -1251,12 +1251,12 @@
   ],
   "summary": {
     "total": 96,
-    "good": 91,
-    "weak": 5,
-    "missing": 0,
-    "avg_confidence": 0.2707,
-    "recognition_rate": 0.368496,
-    "total_faces_detected": 32402,
-    "total_faces_recognized": 11940
+    "good": 7,
+    "weak": 87,
+    "missing": 2,
+    "avg_match_score": 0.5066,
+    "recognition_rate": 0.348371,
+    "total_faces_detected": 399,
+    "total_faces_recognized": 139
   }
 }

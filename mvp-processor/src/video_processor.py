@@ -10,7 +10,7 @@ from typing import Tuple, Generator, List
 
 import logging
 
-from src.exceptions import (
+from exceptions import (
     VideoProcessingError,
     VideoNotFoundError,
     CorruptedVideoError,
@@ -319,21 +319,27 @@ class VideoProcessor:
 
         detections = face_detector.detect_faces(roi_region, timestamp, frame_number)
 
+        # detect_faces reports fractions of the ROI crop; re-express them against the whole
+        # frame, which is what every stored box is measured in.
+        frame_height, frame_width = frame.shape[:2]
+        roi_width = roi.x2 - roi.x1
+        roi_height = roi.y2 - roi.y1
+
         adjusted_detections = []
         for detection in detections:
-            top, right, bottom, left = detection.location
-
-            full_top = top + roi.y1
-            full_right = right + roi.x1
-            full_bottom = bottom + roi.y1
-            full_left = left + roi.x1
+            x1, y1, x2, y2 = detection.bbox
 
             adjusted_detection = FaceDetection(
-                location=(full_top, full_right, full_bottom, full_left),
+                bbox=(
+                    (roi.x1 + x1 * roi_width) / frame_width,
+                    (roi.y1 + y1 * roi_height) / frame_height,
+                    (roi.x1 + x2 * roi_width) / frame_width,
+                    (roi.y1 + y2 * roi_height) / frame_height,
+                ),
                 encoding=detection.encoding,
                 timestamp=detection.timestamp,
                 frame_number=detection.frame_number,
-                confidence=detection.confidence,
+                det_score=detection.det_score,
             )
             adjusted_detections.append(adjusted_detection)
 
@@ -555,41 +561,3 @@ class FrameProcessor:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return rgb_frame
 
-    @staticmethod
-    def draw_face_box(
-        frame: np.ndarray,
-        face_location: Tuple[int, int, int, int],
-        label: str = "",
-        confidence: float = 0.0,
-    ) -> np.ndarray:
-        """
-        Draw bounding box and label on frame
-
-        Args:
-            frame: Input frame
-            face_location: (top, right, bottom, left) coordinates
-            label: Text label to display
-            confidence: Confidence score
-
-        Returns:
-            Frame with drawn bounding box
-        """
-        top, right, bottom, left = face_location
-
-        # Draw rectangle
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-
-        # Draw label
-        if label:
-            label_text = f"{label} ({confidence:.2f})" if confidence > 0 else label
-            cv2.putText(
-                frame,
-                label_text,
-                (left, top - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
-
-        return frame

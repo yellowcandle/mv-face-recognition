@@ -1,9 +1,42 @@
 @import "tailwindcss";
 
+/* 點唱單 — the request slip. Ground, carbon copy, carbon ink, stamp red. */
 @theme {
   --font-sans: "Noto Sans TC", system-ui, sans-serif;
+  --font-serif: "Noto Serif TC", serif;
+  --font-kai: "LXGW WenKai TC", "Noto Serif TC", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --color-surface-primary: #0f172a;
-  --color-surface-secondary: #1e293b;
-  --color-accent: #ff8400;
+  --color-paper: #f2e8bc;
+  --color-paper-light: #faf3d7;
+  --color-paper-dark: #ede3b6;
+  --color-paper-deep: #e7dbab;
+  --color-copy: #c6dae9;
+  --color-carbon: #2b2f6b;
+  --color-carbon-deep: #1f2455;
+  --color-carbon-soft: #4a4f8c;
+  --color-stamp: #ae3b2c;
+  --color-ledger: #8a857a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-carbon-deep);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-stamp);
+  color: var(--color-paper-light);
+}
+
+/* Carbon ink rules are hairlines, never borders of 2px. */
+.rule-carbon {
+  border-color: rgba(43, 47, 107, 0.45);
 }

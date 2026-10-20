@@ -10,6 +10,16 @@ This document describes the architecture and design decisions for the MV Face Re
 
 ## TODO
 
+> **Active effort (2026-09-07): [Wayfinder map](docs/wayfinder/MAP.md)** — run the face
+> recognition pipeline, visualize the results, and get them publish-ready on Cloudflare.
+> Destination, scope boundaries and 10 open decision tickets live there; ticket bodies are in
+> `docs/wayfinder/tickets/`. Two findings from charting that contradict this document:
+> (1) the frontend sections below are stale — the SvelteKit app in `mvp-processor/` was
+> deleted; the real build is `pnpm --filter @mv/viewer build` → `apps/viewer/dist/`.
+> (2) The publish path is broken in the middle: the worker reads KV keys
+> `metadata_dense_<numeric>` and `processed_videos_list` that **no script in the repo writes**,
+> so a deploy today would serve hardcoded fallback videos and mock metadata.
+
 ### Pending
 
 #### Admin UI Component Library (January 2025)
@@ -29,6 +39,15 @@ This document describes the architecture and design decisions for the MV Face Re
 
 #### System Improvements
 - [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
+
+### Completed (June 2026) — deploy-ui-rewrite shippability pass
+
+- [x] `scripts/update-worker-assets.js` embeds `apps/viewer/dist/` (React) instead of the deleted SvelteKit build; binary assets base64-encoded via a `BINARY_ASSETS` manifest the worker decodes; fixed unreachable `main()` and `logger.*` TypeError
+- [x] `local_api.py`: video streaming with HTTP Range, flag persistence (`local_output/flagged_faces.json`), recognition results, contestant photos, `has_embedding` on contestants; `fastapi`/`uvicorn` added to deps (were missing entirely)
+- [x] Video IDs: CJK/space IDs round-trip end-to-end (traversal-checked instead of regex-rejected; Player no longer strips numeric prefixes); all metadata reads unified on `local_output/metadata/`
+- [x] Bbox contract: stored `face_location` stays `[top,right,bottom,left]`, every serving path emits canonical `[x1,y1,x2,y2]`; worker face-detect/recognition-results handlers rewritten off mock shapes onto real `frame_data`/`contestant_timeline`
+- [x] Pipeline: `bbox_scale` covers upscaled sources; tracker IDs stored per-recognition (ByteTrack in-place assignment) so traces can't land on the wrong contestant; effective on next reprocess
+- [x] Admin Ingestion page disabled until its backend exists (routes deleted from worker; never in local_api)
 
 ### Completed (January 2026)
 
@@ -1314,3 +1333,46 @@ curl -s "https://mv.herballemon.dev/api/system/status" | jq .
 - `mvp-processor/` - Primary frontend (SvelteKit)
 
 **See CLAUDE.md for detailed warnings about file preservation.**
+
+---
+
+## Visual language — 點唱單 / 存根 (2026-10)
+
+The public viewer and the local back office share one visual world: a **carbonless
+request slip**. The product's mechanism is "a name filed against a timestamp", and a
+radio dedication slip is exactly that object, so the UI is the form rather than a
+dashboard. The viewer is the **第二聯 (copy 2)** — public, read-only. The admin is the
+**存根 (office copy)** — the writable retained stub.
+
+Recorded in `apps/viewer/.impeccable/surfaces/` and `apps/admin/.impeccable/surfaces/`;
+the Paper comps are `MV Face Recognition — Redesign (點唱單)`.
+
+### Tokens
+
+| Token | Viewer | Admin | Role |
+|---|---|---|---|
+| `--color-paper` | `#f2e8bc` | `#ede3b6` | the form ground (canary NCR paper) |
+| `--color-paper-light` | `#faf3d7` | `#faf3d7` | a slip laid on top; selected row |
+| `--color-paper-dark` | `#ede3b6` | `#e7dbab` | the spine, table headers |
+| `--color-paper-deep` | `#e7dbab` | `#dccd96` | punched-hole shadow, pressed state |
+| `--color-copy` | `#c6dae9` | `#c6dae9` | the carbon copy (viewer queue rail) |
+| `--color-carbon` | `#2b2f6b` | `#2b2f6b` | carbon ink: rules, labels, secondary type |
+| `--color-carbon-deep` | `#1f2455` | `#1f2455` | filled-in handwriting, headings |
+| `--color-carbon-soft` | `#4a4f8c` | `#4a4f8c` | tertiary text |
+| `--color-stamp` | `#ae3b2c` | `#ae3b2c` | rubber-stamp red: active, destructive, primary action |
+| `--color-ledger` | `#8a857a` | `#8a857a` | ledger grey: metadata, low confidence |
+
+Faces: `Noto Serif TC` 900 for printed form headings, `LXGW WenKai TC` 700 for
+handwriting (every name, every filled field), `JetBrains Mono` for timecodes, counts and
+cosines, `Noto Sans TC` for body.
+
+### Rules
+
+- **No rounding, no shadows, no pills, with two deliberate exceptions.** 1px carbon rules; rubber stamps get a 2px border (and a 4px corner radius) because a stamp is a raised object; punched holes are round (22px circles with an inset shadow) because a hole is round. Holes are the only intended shadow-like inset; everything else stays square and flat.
+- **A band is a stamp, not a colour.** `bandFor()` maps to 清楚 / 尚可 / 存疑, struck at
+  −2° with a bordered mark. Never a percentage: the raw cosine is the tooltip.
+- **States are marks on paper**: 待核 / 已核對 / 作廢 / 需重算 / 唯讀.
+- **The viewer is provably read-only.** It carries a 唯讀 stamp and writes nothing; every
+  write lives in the admin.
+- Routes are folios: viewer `01 圖庫 · 02 播放 · 03 名冊 · 04 紀錄`; admin `02 存根` with a filing
+  cabinet for 核對 / 資料 / 生產.

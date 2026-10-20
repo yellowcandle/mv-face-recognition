@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FaceDetection } from '../../types';
+import { bandFor } from '../../lib/bands';
 
 interface FlagDialogProps {
   mode: 'single' | 'batch';
@@ -40,13 +41,13 @@ export function FlagDialog({
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
+        className="bg-paper-light border border-paper-deep rounded-none p-6 max-w-md w-full mx-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <h3 className="text-lg font-semibold text-slate-100 mb-2">{title}</h3>
-        <p className="text-slate-400 text-sm mb-4">
+        <h3 className="text-lg font-semibold text-carbon-deep mb-2">{title}</h3>
+        <p className="text-carbon-soft text-sm mb-4">
           {mode === 'batch'
             ? 'Assign all selected faces to a single contestant.'
             : 'Assign this detected face to a contestant to improve recognition accuracy.'}
@@ -56,24 +57,27 @@ export function FlagDialog({
           {/* Show detected face info */}
           {mode === 'single' && face && (
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Detected As:</label>
-              <p className="text-slate-200">
-                {face.contestant_name || 'Unknown'}{' '}
-                ({((face.confidence ?? 0) * 100).toFixed(1)}% confidence)
+              <label className="block text-sm text-carbon-soft mb-1">Detected As:</label>
+              <p className="text-carbon-deep">
+                {face.matched ? face.contestant_name || face.contestant_nickname || 'Unmatched' : 'Unmatched'}{' '}
+                ({face.matched && face.match_score != null
+                  ? `${face.match_score.toFixed(2)} cosine (${bandFor(face.match_score)} band)`
+                  : 'no match score'})
               </p>
             </div>
           )}
 
           {mode === 'batch' && selectedFaces.length > 0 && (
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Selected Faces:</label>
+              <label className="block text-sm text-carbon-soft mb-1">Selected Faces:</label>
               <div className="flex flex-wrap gap-1.5">
                 {selectedFaces.map((f, i) => (
                   <span
                     key={i}
-                    className="bg-slate-800 text-slate-300 text-xs px-2 py-1 rounded-full border border-slate-700"
+                    className="bg-paper-dark text-carbon text-xs px-2 py-1 rounded-full border border-paper-deep"
                   >
-                    {f.contestant_name || 'Unknown'} ({((f.confidence ?? 0) * 100).toFixed(0)}%)
+                    {f.matched ? f.contestant_name || f.contestant_nickname || 'Unmatched' : 'Unmatched'}{' '}
+                    ({f.matched ? bandFor(f.match_score) : 'unmatched'})
                   </span>
                 ))}
               </div>
@@ -82,12 +86,12 @@ export function FlagDialog({
 
           {/* Contestant select */}
           <div>
-            <label htmlFor="flag-contestant-select" className="block text-sm text-slate-400 mb-1">
+            <label htmlFor="flag-contestant-select" className="block text-sm text-carbon-soft mb-1">
               {mode === 'batch' ? 'Assign All to Contestant:' : 'Correct Contestant:'}
             </label>
             <select
               id="flag-contestant-select"
-              className="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              className="w-full bg-paper-dark text-carbon-deep border border-paper-deep rounded-none px-3 py-2 text-sm"
               value={contestantId ?? ''}
               onChange={(e) =>
                 setContestantId(e.target.value ? parseInt(e.target.value, 10) : null)
@@ -105,13 +109,13 @@ export function FlagDialog({
           {/* User label (single mode only) */}
           {mode === 'single' && (
             <div>
-              <label htmlFor="flag-user-label" className="block text-sm text-slate-400 mb-1">
+              <label htmlFor="flag-user-label" className="block text-sm text-carbon-soft mb-1">
                 Note (optional):
               </label>
               <input
                 id="flag-user-label"
                 type="text"
-                className="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                className="w-full bg-paper-dark text-carbon-deep border border-paper-deep rounded-none px-3 py-2 text-sm"
                 placeholder="e.g., Clear frontal view"
                 value={userLabel}
                 onChange={(e) => setUserLabel(e.target.value)}
@@ -123,13 +127,13 @@ export function FlagDialog({
         {/* Actions */}
         <div className="flex justify-end gap-3 mt-6">
           <button
-            className="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-sm hover:bg-slate-700"
+            className="px-4 py-2 bg-paper-dark text-carbon border border-paper-deep rounded-none text-sm hover:bg-paper-deep"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-stamp text-white rounded-none text-sm font-medium hover:bg-stamp disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSubmit}
             disabled={contestantId === null || isSubmitting}
           >

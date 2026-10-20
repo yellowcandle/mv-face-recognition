@@ -1,5 +1,15 @@
 # 🎬 MV Face Recognition - Hugging Face Spaces Demo
 
+> **Retired.** The Gradio GUI this document describes has been removed from the
+> repository. The product's frontend is now React (`apps/viewer`, `apps/admin`)
+> served by the Cloudflare Worker, and the data lives in the Hugging Face bucket
+> (`yellowcandle/mv-face-recognition`) with the plan in
+> [`docs/void-migration.md`](docs/void-migration.md).
+>
+> The deployed Space `yellowcandle/mv-face-recognition` still carries its own copy
+> of `app.py` and `gradio_app.py` and is sleeping; it is not driven by this
+> repository any more. This file is kept for reference.
+
 **AI-powered contestant recognition in music videos with enhanced annotations and highlight extraction.**
 
 [![Demo](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/your-username/mv-face-recognition)

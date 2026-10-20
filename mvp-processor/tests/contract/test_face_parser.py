@@ -4,9 +4,10 @@ import time
 
 
 class MockFaceDetection:
-    def __init__(self, bbox, confidence):
+    def __init__(self, bbox, det_score):
+        # bbox is in frame fractions, as FaceDetection.bbox is.
         self.bbox = bbox
-        self.confidence = confidence
+        self.det_score = det_score
 
 
 class TestFaceParserContract:
@@ -28,8 +29,8 @@ class TestFaceParserContract:
         assert parser is not None
         assert parser.config.low_conf_threshold == 0.5
 
-    def test_validate_face_returns_true_for_high_confidence(self):
-        """Test validate_face() returns True for high confidence (0.8 >= 0.5 threshold)"""
+    def test_validate_face_returns_true_for_high_det_score(self):
+        """Test validate_face() returns True for high det_score (0.8 >= 0.5 threshold)"""
         from src.face_parser import FaceParser
         from src.config import FaceParsingConfig
 
@@ -44,14 +45,14 @@ class TestFaceParserContract:
         parser = FaceParser(config=config)
 
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.8)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.8)
 
         result = parser.validate_face(frame, face_detection)
 
         assert result is True
 
-    def test_validate_face_triggers_parsing_for_low_confidence(self):
-        """Test validate_face() triggers parsing for low confidence (0.3 < 0.5 threshold)"""
+    def test_validate_face_triggers_parsing_for_low_det_score(self):
+        """Test validate_face() triggers parsing for low det_score (0.3 < 0.5 threshold)"""
         from src.face_parser import FaceParser
         from src.config import FaceParsingConfig
 
@@ -66,7 +67,7 @@ class TestFaceParserContract:
         parser = FaceParser(config=config)
 
         frame = np.ones((480, 640, 3), dtype=np.uint8) * 150
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.3)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.3)
 
         result = parser.validate_face(frame, face_detection)
 
@@ -105,7 +106,7 @@ class TestFaceParserContract:
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         frame[100:200, 100:200] = [180, 150, 120]
 
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.3)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.3)
 
         result = parser.validate_face(frame, face_detection)
 
@@ -128,7 +129,7 @@ class TestFaceParserContract:
 
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.3)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.3)
 
         result = parser.validate_face(frame, face_detection)
 
@@ -150,7 +151,7 @@ class TestFaceParserContract:
         parser = FaceParser(config=config)
 
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.3)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.3)
 
         times = []
         for _ in range(100):
@@ -181,7 +182,7 @@ class TestFaceParserContract:
         parser = FaceParser(config=config)
 
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-        face_detection = MockFaceDetection(bbox=(100, 100, 200, 200), confidence=0.3)
+        face_detection = MockFaceDetection(bbox=(0.1, 0.1, 0.2, 0.2), det_score=0.3)
 
         parser.validate_face(frame, face_detection)
         parser.validate_face(frame, face_detection)

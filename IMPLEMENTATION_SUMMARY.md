@@ -124,7 +124,7 @@ curl -s "https://mv-face-recognition-api.herballemon.workers.dev/api/admin/youtu
 ### 测试 3: 验证 Modal Webhook
 ```bash
 curl -X POST https://your-webhook-url \
-  -H "Authorization: Bearer YOUR_MODAL_TOKEN" \
+  -H "Authorization: Bearer <your-modal-token>" \
   -H "Content-Type: application/json" \
   -d '{"video_url": "https://example.com/video.mp4", "video_name": "test.mp4"}'
 ```

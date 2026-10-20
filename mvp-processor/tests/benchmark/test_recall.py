@@ -139,22 +139,21 @@ class TestRecallPreservation:
             _, rois, faces = processor.process_frame(frame, frame_idx, face_detector=face_detector, timestamp=timestamp)
             
             for face in faces:
-                detections.append((frame_idx, face.location))
+                detections.append((frame_idx, face.bbox))
             
             frame_idx += 1
         
         return detections
     
-    def _is_bbox_detected(self, target_frame, target_bbox, detections, tolerance=50):
+    def _is_bbox_detected(self, target_frame, target_bbox, detections, tolerance=0.026):
+        """Match by frame, within `tolerance` — in frame fractions.
+
+        0.026 is 50px at the 1920-wide extraction width, which is what the boxes compared
+        here were measured against before they became fractions.
+        """
         for frame_idx, bbox in detections:
             if frame_idx == target_frame:
-                top1, right1, bottom1, left1 = target_bbox
-                top2, right2, bottom2, left2 = bbox
-                
-                if (abs(top1 - top2) < tolerance and 
-                    abs(left1 - left2) < tolerance and
-                    abs(bottom1 - bottom2) < tolerance and
-                    abs(right1 - right2) < tolerance):
+                if all(abs(a - b) < tolerance for a, b in zip(target_bbox, bbox)):
                     return True
         
         return False
