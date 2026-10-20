@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useContestants } from '@mv/shared';
+import { formatMmSs, useContestants } from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 interface Appearance {
@@ -25,12 +25,6 @@ const QUALITY_INK: Record<Contestant['quality'], string> = {
   weak: 'text-stamp border-stamp',
   missing: 'text-ledger border-ledger',
 };
-
-function stamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 /** 名冊 — the cast, read as a filing index. 96 people, one row each. */
 export function Contestants() {
@@ -275,7 +269,7 @@ export function Contestants() {
                   className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2"
                 >
                   <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
-                    {stamp(a.timestamp)}
+                    {formatMmSs(a.timestamp)}
                   </span>
                   <span className="flex-1 truncate font-mono text-[9px] tracking-[0.1em] text-ledger">
                     {a.video_name}

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
+  BAND_STAMP,
   bandFor,
+  formatMmSs,
   useContestants,
   useVideos,
   useViewerMetadata,
@@ -10,19 +12,6 @@ import {
   getVideoRenderRect,
 } from '@mv/shared';
 import type { Band, FaceDetection } from '@mv/shared';
-
-const BAND_WORD: Record<Band, string> = { high: '清楚', medium: '尚可', low: '存疑' };
-const BAND_INK: Record<Band, string> = {
-  high: 'text-carbon border-carbon',
-  medium: 'text-stamp border-stamp',
-  low: 'text-ledger border-ledger',
-};
-
-function stamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 function nameOf(face: FaceDetection): string {
   return face.contestant_nickname || face.contestant_name || '—';
@@ -162,7 +151,7 @@ export function PlayerPage() {
             <div className="flex flex-col items-end gap-0.5 pb-0.5">
               <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">FILED</span>
               <span className="font-mono text-[12px] tracking-[0.08em] text-carbon">
-                REEL {video?.id ?? '—'} · {stamp(duration)}
+                REEL {video?.id ?? '—'} · {formatMmSs(duration)}
               </span>
             </div>
             <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
@@ -188,7 +177,7 @@ export function PlayerPage() {
           <Divider />
           <Field label="時段 TIME" width="w-[190px]">
             <span className="font-mono text-[17px] tracking-[0.02em] text-carbon">
-              {stamp(time)} — {stamp(duration)}
+              {formatMmSs(time)} — {formatMmSs(duration)}
             </span>
           </Field>
           <div className="flex-1" />
@@ -205,7 +194,7 @@ export function PlayerPage() {
             <span className={`h-[7px] w-[7px] rounded-full ${playing ? 'bg-stamp' : 'bg-ledger'}`} />
             <span className="font-mono text-[10px] tracking-[0.22em] text-carbon-soft">
               {playing ? 'PLAYING' : 'PAUSED'} · {headline}
-              {headlineBand ? ` · ${BAND_WORD[headlineBand]}` : ''}
+              {headlineBand ? ` · ${BAND_STAMP[headlineBand].word}` : ''}
             </span>
           </div>
           <span className="font-mono text-[10px] tracking-[0.16em] text-ledger">
@@ -245,7 +234,7 @@ export function PlayerPage() {
                 <span className="font-kai text-[14px] font-bold leading-none text-carbon-deep">
                   {nameOf(face)}
                 </span>
-                <span className="font-mono text-[8px] text-carbon-soft">{stamp(time)}</span>
+                <span className="font-mono text-[8px] text-carbon-soft">{formatMmSs(time)}</span>
               </div>
             </div>
           ))}
@@ -270,9 +259,9 @@ export function PlayerPage() {
                 )}
               </button>
               <div className="flex flex-col gap-0.5">
-                <span className="font-mono text-[15px] tracking-[0.04em] text-paper">{stamp(time)}</span>
+                <span className="font-mono text-[15px] tracking-[0.04em] text-paper">{formatMmSs(time)}</span>
                 <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-                  OF {stamp(duration)}
+                  OF {formatMmSs(duration)}
                 </span>
               </div>
             </div>
@@ -305,7 +294,7 @@ export function PlayerPage() {
           <div className="flex flex-row items-baseline gap-2.5">
             <span className="font-kai text-[15px] font-bold text-carbon">現在</span>
             <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">
-              FILED AT {stamp(time)} · {matched.length} SLIPS
+              FILED AT {formatMmSs(time)} · {matched.length} SLIPS
             </span>
           </div>
           <span className="font-mono text-[9px] tracking-[0.14em] text-stamp">SHOW ALL</span>
@@ -318,10 +307,10 @@ export function PlayerPage() {
               <div key={i} className="flex flex-col gap-2 border border-carbon/40 bg-paper-light px-3 py-2.5">
                 <div className="flex flex-row items-center justify-between">
                   <span className="font-mono text-[11px] tracking-[0.06em] text-carbon-soft">
-                    {stamp(time)}
+                    {formatMmSs(time)}
                   </span>
-                  <span className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_INK[band]}`}>
-                    {BAND_WORD[band]}
+                  <span className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}>
+                    {BAND_STAMP[band].word}
                   </span>
                 </div>
                 <div className="flex flex-row items-baseline gap-1.5">
@@ -364,13 +353,13 @@ export function PlayerPage() {
               onClick={() => seek(entry.at)}
               className="flex flex-row items-center gap-3 border-b border-carbon/20 py-2.5 text-left"
             >
-              <span className="w-[46px] font-mono text-[11px] text-carbon-soft">{stamp(entry.at)}</span>
+              <span className="w-[46px] font-mono text-[11px] text-carbon-soft">{formatMmSs(entry.at)}</span>
               <span className="flex flex-1 flex-col gap-0.5">
                 <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
                   {entry.name}
                 </span>
                 <span className="font-mono text-[8px] tracking-[0.14em] text-carbon-soft">
-                  #{entry.contestantId} · {BAND_WORD[entry.band]}
+                  #{entry.contestantId} · {BAND_STAMP[entry.band].word}
                 </span>
               </span>
               <span className="h-[7px] w-[7px] bg-carbon-deep" />

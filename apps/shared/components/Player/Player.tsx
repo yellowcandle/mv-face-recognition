@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { FaceDetection, Video, VideoMetadata } from '../../types';
-import { bandFor } from '../../lib/bands';
+import { BAND_STAMP, bandFor } from '../../lib/bands';
 import { useVideos } from '../../hooks/useVideos';
 import { useContestants } from '../../hooks/useContestants';
 import { useFlaggedFaces } from '../../hooks/useFlaggedFaces';
@@ -41,11 +41,9 @@ function detectionTier(face: FaceDetection): { label: string; className: string;
     };
   }
   const band = bandFor(face.match_score);
-  const className =
-    band === 'high' ? 'text-carbon' : band === 'medium' ? 'text-stamp' : 'text-stamp';
   return {
     label: band,
-    className,
+    className: BAND_STAMP[band].ink,
     title: face.match_score != null ? `${face.match_score.toFixed(2)} cosine` : 'no match score',
   };
 }

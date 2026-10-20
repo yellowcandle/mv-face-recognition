@@ -1,15 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useVideos } from '@mv/shared';
-import { bandFor } from '@mv/shared';
+import { BAND_STAMP, bandFor, formatMmSs } from '@mv/shared';
 import type { Band, VideoMetadata } from '@mv/shared';
-
-const BAND_WORD: Record<Band, string> = { high: '清楚', medium: '尚可', low: '存疑' };
-const BAND_INK: Record<Band, string> = {
-  high: 'text-carbon border-carbon',
-  medium: 'text-stamp border-stamp',
-  low: 'text-ledger border-ledger',
-};
 
 interface ContestantStat {
   id: string;
@@ -22,19 +15,13 @@ interface ContestantStat {
   lastSeen: number;
 }
 
-function stamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 function BandStamp({ band, title }: { band: Band; title: string }) {
   return (
     <span
       title={title}
-      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_INK[band]}`}
+      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
     >
-      {BAND_WORD[band]}
+      {BAND_STAMP[band].word}
     </span>
   );
 }
@@ -208,7 +195,7 @@ export function Analytics() {
                   <BandStamp band={maxBand} title={`${s.maxMatchScore.toFixed(2)} cosine max`} />
                 </span>
                 <span className="w-[150px] text-right font-mono text-[10px] text-carbon-soft">
-                  {stamp(s.firstSeen)} — {stamp(s.lastSeen)}
+                  {formatMmSs(s.firstSeen)} — {formatMmSs(s.lastSeen)}
                 </span>
               </div>
             );
