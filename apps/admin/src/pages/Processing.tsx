@@ -26,11 +26,11 @@ function getStatusVariant(status: string): 'success' | 'warning' | 'error' | 'ne
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'completed': return 'bg-green-500';
-    case 'running': return 'bg-blue-500';
-    case 'failed': return 'bg-red-500';
-    case 'cancelled': return 'bg-slate-500';
-    default: return 'bg-amber-500';
+    case 'completed': return 'bg-carbon';
+    case 'running': return 'bg-carbon';
+    case 'failed': return 'bg-stamp';
+    case 'cancelled': return 'bg-ledger';
+    default: return 'bg-stamp';
   }
 }
 
@@ -152,21 +152,21 @@ export function Processing() {
     <div className="space-y-6 max-w-[1400px] mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Video Processing</h1>
-        <p className="text-slate-400 text-sm mt-1">Manage cloud processing jobs for face recognition</p>
+        <h1 className="text-2xl font-bold text-carbon-deep">Video Processing</h1>
+        <p className="text-carbon-soft text-sm mt-1">Manage cloud processing jobs for face recognition</p>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-lg text-sm font-medium">
+        <div className="bg-stamp/15/30 border border-stamp/50 text-stamp px-4 py-3 rounded-none text-sm font-medium">
           {error}
         </div>
       )}
 
       {/* Active Jobs Banner */}
       {activeCount > 0 && (
-        <div className="bg-blue-900/20 border border-blue-800 text-blue-400 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-carbon/10/20 border border-carbon/50 text-carbon px-4 py-3 rounded-none text-sm font-medium flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-carbon border-t-transparent rounded-full animate-spin" />
           {activeCount} job{activeCount !== 1 ? 's' : ''} running
         </div>
       )}
@@ -175,10 +175,10 @@ export function Processing() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card padding="lg">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-semibold text-slate-200">Initial Processing</h2>
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <h2 className="text-base font-semibold text-carbon-deep">Initial Processing</h2>
+            <span className="w-2 h-2 rounded-full bg-carbon" />
           </div>
-          <p className="text-sm text-slate-400 mb-4 leading-relaxed">
+          <p className="text-sm text-carbon-soft mb-4 leading-relaxed">
             Process all videos using cloud GPUs for initial face detection and recognition
           </p>
           <Button
@@ -189,20 +189,20 @@ export function Processing() {
           >
             {isProcessing ? 'Starting...' : 'Start Processing'}
           </Button>
-          <ul className="space-y-1.5 text-xs text-slate-500">
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Process all unprocessed videos</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Detect and recognize faces</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Cloud GPU acceleration</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Automatic HuggingFace sync</li>
+          <ul className="space-y-1.5 text-xs text-ledger">
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Process all unprocessed videos</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Detect and recognize faces</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Cloud GPU acceleration</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Automatic HuggingFace sync</li>
           </ul>
         </Card>
 
         <Card padding="lg">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-semibold text-slate-200">Embedding Update</h2>
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <h2 className="text-base font-semibold text-carbon-deep">Embedding Update</h2>
+            <span className="w-2 h-2 rounded-full bg-carbon" />
           </div>
-          <p className="text-sm text-slate-400 mb-4 leading-relaxed">
+          <p className="text-sm text-carbon-soft mb-4 leading-relaxed">
             Improve recognition accuracy by incorporating user-flagged faces into embeddings
           </p>
           <Button
@@ -213,11 +213,11 @@ export function Processing() {
           >
             {isProcessing ? 'Starting...' : 'Update Embeddings'}
           </Button>
-          <ul className="space-y-1.5 text-xs text-slate-500">
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Improve face recognition accuracy</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Incorporate user feedback</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Fast embedding recalculation</li>
-            <li className="flex items-center gap-2"><span className="text-green-500">&#x2713;</span> Automatic database rebuild</li>
+          <ul className="space-y-1.5 text-xs text-ledger">
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Improve face recognition accuracy</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Incorporate user feedback</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Fast embedding recalculation</li>
+            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Automatic database rebuild</li>
           </ul>
         </Card>
       </div>
@@ -225,7 +225,7 @@ export function Processing() {
       {/* Jobs List */}
       <Card padding="lg">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-base font-semibold text-slate-200">Processing Jobs</h2>
+          <h2 className="text-base font-semibold text-carbon-deep">Processing Jobs</h2>
           <div className="flex items-center gap-2">
             <Badge variant="warning" size="sm">{activeCount} Active</Badge>
             <Badge variant="success" size="sm">{completedCount} Completed</Badge>
@@ -238,7 +238,7 @@ export function Processing() {
         </div>
 
         {jobs.length === 0 ? (
-          <div className="text-center py-10 text-slate-500">
+          <div className="text-center py-10 text-ledger">
             <p className="text-sm">No processing jobs yet</p>
             <p className="text-xs mt-1">Start a processing job to see it here</p>
           </div>
@@ -247,12 +247,12 @@ export function Processing() {
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex gap-4 hover:border-slate-700 transition-colors"
+                className="bg-paper border border-paper-dark rounded-none p-4 flex gap-4 hover:border-paper-deep transition-colors"
               >
                 {/* Main Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-sm font-semibold text-slate-200">
+                    <h3 className="text-sm font-semibold text-carbon-deep">
                       {job.mode ? job.mode.replace('-', ' ').toUpperCase() : 'Processing'}
                     </h3>
                     <Badge variant={getStatusVariant(job.status)} size="sm">
@@ -261,30 +261,30 @@ export function Processing() {
                   </div>
 
                   {job.current_video && (
-                    <p className="text-xs text-slate-400 font-medium mb-1">{job.current_video}</p>
+                    <p className="text-xs text-carbon-soft font-medium mb-1">{job.current_video}</p>
                   )}
 
                   {job.videos_processed !== undefined && job.total_videos && (
-                    <p className="text-xs text-slate-300 font-medium mb-1">
+                    <p className="text-xs text-carbon font-medium mb-1">
                       {job.videos_processed} / {job.total_videos} videos
                     </p>
                   )}
 
                   {/* Progress bar */}
                   <div className="flex items-center gap-3 mt-2">
-                    <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-paper-dark rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${getStatusColor(job.status)}`}
                         style={{ width: `${job.progress || 0}%` }}
                       />
                     </div>
-                    <span className="text-xs font-semibold text-slate-300 min-w-[40px]">
+                    <span className="text-xs font-semibold text-carbon min-w-[40px]">
                       {job.progress || 0}%
                     </span>
                   </div>
 
                   {job.error && (
-                    <p className="text-xs text-red-400 mt-2">{job.error}</p>
+                    <p className="text-xs text-stamp mt-2">{job.error}</p>
                   )}
                 </div>
 
@@ -301,10 +301,10 @@ export function Processing() {
                   )}
                   <div className="text-right space-y-0.5">
                     {job.created_at && (
-                      <p className="text-[11px] text-slate-500">Created: {formatTimestamp(job.created_at)}</p>
+                      <p className="text-[11px] text-ledger">Created: {formatTimestamp(job.created_at)}</p>
                     )}
                     {job.started_at && (
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-ledger">
                         Duration: {formatDuration(job.started_at, job.completed_at)}
                       </p>
                     )}

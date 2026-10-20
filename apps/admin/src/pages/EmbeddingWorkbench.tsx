@@ -124,21 +124,21 @@ export function EmbeddingWorkbench() {
     <div className="max-w-[1200px] flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-100">Embedding Workbench</h1>
+        <h1 className="text-2xl font-bold text-carbon-deep">Embedding Workbench</h1>
         <Button variant="primary" size="sm">
           Regenerate All
         </Button>
       </div>
 
       {/* Tab Bar */}
-      <div className="flex bg-slate-900 rounded-full p-1">
+      <div className="flex bg-paper-light rounded-full p-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             className={`flex-1 py-2 px-4 border-none text-sm font-medium cursor-pointer rounded-full transition-all ${
               activeTab === tab.id
-                ? 'bg-orange-600 text-white font-semibold'
-                : 'bg-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-stamp text-white font-semibold'
+                : 'bg-transparent text-carbon-soft hover:text-carbon-deep'
             }`}
             onClick={() => switchTab(tab.id)}
           >
@@ -149,9 +149,9 @@ export function EmbeddingWorkbench() {
 
       {/* Loading / Error */}
       {isLoading ? (
-        <div className="py-12 text-center text-slate-400">Loading coverage data...</div>
+        <div className="py-12 text-center text-carbon-soft">Loading coverage data...</div>
       ) : error ? (
-        <div className="py-12 text-center text-red-500 text-sm">{(error as Error).message}</div>
+        <div className="py-12 text-center text-stamp text-sm">{(error as Error).message}</div>
       ) : (
         <>
           {/* COVERAGE TAB */}
@@ -159,35 +159,35 @@ export function EmbeddingWorkbench() {
             <>
               {/* Stats row */}
               <div className="flex gap-4">
-                <div className="flex-1 bg-slate-900 border border-slate-800 p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-slate-400">COVERAGE</span>
+                <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">COVERAGE</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[32px] font-semibold text-slate-100">
+                    <span className="text-[32px] font-semibold text-carbon-deep">
                       {summary.good + summary.weak}/{summary.total}
                     </span>
-                    <span className="text-base text-slate-400">
+                    <span className="text-base text-carbon-soft">
                       {(((summary.good + summary.weak) / summary.total) * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-2 bg-paper-dark rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-orange-500 rounded-full transition-[width] duration-300"
+                      className="h-full bg-stamp rounded-full transition-[width] duration-300"
                       style={{ width: `${((summary.good + summary.weak) / summary.total) * 100}%` }}
                     />
                   </div>
                 </div>
-                <div className="flex-1 bg-slate-900 border border-slate-800 p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-slate-400">AVG CONFIDENCE</span>
+                <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">AVG MATCH SCORE</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[32px] font-semibold text-slate-100">
-                      {summary.avg_confidence.toFixed(2)}
+                    <span className="text-[32px] font-semibold text-carbon-deep">
+                      {summary.avg_match_score.toFixed(2)}
                     </span>
                   </div>
                 </div>
-                <div className="flex-1 bg-slate-900 border border-slate-800 p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-slate-400">RECOGNITION RATE</span>
+                <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">RECOGNITION RATE</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[32px] font-semibold text-slate-100">
+                    <span className="text-[32px] font-semibold text-carbon-deep">
                       {(summary.recognition_rate * 100).toFixed(1)}%
                     </span>
                   </div>
@@ -196,16 +196,16 @@ export function EmbeddingWorkbench() {
 
               {/* Grid header */}
               <div className="flex items-center justify-between">
-                <span className="text-base font-semibold text-slate-200">Contestants</span>
-                <div className="flex gap-4 text-xs text-slate-400">
+                <span className="text-base font-semibold text-carbon-deep">Contestants</span>
+                <div className="flex gap-4 text-xs text-carbon-soft">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Good ({summary.good})
+                    <span className="w-2 h-2 rounded-full bg-carbon inline-block" /> Good ({summary.good})
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Weak ({summary.weak})
+                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Weak ({summary.weak})
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Missing ({summary.missing})
+                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Missing ({summary.missing})
                   </span>
                 </div>
               </div>
@@ -219,11 +219,13 @@ export function EmbeddingWorkbench() {
                     style={{ borderColor: qualityColor(c.quality), background: qualityBg(c.quality) }}
                     onClick={() => selectContestantForDetail(c)}
                   >
-                    <span className="text-[11px] text-slate-500">#{c.id}</span>
-                    <span className="text-[13px] font-semibold text-slate-200 text-center overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
+                    <span className="text-[11px] text-ledger">#{c.id}</span>
+                    <span className="text-[13px] font-semibold text-carbon-deep text-center overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
                       {c.nickname}
                     </span>
-                    <span className="text-[11px] text-slate-400">{(c.avg_confidence * 100).toFixed(0)}%</span>
+                    <span className="text-[11px] text-carbon-soft" title={`${c.avg_match_score.toFixed(4)} cosine average`}>
+                      {c.avg_match_score.toFixed(2)}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -238,12 +240,12 @@ export function EmbeddingWorkbench() {
                   {/* Detail header */}
                   <div className="flex items-center gap-3">
                     <button
-                      className="bg-transparent border border-slate-700 text-slate-400 px-3 py-1.5 rounded-md cursor-pointer text-[13px] hover:text-slate-200 hover:border-slate-500"
+                      className="bg-transparent border border-paper-deep text-carbon-soft px-3 py-1.5 rounded-none cursor-pointer text-[13px] hover:text-carbon-deep hover:border-ledger"
                       onClick={() => setActiveTab('coverage')}
                     >
                       &larr; Back
                     </button>
-                    <h2 className="text-xl font-semibold text-slate-200 flex-1 m-0">
+                    <h2 className="text-xl font-semibold text-carbon-deep flex-1 m-0">
                       #{selectedContestant.id} {selectedContestant.name}
                     </h2>
                     <Badge
@@ -268,10 +270,10 @@ export function EmbeddingWorkbench() {
                     <div className="w-[340px] shrink-0">
                       <Card padding="none">
                         <div className="p-5">
-                          <h3 className="text-sm font-semibold text-slate-200 mb-3">Reference Sources</h3>
-                          <div className="p-6 bg-slate-800 rounded-lg text-center text-slate-400 mb-3">
+                          <h3 className="text-sm font-semibold text-carbon-deep mb-3">Reference Sources</h3>
+                          <div className="p-6 bg-paper-dark rounded-none text-center text-carbon-soft mb-3">
                             <span>{selectedContestant.nickname}</span>
-                            <p className="text-slate-500 text-[13px] mt-1">
+                            <p className="text-ledger text-[13px] mt-1">
                               Current embedding from Instagram screenshot
                             </p>
                           </div>
@@ -279,31 +281,31 @@ export function EmbeddingWorkbench() {
                             Upload New Photo
                           </Button>
                         </div>
-                        <div className="p-5 border-t border-slate-800">
-                          <h3 className="text-sm font-semibold text-slate-200 mb-3">Stats</h3>
-                          <div className="flex justify-between py-2 border-b border-slate-800 text-[13px] text-slate-400">
-                            <span>Avg Confidence</span>
-                            <strong className="text-slate-200">
-                              {(selectedContestant.avg_confidence * 100).toFixed(1)}%
+                        <div className="p-5 border-t border-paper-dark">
+                          <h3 className="text-sm font-semibold text-carbon-deep mb-3">Stats</h3>
+                          <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
+                            <span>Avg Match Score</span>
+                            <strong className="text-carbon-deep" title={`${selectedContestant.avg_match_score.toFixed(4)} cosine average`}>
+                              {selectedContestant.avg_match_score.toFixed(2)}
                             </strong>
                           </div>
-                          <div className="flex justify-between py-2 border-b border-slate-800 text-[13px] text-slate-400">
-                            <span>Max Confidence</span>
-                            <strong className="text-slate-200">
-                              {(selectedContestant.max_confidence * 100).toFixed(1)}%
+                          <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
+                            <span>Max Match Score</span>
+                            <strong className="text-carbon-deep" title={`${selectedContestant.max_match_score.toFixed(4)} cosine max`}>
+                              {selectedContestant.max_match_score.toFixed(2)}
                             </strong>
                           </div>
-                          <div className="flex justify-between py-2 border-b border-slate-800 text-[13px] text-slate-400">
+                          <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Detection Count</span>
-                            <strong className="text-slate-200">{selectedContestant.detection_count}</strong>
+                            <strong className="text-carbon-deep">{selectedContestant.detection_count}</strong>
                           </div>
-                          <div className="flex justify-between py-2 border-b border-slate-800 text-[13px] text-slate-400">
+                          <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Videos Seen In</span>
-                            <strong className="text-slate-200">{selectedContestant.videos_seen_in}</strong>
+                            <strong className="text-carbon-deep">{selectedContestant.videos_seen_in}</strong>
                           </div>
-                          <div className="flex justify-between py-2 text-[13px] text-slate-400">
+                          <div className="flex justify-between py-2 text-[13px] text-carbon-soft">
                             <span>Reference Photos</span>
-                            <strong className="text-slate-200">{selectedContestant.reference_count}</strong>
+                            <strong className="text-carbon-deep">{selectedContestant.reference_count}</strong>
                           </div>
                         </div>
                       </Card>
@@ -312,8 +314,8 @@ export function EmbeddingWorkbench() {
                     {/* Right panel */}
                     <div className="flex-1">
                       <Card padding="md">
-                        <h3 className="text-sm font-semibold text-slate-200 mb-3">Detected Faces from Videos</h3>
-                        <p className="text-slate-500 text-[13px]">
+                        <h3 className="text-sm font-semibold text-carbon-deep mb-3">Detected Faces from Videos</h3>
+                        <p className="text-ledger text-[13px]">
                           Face crops will be extracted on-demand from video frames using canvas (Phase 3).
                         </p>
                       </Card>
@@ -321,7 +323,7 @@ export function EmbeddingWorkbench() {
                   </div>
                 </>
               ) : (
-                <div className="py-12 text-center text-slate-400">
+                <div className="py-12 text-center text-carbon-soft">
                   <p className="mb-4">Select a contestant from the Coverage tab to see details.</p>
                   <Button variant="secondary" size="sm" onClick={() => setActiveTab('coverage')}>
                     Go to Coverage
@@ -335,57 +337,57 @@ export function EmbeddingWorkbench() {
           {activeTab === 'confusion' && (
             <>
               {confusionLoading ? (
-                <div className="py-12 text-center text-slate-400">Loading similarity data...</div>
+                <div className="py-12 text-center text-carbon-soft">Loading similarity data...</div>
               ) : similarityData ? (
                 <div className="flex gap-6">
                   {/* Heatmap */}
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-slate-200 mb-3">
+                    <h3 className="text-sm font-semibold text-carbon-deep mb-3">
                       Pairwise Similarity ({similarityData.stats.contestant_count}x
                       {similarityData.stats.contestant_count})
                     </h3>
                     <div className="relative inline-block" onMouseLeave={hideHeatmapTooltip}>
                       <canvas
                         ref={heatmapCanvasRef}
-                        className="border border-slate-700"
+                        className="border border-paper-deep"
                         onMouseMove={handleHeatmapHover}
                       />
                       {heatmapTooltip.visible && (
                         <div
-                          className="absolute bg-slate-950 border border-slate-600 text-slate-200 px-2 py-1 rounded text-xs pointer-events-none whitespace-nowrap z-10"
+                          className="absolute bg-paper border border-carbon text-carbon-deep px-2 py-1 rounded text-xs pointer-events-none whitespace-nowrap z-10"
                           style={{ left: heatmapTooltip.x, top: heatmapTooltip.y }}
                         >
                           {heatmapTooltip.text}
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-ledger">
                       <span>Low similarity</span>
-                      <div className="flex-1 h-2 rounded bg-gradient-to-r from-orange-500/5 to-orange-500" />
+                      <div className="flex-1 h-2 rounded bg-gradient-to-r from-stamp/5 to-stamp" />
                       <span>High similarity</span>
                     </div>
                   </div>
 
                   {/* Pairs sidebar */}
                   <div className="w-[320px] shrink-0">
-                    <h3 className="text-sm font-semibold text-slate-200 mb-3">Top Confusion Pairs</h3>
+                    <h3 className="text-sm font-semibold text-carbon-deep mb-3">Top Confusion Pairs</h3>
                     <div className="flex flex-col gap-1">
                       {topPairs.map((pair, i) => (
                         <button
                           key={i}
-                          className="flex items-center gap-2 px-3 py-2.5 bg-slate-900 border border-slate-800 rounded cursor-pointer transition-colors text-left w-full hover:bg-slate-800"
+                          className="flex items-center gap-2 px-3 py-2.5 bg-paper-light border border-paper-dark rounded cursor-pointer transition-colors text-left w-full hover:bg-paper-dark"
                           onClick={() => {
                             const c = contestants.find((x) => x.nickname === pair.contestant_a.nickname);
                             if (c) selectContestantForDetail(c);
                           }}
                         >
-                          <span className="text-[11px] text-slate-500 w-6">#{i + 1}</span>
-                          <span className="flex-1 text-[13px] text-slate-200">
+                          <span className="text-[11px] text-ledger w-6">#{i + 1}</span>
+                          <span className="flex-1 text-[13px] text-carbon-deep">
                             {pair.contestant_a.nickname} &harr; {pair.contestant_b.nickname}
                           </span>
                           <span
                             className={`text-[13px] font-semibold ${
-                              pair.similarity > 0.5 ? 'text-red-500' : 'text-slate-400'
+                              pair.similarity > 0.5 ? 'text-stamp' : 'text-carbon-soft'
                             }`}
                           >
                             {(pair.similarity * 100).toFixed(1)}%
@@ -396,7 +398,7 @@ export function EmbeddingWorkbench() {
                   </div>
                 </div>
               ) : (
-                <div className="py-12 text-center text-slate-400">
+                <div className="py-12 text-center text-carbon-soft">
                   <p>
                     No similarity data available. Run: <code>python scripts/compute_similarity.py</code>
                   </p>
@@ -407,10 +409,10 @@ export function EmbeddingWorkbench() {
 
           {/* UNMATCHED TAB */}
           {activeTab === 'unmatched' && (
-            <div className="py-12 text-center text-slate-400">
-              <h3 className="text-slate-200 mb-2">Unmatched Faces</h3>
+            <div className="py-12 text-center text-carbon-soft">
+              <h3 className="text-carbon-deep mb-2">Unmatched Faces</h3>
               <p>Clustered unrecognized faces will appear here after running the clustering pipeline (Phase 5).</p>
-              <p className="text-slate-500 text-[13px] mt-1">
+              <p className="text-ledger text-[13px] mt-1">
                 Requires: T0.4 (save unmatched embeddings) + T0.5 (HDBSCAN clustering)
               </p>
             </div>
