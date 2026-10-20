@@ -105,7 +105,9 @@ export default {
     const corsHeaders: CorsHeaders = {
       'Access-Control-Allow-Origin':
         origin && allowed.includes(origin) ? origin : allowed.length ? '' : '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      // ADR 0003: this Worker serves reads only. Advertising write methods here
+      // contradicted the handler surface and invited preflights that can never succeed.
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
@@ -541,6 +543,9 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
         });
       }
   }
+
+  // Deliberately 404, not 405: ADR 0003 removed the write routes, and a 405 would tell a
+  // caller that a route exists but is gated. Gone must look gone.
 
   return new Response(JSON.stringify({ error: 'API endpoint not found' }), {
     status: 404,
