@@ -103,6 +103,13 @@ known_first_party = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
+# mvp-processor is a separate project with its own pyproject and virtualenv; checking it
+# from here collided on two `conftest` modules. Run its checks from its own directory.
+exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/)'
+# Duplicate basenames exist (batch_process_videos.py at the root and under scripts/archive,
+# two conftests). Explicit package bases lets mypy key modules by path instead of basename.
+explicit_package_bases = true
+mypy_path = "."
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -123,17 +130,39 @@ module = [
     "chromadb.*",
     "ffmpeg.*",
     "numpy.*",
+    "pandas.*",
+    # mvp-processor/src siblings import each other as top-level modules; they only
+    # resolve when mypy runs from that directory.
+    "face_detector",
 ]
 ignore_missing_imports = true
 
-[tool.pyright]
-# The Gradio GUI is retired: the product moved to the React apps (apps/viewer,
-# apps/admin) and mvp-processor. What is left under archive/ — plus the two root
-# scripts that drove it — is kept for reference, not built, not type-checked.
-# app.py is the HF Spaces entry point and still imports the archived GUI, so it
-# no longer launches; see docs/void-migration.md for the storage/edge plan.
-exclude = [
-    "archive",
-    "app.py",
-    "add_performance_flag.py",
+[[tool.mypy.overrides]]
+# Tests: none of the 30 test files annotate, and `-> None` on every test_* adds
+# nothing. Keep bodies type-checked, drop the signature requirement. The module
+# names are the test package directories, not `tests.*` — tests/ has no
+# __init__.py, so mypy roots each test package at its own directory.
+module = [
+    # With explicit_package_bases the tests are `tests.<dir>.<mod>`; without it they are
+    # `<dir>.<mod>`. Both forms are listed so the override holds however mypy is invoked.
+    "tests.unit.*",
+    "tests.contract.*",
+    "tests.integration.*",
+    "tests.performance.*",
+    "unit.*",
+    "contract.*",
+    "integration.*",
+    "performance.*",
+    "benchmark.*",
+    "validation.*",
+    # These test files sit outside a package, so mypy names them as top-level modules.
+    "test_security_performance",
+    "test_face_detector",
+    "test_face_parser",
 ]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pyright]
+# archive/ is the retired Gradio GUI and old copies: kept for reference, not built.
+exclude = ["archive"]

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import numpy as np
 import subprocess
-from typing import Dict
+from typing import Any, Dict
 
 # Add src to path
 sys.path.append("src")
@@ -60,10 +60,10 @@ def pull_lfs_files() -> bool:
         return False
 
 
-def verify_embedding_files() -> Dict[str, any]:
+def verify_embedding_files() -> Dict[str, Any]:
     """Verify all embedding files are valid numpy arrays."""
     contestants_dir = Path("source/photo/contestants")
-    results = {
+    results: Dict[str, Any] = {
         "total_files": 0,
         "valid_files": 0,
         "invalid_files": [],
@@ -244,7 +244,7 @@ def test_face_matching() -> bool:
 
 def print_summary_report(
     verification_results: Dict, db_refresh_success: bool, matching_success: bool
-):
+) -> None:
     """Print a comprehensive summary report."""
     print("\n" + "=" * 60)
     print("🔍 EMBEDDINGS DATABASE DIAGNOSTIC REPORT")
@@ -295,7 +295,7 @@ def print_summary_report(
     print("=" * 60)
 
 
-def main():
+def main() -> bool:
     """Main function."""
     parser = argparse.ArgumentParser(
         description="Fix embeddings database for face recognition"

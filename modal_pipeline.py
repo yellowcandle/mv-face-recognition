@@ -63,13 +63,14 @@ import time
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 from datetime import datetime
-import subprocess
+
+import numpy as np
 
 try:
-    from modal import App, Image, Volume, gpu
+    from modal import App, Image, Volume
 except ImportError:
     print("Error: modal package not installed")
     print("Install with: pip install modal")
@@ -77,8 +78,7 @@ except ImportError:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,7 @@ modal_image = (
 @dataclass
 class VideoProcessingResult:
     """Data class for video processing results."""
+
     video_name: str
     success: bool
     processing_time: float
@@ -130,10 +131,13 @@ def list_available_videos() -> List[str]:
             return []
 
         video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv"}
-        videos = sorted([
-            f.name for f in videos_dir.iterdir()
-            if f.is_file() and f.suffix.lower() in video_extensions
-        ])
+        videos = sorted(
+            [
+                f.name
+                for f in videos_dir.iterdir()
+                if f.is_file() and f.suffix.lower() in video_extensions
+            ]
+        )
         logger.info(f"Found {len(videos)} videos in volume")
         return videos
     except Exception as e:
@@ -159,7 +163,6 @@ def process_video_task(
     import gc
     import random
     import cv2
-    from pathlib import Path
 
     container_id = f"C-{video_name[:8].replace('.', '')}-{random.randint(1000, 9999)}"
     start_time = time.time()
@@ -182,13 +185,17 @@ def process_video_task(
 
         config["paths"]["videos_dir"] = str(VOL_MOUNT_PATH / "source/videos")
         config["paths"]["chroma_db_path"] = str(VOL_MOUNT_PATH / "data/chroma_db")
-        config["paths"]["processed_videos_dir"] = str(VOL_MOUNT_PATH / "processed_videos")
+        config["paths"]["processed_videos_dir"] = str(
+            VOL_MOUNT_PATH / "processed_videos"
+        )
         config["paths"]["metadata_dir"] = str(VOL_MOUNT_PATH / "metadata")
         config["paths"]["clips_dir"] = str(VOL_MOUNT_PATH / "clips")
 
         face_detector = FaceDetector(
             model_name=config.get("face_detection", {}).get("model_name", "buffalo_l"),
-            confidence_threshold=config.get("face_detection", {}).get("detection_threshold", 0.5)
+            confidence_threshold=config.get("face_detection", {}).get(
+                "detection_threshold", 0.5
+            ),
         )
 
         face_matcher = FaceMatcher(config_path=config_path)
@@ -219,22 +226,14 @@ def process_video_task(
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_skip = 5
 
-        fourcc_code = 0x7634706d  # 'mp4v' in hex
-
-        fourcc = cv2.VideoWriter_fourcc(
-            'm', 'p', '4', 'v'
-        )  # type: ignore[attr-defined]
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         out = cv2.VideoWriter(
-            str(processed_path),
-            fourcc,
-            fps,
-            (frame_width, frame_height),
-            True
+            str(processed_path), fourcc, fps, (frame_width, frame_height), True
         )
 
-        metadata = {
+        metadata: Dict[str, Any] = {
             "video_name": video_name,
             "processed_at": datetime.now().isoformat(),
             "frames": [],
@@ -249,7 +248,7 @@ def process_video_task(
             if frame_number % frame_skip == 0:
                 face_detections = face_detector.detect(frame)
 
-                frame_metadata = {
+                frame_metadata: Dict[str, Any] = {
                     "frame_number": frame_number,
                     "timestamp": frame_number / fps,
                     "faces": [],
@@ -257,26 +256,26 @@ def process_video_task(
 
                 for face in face_detections:
                     faces_detected += 1
-                    embedding = face.get("embedding")
-
-                    if embedding is not None:
-                        match = face_matcher.match_face(embedding)
+                    # DetectedFace is a dataclass (src/models/detection.py), not a dict:
+                    # `.get()` raised AttributeError on every face, so this path never
+                    # recognised or annotated anything.
+                    if face.embedding is not None:
+                        match = face_matcher.match_face(
+                            np.asarray(face.embedding.embedding)
+                        )
 
                         if match:
                             faces_recognized += 1
                             contestant_name, confidence = match
 
-                            bbox = face.get("bbox")
+                            bbox = face.bbox
                             if bbox:
-                                x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-
-                                cv2.rectangle(
-                                    frame,
-                                    (x1, y1),
-                                    (x2, y2),
-                                    (0, 255, 0),
-                                    2
+                                x1, y1 = int(bbox.x), int(bbox.y)
+                                x2, y2 = int(bbox.x + bbox.width), int(
+                                    bbox.y + bbox.height
                                 )
+
+                                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                                 cv2.putText(
                                     frame,
                                     f"{contestant_name} ({confidence:.2f})",
@@ -284,14 +283,16 @@ def process_video_task(
                                     cv2.FONT_HERSHEY_SIMPLEX,
                                     0.5,
                                     (0, 255, 0),
-                                    2
+                                    2,
                                 )
 
-                                frame_metadata["faces"].append({
-                                    "contestant_name": contestant_name,
-                                    "similarity": float(confidence),
-                                    "bbox": [x1, y1, x2, y2],
-                                })
+                                frame_metadata["faces"].append(
+                                    {
+                                        "contestant_name": contestant_name,
+                                        "similarity": float(confidence),
+                                        "bbox": [x1, y1, x2, y2],
+                                    }
+                                )
 
                 metadata["frames"].append(frame_metadata)
                 frames_processed += 1
@@ -329,6 +330,7 @@ def process_video_task(
         processing_time = time.time() - start_time
         logger.error(f"[{container_id}] Failed: {str(e)}")
         import traceback
+
         traceback.print_exc()
 
         gc.collect()
@@ -357,14 +359,14 @@ def run_parallel_pipeline(
 ) -> List[VideoProcessingResult]:
     """Run parallel video processing pipeline."""
     import time
+
     start_time = time.time()
 
     logger.info(f"Starting parallel processing of {len(video_list)} videos")
     logger.info(f"Similarity threshold: {similarity_threshold}")
 
     video_params = [
-        (video, similarity_threshold, force_reprocess)
-        for video in video_list
+        (video, similarity_threshold, force_reprocess) for video in video_list
     ]
 
     results = list(process_video_task.starmap(video_params))
@@ -382,7 +384,7 @@ def main(
     force: bool = False,
     parallel: bool = False,
     list_only: bool = False,
-):
+) -> None:
     """Main entry point for Modal pipeline."""
     try:
         from rich.console import Console
@@ -425,7 +427,7 @@ def main(
         console.print("[red]Error: Threshold must be between 0.0 and 1.0[/red]")
         sys.exit(1)
 
-    console.print(f"[cyan]Fetching video list...[/cyan]")
+    console.print("[cyan]Fetching video list...[/cyan]")
     available_videos = list_available_videos.remote()
 
     if not available_videos:
@@ -437,7 +439,9 @@ def main(
     if video:
         if video not in available_videos:
             console.print(f"[red]Video '{video}' not found[/red]")
-            console.print(f"\n[yellow]Available videos:[/yellow] {', '.join(available_videos[:5])}")
+            console.print(
+                f"\n[yellow]Available videos:[/yellow] {', '.join(available_videos[:5])}"
+            )
             sys.exit(1)
 
         videos_to_process = [video]
@@ -483,11 +487,11 @@ def main(
 
 
 def print_summary(
-    console,
+    console: Any,
     results: List[VideoProcessingResult],
     total_time: float,
     parallel: bool,
-):
+) -> None:
     """Print processing summary with Rich formatting."""
     from rich.table import Table
     from rich.panel import Panel
@@ -557,7 +561,11 @@ def print_summary(
         table.add_column("Error", style="red", max_width=60)
 
         for r in failed:
-            error_msg = r.error[:55] + "..." if r.error and len(r.error) > 55 else (r.error or "Unknown")
+            error_msg = (
+                r.error[:55] + "..."
+                if r.error and len(r.error) > 55
+                else (r.error or "Unknown")
+            )
             table.add_row(
                 r.video_name[:35] + "..." if len(r.video_name) > 35 else r.video_name,
                 error_msg,
@@ -571,10 +579,24 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Modal Video Processing Pipeline")
     parser.add_argument("--video", "-v", help="Process single video")
-    parser.add_argument("--threshold", "-t", type=float, default=0.25, help="Similarity threshold (0.0-1.0)")
+    parser.add_argument(
+        "--threshold",
+        "-t",
+        type=float,
+        default=0.25,
+        help="Similarity threshold (0.0-1.0)",
+    )
     parser.add_argument("--force", "-f", action="store_true", help="Force reprocessing")
-    parser.add_argument("--parallel", "-p", action="store_true", help="Enable parallel processing")
-    parser.add_argument("--list", "-l", action="store_true", dest="list_only", help="List available videos")
+    parser.add_argument(
+        "--parallel", "-p", action="store_true", help="Enable parallel processing"
+    )
+    parser.add_argument(
+        "--list",
+        "-l",
+        action="store_true",
+        dest="list_only",
+        help="List available videos",
+    )
 
     args = parser.parse_args()
 

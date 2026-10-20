@@ -3,7 +3,6 @@ Contract tests for access control functionality.
 Tests the AuthMiddleware class against defined contracts.
 """
 
-import pytest
 import time
 from unittest.mock import patch
 from src.middleware.auth import AuthMiddleware, RateLimiter
@@ -42,6 +41,7 @@ class TestAuthMiddleware:
         token = self.auth.generate_token(user_id)
         payload = self.auth.verify_token(token)
 
+        assert payload is not None
         assert payload["roles"] == ["user"]
 
     def test_verify_valid_token(self):
@@ -58,7 +58,7 @@ class TestAuthMiddleware:
     def test_verify_expired_token(self):
         """Test verification rejects expired tokens."""
         # Create token with very short expiry
-        with patch.object(self.auth, 'token_expiry_hours', 0):
+        with patch.object(self.auth, "token_expiry_hours", 0):
             token = self.auth.generate_token("user")
 
         # Wait a bit for expiry

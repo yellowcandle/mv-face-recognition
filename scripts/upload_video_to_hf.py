@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -37,7 +38,7 @@ DEFAULT_REPO_ID = "yellowcandle/mv-face-recognition-data"
 
 def upload_video(
     video_path: str,
-    custom_name: str = None,
+    custom_name: Optional[str] = None,
     repo_id: str = DEFAULT_REPO_ID,
 ) -> bool:
     """
@@ -63,7 +64,7 @@ def upload_video(
     video_file = Path(video_path)
     file_size_mb = video_file.stat().st_size / (1024 * 1024)
 
-    logger.info(f"\n📹 Video Information:")
+    logger.info("\n📹 Video Information:")
     logger.info(f"  • Path: {video_path}")
     logger.info(f"  • Size: {file_size_mb:.2f} MB")
     logger.info(f"  • Repository: {repo_id}")
@@ -94,7 +95,7 @@ def upload_video(
         return False
 
     # Upload video
-    logger.info(f"\n📤 Starting upload...")
+    logger.info("\n📤 Starting upload...")
     result = dataset.upload_source_video(
         video_path=video_path,
         video_name=custom_name,
@@ -104,11 +105,13 @@ def upload_video(
         logger.info(f"\n{'=' * 60}")
         logger.info("✅ UPLOAD SUCCESSFUL")
         logger.info(f"{'=' * 60}")
-        logger.info(f"\n📊 Upload Summary:")
+        logger.info("\n📊 Upload Summary:")
         logger.info(f"  • Video name: {result['video_name']}")
         logger.info(f"  • Video URL: {result['video_url']}")
-        logger.info(f"\n🔗 View on HuggingFace:")
-        logger.info(f"  https://huggingface.co/datasets/{repo_id}/tree/main/videos/source")
+        logger.info("\n🔗 View on HuggingFace:")
+        logger.info(
+            f"  https://huggingface.co/datasets/{repo_id}/tree/main/videos/source"
+        )
         logger.info(f"\n{'=' * 60}")
         return True
     else:
@@ -138,8 +141,10 @@ def list_uploaded_videos(repo_id: str = DEFAULT_REPO_ID) -> None:
 
         if not video_files:
             logger.info("\n⚠️  No source videos found in repository")
-            logger.info(f"\nTo upload a video, run:")
-            logger.info(f"  python scripts/upload_video_to_hf.py --video path/to/video.mp4")
+            logger.info("\nTo upload a video, run:")
+            logger.info(
+                "  python scripts/upload_video_to_hf.py --video path/to/video.mp4"
+            )
         else:
             logger.info(f"\nFound {len(video_files)} source video(s):\n")
             for video_file in video_files:
@@ -154,7 +159,7 @@ def list_uploaded_videos(repo_id: str = DEFAULT_REPO_ID) -> None:
         logger.error(f"❌ Failed to list videos: {e}")
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Upload source videos to HuggingFace XET storage"

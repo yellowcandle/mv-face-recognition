@@ -6,7 +6,7 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import numpy as np
 import chromadb
 from chromadb.config import Settings
@@ -84,7 +84,7 @@ class ChromaDBManager:
                 # Verify integrity hash if available
                 hash_path = Path(str(npy_file) + ".sha256")
                 if hash_path.exists():
-                    with open(hash_path, 'r') as f:
+                    with open(hash_path, "r") as f:
                         expected_hash = f.read().strip()
 
                     actual_hash = hashlib.sha256(embedding.tobytes()).hexdigest()
@@ -99,7 +99,9 @@ class ChromaDBManager:
                     else:
                         logger.debug(f"Integrity verified for {name}")
                 else:
-                    logger.debug(f"No integrity hash found for {name}, skipping verification")
+                    logger.debug(
+                        f"No integrity hash found for {name}, skipping verification"
+                    )
 
                 # Validate and reshape embedding
                 if embedding.ndim == 2 and embedding.shape == (1, 512):
@@ -122,7 +124,9 @@ class ChromaDBManager:
             except Exception as e:
                 logger.error(f"Error loading {npy_file}: {e}")
 
-        logger.info(f"Successfully loaded {len(embeddings)} embeddings with integrity verification")
+        logger.info(
+            f"Successfully loaded {len(embeddings)} embeddings with integrity verification"
+        )
         return embeddings
 
     def populate_database(self, force_refresh: bool = False) -> int:
@@ -156,10 +160,12 @@ class ChromaDBManager:
             logger.warning("No embeddings found to populate database")
             return 0
 
-        # Prepare data for ChromaDB
-        ids = []
-        embeddings_list = []
-        metadatas = []
+        # Prepare data for ChromaDB. `Any` here on purpose: chromadb's OneOrMany types are
+        # invariant, so list[list[float]] / list[dict[...]] are rejected although they are
+        # exactly what Collection.add accepts at runtime.
+        ids: list[str] = []
+        embeddings_list: list[Any] = []
+        metadatas: list[Any] = []
 
         for name, embedding in embeddings.items():
             ids.append(name)
@@ -178,8 +184,12 @@ class ChromaDBManager:
         self, query_embedding: np.ndarray, n_results: Optional[int] = None
     ) -> List[Tuple[str, float]]:
         """Search for similar faces in the database."""
-        if n_results is None:
-            n_results = self.config["face_matching"]["max_results"]
+        # `config` is untyped, so resolve to a real int without reassigning the parameter.
+        limit: int = (
+            int(n_results)
+            if n_results is not None
+            else int(self.config["face_matching"]["max_results"])
+        )
 
         # Ensure embedding is the right format
         if isinstance(query_embedding, np.ndarray):
@@ -188,7 +198,7 @@ class ChromaDBManager:
         # Search in ChromaDB
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=n_results,
+            n_results=limit,
             include=["metadatas", "distances"],
         )
 
@@ -231,7 +241,7 @@ class ChromaDBManager:
             "similarity_threshold": self.similarity_threshold,
         }
 
-    def reset_database(self):
+    def reset_database(self) -> None:
         """Reset the database (delete and recreate)."""
         self.client.delete_collection("contestants_faces")
         self.collection = self.client.create_collection(

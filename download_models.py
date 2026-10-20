@@ -21,6 +21,19 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Optional, TypedDict
+
+# `rich` is optional (not a declared dependency). The checker always sees the names via
+# TYPE_CHECKING; at runtime every use is behind HAS_RICH.
+if TYPE_CHECKING:
+    from rich.console import Console
+    from rich.progress import (
+        BarColumn,
+        DownloadColumn,
+        Progress,
+        TimeRemainingColumn,
+        TransferSpeedColumn,
+    )
 
 try:
     from rich.console import Console
@@ -46,8 +59,17 @@ logger = logging.getLogger(__name__)
 if HAS_RICH:
     console = Console()
 
+
+class ModelSpec(TypedDict):
+    url: str
+    backup_url: str
+    md5: str
+    size: int
+    description: str
+
+
 # Model URLs and expected file sizes
-MODELS = {
+MODELS: Dict[str, ModelSpec] = {
     "arcface_r50.onnx": {
         "url": "https://github.com/onnx/models/raw/main/vision/body_analysis/arcface/model/arcfaceresnet100-8.onnx",
         "backup_url": "https://storage.googleapis.com/tensorflow/models/face_recognition/arcface_r50.onnx",
@@ -84,16 +106,20 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 
-def calculate_md5(file_path):
+def calculate_md5(file_path: "str | Path") -> str:
     """Calculate MD5 hash of a file."""
     hash_md5 = hashlib.md5()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
+    try:
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+    except OSError as exc:
+        logger.error("cannot read %s for hashing: %s", file_path, exc)
+        return ""
     return hash_md5.hexdigest()
 
 
-def verify_file(file_path, expected_md5=None):
+def verify_file(file_path: "str | Path", expected_md5: Optional[str] = None) -> bool:
     """Verify if a file exists and has the correct MD5 hash."""
     if not os.path.exists(file_path):
         return False
@@ -113,10 +139,11 @@ def verify_file(file_path, expected_md5=None):
 class DownloadProgressBar:
     """Progress bar for downloads."""
 
-    def __init__(self, filename, total_size):
+    def __init__(self, filename: str, total_size: int) -> None:
         self.filename = filename
         self.total_size = total_size
         self.downloaded = 0
+        self.progress: Optional["Progress"] = None
 
         if HAS_RICH:
             self.progress = Progress(
@@ -131,10 +158,8 @@ class DownloadProgressBar:
                 f"Downloading {filename}", total=total_size
             )
             self.progress.start()
-        else:
-            self.progress = None
 
-    def update(self, chunk_size):
+    def update(self, chunk_size: int) -> None:
         """Update progress."""
         self.downloaded += chunk_size
 
@@ -149,7 +174,7 @@ class DownloadProgressBar:
             )
             sys.stdout.flush()
 
-    def finish(self):
+    def finish(self) -> None:
         """Finish progress tracking."""
         if self.progress:
             self.progress.stop()
@@ -158,8 +183,12 @@ class DownloadProgressBar:
 
 
 def download_file(
-    url, local_path, expected_md5=None, expected_size=None, backup_url=None
-):
+    url: str,
+    local_path: "str | Path",
+    expected_md5: Optional[str] = None,
+    expected_size: Optional[int] = None,
+    backup_url: Optional[str] = None,
+) -> bool:
     """Download a file with progress bar."""
     urls_to_try = [url]
     if backup_url:
@@ -242,11 +271,15 @@ def download_file(
     return False
 
 
-def download_models(force=False):
+def download_models(force: bool = False) -> bool:
     """Download required models."""
     # Get models directory
     models_dir = Path(__file__).parent / "models"
-    os.makedirs(models_dir, exist_ok=True)
+    try:
+        os.makedirs(models_dir, exist_ok=True)
+    except OSError as exc:
+        logger.error("cannot create %s: %s", models_dir, exc)
+        return False
 
     # Check if models directory has existing model files
     if not force:
@@ -322,16 +355,15 @@ def download_models(force=False):
         else:
             # Try to get model from installed packages
             try:
+                import site
+
                 # Common locations in Python packages
+                site_packages = site.getsitepackages()[0]
                 package_locations = [
                     os.path.join(site_packages, "insightface", "models"),
                     os.path.join(site_packages, "cv2", "data"),
                     os.path.join(site_packages, "face_recognition", "models"),
                 ]
-
-                import site
-
-                site.getsitepackages()[0]
 
                 found = False
                 for location in package_locations:
@@ -406,7 +438,7 @@ def download_models(force=False):
     return success
 
 
-def main():
+def main() -> int:
     """Main function."""
     parser = argparse.ArgumentParser(
         description="Download models for face recognition system"

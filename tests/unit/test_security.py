@@ -4,9 +4,8 @@ Tests encryption, authentication, and security helpers.
 """
 
 import pytest
-import json
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from src.encryption import FaceDataEncryption
 from src.middleware.auth import AuthMiddleware, RateLimiter
 from src.validation import InputValidator
@@ -36,11 +35,13 @@ class TestFaceDataEncryption:
 
     def test_encrypt_decrypt_invalid_data(self):
         """Test encryption/decryption with invalid data."""
+        # The point of this test is the runtime validation of wrong types, so the type
+        # checker is told to ignore the deliberately invalid arguments.
         with pytest.raises(ValueError, match="Embedding must be a list of numbers"):
-            self.encryption.encrypt_embedding("not a list")
+            self.encryption.encrypt_embedding("not a list")  # type: ignore[arg-type]
 
         with pytest.raises(ValueError, match="Embedding must be a list of numbers"):
-            self.encryption.encrypt_embedding([0.1, "invalid", 0.3])
+            self.encryption.encrypt_embedding([0.1, "invalid", 0.3])  # type: ignore[list-item]
 
     def test_decrypt_corrupted_data(self):
         """Test decryption of corrupted data."""
