@@ -1,4 +1,5 @@
 import pytest
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -37,8 +38,6 @@ def setup_test_files():
         if os.path.exists(file):
             os.remove(file)
     if os.path.exists("test_output"):
-        import shutil
-
         shutil.rmtree("test_output")
     if os.path.exists("test_photos"):
         shutil.rmtree("test_photos")
