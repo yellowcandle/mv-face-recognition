@@ -108,7 +108,7 @@ class TestAuthMiddleware:
             "user_id": "user123",
             "roles": ["user"],
             "iat": int(time.time()),
-            "exp": int(time.time()) - 3600  # Expired 1 hour ago
+            "exp": int(time.time()) - 3600,  # Expired 1 hour ago
         }
         token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
 
@@ -180,7 +180,7 @@ class TestRateLimiter:
             self.limiter.is_allowed(client_id)
 
         # Simulate time passing (mock time)
-        with patch('time.time', return_value=int(time.time()) + 61):
+        with patch("time.time", return_value=int(time.time()) + 61):
             # Should allow again after window
             assert self.limiter.is_allowed(client_id)
 
@@ -199,26 +199,26 @@ class TestInputValidator:
         import os
 
         # Create a valid mp4 file
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
-            f.write(b'test video content')
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(b"test video content")
             valid_file = f.name
 
         try:
             result = self.validator.validate_video_file(valid_file)
-            assert result['valid'] is True
-            assert result['error'] is None
+            assert result["valid"] is True
+            assert result["error"] is None
         finally:
             os.unlink(valid_file)
 
         # Invalid file extension
-        with tempfile.NamedTemporaryFile(suffix='.exe', delete=False) as f:
-            f.write(b'test content')
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            f.write(b"test content")
             invalid_file = f.name
 
         try:
             result = self.validator.validate_video_file(invalid_file)
-            assert result['valid'] is False
-            assert 'Invalid file type' in result['error']
+            assert result["valid"] is False
+            assert "Invalid file type" in result["error"]
         finally:
             os.unlink(invalid_file)
 
@@ -226,43 +226,48 @@ class TestInputValidator:
         """Test contestant name validation."""
         # Valid names
         result = self.validator.validate_contestant_name("John Doe")
-        assert result['valid'] is True
-        assert result['sanitized'] == "John Doe"
+        assert result["valid"] is True
+        assert result["sanitized"] == "John Doe"
 
         result = self.validator.validate_contestant_name("张三")
-        assert result['valid'] is True
+        assert result["valid"] is True
 
         # Invalid names
         result = self.validator.validate_contestant_name("")
-        assert result['valid'] is False
-        assert "non-empty string" in result['error']
+        assert result["valid"] is False
+        assert "non-empty string" in result["error"]
 
         result = self.validator.validate_contestant_name("A" * 101)
-        assert result['valid'] is False
-        assert "too long" in result['error']
+        assert result["valid"] is False
+        assert "too long" in result["error"]
 
-        result = self.validator.validate_contestant_name("<script>alert('xss')</script>")
-        assert result['valid'] is False
-        assert "invalid characters" in result['error']
+        result = self.validator.validate_contestant_name(
+            "<script>alert('xss')</script>"
+        )
+        assert result["valid"] is False
+        assert "invalid characters" in result["error"]
 
     def test_validate_api_input(self):
         """Test API input validation."""
         # Valid input
         valid_data = {"video_id": "123", "contestant_name": "John"}
         result = self.validator.validate_api_input(valid_data)
-        assert result['valid'] is True
+        assert result["valid"] is True
 
         # Dangerous key
         invalid_data = {"video_id": "123", "__import__": "os"}
         result = self.validator.validate_api_input(invalid_data)
-        assert result['valid'] is False
-        assert "Dangerous key" in result['error']
+        assert result["valid"] is False
+        assert "Dangerous key" in result["error"]
 
         # XSS content
         xss_data = {"name": "<script>alert('xss')</script>"}
         result = self.validator.validate_api_input(xss_data)
-        assert result['valid'] is True  # Should sanitize, not reject
-        assert result['sanitized']['name'] == "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+        assert result["valid"] is True  # Should sanitize, not reject
+        assert (
+            result["sanitized"]["name"]
+            == "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+        )
 
 
 class TestSecureErrorHandler:
@@ -276,16 +281,18 @@ class TestSecureErrorHandler:
         """Test creation of secure error responses."""
         response = create_error_response("Test error", 400)
 
-        assert response['code'] == 400
-        assert response['error'] == "Test error"
-        assert response['type'] == 'server_error'
+        assert response["code"] == 400
+        assert response["error"] == "Test error"
+        assert response["type"] == "server_error"
 
     def test_log_security_event(self):
         """Test security event logging."""
-        with patch('src.error_handlers.logger') as mock_logger:
+        with patch("src.error_handlers.logger") as mock_logger:
             from src.error_handlers import log_security_event, ErrorSeverity
 
-            log_security_event("Test security event", {"user": "test"}, ErrorSeverity.MEDIUM)
+            log_security_event(
+                "Test security event", {"user": "test"}, ErrorSeverity.MEDIUM
+            )
 
             mock_logger.warning.assert_called_once()
             args = mock_logger.warning.call_args
