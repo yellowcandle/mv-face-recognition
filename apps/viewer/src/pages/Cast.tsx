@@ -8,12 +8,6 @@ const QUALITY_WORD: Record<Contestant['quality'], string> = {
   missing: '缺',
 };
 
-function portraitOf(c: Contestant): string | null {
-  // The cropped face thumbnail once Phase 3 publishes it; until then the reference photo,
-  // framed to the upper third where an Instagram portrait keeps the face.
-  return c.portrait_url ?? `/api/contestants/${c.id}/photo`;
-}
-
 /**
  * 名冊 — the cast as a contact sheet. Every contestant is one frame with their number,
  * their name in hand, and a stamped note when the reference set is thin. No cards:
@@ -102,7 +96,8 @@ export function Cast() {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] border-l border-t border-carbon/25">
           {filtered.map((c) => {
-            const src = portraitOf(c);
+            // Only the cropped derivative is public; no portrait_url means the 缺相 stamp shows.
+            const src = c.portrait_url ?? null;
             return (
               <figure key={c.id} className="group flex flex-col border-b border-r border-carbon/25 bg-paper">
                 <div className="relative aspect-[3/4] overflow-hidden bg-paper-dark">
@@ -153,7 +148,7 @@ export function Cast() {
       <div className="flex-1" />
       <div className="mt-4 flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
         <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-          相片來源 INSTAGRAM · 臉部裁切為衍生縮圖
+          相片來源 精選歷史相片集 CURATED HISTORICAL SET · 臉部裁切為衍生縮圖
         </span>
         <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>
       </div>
