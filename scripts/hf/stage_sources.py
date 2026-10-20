@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 from datetime import datetime, timezone
+from typing import Any
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC_VIDEOS = os.path.join(REPO, 'source/videos')
@@ -22,7 +23,7 @@ LFS_MAGIC = b'version https://git-lfs'
 NOW = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 
-def sha256(path):
+def sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, 'rb') as f:
         for chunk in iter(lambda: f.read(1 << 20), b''):
@@ -30,12 +31,12 @@ def sha256(path):
     return h.hexdigest()
 
 
-def is_lfs_pointer(path):
+def is_lfs_pointer(path: str) -> bool:
     with open(path, 'rb') as f:
         return f.read(len(LFS_MAGIC)) == LFS_MAGIC
 
 
-def stage(src, key):
+def stage(src: str, key: str) -> None:
     dest = os.path.join(STAGE, 'objects', key)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     if os.path.lexists(dest):
@@ -46,13 +47,16 @@ def stage(src, key):
         shutil.copy2(src, dest)  # different volume
 
 
-def video_id(name):
+def video_id(name: str) -> str:
     m = re.match(r'(\d+)-', name)  # the app keys metadata by the numeric prefix
     return m.group(1) if m else os.path.splitext(name)[0]
 
 
-def main():
-    videos, photos, skipped, dups = {}, {}, [], 0
+def main() -> None:
+    videos: dict[str, dict[str, Any]] = {}
+    photos: dict[str, list[dict[str, Any]]] = {}
+    skipped: list[str] = []
+    dups = 0
 
     for name in sorted(os.listdir(SRC_VIDEOS)):
         src = os.path.join(SRC_VIDEOS, name)

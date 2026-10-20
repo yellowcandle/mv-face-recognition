@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import glob
 import json
+import logging
 import os
 import sys
 from collections import Counter
@@ -25,6 +26,8 @@ except ImportError as exc:  # pragma: no cover - numpy is a hard dependency
     raise SystemExit(f"numpy is required: {exc}") from exc
 
 from insightface.app import FaceAnalysis
+
+logger = logging.getLogger(__name__)
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PHOTOS = os.path.join(REPO, "source/photo/contestants/ig_photos")
@@ -99,7 +102,8 @@ def load_embeddings() -> dict[str, np.ndarray]:
         )
         try:
             vec = np.load(path, allow_pickle=True).astype(np.float32).reshape(-1)
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            logger.warning("skipping unreadable embedding %s: %s", path, exc)
             continue
         if vec.size != 512:
             continue
@@ -227,8 +231,8 @@ def main() -> int:
         try:
             with open(manifest_path, encoding="utf-8") as f:
                 manifest.update(json.load(f))
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            logger.warning("could not read existing manifest %s: %s", manifest_path, exc)
 
     for cid, nickname, _name in load_contestants():
         if only is not None and cid not in only:
@@ -266,7 +270,8 @@ def main() -> int:
         try:
             cv2.imwrite(out, patch, [cv2.IMWRITE_WEBP_QUALITY, 88])
             size = os.path.getsize(out)
-        except (OSError, cv2.error):
+        except (OSError, cv2.error) as exc:
+            logger.warning("could not write portrait %s: %s", out, exc)
             no_portrait.append(cid)
             continue
 
