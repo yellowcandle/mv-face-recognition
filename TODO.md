@@ -10,7 +10,7 @@ All "Now" items from the 2026-06-10 review were fixed on 2026-06-11 (see Done).
 Remaining before the branch lands:
 
 - [ ] Production `wrangler deploy` + live smoke test (local `wrangler dev` already serves the React viewer end-to-end; deploy needs user approval)
-- [ ] Reprocess videos so stored metadata picks up the new per-recognition `tracker_id` field and post-BGR-fix embeddings (annotated-video traces and the accuracy track both depend on this)
+- [x] Reprocess `test-video-mv2` (2026-06-30): metadata now carries `tracker_id` + post-fix embeddings. **But recognition is flat at 37.6% (was 35.2%) — the BGR fix produced no accuracy gain.** See accuracy track for the real root cause. Other videos still need a reprocess once matching is fixed (don't reprocess on the broken matcher).
 - [ ] `scripts/modal_youtube_processor.py` lost `youtube_cookies.txt` support (age-restricted downloads now fail) and all webhook progress reporting — restore or consciously retire (deferred 2026-06-11: the admin Ingestion page that drove it is disabled until ingestion endpoints exist)
 
 ## Next — cleanup confirmed in review
@@ -31,9 +31,18 @@ Remaining before the branch lands:
 
 ## Recognition accuracy track
 
-- [ ] Reprocess a test video and re-measure recognition rate now that the BGR/RGB swap is fixed (pre-fix baseline: ~35-37%)
-- [ ] Re-collect distance distribution and tune `tolerance` in `processing_config.yaml` (see TODOS.md)
-- [ ] Re-run `generate_coverage.py` / `compute_similarity.py` on post-fix data, refresh workbench JSON
+**2026-06-30 diagnosis — root cause found (see `memory/project_bgr_fix_did_not_improve_accuracy`):**
+BGR fix does NOT help (37.6% vs 35.2%). Distance distribution is a single smeared blob (mean 0.21,
+max 0.51 — no true-match cluster). Stored embeddings are FINE (≈ fresh, 0.82-0.97; cross-person
+separation 0.07). Bottleneck is **reference-photo quality + averaging**: a contestant's own IG photos
+match each other only at mean ~0.3, and the pipeline averages 5 into one mushy centroid. Threshold
+tuning and naive regeneration both can't fix this.
+
+- [ ] **(cheap, do first) Max-over-photos matching**: store all per-photo embeddings per contestant; match a video face by max cosine over photos instead of cosine-to-averaged-centroid. Within-person max ~0.7 vs mean ~0.3 → ~doubles true-match score. Small change in `mvp-processor/src/face_detector.py`. Re-measure on `test-video-mv2`.
+- [ ] **Curate references (HDBSCAN)**: cluster each contestant's photo embeddings, drop outlier/wrong-person shots before building references (= Embedding Workbench T0.5). `app.get` currently takes the *largest* face — wrong person in group shots.
+- [ ] Fix `regenerate_embeddings_from_contestant_photos`: it reads `photos/contestant_{id}/` (4KB Git-LFS pointers); real photos are in `source/photo/contestants/ig_photos/contestant_{id}/{id}_ig_N.jpg`.
+- [ ] Then re-tune `tolerance` in `processing_config.yaml` against the *new* distribution — current `min_confidence` 0.15 rubber-stamps near-random matches.
+- [ ] Reset expectations: even clean IG photos top ~0.5-0.7 and MV faces are small/moving — ~37% may be near the ceiling for this reference set. Better refs raise it; don't assume 90%.
 - [ ] Embedding Workbench remaining phases: save unmatched embeddings (T0.4), HDBSCAN clustering (T0.5), face crops via canvas (Phase 3), unmatched-faces UI (Phase 5) — see `openspec/changes/embedding-workbench/`
 
 ## Tests

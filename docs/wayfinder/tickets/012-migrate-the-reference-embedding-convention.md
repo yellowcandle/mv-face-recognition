@@ -139,3 +139,28 @@ Both flagged leftovers the migration orphaned; both are now resolved:
   embeddings.
 
 Re-verified after the cleanup: 19/19 tests, loader returns 94 contestants / 663 references.
+
+### Reprocessed `test-video-mv2` on the migrated matcher (2026-09-08)
+
+Same 399 detections across 187 frames in all three runs:
+
+| run | recognitions | rate | contestants | cos avg | cos min |
+|---|---|---|---|---|---|
+| before — averaging, bar 0.32 | 150 | 37.6% | 14 | 0.520 | 0.422 |
+| after — hidden gate, effective bar 0.53 | 48 | 12.0% | 11 | 0.569 | 0.534 |
+| **after — bar 0.45 as agreed** | **139** | **34.8%** | **15** | 0.515 | **0.451** |
+
+The observed minimum landing on 0.451 confirms the configured threshold now governs.
+
+**The middle row is a bug this run exposed**, not a result: `process_video.py:257` hardcoded a
+second gate at `min_confidence=0.15`, which — because confidence is tolerance-relative — set the
+real bar to cosine 0.5325 rather than the 0.45 settled in *Choose the matching strategy*. Removed
+so tolerance is the single acceptance threshold. The wider problem is ticketed as *Settle what
+match confidence means on the wire*.
+
+**Do not read 34.8% as an improvement over 37.6%.** They are not comparable: the old figure is
+matches against averaged centroids at a 0.32 bar, the new one is max-cosine against 663 per-photo
+references at 0.45. A recognition rate cannot separate a right answer from a confident wrong one
+without labels — which is how 37.6% misled this effort once already. This run demonstrates the
+pipeline works end to end on the new matcher; it says nothing about accuracy until
+*Label 30 seconds of test-video-mv2* exists.
