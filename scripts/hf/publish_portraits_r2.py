@@ -92,7 +92,9 @@ def crop_path(cid: str) -> str | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description="Publish the gallery portraits to Cloudflare R2."
+    )
     parser.add_argument(
         "--dry-run", action="store_true", help="verify and index, upload nothing"
     )
@@ -114,7 +116,8 @@ def main() -> int:
     index: dict[str, Portrait] = {}
     failed = mismatched = 0
     for cid, entry in sorted(
-        manifest.items(), key=lambda kv: (len(kv[0]), kv[0])  # numeric order for digit ids
+        manifest.items(),
+        key=lambda kv: (len(kv[0]), kv[0]),  # numeric order for digit ids
     ):
         src = crop_path(cid)
         if src is None or not isinstance(entry, dict):
@@ -125,19 +128,24 @@ def main() -> int:
         if not os.path.isfile(src):
             logger.warning("skip %s: no crop at %s", cid, src)
             continue
-        digest = sha256(src)
+        digest: str | None
+        size: int
         try:
+            digest = sha256(src)
             size = os.path.getsize(src)
         except OSError as exc:
-            logger.error("cannot stat %s: %s", src, exc)
+            logger.error("cannot read %s: %s", src, exc)
             digest = None
+            size = 0
         if digest is None:
             failed += 1
             continue
         if "size_bytes" in entry and entry["size_bytes"] != size:
             logger.error(
                 "size mismatch for %s: manifest says %s, file is %d bytes; not uploading",
-                src, entry["size_bytes"], size,
+                src,
+                entry["size_bytes"],
+                size,
             )
             failed += 1
             mismatched += 1
@@ -153,27 +161,42 @@ def main() -> int:
     # Pass 2: upload only bytes that still hash to what the index records.
     uploaded = 0
     for cid, src in pending:
+        record = index.get(cid)
+        if record is None:
+            failed += 1
+            continue
+        # Copy the fields out before any `del index[cid]`: the deletion invalidates the
+        # narrowing of `record`, and these are plain strings.
+        key = record["key"]
+        expected = record["sha256"]
         current = sha256(src)
-        if current != index[cid]["sha256"]:
+        if current is None:
+            failed += 1
+            continue
+        if current != expected:
             logger.error(
                 "sha256 mismatch for %s: recorded %s, now %s; not uploading",
-                src, index[cid]["sha256"], current,
+                src,
+                expected,
+                current,
             )
             del index[cid]
             failed += 1
             mismatched += 1
             continue
         if dry_run:
-            print(f"  would put {BUCKET}/{index[cid]['key']} ({current[:12]})")
+            print(f"  would put {BUCKET}/{key} ({current[:12]})")
         elif not wrangler(
-            "r2", "object", "put", f"{BUCKET}/{index[cid]['key']}", "--file", src, "--remote"
+            "r2", "object", "put", f"{BUCKET}/{key}", "--file", src, "--remote"
         ):
             del index[cid]
             failed += 1
             continue
         uploaded += 1
 
-    index_path = os.path.join(PORTRAITS, "r2-index.dry-run.json" if dry_run else "r2-index.json")
+    index_path = os.path.join(
+        PORTRAITS, "r2-index.dry-run.json" if dry_run else "r2-index.json"
+    )
     try:
         with open(index_path, "w", encoding="utf-8") as f:
             json.dump(index, f, ensure_ascii=False, indent=2, sort_keys=True)
@@ -186,13 +209,21 @@ def main() -> int:
     print(f"{verb} {uploaded} portraits ({total / 1e6:.2f} MB) for {BUCKET}/{PREFIX}/")
     print(f"failed: {failed} (sha256/size mismatches: {mismatched})")
     if failed:
-        logger.error("not publishing %s/%s/manifest.json: %d failures", BUCKET, PREFIX, failed)
+        logger.error(
+            "not publishing %s/%s/manifest.json: %d failures", BUCKET, PREFIX, failed
+        )
         return 1
     if dry_run:
         print(f"would put index: {BUCKET}/{PREFIX}/manifest.json")
         return 0
     if not wrangler(
-        "r2", "object", "put", f"{BUCKET}/{PREFIX}/manifest.json", "--file", index_path, "--remote"
+        "r2",
+        "object",
+        "put",
+        f"{BUCKET}/{PREFIX}/manifest.json",
+        "--file",
+        index_path,
+        "--remote",
     ):
         return 1
     print(f"index: {BUCKET}/{PREFIX}/manifest.json")
