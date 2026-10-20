@@ -121,5 +121,6 @@ module = [
     "insightface.*",
     "chromadb.*",
     "ffmpeg.*",
+    "numpy.*",
 ]
 ignore_missing_imports = true
