@@ -186,8 +186,28 @@ never displace a curated one. `ig_photos` and the recovered `photos/` set remain
 any contestant the historical set is missing. Rescored after the switch: 96 portraits, 3.2 MB,
 45 by embedding, 46 by clustering, 5 with no signal (#7, #21, #51, #72, #93).
 
+**Published 2026-10-20.** `scripts/hf/publish_portraits_r2.py` uploaded all **96 portraits
+(3.17 MB)** to `mv-face-recognition-videos/portraits/{id}.webp` plus a `portraits/manifest.json`
+index carrying `{key, bytes, sha256, source_file}` per contestant. The script re-reads each
+crop's sha256 immediately before upload and refuses to publish if the bytes changed, so the
+index can never point at a file it did not verify.
+
+Served by the Worker at `GET /api/contestants/{id}/thumb/{size}` (`face`, `320`, `640`) with
+`Cache-Control: public, max-age=31536000, immutable` — the objects are content-addressed, so
+immutability is honest. `portrait_url` is now part of the `Contestant` response. Before this the
+public cast sheet had no route at the edge and would have shown 缺相 for all 96 contestants.
+
+**Deploy note:** the route exists in the Worker source; it reaches the edge only when the Worker
+is deployed. Nothing in this branch deployed it.
+
 **Decided 2026-10-20: Hugging Face holds inputs and run history; R2 holds only the served
 state; D1 holds the index.** The viewer never reads from HF, and nothing is authored in R2.
+
+**Secret removed from the repo (action required).** `.kiro/settings/mcp.json` carried an Exa API
+key in a URL query string, committed in the **initial commit** — so it is in git history and has
+been pushed. It is replaced with `${EXA_API_KEY}` in the working tree, but that does not
+unpublish it: **rotate the key** at exa.ai, then optionally scrub history with
+`git filter-repo --path .kiro/settings/mcp.json` (a rewrite, so coordinate any open branches).
 
 Two HF products, split by whether git history is the point:
 
