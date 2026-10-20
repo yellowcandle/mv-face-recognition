@@ -56,6 +56,16 @@ PAD = 1.9  # square side as a multiple of the longer face edge
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 
 
+def under(root: str, *parts: str) -> str | None:
+    """realpath of root/parts, or None (logged) if it resolves outside root."""
+    base = os.path.realpath(root)
+    target = os.path.realpath(os.path.join(base, *parts))
+    if os.path.commonpath([base, target]) != base:
+        logger.warning("rejecting %s: resolves outside %s", target, base)
+        return None
+    return target
+
+
 class Portrait(TypedDict):
     portrait: str
     source_file: str
@@ -71,24 +81,32 @@ def load_contestants() -> list[tuple[int, str, str]]:
     try:
         with open(CSV, encoding="utf-8-sig") as f:
             rows = list(csv.DictReader(f))
-    except OSError as exc:
-        sys.exit(f"cannot read {CSV}: {exc}")
+    except (OSError, csv.Error, UnicodeDecodeError) as exc:
+        logger.error("cannot read %s: %s", CSV, exc)
+        sys.exit(1)
     if not rows:
-        sys.exit(f"{CSV} has no rows")
+        logger.error("%s has no rows", CSV)
+        sys.exit(1)
     people: list[tuple[int, str, str]] = []
     for row in rows:
         try:
-            cid = int(row["編號"].strip())
+            people.append(
+                (int(row["編號"].strip()), row["暱稱"].strip(), row["姓名"].strip())
+            )
         except (AttributeError, KeyError, ValueError) as exc:
-            sys.exit(f"bad 編號 in {CSV}: {row!r} ({exc})")
-        people.append((cid, row["暱稱"].strip(), row["姓名"].strip()))
+            logger.warning("skipping malformed row in %s: %r (%s)", CSV, row, exc)
     return people
 
 
 def read_image(path: str) -> np.ndarray | None:
     """cv2.imread is typed as always returning an array; normalise to array or None."""
-    data = cv2.imread(path)
+    try:
+        data = cv2.imread(path)
+    except cv2.error as exc:
+        logger.warning("cannot decode %s: %s", path, exc)
+        return None
     if not isinstance(data, np.ndarray) or data.size == 0:
+        logger.warning("cannot decode %s: not an image", path)
         return None
     return data
 
@@ -96,16 +114,22 @@ def read_image(path: str) -> np.ndarray | None:
 def load_embeddings() -> dict[str, np.ndarray]:
     """nickname (lower-cased) -> unit-norm 512-d vector, tolerating (512,) and (1,512)."""
     emb: dict[str, np.ndarray] = {}
-    for path in glob.glob(os.path.join(EMB_DIR, "*.npy")):
+    for found in glob.glob(os.path.join(EMB_DIR, "*.npy")):
+        path = under(EMB_DIR, os.path.basename(found))
+        if path is None:
+            continue
         nick = (
-            os.path.basename(path)[: -len("_embedding.npy")].replace("_", " ").strip()
+            os.path.basename(found)[: -len("_embedding.npy")].replace("_", " ").strip()
         )
         try:
-            vec = np.load(path, allow_pickle=True).astype(np.float32).reshape(-1)
+            # allow_pickle=False: a .npy that needs pickle can execute code on load, and
+            # every embedding here is a plain float array (verified for all 94 files).
+            vec = np.load(path, allow_pickle=False).astype(np.float32).reshape(-1)
         except (OSError, ValueError) as exc:
             logger.warning("skipping unreadable embedding %s: %s", path, exc)
             continue
         if vec.size != 512:
+            logger.warning("skipping embedding %s: %d values, expected 512", path, vec.size)
             continue
         norm = float(np.linalg.norm(vec))
         emb[nick.lower()] = vec / norm if norm else vec
@@ -215,7 +239,8 @@ def main() -> int:
     try:
         os.makedirs(OUT, exist_ok=True)
     except OSError as exc:
-        sys.exit(f"cannot create {OUT}: {exc}")
+        logger.error("cannot create %s: %s", OUT, exc)
+        return 1
 
     embeddings = load_embeddings()
     app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
@@ -223,7 +248,11 @@ def main() -> int:
 
     manifest: dict[str, Portrait] = {}
     no_portrait: list[int] = []
-    only = {int(a) for a in sys.argv[1:]} if len(sys.argv) > 1 else None
+    try:
+        only = {int(a) for a in sys.argv[1:]} if len(sys.argv) > 1 else None
+    except ValueError as exc:
+        logger.error("contestant ids must be integers: %s", exc)
+        return 2
 
     manifest_path = os.path.join(OUT, "manifest.json")
     if only is not None:
@@ -240,10 +269,14 @@ def main() -> int:
         # ig_photos first (the pipeline's reference set), then the curated set to fill slots.
         files: list[str] = []
         for root, pattern in PHOTO_SOURCES:
+            cdir = os.path.join(root, pattern.format(cid=cid))
             found = sorted(
                 path
-                for path in glob.glob(os.path.join(root, pattern.format(cid=cid), "*"))
-                if os.path.splitext(path)[1].lower() in IMAGE_EXT
+                for path in (
+                    under(cdir, os.path.basename(p))
+                    for p in glob.glob(os.path.join(cdir, "*"))
+                )
+                if path is not None and os.path.splitext(path)[1].lower() in IMAGE_EXT
             )
             if found:
                 # Exclusive, not additive: the first source that has photos wins outright, so
@@ -268,7 +301,8 @@ def main() -> int:
 
         out = os.path.join(OUT, f"{cid}.webp")
         try:
-            cv2.imwrite(out, patch, [cv2.IMWRITE_WEBP_QUALITY, 88])
+            if not cv2.imwrite(out, patch, [cv2.IMWRITE_WEBP_QUALITY, 88]):
+                raise OSError("cv2.imwrite returned False")
             size = os.path.getsize(out)
         except (OSError, cv2.error) as exc:
             logger.warning("could not write portrait %s: %s", out, exc)
@@ -291,7 +325,8 @@ def main() -> int:
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2, sort_keys=True)
     except OSError as exc:
-        sys.exit(f"cannot write {manifest_path}: {exc}")
+        logger.error("cannot write %s: %s", manifest_path, exc)
+        return 1
 
     total = sum(p["size_bytes"] for p in manifest.values())
     print(
@@ -319,4 +354,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())

@@ -12,11 +12,14 @@ git: nothing is checked out, no branch is touched.
 
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 from typing import TypedDict
+
+logger = logging.getLogger(__name__)
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(REPO, "source/photo/historical")
@@ -30,16 +33,31 @@ class Copied(TypedDict):
     bytes: int
 
 
+def under(root: str, *parts: str) -> str | None:
+    """realpath of root/parts, or None (logged) if it resolves outside root."""
+    base = os.path.realpath(root)
+    target = os.path.realpath(os.path.join(base, *parts))
+    if os.path.commonpath([base, target]) != base:
+        logger.warning("rejecting %s: resolves outside %s", target, base)
+        return None
+    return target
+
+
 def discover() -> dict[str, str]:
     """path -> lfs oid for every LFS-tracked file under source/photo, from the all-refs index."""
-    proc = subprocess.run(
-        ["git", "lfs", "ls-files", "--all", "--long"],
-        capture_output=True,
-        text=True,
-        cwd=REPO,
-    )
+    try:
+        proc = subprocess.run(
+            ["git", "lfs", "ls-files", "--all", "--long"],
+            capture_output=True,
+            text=True,
+            cwd=REPO,
+        )
+    except OSError as exc:
+        logger.error("cannot run git lfs ls-files: %s", exc)
+        sys.exit(1)
     if proc.returncode != 0:
-        sys.exit(f"git lfs ls-files failed: {proc.stderr[:200]}")
+        logger.error("git lfs ls-files failed: %s", proc.stderr[:200])
+        sys.exit(1)
     chosen: dict[str, str] = {}
     for line in proc.stdout.splitlines():
         match = re.match(r"^([0-9a-f]{64}) [*-] (.+)$", line)
@@ -54,13 +72,14 @@ def discover() -> dict[str, str]:
 def main() -> int:
     chosen = discover()
     if not chosen:
-        sys.exit("no LFS-tracked files found under source/photo")
+        logger.error("no LFS-tracked files found under source/photo")
+        return 1
 
     manifest: list[Copied] = []
     failed: list[str] = []
     for path, oid in sorted(chosen.items()):
-        src = os.path.join(LFS, oid[:2], oid[2:4], oid)
-        if not os.path.isfile(src):
+        src = under(LFS, oid[:2], oid[2:4], oid)
+        if src is None or not os.path.isfile(src):
             failed.append(f"{path} (missing object {oid[:10]})")
             continue
         try:
@@ -72,8 +91,11 @@ def main() -> int:
         if hashlib.sha256(data).hexdigest() != oid:
             failed.append(f"{path} (hash mismatch)")
             continue
-        rel = os.path.relpath(path, PREFIX)
-        dest = os.path.join(OUT, rel)
+        # The path comes from git output: it must stay inside OUT once PREFIX is stripped.
+        dest = under(OUT, os.path.relpath(path, PREFIX))
+        if dest is None or dest == os.path.realpath(OUT):
+            failed.append(f"{path} (path escapes {OUT})")
+            continue
         try:
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             with open(dest, "wb") as dest_f:
@@ -90,18 +112,20 @@ def main() -> int:
         ) as manifest_f:
             json.dump(manifest, manifest_f, ensure_ascii=False, indent=2)
     except OSError as exc:
-        sys.exit(f"cannot write manifest: {exc}")
+        logger.error("cannot write manifest: %s", exc)
+        return 1
 
     total = sum(m["bytes"] for m in manifest)
     print(
         f"copied {len(manifest)} files, {total / 1e6:.1f} MB -> {os.path.relpath(OUT, REPO)}"
     )
     if failed:
-        print(f"FAILED {len(failed)}:")
+        logger.error("FAILED %d:", len(failed))
         for label in failed[:10]:
-            print("  ", label)
+            logger.error("   %s", label)
     return 0 if not failed else 1
 
 
 if __name__ == "__main__":
+    logging.basicConfig(format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())
