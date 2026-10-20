@@ -309,3 +309,6 @@ docs/wayfinder/assets/photo_embeddings.npz
 
 # One-off temporary render from a pipeline run
 mvp-processor/*TEMP*.mp4
+
+# Rewritten with temp paths by tests/contract/test_cli_*.py on every run.
+/db/init_state.json

@@ -38,7 +38,7 @@
       "args": [
         "-y",
         "mcp-remote",
-        "https://mcp.exa.ai/mcp?exaApiKey=1963415b-0d89-445d-a448-f3001b24dd31"
+        "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}"
       ]
     },
     "cloudflare-bindings": {

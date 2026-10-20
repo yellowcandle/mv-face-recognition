@@ -91,6 +91,7 @@ extend-exclude = '''
   | \.venv
   | build
   | dist
+  | archive
 )/
 '''
 
@@ -124,3 +125,15 @@ module = [
     "numpy.*",
 ]
 ignore_missing_imports = true
+
+[tool.pyright]
+# The Gradio GUI is retired: the product moved to the React apps (apps/viewer,
+# apps/admin) and mvp-processor. What is left under archive/ — plus the two root
+# scripts that drove it — is kept for reference, not built, not type-checked.
+# app.py is the HF Spaces entry point and still imports the archived GUI, so it
+# no longer launches; see docs/void-migration.md for the storage/edge plan.
+exclude = [
+    "archive",
+    "app.py",
+    "add_performance_flag.py",
+]
