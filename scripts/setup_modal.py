@@ -44,10 +44,10 @@ class ModalSetup:
         "modal-config": "MODAL_CONFIG",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize Modal setup."""
         self.workspace = "mv-face-recognition"
-        self.status = {}
+        self.status: Dict[str, str] = {}
 
     def check_modal_cli(self) -> bool:
         """Check if Modal CLI is installed and configured."""
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         """Check existing Modal setup."""
         logger.info("\nChecking existing Modal setup...")
         
-        status = {}
+        status: Dict[str, str] = {}
         
         if self._has_modal_token_file():
             status["authentication"] = "✅ Configured"
@@ -284,7 +284,8 @@ if __name__ == "__main__":
                 status["volume_mv-face-recognition-data"] = "✅ Created"
             else:
                 status["volume_mv-face-recognition-data"] = "❌ Not found"
-        except:
+        except (subprocess.SubprocessError, OSError) as exc:
+            logger.warning("could not list modal volumes: %s", exc)
             status["volumes"] = "⚠️  Could not check"
         
         try:
@@ -298,7 +299,8 @@ if __name__ == "__main__":
                 status["secret_hf-secret"] = "✅ Created"
             else:
                 status["secret_hf-secret"] = "❌ Not found"
-        except:
+        except (subprocess.SubprocessError, OSError) as exc:
+            logger.warning("could not list modal secrets: %s", exc)
             status["secrets"] = "⚠️  Could not check"
         
         return status
@@ -366,7 +368,7 @@ if __name__ == "__main__":
         return all_configured
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Set up Modal for MV Face Recognition"

@@ -131,6 +131,7 @@ module = [
     "ffmpeg.*",
     "numpy.*",
     "pandas.*",
+    "yt_dlp.*",
     # mvp-processor/src siblings import each other as top-level modules; they only
     # resolve when mypy runs from that directory.
     "face_detector",
@@ -155,10 +156,24 @@ module = [
     "performance.*",
     "benchmark.*",
     "validation.*",
-    # These test files sit outside a package, so mypy names them as top-level modules.
+    # These test files sit outside a package, so mypy names them as bare modules when
+    # invoked from inside their directory.
+    "test_security",
+    "test_access_control",
+    "test_compliance",
+    "test_error_handling",
+    "test_input_validation",
+    "test_security_fixes",
     "test_security_performance",
     "test_face_detector",
     "test_face_parser",
+    "test_recall",
+    "test_quickstart",
+    "test_roi_cache",
+    "test_person_segmenter",
+    "test_frame_optimizer",
+    "test_metadata_compressor",
+    "test_performance",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false

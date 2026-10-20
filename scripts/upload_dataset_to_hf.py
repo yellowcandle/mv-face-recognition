@@ -319,7 +319,7 @@ def print_summary(
     upload_results: Dict[str, Any],
     verify_results: Dict[str, Any],
     validation: Dict[str, Any],
-):
+) -> None:
     """Print final summary report."""
     logger.info("\n" + "=" * 60)
     logger.info("📊 UPLOAD SUMMARY REPORT")
@@ -378,7 +378,7 @@ def print_summary(
     logger.info("=" * 60)
 
 
-def main():
+def main() -> int:
     """Main execution function."""
     parser = argparse.ArgumentParser(
         description="Upload contestant dataset to HuggingFace XET",

@@ -15,7 +15,7 @@ from src.compliance import ComplianceChecker
 class TestSecurityIntegration:
     """Integration tests for security feature implementation."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.validator = InputValidator()
         self.encryption = FaceDataEncryption()
@@ -23,7 +23,7 @@ class TestSecurityIntegration:
         self.error_handler = SecureErrorHandler()
         self.compliance_checker = ComplianceChecker()
 
-    def test_input_validation_and_error_handling(self):
+    def test_input_validation_and_error_handling(self) -> None:
         """Test input validation with error handling."""
         # Test invalid input
         result = self.validator.validate_contestant_name("")
@@ -38,7 +38,7 @@ class TestSecurityIntegration:
         assert response["error"] == "Invalid input provided"
         assert "name" not in str(response)  # Sensitive data not leaked
 
-    def test_encryption_and_access_control(self):
+    def test_encryption_and_access_control(self) -> None:
         """Test data encryption with access control."""
         # Create test data
         embedding = [0.1, 0.2, 0.3]
@@ -59,7 +59,7 @@ class TestSecurityIntegration:
         decrypted = self.encryption.decrypt_embedding(encrypted)
         assert decrypted == embedding
 
-    def test_comprehensive_security_workflow(self):
+    def test_comprehensive_security_workflow(self) -> None:
         """Test complete security workflow from input to storage."""
         # 1. Validate input
         video_result = self.validator.validate_video_file("test.mp4")
@@ -92,7 +92,7 @@ class TestSecurityIntegration:
             assert response["code"] == 500
             assert "Test error" not in response["error"]  # No leak
 
-    def test_security_audit_workflow(self):
+    def test_security_audit_workflow(self) -> None:
         """Test security audit workflow."""
         # Run compliance audit
         audit_result = self.compliance_checker.run_full_audit()
@@ -109,7 +109,7 @@ class TestSecurityIntegration:
         assert "owasp_top_10" in results
         assert "gdpr" in results
 
-    def test_rate_limiting_integration(self):
+    def test_rate_limiting_integration(self) -> None:
         """Test rate limiting integration with auth."""
         from src.middleware.auth import RateLimiter
 
@@ -128,7 +128,7 @@ class TestSecurityIntegration:
             else:
                 assert allowed == False
 
-    def test_error_logging_security(self):
+    def test_error_logging_security(self) -> None:
         """Test that error logging doesn't expose sensitive data."""
         from src.error_handlers import log_security_event
 
@@ -151,7 +151,7 @@ class TestSecurityIntegration:
             assert "user_password" not in logged_message
             assert "[REDACTED]" in logged_message
 
-    def test_data_protection_end_to_end(self):
+    def test_data_protection_end_to_end(self) -> None:
         """Test data protection from creation to access."""
         # Create sensitive data
         contestant_data = {
@@ -177,7 +177,7 @@ class TestSecurityIntegration:
         else:
             pytest.fail("Should have access")
 
-    def test_compliance_monitoring(self):
+    def test_compliance_monitoring(self) -> None:
         """Test ongoing compliance monitoring."""
         # Initial compliance check
         initial_result = self.compliance_checker.check_owasp_compliance()
