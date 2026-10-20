@@ -294,3 +294,11 @@ apps/admin/.labelling-harness/
 # Build artifacts and throwaway renders
 *.tsbuildinfo
 mvp-processor/test-*_TEMP_*.mp4
+local_output/
+metadata/test-video-mv2_metadata.json
+mvp-processor/test-*_TEMP_*.mp4
+
+# Screenshots and one-off renders at the repo root
+/*.png
+/*.pen
+/confusion-before-click.md
