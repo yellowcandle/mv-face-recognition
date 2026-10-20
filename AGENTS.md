@@ -10,11 +10,13 @@
 - `uv run flake8 .` - Lint code 
 - `uv run mypy .` - Type checking
 
-**Frontend (Svelte):**
-- `cd frontend && npm run lint` - ESLint + Prettier check
-- `cd frontend && npm run format` - Auto-format with Prettier
-- `cd frontend && npm run check` - Type check with svelte-check
-- `cd frontend && npm run build` - Production build
+**Frontend (React, `apps/viewer` and `apps/admin`, both depend on `@mv/shared` in `apps/shared`):**
+- `cd apps/<viewer|admin> && npx tsc --noEmit` - the real type gate (same as `npm run check`)
+- `cd apps/<viewer|admin> && npm run build` - `tsc -b && vite build`
+- There is NO lint or format gate for the React apps: no eslint or prettier config exists in the repo.
+- `frontend/` has no package.json; the old Svelte `npm run lint|format|check` commands do not exist.
+- `uv run mypy scripts/hf/` is the typed gate for `scripts/hf` (`disallow_untyped_defs` in pyproject.toml); `uv run mypy .` is not expected to pass.
+- The `.cursorrules` Backlog.md workflow is not in use: there is no root `backlog/`; `worker/backlog/tasks/` holds one stale task file (task-1, Worker API endpoints), not a live Backlog.md board.
 
 **MVP Processor:**
 - `cd mvp-processor && npm test` - Run Vitest tests

@@ -217,11 +217,11 @@ curl -s "https://mv-face-recognition-api.herballemon.workers.dev/" | head -10
 - **NEVER DELETE metadata/contestant_info.csv**
 - **NEVER RESTORE frontend-legacy-backup/ directory as frontend/**
 - **NEVER RESTORE src/main.js.backup or src/App.svelte.backup**
-- **FRONTEND IS NOW IN mvp-processor/ DIRECTORY - DO NOT REVERT**
+- **FRONTEND IS NOW IN apps/viewer AND apps/admin (React) - DO NOT REVERT**
 - **ALWAYS CHECK CLAUDE.md BEFORE MAKING BUILD CONFIGURATION CHANGES**
 - **VERIFY SVELTEKIT DEPLOYMENT AFTER ANY FRONTEND CHANGES**
 - **THE USER EXPECTS FACE RECOGNITION DASHBOARD, NOT SIMPLE VIDEO PLAYER**
-- **mvp-processor/ IS THE SINGLE SOURCE OF TRUTH FOR FRONTEND**
+- **apps/viewer AND apps/admin (sharing apps/shared) ARE THE SINGLE SOURCE OF TRUTH FOR FRONTEND**
 
 # 🧪 COMPREHENSIVE TEST SUITE - PRODUCTION READY
 ## ✅ TESTING INFRASTRUCTURE COMPLETE (January 2025)

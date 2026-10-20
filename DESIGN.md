@@ -1368,11 +1368,11 @@ cosines, `Noto Sans TC` for body.
 
 ### Rules
 
-- **No rounding, no shadows, no pills.** 1px carbon rules, punched holes, rotated stamps.
+- **No rounding, no shadows, no pills, with two deliberate exceptions.** 1px carbon rules; rubber stamps get a 2px border (and a 4px corner radius) because a stamp is a raised object; punched holes are round (22px circles with an inset shadow) because a hole is round. Holes are the only intended shadow-like inset; everything else stays square and flat.
 - **A band is a stamp, not a colour.** `bandFor()` maps to 清楚 / 尚可 / 存疑, struck at
   −2° with a bordered mark. Never a percentage: the raw cosine is the tooltip.
 - **States are marks on paper**: 待核 / 已核對 / 作廢 / 需重算 / 唯讀.
 - **The viewer is provably read-only.** It carries a 唯讀 stamp and writes nothing; every
   write lives in the admin.
-- Routes are folios: viewer `01 圖庫 · 02 播放 · 03 紀錄`; admin `02 存根` with a filing
+- Routes are folios: viewer `01 圖庫 · 02 播放 · 03 名冊 · 04 紀錄`; admin `02 存根` with a filing
   cabinet for 核對 / 資料 / 生產.
