@@ -18,13 +18,12 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict
 
 logging.basicConfig(
     level=logging.INFO,

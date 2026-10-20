@@ -367,7 +367,7 @@ class HuggingFaceDataset:
                 commit_message=f"Upload {stats['uploaded']} contestant photos",
             )
 
-            logger.info(f"  ✅ Batch upload complete!")
+            logger.info("  ✅ Batch upload complete!")
 
             # Upload manifest
             try:
@@ -383,7 +383,7 @@ class HuggingFaceDataset:
                     token=self.token,
                     commit_message="Update photo manifest",
                 )
-                logger.info(f"  ✅ Uploaded photo manifest")
+                logger.info("  ✅ Uploaded photo manifest")
 
             except Exception as e:
                 logger.info(f"  ⚠️ Failed to upload manifest: {e}")
@@ -393,7 +393,7 @@ class HuggingFaceDataset:
             if os.path.exists(temp_upload_dir):
                 shutil.rmtree(temp_upload_dir, ignore_errors=True)
 
-        logger.info(f"\n📊 Photo Upload Summary:")
+        logger.info("\n📊 Photo Upload Summary:")
         logger.info(f"  • Uploaded: {stats['uploaded']} photos ({stats['total_size_mb']:.2f} MB)")
         logger.info(f"  • Failed: {stats['failed']}")
         logger.info(f"  • Skipped: {stats['skipped']}")

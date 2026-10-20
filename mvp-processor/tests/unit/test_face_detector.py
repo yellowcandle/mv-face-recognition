@@ -7,8 +7,7 @@ import sys
 import json
 import pytest
 import numpy as np
-from pathlib import Path
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, "mvp-processor")
 
@@ -17,7 +16,6 @@ from src.face_detector import (
     FaceRecognizer,
     ContestantDatabase,
     FaceDetection,
-    _get_insightface_app,
 )
 
 
@@ -145,7 +143,6 @@ class TestSingleton:
         with patch.dict("sys.modules", {"insightface": MagicMock(), "insightface.app": MagicMock()}):
             with patch("src.face_detector.FaceAnalysis", mock_fa, create=True):
                 # Patch the import inside the function
-                import importlib
                 with patch("builtins.__import__", side_effect=lambda name, *a, **kw: (
                     type("mod", (), {"FaceAnalysis": mock_fa})() if name == "insightface.app" else __builtins__.__import__(name, *a, **kw)
                 )):

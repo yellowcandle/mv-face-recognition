@@ -14,7 +14,6 @@ from exceptions import (
     VideoProcessingError,
     VideoNotFoundError,
     CorruptedVideoError,
-    FrameExtractionError,
 )
 
 logger = logging.getLogger(__name__)

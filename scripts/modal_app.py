@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from modal import web_endpoint, App, Image, Volume, Secret, method
-import click
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,7 +73,6 @@ class VideoProcessor:
             import sys
             sys.path.insert(0, "/src")
             
-            from core.face_detector import FaceDetector
             from services.video_processor import VideoProcessor as VP
             
             processor = VP(video_path=video_path)
@@ -231,7 +229,6 @@ def check_system_status() -> Dict[str, Any]:
         logger.warning(f"⚠️  ChromaDB check failed: {e}")
     
     try:
-        import insightface
         status["models"] = True
         logger.info("✅ InsightFace models available")
     except Exception as e:
@@ -290,7 +287,6 @@ def main(
 
 
 if __name__ == "__main__":
-    import sys
     
     parser = argparse.ArgumentParser(
         description="Modal app for MV Face Recognition"

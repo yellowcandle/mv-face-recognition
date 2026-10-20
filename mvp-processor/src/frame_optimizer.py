@@ -5,7 +5,7 @@ Reduces redundant frame processing through diff detection and face tracking
 
 import cv2
 import numpy as np
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Dict
 from dataclasses import dataclass
 import logging
 

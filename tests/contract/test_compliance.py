@@ -3,7 +3,6 @@ Contract tests for compliance checking functionality.
 Tests the ComplianceChecker class against defined contracts.
 """
 
-import pytest
 from src.compliance import ComplianceChecker, ComplianceStandard
 
 

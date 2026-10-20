@@ -4,7 +4,7 @@ Tests the complete security enhancement implementation.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from src.validation import InputValidator
 from src.encryption import FaceDataEncryption
 from src.middleware.auth import AuthMiddleware

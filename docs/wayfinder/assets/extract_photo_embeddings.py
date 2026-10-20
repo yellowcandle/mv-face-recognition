@@ -4,7 +4,6 @@ Mirrors mvp-processor/src/face_detector.py:_get_insightface_app (buffalo_l, 640x
 CoreML->CPU) and takes faces[0] like reference extraction does. Scratch only.
 """
 import os
-import sys
 import warnings
 from pathlib import Path
 

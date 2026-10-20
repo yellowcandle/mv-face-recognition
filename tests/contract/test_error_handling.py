@@ -3,7 +3,6 @@ Contract tests for error handling functionality.
 Tests the SecureErrorHandler class against defined contracts.
 """
 
-import pytest
 from unittest.mock import patch
 from src.error_handlers import SecureErrorHandler, create_error_response, log_security_event, ErrorSeverity
 

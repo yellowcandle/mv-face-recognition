@@ -88,7 +88,9 @@ def video_id_from(path: str) -> str | None:
     return str(int(m.group(1))) if m else None
 
 
-def convert_legacy(doc: dict[str, Any], by_nick: Roster, by_name: Roster) -> dict[str, Any]:
+def convert_legacy(
+    doc: dict[str, Any], by_nick: Roster, by_name: Roster
+) -> dict[str, Any]:
     """Legacy `frame_results[].faces[]` -> contract `frame_data[].detections[]`."""
     info = doc.get("video_info") or {}
     width = float(info.get("width") or 0)
@@ -120,7 +122,9 @@ def convert_legacy(doc: dict[str, Any], by_nick: Roster, by_name: Roster) -> dic
                     contestant_id=cid,
                     contestant_name=cname,
                     contestant_nickname=cnick,
-                    match_score=(round(float(conf), 4) if matched and conf is not None else None),
+                    match_score=(
+                        round(float(conf), 4) if matched and conf is not None else None
+                    ),
                     det_score=round(float(face.get("detection_confidence") or 0), 4),
                     bbox=[
                         round(x1 / width, 6),
@@ -136,14 +140,18 @@ def convert_legacy(doc: dict[str, Any], by_nick: Roster, by_name: Roster) -> dic
                 frame_number=int(raw.get("frame_number") or 0),
                 timestamp=float(raw.get("timestamp") or 0),
                 detections_count=len(dets),
-                recognitions_count=sum(1 for d in dets if d["contestant_id"] is not None),
+                recognitions_count=sum(
+                    1 for d in dets if d["contestant_id"] is not None
+                ),
                 detections=dets,
             )
         )
     return {"video_info": info, "legacy_source": True, "frame_data": frames}
 
 
-def build_timeline(frames: list[Frame], by_nick: Roster, by_name: Roster) -> dict[str, Any]:
+def build_timeline(
+    frames: list[Frame], by_nick: Roster, by_name: Roster
+) -> dict[str, Any]:
     """Derive the contract's contestant_timeline from frame_data alone."""
     per: dict[str, dict[str, Any]] = {}
     for frame in frames:
@@ -226,7 +234,9 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
                     contestant_name=rec.get("contestant_name"),
                     contestant_nickname=rec.get("contestant_nickname"),
                     match_score=(
-                        round(float(rec["confidence"]), 4) if rec.get("confidence") is not None else None
+                        round(float(rec["confidence"]), 4)
+                        if rec.get("confidence") is not None
+                        else None
                     ),
                     det_score=0.0,  # not stored in this variant
                     bbox=[
@@ -289,8 +299,10 @@ def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
 def pick_sources() -> dict[str, list[str]]:
     """video id -> every candidate local file, so the richest can be chosen per reel."""
     candidates: dict[str, list[str]] = {}
-    for pattern in (os.path.join(LEGACY_FMT, "*_annotated_dense_metadata.json"),
-                    os.path.join(NEW_FMT, "*.json")):
+    for pattern in (
+        os.path.join(LEGACY_FMT, "*_annotated_dense_metadata.json"),
+        os.path.join(NEW_FMT, "*.json"),
+    ):
         for path in sorted(glob.glob(pattern)):
             vid = video_id_from(path)
             if vid:
@@ -299,16 +311,24 @@ def pick_sources() -> dict[str, list[str]]:
 
 
 def wrangler(*args: str) -> bool:
-    proc = subprocess.run(["npx", "wrangler", *args], cwd=REPO, capture_output=True, text=True)
+    proc = subprocess.run(
+        ["npx", "wrangler", *args], cwd=REPO, capture_output=True, text=True
+    )
     if proc.returncode != 0:
-        logger.error("wrangler %s failed: %s", " ".join(args[:4]), (proc.stderr or proc.stdout)[-400:])
+        logger.error(
+            "wrangler %s failed: %s",
+            " ".join(args[:4]),
+            (proc.stderr or proc.stdout)[-400:],
+        )
         return False
     return True
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__ or "")
-    ap.add_argument("--publish", action="store_true", help="write to KV (default: stage only)")
+    ap.add_argument(
+        "--publish", action="store_true", help="write to KV (default: stage only)"
+    )
     args = ap.parse_args()
 
     by_nick, by_name = load_contestants()
@@ -351,7 +371,9 @@ def main() -> int:
         frames = payload["frame_data"]
         empty = sum(1 for f in frames if f["detections_count"] == 0)
         src = payload["read_model"]["source"]
-        with_match = sum(1 for f in frames for d in f["detections"] if d["match_score"] is not None)
+        with_match = sum(
+            1 for f in frames for d in f["detections"] if d["match_score"] is not None
+        )
         print(
             f"  reel {vid}: {len(frames):>4} frames, {empty:>3} empty, "
             f"{with_match:>4} matched detections, {len(payload['contestant_timeline']):>2} contestants "
@@ -393,12 +415,30 @@ def main() -> int:
 
     for vid in sorted(chosen, key=int):
         staged = os.path.join(STAGE, f"metadata_dense_{vid}.json")
-        if not wrangler("kv", "key", "put", f"metadata_dense_{vid}", "--path", staged,
-                        "--binding", "METADATA_KV", "--remote"):
+        if not wrangler(
+            "kv",
+            "key",
+            "put",
+            f"metadata_dense_{vid}",
+            "--path",
+            staged,
+            "--binding",
+            "METADATA_KV",
+            "--remote",
+        ):
             return 1
         print(f"  put metadata_dense_{vid}")
-    if not wrangler("kv", "key", "put", "processed_videos_list", "--path", list_path,
-                    "--binding", "METADATA_KV", "--remote"):
+    if not wrangler(
+        "kv",
+        "key",
+        "put",
+        "processed_videos_list",
+        "--path",
+        list_path,
+        "--binding",
+        "METADATA_KV",
+        "--remote",
+    ):
         return 1
     print("  put processed_videos_list")
     return 0

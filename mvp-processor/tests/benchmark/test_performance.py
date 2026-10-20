@@ -2,8 +2,6 @@ import pytest
 import time
 import cv2
 import numpy as np
-from pathlib import Path
-import tempfile
 import logging
 
 import sys

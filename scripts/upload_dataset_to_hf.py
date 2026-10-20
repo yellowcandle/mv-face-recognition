@@ -13,12 +13,11 @@ Usage:
 
 import argparse
 import hashlib
-import json
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -73,7 +72,7 @@ def validate_prerequisites(
             # This will use cached credentials if available
             whoami = api.whoami()
             logger.info(f"  ✅ HuggingFace CLI authenticated as: {whoami['name']}")
-        except Exception as e:
+        except Exception:
             results["valid"] = False
             results["errors"].append(
                 "HuggingFace authentication required. Run: huggingface-cli login"
@@ -170,7 +169,7 @@ def upload_dataset(
             embedding_stats = dataset.upload_embeddings(embeddings_dir)
             results["stats"]["embeddings"] = embedding_stats
             results["embeddings_uploaded"] = embedding_stats["uploaded"] > 0
-            logger.info(f"✅ Embeddings upload complete")
+            logger.info("✅ Embeddings upload complete")
         else:
             logger.info("⚠️  Embeddings directory not found, skipping")
             results["embeddings_uploaded"] = True  # Not a failure
@@ -184,7 +183,7 @@ def upload_dataset(
         photo_stats = dataset.upload_contestant_photos(photos_dir)
         results["stats"]["photos"] = photo_stats
         results["photos_uploaded"] = photo_stats["uploaded"] > 0
-        logger.info(f"✅ Photos upload complete")
+        logger.info("✅ Photos upload complete")
     except Exception as e:
         logger.info(f"❌ Photos upload failed: {e}")
         return results
@@ -267,7 +266,7 @@ def verify_upload(
             and results["samples_checked"] > 0
         )
 
-        logger.info(f"\n📊 Verification Summary:")
+        logger.info("\n📊 Verification Summary:")
         logger.info(f"  • Samples checked: {results['samples_checked']}")
         logger.info(f"  • Samples matched: {results['samples_matched']}")
         logger.info(f"  • Errors: {len(results['errors'])}")
@@ -305,7 +304,7 @@ def download_dataset(
             include_flagged=False,
         )
 
-        logger.info(f"\n✅ Download complete:")
+        logger.info("\n✅ Download complete:")
         logger.info(f"  • Files downloaded: {stats['downloaded_files']}")
         logger.info(f"  • Total size: {stats['total_size_mb']:.2f} MB")
 
@@ -345,14 +344,14 @@ def print_summary(
 
     if "stats" in upload_results and "photos" in upload_results["stats"]:
         photo_stats = upload_results["stats"]["photos"]
-        logger.info(f"\n📸 Photo Upload Details:")
+        logger.info("\n📸 Photo Upload Details:")
         logger.info(f"  • Uploaded: {photo_stats['uploaded']}")
         logger.info(f"  • Failed: {photo_stats['failed']}")
         logger.info(f"  • Total size: {photo_stats['total_size_mb']:.2f} MB")
 
     # Verification results
     if verify_results:
-        logger.info(f"\n🔍 Verification:")
+        logger.info("\n🔍 Verification:")
         logger.info(f"  • Status: {'✅ Passed' if verify_results.get('verified') else '❌ Failed'}")
         logger.info(f"  • Samples checked: {verify_results.get('samples_checked', 0)}")
         logger.info(f"  • Samples matched: {verify_results.get('samples_matched', 0)}")

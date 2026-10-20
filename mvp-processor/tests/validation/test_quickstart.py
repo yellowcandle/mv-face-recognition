@@ -10,7 +10,6 @@ sys.path.insert(0, '.')
 
 from src.video_processor import VideoProcessor
 from src.face_detector import FaceDetector
-from src.metadata_generator import MetadataGenerator
 
 logger = logging.getLogger(__name__)
 

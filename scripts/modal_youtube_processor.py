@@ -19,11 +19,10 @@ import sys
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
-import tempfile
 
-from modal import App, Image, Volume, Secret, method
+from modal import App, Image, Volume, method
 
 # --- Modal Configuration ---
 
@@ -193,7 +192,6 @@ class YouTubeProcessor:
             Dictionary with face detections and sample paths
         """
         import cv2
-        import numpy as np
         from insightface.app import FaceAnalysis
 
         print(f"[Stage 2] Sampling frames from: {video_path}")
@@ -343,7 +341,7 @@ class YouTubeProcessor:
             collection = client.get_collection(name=chroma_collection_name)
             print(f"  Using existing collection: {chroma_collection_name}")
         except:
-            print(f"  No existing collection found, skipping recognition")
+            print("  No existing collection found, skipping recognition")
             return {
                 'success': True,
                 'recognized_faces': 0,
@@ -414,7 +412,6 @@ class YouTubeProcessor:
         import pandas as pd
         from insightface.app import FaceAnalysis
         import chromadb
-        from pathlib import Path
 
         print(f"[Stage 3] Bootstrapping embeddings for: {queue_id}")
 
@@ -514,7 +511,7 @@ class YouTubeProcessor:
                         except Exception as e:
                             print(f"    Warning: Failed to process {img_path}: {e}")
 
-                print(f"  Added embeddings from supplied photos")
+                print("  Added embeddings from supplied photos")
 
         # Initialize ChromaDB
         chroma_path = VOL_MOUNT_PATH / "chroma_db"
@@ -611,7 +608,7 @@ def main(
         youtube_url = url
 
     print(f"\n{'='*60}")
-    print(f"YouTube Processing Pipeline")
+    print("YouTube Processing Pipeline")
     print(f"Queue ID: {queue_id}")
     print(f"URL: {youtube_url}")
     print(f"{'='*60}\n")
@@ -624,7 +621,7 @@ def main(
         print(f"\n✗ Pipeline failed at Stage 1: {download_result.get('error')}")
         sys.exit(1)
 
-    print(f"✓ Stage 1 complete")
+    print("✓ Stage 1 complete")
 
     # Stage 2: Sample and detect
     print("\n[2/3] Sampling frames and detecting faces...")
@@ -653,10 +650,10 @@ def main(
 
     # Stage 3: User validation and embedding bootstrap
     print("\n[3/3] Ready for user validation")
-    print(f"\nNext steps:")
+    print("\nNext steps:")
     print(f"1. Review detected faces at: {sample_result['samples_dir']}")
-    print(f"2. Use admin UI to validate/flag faces")
-    print(f"3. Run embedding bootstrap with validated data")
+    print("2. Use admin UI to validate/flag faces")
+    print("3. Run embedding bootstrap with validated data")
     print(f"\n{'='*60}")
     print(f"Pipeline complete! Queue ID: {queue_id}")
     print(f"{'='*60}\n")

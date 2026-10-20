@@ -3,7 +3,6 @@ Contract tests for input validation functionality.
 Tests the InputValidator class against defined contracts.
 """
 
-import pytest
 import tempfile
 import os
 from unittest.mock import patch

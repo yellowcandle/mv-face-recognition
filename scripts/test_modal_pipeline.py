@@ -16,11 +16,9 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,9 +62,9 @@ class ModalPipelineTestSuite:
             try:
                 import insightface
                 status["models"] = True
-                logger.info(f"  ✅ InsightFace models available")
+                logger.info("  ✅ InsightFace models available")
             except ImportError:
-                logger.warning(f"  ⚠️  InsightFace not installed")
+                logger.warning("  ⚠️  InsightFace not installed")
             
             storage_path = Path(".chroma_db")
             status["storage"] = storage_path.exists()

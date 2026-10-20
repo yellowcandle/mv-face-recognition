@@ -89,31 +89,12 @@ node scripts/upload-to-r2.js
 python scripts/check_stored_embeddings.py
 ```
 
-#### `debug_similarity.py`
-**Debug face recognition similarity scores**
-- Analyzes why faces might not be matching
-- Tests similarity thresholds with sample data
+#### Retired
 
-```bash
-python scripts/debug_similarity.py
-```
-
-#### `deduplicate_embeddings.py`
-**Clean up duplicate embeddings in database**
-- Removes exact and similar duplicates
-- Prioritizes real names over contestant numbers
-- Optimizes database performance
-
-```bash
-# Analyze duplicates
-python scripts/deduplicate_embeddings.py --analyze
-
-# Remove exact duplicates
-python scripts/deduplicate_embeddings.py --remove exact
-
-# Remove all duplicates
-python scripts/deduplicate_embeddings.py --remove all
-```
+`debug_similarity.py` and `deduplicate_embeddings.py` were removed with the old
+ChromaDB-era embedding workflow. Similarity debugging is covered by
+`docs/wayfinder/assets/analyse_separation.py`, and duplicate handling moved into
+`mvp-processor/scripts/build_reference_cache.py`, which applies curation at write time.
 
 #### `fix_embeddings.py`
 **Fix and refresh face embeddings database**

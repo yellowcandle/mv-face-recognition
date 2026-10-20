@@ -17,12 +17,11 @@ Usage:
 
 import argparse
 import csv
-import json
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 
@@ -144,7 +143,7 @@ class DatabaseInitializer:
             stats["embedding_shapes"][shape] += 1
 
         # Log verification results
-        logger.info(f"\n📊 Data Consistency Report:")
+        logger.info("\n📊 Data Consistency Report:")
         logger.info(f"   Total contestants: {stats['total_contestants']}")
         logger.info(f"   Total embeddings: {stats['total_embeddings']}")
 
@@ -153,14 +152,14 @@ class DatabaseInitializer:
                 f"   ⚠️  Missing embeddings for {len(stats['missing_embeddings'])} contestants: {stats['missing_embeddings'][:5]}..."
             )
         else:
-            logger.info(f"   ✅ All contestants have embeddings")
+            logger.info("   ✅ All contestants have embeddings")
 
         if stats["orphan_embeddings"]:
             logger.warning(
                 f"   ⚠️  {len(stats['orphan_embeddings'])} orphan embeddings found"
             )
         else:
-            logger.info(f"   ✅ No orphan embeddings")
+            logger.info("   ✅ No orphan embeddings")
 
         logger.info(f"   Embedding shapes: {stats['embedding_shapes']}")
 
@@ -264,13 +263,13 @@ class DatabaseInitializer:
             "\n" + "=" * 60,
             "DATABASE INITIALIZATION REPORT",
             "=" * 60,
-            f"\n📁 Paths:",
+            "\n📁 Paths:",
             f"   Contestant CSV: {self.contestant_csv}",
             f"   Photos directory: {self.contestant_photos_dir}",
             f"   ChromaDB path: {self.chroma_db_path}",
-            f"\n👥 Contestants:",
+            "\n👥 Contestants:",
             f"   Total loaded: {len(self.contestants)}",
-            f"\n🎭 Face Embeddings:",
+            "\n🎭 Face Embeddings:",
             f"   Total loaded: {len(self.embeddings)}",
         ]
 
@@ -278,9 +277,9 @@ class DatabaseInitializer:
         is_valid, stats = self.verify_data_consistency()
 
         if is_valid:
-            report.append(f"\n✅ Data consistency: VALID")
+            report.append("\n✅ Data consistency: VALID")
         else:
-            report.append(f"\n⚠️  Data consistency: ISSUES FOUND")
+            report.append("\n⚠️  Data consistency: ISSUES FOUND")
             if stats["missing_embeddings"]:
                 report.append(
                     f"   Missing: {len(stats['missing_embeddings'])} contestants"
