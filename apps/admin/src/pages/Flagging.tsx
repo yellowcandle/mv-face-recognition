@@ -1,28 +1,55 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { bandFor, useFlaggedFaces, useContestants } from '@mv/shared';
-import type { Band, FlaggedFace, Contestant } from '@mv/shared';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  BAND_STAMP,
+  bandFor,
+  formatMmSs,
+  useFlaggedFaces,
+  useContestants,
+  useVideos,
+} from '@mv/shared';
+import type { Band, FlaggedFace, Contestant, FrameData, VideoMetadata } from '@mv/shared';
 
-const BAND_WORD: Record<Band, string> = { high: '清楚', medium: '尚可', low: '存疑' };
-const BAND_INK: Record<Band, string> = {
-  high: 'text-carbon border-carbon',
-  medium: 'text-stamp border-stamp',
-  low: 'text-ledger border-ledger',
-};
+/**
+ * The pipeline's acceptance threshold, as a cosine. Source: the header of
+ * apps/shared/lib/bands.ts ("The pipeline's acceptance threshold (0.45)"); each run also
+ * stamps it into `recognition_config.acceptance_threshold`.
+ */
+const ACCEPTANCE_THRESHOLD = 0.45;
+
+/**
+ * DET and the context strip for one flag. The flag record (`GET /api/faces/flagged`) carries
+ * neither a det_score nor a frame number — only video_id, timestamp and bbox — so both are
+ * recovered from the video's dense metadata (`GET /api/videos/metadata/dense/{id}`):
+ * - the floor frame is the last processed frame at or before the flag's timestamp (the same
+ *   floor rule `/api/faces/detect` and the player use, which is where the flagged bbox came from);
+ * - DET is the det_score of the floor frame's detection whose bbox equals the flag's bbox.
+ *   No exact match (or metadata from before detections were stored) → null, never estimated;
+ * - the strip is the two processed frames either side of the floor frame. A slot past either end
+ *   of the video is null.
+ */
+function flagContext(meta: VideoMetadata | undefined, face: FlaggedFace) {
+  const frames = [...(meta?.frame_data ?? [])].sort((a, b) => a.timestamp - b.timestamp);
+  let i = -1;
+  while (i + 1 < frames.length && frames[i + 1].timestamp <= face.timestamp) i++;
+  const bbox = face.bbox;
+  const sameBox = (b: number[] | undefined) =>
+    !!bbox && !!b && b.length === 4 && b.every((v, j) => Math.abs(v - bbox[j]) < 1e-6);
+  const det = i >= 0 ? (frames[i].detections?.find((d) => sameBox(d.bbox))?.det_score ?? null) : null;
+  const strip: (FrameData | null)[] = [-2, -1, 0, 1, 2].map((o) =>
+    i >= 0 ? (frames[i + o] ?? null) : null,
+  );
+  return { det, strip };
+}
+
 const STATUS_WORD: Record<FlaggedFace['status'], string> = {
   pending: '待核',
   accepted: '已核對',
   rejected: '作廢',
 };
 
-function stamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 /**
- * 待核 — the flag queue as a tray of slips. Each row is one flag awaiting a human
+ * 存根 / 待核 — the flag queue as a tray of slips. Each row is one flag awaiting a human
  * decision; the right-hand sheet is the one being decided. Every state is a stamp.
  */
 export function Flagging() {
@@ -59,11 +86,83 @@ export function Flagging() {
     [filtered, focusedId],
   );
 
+  // Reset the reassign picker only when the focused slip (or its filing) changes. Depending on
+  // reassignTo here would snap every pick straight back, making 改派 impossible.
+  const focusedKey = focused ? `${focused.id}:${focused.contestant_id}` : '';
   useEffect(() => {
-    if (focused && String(focused.contestant_id) !== reassignTo) {
-      setReassignTo(String(focused.contestant_id));
+    if (focused) setReassignTo(String(focused.contestant_id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedKey]);
+
+  const { data: videos = [] } = useVideos();
+  // Same key and endpoint as Labelling, so the two pages share one cached copy.
+  const { data: denseMetadata } = useQuery<VideoMetadata>({
+    queryKey: ['dense-metadata', focused?.video_id],
+    enabled: !!focused,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/videos/metadata/dense/${encodeURIComponent(focused?.video_id ?? '')}`,
+      );
+      if (!res.ok) throw new Error(`Failed to load metadata: HTTP ${res.status}`);
+      return (await res.json()) as VideoMetadata;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const context = useMemo(
+    () => (focused ? flagContext(denseMetadata, focused) : { det: null, strip: [] }),
+    [denseMetadata, focused],
+  );
+  const streamUrl = videos.find((v) => v.id === focused?.video_id)?.stream_url;
+
+  const reassignRef = useRef<HTMLSelectElement>(null);
+  const trayRef = useRef<HTMLDivElement>(null);
+
+  function goNext() {
+    if (!focused) return;
+    const next = filtered[filtered.findIndex((f) => f.id === focused.id) + 1];
+    if (next) setFocusedId(next.id);
+  }
+
+  async function decideFocused(status: 'accepted' | 'rejected') {
+    if (!focused || focused.status !== 'pending') return;
+    const i = filtered.findIndex((f) => f.id === focused.id);
+    const next = filtered.slice(i + 1).find((f) => f.status === 'pending');
+    await updateFaceStatus(focused.id, status);
+    if (next) setFocusedId(next.id);
+  }
+
+  // Keyboard: 1 蓋印 / 2 作廢 / 3 改派 / ↓ 下一張. Silent while typing in a field or while any
+  // modal is open (FlagDialog renders role="dialog" aria-modal="true"). Re-bound each render so
+  // the handler always sees the current slip; removed on unmount.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      if (document.querySelector('[role="dialog"], [aria-modal="true"], dialog[open]')) return;
+      if (!focused) return;
+      if (e.key === '1' || e.key === '2') {
+        e.preventDefault();
+        void decideFocused(e.key === '1' ? 'accepted' : 'rejected');
+      } else if (e.key === '3') {
+        e.preventDefault();
+        reassignRef.current?.focus();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        goNext();
+      }
     }
-  }, [focused, reassignTo]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // Keep the focused slip in view as the keyboard walks the tray.
+  useEffect(() => {
+    if (!focused) return;
+    trayRef.current
+      ?.querySelector(`[data-slip="${CSS.escape(focused.id)}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [focused?.id]);
 
   const contestantOf = useCallback(
     (id: number): Contestant | undefined =>
@@ -131,10 +230,10 @@ export function Flagging() {
           </div>
           <div className="flex flex-row items-baseline gap-3.5">
             <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-              待核
+              存根
             </h1>
             <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">
-              FLAG QUEUE · WRITABLE
+              OFFICE COPY · WRITABLE
             </span>
           </div>
         </div>
@@ -257,13 +356,14 @@ export function Flagging() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-1.5 overflow-y-auto pb-2">
+            <div ref={trayRef} className="flex flex-col gap-1.5 overflow-y-auto pb-2">
               {filtered.slice(0, 200).map((face) => {
                 const band = bandFor(face.confidence ?? 0);
                 const isFocused = focused?.id === face.id;
                 return (
                   <div
                     key={face.id}
+                    data-slip={face.id}
                     onClick={() => setFocusedId(face.id)}
                     className={`flex cursor-pointer flex-row items-center gap-3 border py-2 pl-3 pr-2 ${
                       isFocused
@@ -286,7 +386,7 @@ export function Flagging() {
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="font-mono text-[11px] text-carbon-soft">
-                        {stamp(face.timestamp)}
+                        {formatMmSs(face.timestamp)}
                       </span>
                       <span className="truncate font-mono text-[8px] tracking-[0.1em] text-ledger">
                         {face.video_id}
@@ -302,12 +402,15 @@ export function Flagging() {
                     </div>
                     <div className="flex w-[54px] shrink-0 justify-center">
                       <span
-                        className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${BAND_INK[band]}`}
+                        className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${BAND_STAMP[band].ink}`}
                       >
-                        {BAND_WORD[band]}
+                        {BAND_STAMP[band].word}
                       </span>
                     </div>
-                    <span className="w-[36px] shrink-0 font-mono text-[11px] text-carbon-soft">
+                    <span
+                      title="被標記偵測的配對分數（標記本身不帶分數）"
+                      className="w-[36px] shrink-0 font-mono text-[11px] text-carbon-soft"
+                    >
                       {face.confidence == null ? '—' : face.confidence.toFixed(2)}
                     </span>
                     <span className="flex-1" />
@@ -357,14 +460,14 @@ export function Flagging() {
                   SLIP {String(focused.id).slice(-4).toUpperCase()} · REVIEW
                 </span>
                 <span className="font-mono text-[9px] tracking-[0.1em] text-stamp">
-                  {focusedBand ? BAND_WORD[focusedBand] : '未配對'}
+                  {focusedBand ? BAND_STAMP[focusedBand].word : '未配對'}
                   {focused.confidence == null ? '' : ` ${focused.confidence.toFixed(2)}`}
                 </span>
               </div>
 
               <div className="mt-3 flex flex-row gap-5">
                 <div className="flex flex-col gap-2">
-                  <div className="h-[176px] w-[156px] overflow-hidden border border-carbon bg-[#191922]">
+                  <div className="h-[210px] w-[186px] overflow-hidden border border-carbon bg-[#191922]">
                     {focused.thumbnail ? (
                       <img src={focused.thumbnail} alt="被標記的人臉" className="h-full w-full object-cover" />
                     ) : (
@@ -375,12 +478,15 @@ export function Flagging() {
                       </div>
                     )}
                   </div>
-                  <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
-                    {focused.video_id} · {stamp(focused.timestamp)}
+                  <span className="font-mono text-[9px] tracking-[0.14em] text-carbon-soft">
+                    DET {context.det == null ? '— 無資料' : context.det.toFixed(2)}
+                  </span>
+                  <span className="max-w-[186px] truncate font-mono text-[8px] tracking-[0.16em] text-ledger">
+                    {focused.video_id} · {formatMmSs(focused.timestamp)}
                   </span>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
                     CURRENTLY FILED AS
                   </span>
@@ -390,25 +496,47 @@ export function Flagging() {
                     </span>
                     <span className="font-mono text-[10px] text-ledger">#{focused.contestant_id}</span>
                   </div>
-                  <div className="h-[3px] w-full bg-carbon-deep/15">
+                  {/* The flag asserts no score of its own (CONTEXT.md, "Flag"). `confidence` is the
+                      flagged detection's match score, carried as context for the claim. */}
+                  <span className="mt-1 font-mono text-[8px] tracking-[0.2em] text-ledger">
+                    DETECTION MATCH SCORE
+                  </span>
+                  <div className="relative h-[3px] w-full bg-carbon-deep/15">
                     <div
                       className="h-[3px] bg-stamp"
                       style={{ width: `${Math.max(0, Math.min(1, focused.confidence ?? 0)) * 100}%` }}
                     />
+                    <div
+                      className="absolute -top-[3px] h-[9px] w-px bg-carbon-deep"
+                      style={{ left: `${ACCEPTANCE_THRESHOLD * 100}%` }}
+                      title={`acceptance threshold ${ACCEPTANCE_THRESHOLD}`}
+                    />
                   </div>
-                  <span className="font-mono text-[9px] text-carbon-soft">
-                    {focused.confidence == null
-                      ? 'no match score'
-                      : `${focused.confidence.toFixed(2)} cosine`}
+                  <div className="flex flex-row justify-between font-mono text-[9px] text-carbon-soft">
+                    <span>
+                      {focused.confidence == null
+                        ? '無配對分數'
+                        : `${focused.confidence.toFixed(2)} cosine`}
+                    </span>
+                    <span className="text-ledger">門檻 {ACCEPTANCE_THRESHOLD.toFixed(2)}</span>
+                  </div>
+                  <span className="font-kai text-[11px] leading-snug text-carbon-soft">
+                    被標記偵測的配對分數，僅供參考；標記本身不帶分數。
                   </span>
 
                   <div className="mt-1 h-px bg-carbon/20" />
 
+                  {/* Three reference slots. The only reference-image route is
+                      GET /api/contestants/{id}/photo, which serves the contestant's FIRST photo by
+                      filename — not ranked by cosine: no endpoint returns per-reference embeddings
+                      or scores for a flag, so "nearest" cannot be computed here. Slot 1 is that real
+                      photo; slots 2–3 are marked unavailable rather than filled.
+                      `reference_count` (GET /api/contestants) is how many exist on file. */}
                   <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-                    CONTESTANT REFERENCE
+                    REFERENCES · {focusedContestant?.reference_count ?? 0} ON FILE
                   </span>
-                  <div className="flex flex-row items-center gap-3">
-                    <div className="relative h-[74px] w-[62px] overflow-hidden border border-carbon/45 bg-paper-dark">
+                  <div className="flex flex-row gap-1.5">
+                    <div className="h-[54px] w-[46px] overflow-hidden border border-carbon/45 bg-paper-dark">
                       <img
                         src={`/api/contestants/${focused.contestant_id}/photo`}
                         alt={focusedContestant?.name ?? ''}
@@ -418,15 +546,18 @@ export function Flagging() {
                         }}
                       />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-kai text-[14px] font-bold text-carbon-deep">
-                        {focusedContestant?.name ?? '—'}
-                      </span>
-                      <span className="font-mono text-[9px] text-ledger">
-                        編號 {focused.contestant_id}
-                      </span>
-                    </div>
+                    {[1, 2].map((k) => (
+                      <div
+                        key={k}
+                        className="flex h-[54px] w-[46px] items-center justify-center border border-dashed border-carbon/35"
+                      >
+                        <span className="font-kai text-[10px] text-ledger">未提供</span>
+                      </div>
+                    ))}
                   </div>
+                  <span className="font-mono text-[8px] tracking-[0.1em] text-ledger">
+                    {focusedContestant?.name ?? '—'} · 編號 {focused.contestant_id} · 未按相似度排序
+                  </span>
 
                   {focused.user_label && (
                     <div className="mt-1 border-l-2 border-stamp/60 pl-2 font-kai text-[12px] text-carbon-soft">
@@ -442,6 +573,7 @@ export function Flagging() {
                 <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">REASSIGN TO</span>
                 <div className="flex flex-row items-center gap-2">
                   <select
+                    ref={reassignRef}
                     value={reassignTo}
                     onChange={(e) => setReassignTo(e.target.value)}
                     className="min-w-0 flex-1 border border-carbon/45 bg-paper-light px-2.5 py-2 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
@@ -460,6 +592,39 @@ export function Flagging() {
                     改派
                   </button>
                 </div>
+              </div>
+
+              {/* Context: the two processed frames either side of the flag's floor frame, each a
+                  real frame of the served rendition (`stream_url` seeked by a #t media fragment).
+                  Slots with no frame — no dense metadata, or past either end — say so. */}
+              <div className="mt-4 flex flex-col gap-2">
+                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">CONTEXT · 前後五格</span>
+                <div className="flex flex-row gap-1">
+                  {context.strip.map((frame, k) => (
+                    <div
+                      key={k}
+                      className={`flex aspect-video min-w-0 flex-1 items-center justify-center overflow-hidden border bg-[#191922] ${
+                        k === 2 ? 'border-stamp' : 'border-carbon/40'
+                      }`}
+                    >
+                      {frame && streamUrl ? (
+                        <video
+                          src={`${streamUrl}#t=${frame.timestamp}`}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          title={formatMmSs(frame.timestamp)}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-mono text-[8px] text-paper/40">—</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {!streamUrl || context.strip.every((f) => f == null) ? (
+                  <span className="font-kai text-[11px] text-carbon-soft">此片段無前後影格可調閱。</span>
+                ) : null}
               </div>
 
               <div className="flex-1" />
@@ -490,11 +655,7 @@ export function Flagging() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const i = filtered.findIndex((f) => f.id === focused.id);
-                    const next = filtered[i + 1];
-                    if (next) setFocusedId(next.id);
-                  }}
+                  onClick={goNext}
                   className="shrink-0 border border-carbon/45 px-3 py-3"
                 >
                   <span className="whitespace-nowrap font-kai text-[13px] tracking-[0.1em] text-carbon-soft">

@@ -64,7 +64,9 @@ _Avoid_: match, identification
 **Flag**:
 A human-proposed correction against a **detection** — an assertion of which **contestant** it
 really is. A flag is a claim awaiting review, with its own pending / accepted / rejected
-lifecycle; it is not a **match score** and carries no cosine. Flagging is an **admin** act.
+lifecycle; it is not a **match score** and carries no cosine. The flag record does carry the
+flagged detection's match score (served as `confidence`) as context for the claim, never as the
+claim's own score. Flagging is an **admin** act.
 _Avoid_: correction, label, annotation, ground truth — a flag is a proposal, and only becomes
 evidence once accepted.
 
