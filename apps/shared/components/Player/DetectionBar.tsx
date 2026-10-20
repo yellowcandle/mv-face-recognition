@@ -1,43 +1,33 @@
 interface DetectionBarProps {
   faceCount: number;
+  /** Of `faceCount`, how many were matched to a contestant; the rest are unmatched detections. */
+  recognizedCount: number;
   frameNumber: number;
-  showOriginalVideo: boolean;
   showAnnotations: boolean;
   batchMode: boolean;
   selectedCount: number;
-  onToggleSource: () => void;
+  /** Flagging is an admin act — the viewer must not be invited to click a face. */
+  canFlag: boolean;
   onToggleAnnotations: () => void;
 }
 
 export function DetectionBar({
   faceCount,
+  recognizedCount,
   frameNumber,
-  showOriginalVideo,
   showAnnotations,
   batchMode,
   selectedCount,
-  onToggleSource,
+  canFlag,
   onToggleAnnotations,
 }: DetectionBarProps) {
   return (
-    <div className="flex items-center gap-3 flex-wrap bg-slate-900/80 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-      <button
-        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-          !showOriginalVideo
-            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
-            : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200'
-        }`}
-        onClick={onToggleSource}
-        title={showOriginalVideo ? 'Switch to Annotated Video' : 'Switch to Original Video'}
-      >
-        {showOriginalVideo ? 'Original' : 'Annotated'}
-      </button>
-
+    <div className="flex items-center gap-3 flex-wrap bg-paper-light/80 border border-paper-dark rounded-none px-4 py-2 text-sm">
       <button
         className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
           showAnnotations
-            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
-            : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200'
+            ? 'bg-stamp/20 text-stamp border border-stamp/40'
+            : 'bg-paper-dark text-carbon-soft border border-paper-deep hover:text-carbon-deep'
         }`}
         onClick={onToggleAnnotations}
         title={showAnnotations ? 'Hide face annotations' : 'Show face annotations'}
@@ -45,21 +35,28 @@ export function DetectionBar({
         {showAnnotations ? 'Boxes ON' : 'Boxes OFF'}
       </button>
 
-      <span className="text-slate-400">
-        Faces: <span className="text-slate-200 font-medium">{faceCount}</span>
+      <span className="text-carbon-soft">
+        Faces: <span className="text-carbon-deep font-medium">{faceCount}</span>
+        {faceCount > 0 && (
+          <span className="text-ledger">
+            {' ('}
+            <span className="text-carbon">{recognizedCount}</span> recognized,{' '}
+            <span className="text-carbon">{faceCount - recognizedCount}</span> unmatched{')'}
+          </span>
+        )}
       </span>
 
-      <span className="text-slate-400">
-        Frame: <span className="text-slate-200 font-mono">{frameNumber}</span>
+      <span className="text-carbon-soft">
+        Frame: <span className="text-carbon-deep font-mono">{frameNumber}</span>
       </span>
 
-      {faceCount > 0 && (
+      {faceCount > 0 && canFlag && (
         batchMode ? (
-          <span className="text-orange-400 font-medium">
+          <span className="text-stamp font-medium">
             Selected: {selectedCount}
           </span>
         ) : (
-          <span className="text-slate-500 text-xs italic">Click a face to flag it</span>
+          <span className="text-ledger text-xs italic">Click a face to flag it</span>
         )
       )}
     </div>

@@ -1,16 +1,17 @@
 import React, { useMemo, useCallback } from "react";
+import { bandFor } from "../../lib/bands";
 
 interface Appearance {
   timestamp: number;
   frame_number: number;
-  confidence: number;
-  face_location: number[];
+  match_score: number; // raw cosine
+  bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
 }
 
 interface ContestantData {
   appearances: Appearance[];
   total_appearances: number;
-  average_confidence: number;
+  average_match_score: number; // raw cosine
   first_appearance: number;
   last_appearance: number;
   contestant_info: { id: string; name: string; nickname: string };
@@ -87,7 +88,7 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
 
   return (
     <div
-      className="w-full rounded-lg p-4"
+      className="w-full rounded-none p-4"
       style={{ backgroundColor: "#1A1A1A" }}
     >
       <div className="mb-3 flex items-center justify-between">
@@ -118,13 +119,13 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
                 fontFamily:
                   'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", sans-serif',
               }}
-              title={entry.data.contestant_info.nickname}
+              title={`${entry.data.contestant_info.nickname} · average ${entry.data.average_match_score.toFixed(2)} cosine (${bandFor(entry.data.average_match_score)} band)`}
             >
               {entry.data.contestant_info.nickname}
             </div>
 
             <div
-              className="relative flex-1 cursor-pointer rounded-sm"
+              className="relative flex-1 cursor-pointer rounded-none"
               style={{ backgroundColor: "#2E2E2E", height: "20px" }}
               onClick={(e) => handleBarClick(e, entry)}
             >
@@ -138,7 +139,7 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
                 return (
                   <div
                     key={i}
-                    className="absolute top-0 h-full rounded-sm"
+                    className="absolute top-0 h-full rounded-none"
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,

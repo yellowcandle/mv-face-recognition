@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { FaceDetection, Video, VideoMetadata } from '../../types';
+import { bandFor } from '../../lib/bands';
 import { useVideos } from '../../hooks/useVideos';
 import { useContestants } from '../../hooks/useContestants';
 import { useFlaggedFaces } from '../../hooks/useFlaggedFaces';
@@ -11,10 +12,13 @@ import { FlagDialog } from './FlagDialog';
 import { getVideoRenderRect } from './useAnnotations';
 import { useViewerMetadata } from '../../hooks/useViewerMetadata';
 import { ContestantTimeline } from './ContestantTimeline';
+import { pickInitialVideo } from './pickInitialVideo';
 
 interface PlayerProps {
   mode: 'admin' | 'viewer';
   apiBase: string;
+  /** Video to open on mount. Falls back to the first video when absent or unmatched. */
+  initialVideoId?: string | null;
 }
 
 function formatTime(seconds: number): string {
@@ -23,11 +27,39 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function Player({ mode, apiBase }: PlayerProps) {
+/**
+ * How a detection reads in the UI: an unmatched one has no contestant and no match
+ * score, so it names no band; a matched one shows its band, and its raw cosine goes in
+ * the tooltip — never a percentage.
+ */
+function detectionTier(face: FaceDetection): { label: string; className: string; title: string } {
+  if (!face.matched) {
+    return {
+      label: 'unmatched',
+      className: 'text-ledger',
+      title: `unmatched · detection score ${face.det_score.toFixed(2)}`,
+    };
+  }
+  const band = bandFor(face.match_score);
+  const className =
+    band === 'high' ? 'text-carbon' : band === 'medium' ? 'text-stamp' : 'text-stamp';
+  return {
+    label: band,
+    className,
+    title: face.match_score != null ? `${face.match_score.toFixed(2)} cosine` : 'no match score',
+  };
+}
+
+export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
+  // Flagging is an admin act. The deployed Worker is read-only and no longer serves the flag
+  // routes at all (ADR 0003), so this single derivation decides what the player offers — and
+  // whether it even asks for flagged faces.
+  const canFlag = mode === 'admin';
+
   // Data queries
   const { data: videos = [], isLoading, error: videosError } = useVideos(apiBase);
   const { data: contestants = [] } = useContestants(apiBase);
-  const { data: flaggedFaces = [], refetch: refetchFlagged } = useFlaggedFaces(apiBase);
+  const { data: flaggedFaces = [], refetch: refetchFlagged } = useFlaggedFaces(apiBase, canFlag);
 
   // Refs
   const videoCanvasRef = useRef<VideoCanvasHandle>(null);
@@ -41,7 +73,6 @@ export function Player({ mode, apiBase }: PlayerProps) {
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [volume, setVolume] = useState(0.8);
-  const [showOriginalVideo, setShowOriginalVideo] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(true);
 
   // Face detection state
@@ -73,10 +104,10 @@ export function Player({ mode, apiBase }: PlayerProps) {
   const viewerMeta = useViewerMetadata(apiBase, viewerVideoId);
   const lastViewerFrameRef = useRef<string | null>(null);
 
-  // Auto-select first video
+  // Auto-select the requested video, else the first
   useEffect(() => {
     if (videos.length > 0 && !selectedVideo) {
-      handleSelectVideo(videos[0]);
+      handleSelectVideo(pickInitialVideo(videos, initialVideoId)!);
     }
   }, [videos]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -84,15 +115,11 @@ export function Player({ mode, apiBase }: PlayerProps) {
 
   const getVideoEl = useCallback(() => videoCanvasRef.current?.video ?? null, []);
 
+  // There is exactly one video source: the rendition the API serves. The old "show original"
+  // toggle pointed at `/source/videos/<file>`, which nothing serves — not the Worker, not
+  // `local_api`, not the admin dev server — so it blanked the player in both apps.
   const getVideoSource = useCallback(
-    (video: Video | null, useOriginal: boolean): string => {
-      if (!video) return '';
-      if (useOriginal) {
-        const filename = video.filename || `${video.id}.mp4`;
-        return `/source/videos/${filename}`;
-      }
-      return `${apiBase}${video.stream_url}`;
-    },
+    (video: Video | null): string => (video ? `${apiBase}${video.stream_url}` : ''),
     [apiBase],
   );
 
@@ -235,26 +262,6 @@ export function Player({ mode, apiBase }: PlayerProps) {
     [getVideoEl, duration, fetchFacesAtTime],
   );
 
-  const handleToggleSource = useCallback(() => {
-    const video = getVideoEl();
-    if (!video || !selectedVideo) return;
-    const savedTime = video.currentTime;
-    const wasPlaying = !video.paused;
-    const next = !showOriginalVideo;
-    setShowOriginalVideo(next);
-
-    // After React re-renders with the new src, restore position
-    requestAnimationFrame(() => {
-      const v = getVideoEl();
-      if (!v) return;
-      const onLoaded = () => {
-        v.currentTime = savedTime;
-        if (wasPlaying) v.play();
-      };
-      v.addEventListener('loadedmetadata', onLoaded, { once: true });
-    });
-  }, [getVideoEl, selectedVideo, showOriginalVideo]);
-
   const handleToggleAnnotations = useCallback(() => {
     setShowAnnotations((prev) => !prev);
   }, []);
@@ -267,15 +274,19 @@ export function Player({ mode, apiBase }: PlayerProps) {
       if (!video || !face.bbox || face.bbox.length < 4) return null;
       try {
         const [x1, y1, x2, y2] = face.bbox;
-        const w = x2 - x1;
-        const h = y2 - y1;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!vw || !vh) return null;
+        // `drawImage`'s source rectangle is in the element's own decoded pixels, so this
+        // is the one place a frame fraction becomes pixels — and it uses the frame
+        // actually being drawn, never `video_info.width` (the SOURCE dimensions).
         const padding = 0.2;
-        const padX = w * padding;
-        const padY = h * padding;
-        const cropX = Math.max(0, x1 - padX);
-        const cropY = Math.max(0, y1 - padY);
-        const cropW = Math.min(video.videoWidth - cropX, w + 2 * padX);
-        const cropH = Math.min(video.videoHeight - cropY, h + 2 * padY);
+        const padX = (x2 - x1) * padding;
+        const padY = (y2 - y1) * padding;
+        const cropX = Math.max(0, x1 - padX) * vw;
+        const cropY = Math.max(0, y1 - padY) * vh;
+        const cropW = Math.min(vw - cropX, (x2 - x1 + 2 * padX) * vw);
+        const cropH = Math.min(vh - cropY, (y2 - y1 + 2 * padY) * vh);
 
         const canvas = document.createElement('canvas');
         const targetSize = 150;
@@ -307,12 +318,12 @@ export function Player({ mode, apiBase }: PlayerProps) {
           else next.add(face);
           return next;
         });
-      } else {
+      } else if (canFlag) {
         setSelectedFace(face);
         setShowFlagDialog(true);
       }
     },
-    [batchMode],
+    [batchMode, canFlag],
   );
 
   const handleToggleBatchMode = useCallback(() => {
@@ -344,7 +355,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
             video_id: selectedVideo.id,
             timestamp: currentTime,
             bbox: selectedFace?.bbox,
-            confidence: selectedFace?.confidence,
+            confidence: selectedFace?.match_score ?? null,
             user_label: userLabel || `Flagged by user at ${formatTime(currentTime)}`,
             thumbnail,
           }),
@@ -387,7 +398,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
                 video_id: selectedVideo.id,
                 timestamp: currentTime,
                 bbox: face.bbox,
-                confidence: face.confidence,
+                confidence: face.match_score ?? null,
                 user_label: `Batch flagged (${facesArray.length} faces) at ${formatTime(currentTime)}`,
                 thumbnail,
               }),
@@ -490,14 +501,14 @@ export function Player({ mode, apiBase }: PlayerProps) {
 
   // --- Render ---
 
-  const videoSrc = getVideoSource(selectedVideo, showOriginalVideo);
+  const videoSrc = getVideoSource(selectedVideo);
   const fps = videoMetadata?.video_info?.fps || 25;
   const frameNumber = Math.floor(currentTime * fps);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400">
-        <div className="w-10 h-10 border-2 border-slate-700 border-t-orange-500 rounded-full animate-spin mb-4" />
+      <div className="flex flex-col items-center justify-center h-full text-carbon-soft">
+        <div className="w-10 h-10 border-2 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
         <p>Loading videos...</p>
       </div>
     );
@@ -505,10 +516,10 @@ export function Player({ mode, apiBase }: PlayerProps) {
 
   if (videosError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400">
-        <p className="text-red-400 mb-2">Failed to load videos</p>
+      <div className="flex flex-col items-center justify-center h-full text-carbon-soft">
+        <p className="text-stamp mb-2">Failed to load videos</p>
         <button
-          className="px-4 py-2 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300 hover:bg-slate-700"
+          className="px-4 py-2 bg-paper-dark border border-paper-deep rounded text-sm text-carbon hover:bg-paper-deep"
           onClick={() => window.location.reload()}
         >
           Retry
@@ -518,24 +529,26 @@ export function Player({ mode, apiBase }: PlayerProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-200 relative">
+    <div className="h-full flex flex-col bg-paper text-carbon-deep relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
-        <h1 className="text-xl font-semibold text-slate-100">Annotated Video Player</h1>
+      <div className="flex items-center justify-between px-5 py-3 border-b border-paper-dark">
+        <h1 className="text-xl font-semibold text-carbon-deep">Annotated Video Player</h1>
         <div className="flex items-center gap-4">
-          <button
-            className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-700"
-            onClick={() => setShowFlaggedPanel((p) => !p)}
-          >
-            Flagged ({flaggedFaces.length})
-          </button>
+          {canFlag && (
+            <button
+              className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-sm text-carbon hover:bg-paper-deep"
+              onClick={() => setShowFlaggedPanel((p) => !p)}
+            >
+              Flagged ({flaggedFaces.length})
+            </button>
+          )}
           <div className="flex items-center gap-2">
-            <label htmlFor="video-select" className="text-sm text-slate-400">
+            <label htmlFor="video-select" className="text-sm text-carbon-soft">
               Video:
             </label>
             <select
               id="video-select"
-              className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-1.5 text-sm max-w-[300px]"
+              className="bg-paper-dark text-carbon-deep border border-paper-deep rounded-none px-3 py-1.5 text-sm max-w-[300px]"
               value={selectedVideo?.id ?? ''}
               onChange={(e) => {
                 const v = videos.find((v) => v.id === e.target.value);
@@ -559,7 +572,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
           {/* Video frame */}
           <div
             ref={containerRef}
-            className="flex-1 bg-black rounded-lg overflow-hidden relative min-h-[400px]"
+            className="flex-1 bg-black rounded-none overflow-hidden relative min-h-[400px]"
           >
             {selectedVideo ? (
               <>
@@ -580,14 +593,13 @@ export function Player({ mode, apiBase }: PlayerProps) {
                   onFaceClick={handleFaceClick}
                   selectedFace={selectedFace}
                   batchMode={batchMode}
+                  canFlag={canFlag}
                   selectedFaces={selectedFaces}
                   getVideoRenderRect={getRenderRect}
-                  videoWidth={videoMetadata?.video_info?.width ?? 1920}
-                  videoHeight={videoMetadata?.video_info?.height ?? 1080}
                 />
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500">
+              <div className="flex items-center justify-center h-full text-ledger">
                 Select a video to play
               </div>
             )}
@@ -613,12 +625,12 @@ export function Player({ mode, apiBase }: PlayerProps) {
           {/* Detection bar */}
           <DetectionBar
             faceCount={detectedFaces.length}
+            recognizedCount={detectedFaces.filter((f) => f.matched).length}
             frameNumber={frameNumber}
-            showOriginalVideo={showOriginalVideo}
             showAnnotations={showAnnotations}
             batchMode={batchMode}
             selectedCount={selectedFaces.size}
-            onToggleSource={handleToggleSource}
+            canFlag={canFlag}
             onToggleAnnotations={handleToggleAnnotations}
           />
 
@@ -638,37 +650,38 @@ export function Player({ mode, apiBase }: PlayerProps) {
             />
           )}
 
-          {/* Batch controls */}
-          <div className="flex items-center gap-2">
+          {/* Batch controls — admin only: every button in here ends in a flag */}
+          {canFlag && (
+            <div className="flex items-center gap-2">
             <button
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+              className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
                 batchMode
-                  ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                  ? 'bg-stamp/20 text-stamp border-stamp/40'
+                  : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
               }`}
               onClick={handleToggleBatchMode}
             >
               {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
             </button>
 
-            {batchMode && (
-              <>
-                <button
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-40"
-                  onClick={handleSelectAllFaces}
+              {batchMode && (
+                <>
+                  <button
+                    className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
+                    onClick={handleSelectAllFaces}
                   disabled={detectedFaces.length === 0}
                 >
                   Select All
                 </button>
                 <button
-                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-40"
+                  className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
                   onClick={handleClearSelection}
                   disabled={selectedFaces.size === 0}
                 >
                   Clear
                 </button>
                 <button
-                  className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-400 disabled:opacity-40"
+                  className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
                   onClick={() => {
                     if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
                   }}
@@ -679,17 +692,18 @@ export function Player({ mode, apiBase }: PlayerProps) {
               </>
             )}
           </div>
+          )}
 
           {/* Timeline filter (admin mode only) */}
           {mode === 'admin' && (
-            <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-4 py-2">
+            <div className="bg-paper-light/80 border border-paper-dark rounded-none px-4 py-2">
               <div className="flex items-center gap-3">
-                <label htmlFor="contestant-filter" className="text-xs text-slate-400">
+                <label htmlFor="contestant-filter" className="text-xs text-carbon-soft">
                   Filter Timeline:
                 </label>
                 <select
                   id="contestant-filter"
-                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-xs"
+                  className="bg-paper-dark text-carbon-deep border border-paper-deep rounded px-2 py-1 text-xs"
                   onChange={(e) =>
                     handleFilterByContestant(e.target.value ? parseInt(e.target.value, 10) : null)
                   }
@@ -703,18 +717,18 @@ export function Player({ mode, apiBase }: PlayerProps) {
                   ))}
                 </select>
                 {filterContestantId !== null && (
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-ledger">
                     {contestantAppearances.length} appearances
                   </span>
                 )}
               </div>
 
               {filterContestantId !== null && contestantAppearances.length > 0 && (
-                <div className="mt-2 relative h-4 bg-slate-800 rounded-full overflow-hidden">
+                <div className="mt-2 relative h-4 bg-paper-dark rounded-full overflow-hidden">
                   {contestantAppearances.map((a, i) => (
                     <button
                       key={i}
-                      className="absolute top-0 w-1.5 h-full bg-orange-500 rounded-full hover:bg-orange-400"
+                      className="absolute top-0 w-1.5 h-full bg-stamp rounded-full hover:bg-stamp"
                       style={{
                         left: `${duration > 0 ? (a.timestamp / duration) * 100 : 0}%`,
                       }}
@@ -735,50 +749,50 @@ export function Player({ mode, apiBase }: PlayerProps) {
         </div>
 
         {/* Info panel */}
-        <div className="flex-1 max-w-xs bg-slate-900 border border-slate-800 rounded-lg p-4 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Video Information</h3>
+        <div className="flex-1 max-w-xs bg-paper-light border border-paper-dark rounded-none p-4 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-carbon-deep mb-3">Video Information</h3>
 
           {selectedVideo && (
             <>
               <div className="mb-4">
-                <h4 className="text-xs font-medium text-slate-400 mb-2">Details</h4>
+                <h4 className="text-xs font-medium text-carbon-soft mb-2">Details</h4>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Title</span>
-                    <span className="text-slate-300 truncate ml-2">{selectedVideo.name}</span>
+                    <span className="text-ledger">Title</span>
+                    <span className="text-carbon truncate ml-2">{selectedVideo.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Resolution</span>
-                    <span className="text-slate-300">
+                    <span className="text-ledger">Resolution</span>
+                    <span className="text-carbon">
                       {videoMetadata?.video_info?.width ?? 1920}x
                       {videoMetadata?.video_info?.height ?? 1080}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">FPS</span>
-                    <span className="text-slate-300">{fps}</span>
+                    <span className="text-ledger">FPS</span>
+                    <span className="text-carbon">{fps}</span>
                   </div>
                 </div>
               </div>
 
               <div className="mb-4">
-                <h4 className="text-xs font-medium text-slate-400 mb-2">Recognition Summary</h4>
+                <h4 className="text-xs font-medium text-carbon-soft mb-2">Recognition Summary</h4>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Unique Contestants</span>
-                    <span className="text-slate-300">
+                    <span className="text-ledger">Unique Contestants</span>
+                    <span className="text-carbon">
                       {videoMetadata?.processing_summary?.unique_contestants ?? 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Faces Detected</span>
-                    <span className="text-slate-300">
+                    <span className="text-ledger">Faces Detected</span>
+                    <span className="text-carbon">
                       {videoMetadata?.processing_summary?.total_faces_detected ?? 0}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Faces Recognized</span>
-                    <span className="text-slate-300">
+                    <span className="text-ledger">Faces Recognized</span>
+                    <span className="text-carbon">
                       {videoMetadata?.processing_summary?.total_recognitions ?? 0}
                     </span>
                   </div>
@@ -788,33 +802,36 @@ export function Player({ mode, apiBase }: PlayerProps) {
           )}
 
           <div>
-            <h4 className="text-xs font-medium text-slate-400 mb-2">Current Frame Faces</h4>
+            <h4 className="text-xs font-medium text-carbon-soft mb-2">Current Frame Faces</h4>
             {detectedFaces.length === 0 ? (
-              <p className="text-xs text-slate-600 italic">No faces detected at this timestamp</p>
+              <p className="text-xs text-carbon italic">No faces detected at this timestamp</p>
             ) : (
               <div className="space-y-1">
-                {detectedFaces.map((face, i) => (
-                  <button
-                    key={i}
-                    className="w-full flex items-center justify-between px-2 py-1.5 bg-slate-800 rounded text-xs hover:bg-slate-700 transition-colors"
-                    onClick={() => handleFaceClick(face)}
-                  >
-                    <span className="text-slate-200">
-                      {face.contestant_name || 'Unknown'}
-                    </span>
-                    <span className="text-slate-500">
-                      {((face.confidence ?? 0) * 100).toFixed(1)}%
-                    </span>
-                  </button>
-                ))}
+                {detectedFaces.map((face, i) => {
+                  const tier = detectionTier(face);
+                  return (
+                    <button
+                      key={i}
+                      className="w-full flex items-center justify-between px-2 py-1.5 bg-paper-dark rounded text-xs hover:bg-paper-deep transition-colors"
+                      onClick={() => handleFaceClick(face)}
+                    >
+                      <span className="text-carbon-deep">
+                        {face.matched ? face.contestant_name || face.contestant_nickname || 'Unmatched' : 'Unmatched'}
+                      </span>
+                      <span className={`${tier.className} font-medium`} title={tier.title}>
+                        {tier.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Flag Dialog */}
-      {showFlagDialog && selectedFace && (
+      {/* Flag Dialog — admin only; a viewer cannot reach these states either way */}
+      {canFlag && showFlagDialog && selectedFace && (
         <FlagDialog
           mode="single"
           face={selectedFace}
@@ -829,7 +846,7 @@ export function Player({ mode, apiBase }: PlayerProps) {
       )}
 
       {/* Batch Flag Dialog */}
-      {showBatchFlagDialog && (
+      {canFlag && showBatchFlagDialog && (
         <FlagDialog
           mode="batch"
           selectedFaces={Array.from(selectedFaces)}
@@ -841,12 +858,12 @@ export function Player({ mode, apiBase }: PlayerProps) {
       )}
 
       {/* Flagged Faces Panel */}
-      {showFlaggedPanel && (
-        <div className="absolute top-0 right-0 w-80 h-full bg-slate-900 border-l border-slate-800 z-40 flex flex-col shadow-2xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-200">Flagged Faces</h3>
+      {canFlag && showFlaggedPanel && (
+        <div className="absolute top-0 right-0 w-80 h-full bg-paper-light border-l border-paper-dark z-40 flex flex-col shadow-2xl">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-paper-dark">
+            <h3 className="text-sm font-semibold text-carbon-deep">Flagged Faces</h3>
             <button
-              className="text-slate-400 hover:text-slate-200 text-lg"
+              className="text-carbon-soft hover:text-carbon-deep text-lg"
               onClick={() => setShowFlaggedPanel(false)}
             >
               &#10005;
@@ -854,28 +871,28 @@ export function Player({ mode, apiBase }: PlayerProps) {
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {flaggedFaces.length === 0 ? (
-              <p className="text-sm text-slate-600 italic">No faces have been flagged yet.</p>
+              <p className="text-sm text-carbon italic">No faces have been flagged yet.</p>
             ) : (
               <div className="space-y-2">
                 {flaggedFaces.map((flag) => (
                   <div
                     key={flag.id}
-                    className="bg-slate-800 rounded-lg p-3 text-xs"
+                    className="bg-paper-dark rounded-none p-3 text-xs"
                   >
                     <div className="space-y-0.5">
-                      <div className="text-slate-200 font-medium">
+                      <div className="text-carbon-deep font-medium">
                         {getContestantName(flag.contestant_id)}
                       </div>
-                      <div className="text-slate-500">Video: {flag.video_id}</div>
-                      <div className="text-slate-500">@ {formatTime(flag.timestamp)}</div>
+                      <div className="text-ledger">Video: {flag.video_id}</div>
+                      <div className="text-ledger">@ {formatTime(flag.timestamp)}</div>
                     </div>
                     <span
                       className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
                         flag.status === 'pending'
-                          ? 'bg-amber-500/20 text-amber-400'
+                          ? 'bg-stamp/20 text-stamp'
                           : flag.status === 'accepted'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-red-500/20 text-red-400'
+                            ? 'bg-carbon/20 text-carbon'
+                            : 'bg-stamp/20 text-stamp'
                       }`}
                     >
                       {flag.status}
