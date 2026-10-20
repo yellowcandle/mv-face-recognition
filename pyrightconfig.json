@@ -1,0 +1,25 @@
+{
+  "//": [
+    "Type-check scope for the Python side. The product's frontends are the React apps",
+    "(apps/viewer, apps/admin) and the Worker; the Python that ships is the pipeline in",
+    "mvp-processor/ plus scripts/.",
+    "",
+    "Excluded here are the retired desktop/GUI surfaces and the archived tree. They are kept",
+    "for reference and are not built, so their diagnostics are not a signal anyone can act on:",
+    "  - gui/ + gui_app.py       PyQt6 desktop app",
+    "  - ui/ + nicegui_app.py    NiceGUI desktop app",
+    "  - archive/                retired Gradio GUI and old copies",
+    "  - scripts/debug*, scripts/deduplicate_embeddings.py, scripts/debug_similarity.py",
+    "                            one-off analyses that import each other and nothing else"
+  ],
+  "exclude": [
+    "archive",
+    "gui",
+    "ui",
+    "gui_app.py",
+    "nicegui_app.py",
+    "scripts/debug",
+    "scripts/debug_similarity.py",
+    "scripts/deduplicate_embeddings.py"
+  ]
+}
