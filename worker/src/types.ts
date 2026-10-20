@@ -39,25 +39,26 @@ export interface VideoMetadata {
 }
 
 /**
- * Face detection result
+ * Face detection — one shape at every serving boundary (`/faces/detect`, the realtime
+ * WebSocket `frame_update`) and the same shape `mvp-processor` stores per detection.
  */
 export interface FaceDetection {
-  /** Unique detection identifier */
-  id: string;
-  /** Contestant ID from metadata */
-  contestant_id: string;
-  /** Detection confidence score (0-1) */
-  confidence: number;
-  /** Bounding box [x, y, width, height] */
+  /** Bounding box in frame fractions, canonical [x1, y1, x2, y2] — never reordered, never scaled */
   bbox: [number, number, number, number];
-  /** Timestamp in video (seconds) */
-  timestamp: number;
-  /** Frame number */
-  frame_number: number;
-  /** Contestant name */
-  name?: string;
-  /** Contestant nickname */
-  nickname?: string;
+  /** Raw cosine similarity to the contestant's best reference embedding; null when unmatched */
+  match_score: number | null;
+  /** Detector's own face score; present on every detection, matched or not */
+  det_score: number;
+  /** Contestant number (編號), null when unmatched */
+  contestant_id: string | null;
+  /** Full name (姓名), null when unmatched */
+  contestant_name: string | null;
+  /** Nickname (暱稱), null when unmatched */
+  contestant_nickname: string | null;
+  /** Track id within the video, null when the detector assigned none */
+  tracker_id: number | null;
+  /** Whether this detection was identified (`contestant_id !== null`) */
+  matched: boolean;
 }
 
 /**
@@ -132,7 +133,8 @@ export interface VideoAnalytics {
     contestant_id: string;
     name: string;
     detection_count: number;
-    average_confidence: number;
+    /** Mean raw cosine across this contestant's recognitions */
+    average_match_score: number;
     screen_time_seconds: number;
   }>;
   /** Processing metadata */
