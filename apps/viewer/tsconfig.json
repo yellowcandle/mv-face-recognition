@@ -12,11 +12,21 @@
     "isolatedModules": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@mv/shared": ["../shared/index.ts"],
-      "@mv/shared/*": ["../shared/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@mv/shared": [
+        "../shared/index.ts"
+      ],
+      "@mv/shared/*": [
+        "../shared/*"
+      ]
     },
-    "baseUrl": "."
+    "baseUrl": ".",
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", "../shared"]
+  "include": [
+    "src",
+    "../shared"
+  ]
 }
