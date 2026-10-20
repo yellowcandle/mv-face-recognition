@@ -3,13 +3,10 @@ Main Video Processing Script
 Orchestrates the complete video processing pipeline
 """
 
-import bisect
 import click
 import yaml
 import json
 import logging
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 from tqdm import tqdm
@@ -18,15 +15,6 @@ from video_processor import VideoProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
 from cloudflare_uploader import CloudflareUploader
-from supervision_annotator import (
-    insightface_to_sv_detections,
-    create_tracker,
-    create_annotator_pipeline,
-    annotate_frame,
-    build_contestant_id_map,
-    get_color_for_contestant,
-)
-import cv2
 import numpy as np
 import supervision as sv
 
@@ -44,6 +32,37 @@ def _json_default(obj):
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+def _create_tracker(frame_rate: int) -> sv.ByteTrack:
+    """ByteTrack configured for faces tracked across sampled frames.
+
+    Activation is on the detector score, which is what `detections.confidence` holds here.
+
+    `minimum_matching_threshold` is a **cost ceiling on `1 - IoU`**, not a quality floor: the
+    value is handed to `linear_assignment(1 - IoU, threshold)`, so 0.8 accepts pairs overlapping
+    at IoU 0.2 while 0.3 would accept only IoU 0.7. This used to be 0.3 — reading as "require 30%
+    of a match" and doing the opposite (the same inversion as the old `tolerance`/cosine mixup
+    CONTEXT.md was written to end). Measured on `test-video-mv2` by replaying the stored
+    detections, over 399 detections:
+
+        threshold   IoU needed   tracks   1-frame   untracked   longest
+        0.3         0.7          119      111       270         4
+        0.5         0.5          81       48        221         16
+        0.8         0.2          42       7         162         19     <- the library default
+        0.9         0.1          36       3         144         20
+
+    So the default it is: 0.9 buys a little more while merging far more aggressively (IoU 0.1
+    across a camera cut can join two different people). The detections that stay untracked even
+    at 0.9 are an artefact of `update_with_detections` re-associating at a fixed IoU 0.5, which
+    this setting does not reach.
+    """
+    return sv.ByteTrack(
+        track_activation_threshold=0.25,
+        lost_track_buffer=30,
+        minimum_matching_threshold=0.8,
+        frame_rate=frame_rate,
+    )
 
 
 class VideoProcessingPipeline:
@@ -134,7 +153,6 @@ class VideoProcessingPipeline:
 
     def process_video(
         self, video_path: Path, output_name: Optional[str] = None,
-        no_annotate: bool = False,
     ) -> Dict:
         """
         Process a single video through the complete pipeline
@@ -180,10 +198,7 @@ class VideoProcessingPipeline:
         unmatched_faces = []
 
         # Initialize ByteTrack for persistent face tracking
-        tracker = create_tracker(frame_rate=self.config["video"]["fps_sample_rate"])
-        contestant_id_map = build_contestant_id_map(self.contestant_db.contestants_info)
-        screen_time = {}  # nickname → cumulative seconds
-        frame_interval = 1.0 / self.config["video"]["fps_sample_rate"]
+        tracker = _create_tracker(self.config["video"]["fps_sample_rate"])
 
         for frame_idx, (frame, timestamp) in enumerate(
             tqdm(frames_list, desc="Processing frames")
@@ -199,74 +214,85 @@ class VideoProcessingPipeline:
                 recognitions = self.face_recognizer.recognize_faces(detections)
                 all_recognitions.extend(recognitions)
 
-                # Collect unmatched detections (detected but not recognized)
-                matched_detections = {id(r.detection) for r in recognitions}
-                for det in detections:
-                    if id(det) not in matched_detections:
-                        unmatched_faces.append(det)
+                recognition_by_detection = {id(r.detection): r for r in recognitions}
+                unmatched_faces.extend(
+                    det for det in detections if id(det) not in recognition_by_detection
+                )
 
-                # Store frame data
+                # Every detection is stored, matched or not — a face the matcher got wrong is
+                # exactly what a labeller needs to click. Unmatched entries carry no contestant
+                # and no match_score; their det_score is the only score they have.
+                entries = []
+                for det in detections:
+                    r = recognition_by_detection.get(id(det))
+                    entries.append(
+                        {
+                            "contestant_id": str(r.contestant_id) if r else None,
+                            "contestant_name": str(r.contestant_name) if r else None,
+                            "contestant_nickname": str(r.contestant_nickname) if r else None,
+                            "match_score": float(r.match_score) if r else None,
+                            "det_score": float(det.det_score),
+                            "bbox": [float(v) for v in det.bbox],
+                            "tracker_id": None,
+                        }
+                    )
+
                 frame_data.append(
                     {
                         "frame_number": int(frame_idx),
                         "timestamp": float(timestamp),
                         "detections_count": len(detections),
                         "recognitions_count": len(recognitions),
-                        "recognitions": [
-                            {
-                                "contestant_id": str(r.contestant_id),
-                                "contestant_name": str(r.contestant_name),
-                                "contestant_nickname": str(r.contestant_nickname),
-                                "confidence": float(r.match_confidence),
-                                "face_location": [int(x) for x in r.detection.location],
-                            }
-                            for r in recognitions
-                        ],
+                        "detections": entries,
                     }
                 )
 
-                # Run ByteTrack for persistent tracking
-                sv_detections = insightface_to_sv_detections(
-                    recognitions,
-                    [det for det in detections if id(det) not in matched_detections],
-                    contestant_id_map,
+                # ByteTrack needs pixels and runs in detection space, while the stored contract is
+                # frame fractions — so project back with the detection frame's own dimensions.
+                # Order is preserved end to end, so each tracker id lands on its own entry.
+                frame_height, frame_width = frame.shape[:2]
+                sv_detections = sv.Detections(
+                    xyxy=np.array(
+                        [
+                            [
+                                det.bbox[0] * frame_width,
+                                det.bbox[1] * frame_height,
+                                det.bbox[2] * frame_width,
+                                det.bbox[3] * frame_height,
+                            ]
+                            for det in detections
+                        ],
+                        dtype=np.float32,
+                    ),
+                    confidence=np.array(
+                        [det.det_score for det in detections], dtype=np.float32
+                    ),
                 )
-                if len(sv_detections) > 0:
-                    tracker.update_with_detections(sv_detections)
-                    # update_with_detections assigns tracker_id onto the *input*
-                    # detections, index-aligned with how sv_detections was built:
-                    # recognitions first, then unmatched; -1 means no track.
-                    # Key tracker IDs by recognition identity, not position in
-                    # the (filtered, reordered) tracker output.
-                    if sv_detections.tracker_id is not None:
-                        for i, rec in enumerate(frame_data[-1]["recognitions"]):
-                            tid = int(sv_detections.tracker_id[i])
-                            rec["tracker_id"] = tid if tid >= 0 else None
-
-                    # Accumulate screen time from original detections (not tracked — ByteTrack may drop custom data)
-                    orig_labels = sv_detections.data.get("labels", [])
-                    for label in orig_labels:
-                        if label != "Unknown":
-                            screen_time[label] = screen_time.get(label, 0) + frame_interval
+                tracker.update_with_detections(sv_detections)
+                # update_with_detections assigns tracker_id onto the *input* detections,
+                # index-aligned with how sv_detections was built; -1 means no track.
+                if sv_detections.tracker_id is not None:
+                    for entry, track_id in zip(entries, sv_detections.tracker_id):
+                        track_id = int(track_id)
+                        entry["tracker_id"] = track_id if track_id >= 0 else None
 
         # Save unmatched face embeddings for clustering
         if unmatched_faces:
             self._save_unmatched_embeddings(unmatched_faces, output_name)
 
-        # Filter low-confidence recognitions
-        filtered_recognitions = self.face_recognizer.filter_recognitions(
-            all_recognitions, min_confidence=0.15
-        )
-
+        # `acceptance_threshold` in processing_config.yaml is the single acceptance gate, and it is
+        # a cosine, in the same direction as the match score. There is deliberately no second
+        # filter here: a second gate on a different scale is what silently raised the real bar to
+        # cosine 0.5325 while the config said 0.45 (see CONTEXT.md — "Acceptance threshold").
         logger.info(
-            f"Processing complete: {len(filtered_recognitions)} recognitions found, "
+            f"Processing complete: {len(all_recognitions)} recognitions found, "
             f"{len(unmatched_faces)} unmatched faces saved"
         )
 
         # Generate metadata
         metadata = self.metadata_generator.generate_metadata(
             video_info=video_info,
-            recognitions=filtered_recognitions,
+            recognitions=all_recognitions,
             frame_data=frame_data,
             output_name=output_name,
             thumbnail_paths=thumbnail_paths,
@@ -281,7 +307,7 @@ class VideoProcessingPipeline:
 
         # Generate galleries
         gallery_data = self.metadata_generator.generate_face_galleries(
-            recognitions=filtered_recognitions, output_name=output_name
+            recognitions=all_recognitions, output_name=output_name
         )
 
         # Save gallery data locally
@@ -290,128 +316,8 @@ class VideoProcessingPipeline:
         # Convert video formats
         processed_videos = self.convert_video_formats(video_path, output_name)
 
-        # Generate annotated video with Supervision
-        annotated_video_path = None
-        if not no_annotate and frame_data:
-            output_dir = Path(self.config["output"]["processed_dir"])
-            annotated_filename = f"{output_name}_annotated.mp4"
-            annotated_output = output_dir / annotated_filename
-
-            try:
-                annotators = create_annotator_pipeline()
-
-                # Build color map for timeline bar
-                color_map = {}
-                for nickname, cid in contestant_id_map.items():
-                    color_map[nickname] = get_color_for_contestant(cid)
-
-                # Re-read video and annotate each frame
-                cap = cv2.VideoCapture(str(video_path))
-                fps = cap.get(cv2.CAP_PROP_FPS)
-                orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-                # Detection was done on resized frames — compute scale factor.
-                # extract_frames resizes any source whose width != resize_width
-                # (upscaling narrow sources too), so scale both directions.
-                detect_width = self.config["video"]["resize_width"]
-                bbox_scale = orig_width / detect_width
-
-                video_info_sv = sv.VideoInfo(
-                    width=orig_width, height=orig_height, fps=fps,
-                )
-
-                # Build timestamp → frame_data lookup for nearest-match
-                # Each sampled frame has a timestamp; we match video frames to the closest one
-                sorted_fd = sorted(frame_data, key=lambda fd: fd["timestamp"])
-                fd_timestamps = [fd["timestamp"] for fd in sorted_fd]
-
-                with sv.VideoSink(str(annotated_output), video_info_sv) as sink:
-                    frame_idx = 0
-
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-
-                        # Map video frame to most recent past detection (floor, not nearest)
-                        # This prevents bboxes appearing before the face arrives
-                        video_ts = frame_idx / fps if fps > 0 else 0
-                        idx = bisect.bisect_right(fd_timestamps, video_ts)
-                        # bisect_right gives insertion point after matching timestamps
-                        # so idx-1 is the most recent detection at or before video_ts
-                        if idx == 0:
-                            fd = None  # no detection yet at this point in the video
-                        else:
-                            fd = sorted_fd[idx - 1]
-
-                        if fd and fd.get("recognitions"):
-                            # Reconstruct detections from stored frame_data
-                            xyxy_list = []
-                            labels = []
-                            confidences = []
-                            class_ids = []
-
-                            for r in fd["recognitions"]:
-                                top, right, bottom, left = r["face_location"]
-                                # Scale bbox from detection resolution to original video resolution
-                                xyxy_list.append([left * bbox_scale, top * bbox_scale, right * bbox_scale, bottom * bbox_scale])
-                                labels.append(r["contestant_nickname"])
-                                confidences.append(r["confidence"])
-                                class_ids.append(contestant_id_map.get(r["contestant_nickname"], -1))
-
-                            detections = sv.Detections(
-                                xyxy=np.array(xyxy_list, dtype=np.float32),
-                                confidence=np.array(confidences, dtype=np.float32),
-                                class_id=np.array(class_ids, dtype=int),
-                                data={"labels": labels},
-                            )
-
-                            # Per-recognition tracker IDs (None → -1 placeholder;
-                            # annotate_frame only traces real tracks)
-                            tracker_ids = [r.get("tracker_id") for r in fd["recognitions"]]
-                            if any(t is not None for t in tracker_ids):
-                                detections.tracker_id = np.array(
-                                    [t if t is not None else -1 for t in tracker_ids],
-                                    dtype=int,
-                                )
-                        else:
-                            detections = sv.Detections.empty()
-
-                        frame = annotate_frame(frame, detections, annotators, screen_time, color_map)
-                        sink.write_frame(frame)
-                        frame_idx += 1
-
-                cap.release()
-
-                # Merge audio from original video
-                if shutil.which("ffmpeg"):
-                    final_output = output_dir / f"{output_name}_annotated_audio.mp4"
-                    result = subprocess.run([
-                        "ffmpeg", "-y",
-                        "-i", str(annotated_output),
-                        "-i", str(video_path),
-                        "-c", "copy",
-                        "-map", "0:v:0", "-map", "1:a:0",
-                        str(final_output),
-                    ], capture_output=True)
-                    if result.returncode == 0:
-                        annotated_output.unlink()  # Remove video-only version
-                        final_output.rename(annotated_output)  # Rename to expected name
-                        logger.info(f"Audio merged into annotated video")
-                    else:
-                        stderr_text = result.stderr.decode("utf-8", errors="replace")[:200]
-                        logger.warning(f"FFmpeg audio merge failed: {stderr_text}")
-                else:
-                    logger.warning("FFmpeg not found — annotated video has no audio")
-
-                annotated_video_path = str(annotated_output)
-                processed_videos.append(annotated_video_path)
-                logger.info(f"Annotated video created: {annotated_video_path}")
-            except Exception as e:
-                logger.warning(f"Failed to create annotated video: {e}")
-
-        # Prepare upload package
+        # No annotated rendition: overlays are drawn by the JS layer, which can toggle them.
+        # `_annotated.mp4` burned boxes into pixels and was never published.
         upload_package = {
             "video_info": video_info,
             "metadata": metadata,
@@ -419,7 +325,6 @@ class VideoProcessingPipeline:
             "processed_videos": processed_videos,
             "thumbnails": thumbnail_paths,
             "metadata_file": str(metadata_path),
-            "annotated_video": annotated_video_path,
         }
 
         return upload_package
@@ -439,8 +344,8 @@ class VideoProcessingPipeline:
                 "file": filename,
                 "frame_number": int(det.frame_number),
                 "timestamp": float(det.timestamp),
-                "location": [int(x) for x in det.location],
-                "confidence": float(det.confidence),
+                "bbox": [float(v) for v in det.bbox],
+                "det_score": float(det.det_score),
             })
 
         index_path = unmatched_dir / "unmatched_index.json"
@@ -509,7 +414,6 @@ class VideoProcessingPipeline:
 )
 @click.option("--output-dir", help="Custom base output directory for local-only mode")
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
-@click.option("--no-annotate", is_flag=True, help="Skip annotated video generation")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
     input: str,
@@ -519,7 +423,6 @@ def main(
     local_only: bool,
     output_dir: str,
     rebuild_db: bool,
-    no_annotate: bool,
     debug: bool,
 ):
     """Process video through face recognition pipeline"""
@@ -582,7 +485,7 @@ def main(
             pipeline.initialize_database(force_rebuild=rebuild_db)
 
             # Process video
-            upload_package = pipeline.process_video(video_path, output_name, no_annotate=no_annotate)
+            upload_package = pipeline.process_video(video_path, output_name)
 
             # Upload to Cloudflare (unless disabled or in local-only mode)
             if not (no_upload or local_only) and pipeline.cloudflare_uploader:

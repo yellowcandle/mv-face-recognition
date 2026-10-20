@@ -16,9 +16,9 @@ class FaceParser:
         self._rejected = 0
 
     def validate_face(self, frame: np.ndarray, face_detection: Any) -> bool:
-        confidence = face_detection.confidence
+        det_score = face_detection.det_score
 
-        if confidence >= self.config.low_conf_threshold:
+        if det_score >= self.config.low_conf_threshold:
             return True
 
         if not self.config.enable_on_low_conf:
@@ -27,7 +27,10 @@ class FaceParser:
         self._total_validated += 1
 
         if hasattr(face_detection, "bbox"):
-            bbox = face_detection.bbox
+            # Stored boxes are frame fractions; cropping needs pixels.
+            height, width = frame.shape[:2]
+            x1, y1, x2, y2 = face_detection.bbox
+            bbox = (x1 * width, y1 * height, x2 * width, y2 * height)
         elif hasattr(face_detection, "location"):
             top, right, bottom, left = face_detection.location
             bbox = (left, top, right, bottom)
@@ -45,7 +48,7 @@ class FaceParser:
             self._rejected += 1
 
         logger.debug(
-            f"Face parsing validation: confidence={confidence:.3f}, skin_ratio={skin_ratio:.3f}, valid={is_valid}"
+            f"Face parsing validation: det_score={det_score:.3f}, skin_ratio={skin_ratio:.3f}, valid={is_valid}"
         )
 
         return bool(is_valid)

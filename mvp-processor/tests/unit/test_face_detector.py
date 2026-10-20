@@ -97,13 +97,11 @@ def sample_config():
     return {
         "face_detection": {
             "model": "insightface",
-            "min_confidence": 0.6,
             "min_face_size": 20,
         },
         "face_recognition": {
-            "tolerance": 0.4,
-            "max_distance": 0.4,
-            "high_confidence_threshold": 0.85,
+            # A cosine, not a distance: 0.6 is the old tolerance 0.4 read the other way up.
+            "acceptance_threshold": 0.6,
         },
         "contestants": {
             "photo_dir": "/tmp/test_contestants",
@@ -223,22 +221,21 @@ class TestFaceDetector:
         assert len(detections) == 1
         assert detections[0].encoding.shape == (512,)
 
-    def test_detect_faces_bbox_mapping(self, sample_config, mock_app, base_embedding):
-        """⑤ InsightFace [x1,y1,x2,y2] maps to (top=y1, right=x2, bottom=y2, left=x1)."""
+    def test_detect_faces_bbox_is_frame_fractions(self, sample_config, mock_app, base_embedding):
+        """⑤ InsightFace [x1,y1,x2,y2] in pixels becomes frame fractions, same order."""
         x1, y1, x2, y2 = 100, 50, 200, 180
         face = MockFace(bbox=[x1, y1, x2, y2], det_score=0.9, normed_embedding=base_embedding)
         mock_app.get.return_value = [face]
 
         with patch("src.face_detector._get_insightface_app", return_value=mock_app):
             detector = FaceDetector(sample_config)
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)  # height 480, width 640
             detections = detector.detect_faces(frame, timestamp=0.0, frame_number=0)
 
-        top, right, bottom, left = detections[0].location
-        assert top == y1
-        assert right == x2
-        assert bottom == y2
-        assert left == x1
+        assert detections[0].bbox == pytest.approx((x1 / 640, y1 / 480, x2 / 640, y2 / 480))
+        # ...and a fraction is a fraction: the same box against a differently sized frame is
+        # what makes it correct against the 1080p and 720p renditions too.
+        assert all(0.0 <= v <= 1.0 for v in detections[0].bbox)
 
     def test_detect_faces_min_size_filter(self, sample_config, mock_app, base_embedding):
         """⑥ Faces smaller than min_face_size are filtered out."""
@@ -254,7 +251,7 @@ class TestFaceDetector:
         assert len(detections) == 0
 
     def test_detect_faces_uses_real_det_score(self, sample_config, mock_app, base_embedding):
-        """⑦ FaceDetection.confidence equals the InsightFace det_score."""
+        """⑦ FaceDetection.det_score equals the InsightFace det_score."""
         face = MockFace(bbox=[100, 50, 200, 180], det_score=0.85, normed_embedding=base_embedding)
         mock_app.get.return_value = [face]
 
@@ -263,7 +260,7 @@ class TestFaceDetector:
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             detections = detector.detect_faces(frame, timestamp=0.0, frame_number=0)
 
-        assert detections[0].confidence == pytest.approx(0.85)
+        assert detections[0].det_score == pytest.approx(0.85)
 
 
 # ---------------------------------------------------------------------------
@@ -298,11 +295,11 @@ class TestFaceRecognizer:
 
         similar = _similar_vec(base_embedding, noise_scale=0.01, seed=99)
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=similar,
             timestamp=1.0,
             frame_number=30,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         results = recognizer.recognize_faces([det])
@@ -319,11 +316,11 @@ class TestFaceRecognizer:
 
         distant = _normalized_vec(seed=999)  # independent random vector
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=distant,
             timestamp=2.0,
             frame_number=60,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         results = recognizer.recognize_faces([det])
@@ -335,11 +332,11 @@ class TestFaceRecognizer:
         recognizer = FaceRecognizer(sample_config, db)
 
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=base_embedding,
             timestamp=0.0,
             frame_number=0,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         results = recognizer.recognize_faces([det])
@@ -365,21 +362,22 @@ class TestFaceRecognizer:
         recognizer = FaceRecognizer(sample_config, db)
 
         query = _similar_vec(refs[2], noise_scale=0.01, seed=555)
-        # Far from the other two references of the same contestant.
-        tolerance = sample_config["face_recognition"]["tolerance"]
-        assert 1 - np.dot(query, refs[0]) > tolerance
-        assert 1 - np.dot(query, refs[1]) > tolerance
+        # Below the acceptance threshold against the other two references of the same
+        # contestant, so only a per-photo max can match it.
+        threshold = sample_config["face_recognition"]["acceptance_threshold"]
+        assert np.dot(query, refs[0]) < threshold
+        assert np.dot(query, refs[1]) < threshold
         # And the old averaged-vector representation would have rejected it outright.
         averaged = refs.mean(axis=0)
         averaged /= np.linalg.norm(averaged)
-        assert 1 - np.dot(query, averaged) > tolerance
+        assert np.dot(query, averaged) < threshold
 
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=query,
             timestamp=3.0,
             frame_number=90,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         results = recognizer.recognize_faces([det])
@@ -408,11 +406,11 @@ class TestBatchRecognition:
 
         similar = _similar_vec(base_embedding, noise_scale=0.01, seed=77)
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=similar,
             timestamp=1.0,
             frame_number=30,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         single_results = recognizer.recognize_faces([det])
@@ -436,21 +434,21 @@ class TestBatchRecognition:
 
         similar = _similar_vec(base_embedding, noise_scale=0.01, seed=88)
         det = FaceDetection(
-            location=(50, 200, 180, 100),
+            bbox=(0.078, 0.104, 0.312, 0.375),
             encoding=similar,
             timestamp=1.0,
             frame_number=30,
-            confidence=0.9,
+            det_score=0.9,
         )
 
         results = recognizer.recognize_faces_batch([[det]])
         assert len(results[0]) == 1
 
-        # Manually compute expected cosine distance
-        cosine_dist = 1 - np.dot(similar, base_embedding)
-        expected_confidence = 1 - (cosine_dist / sample_config["face_recognition"]["tolerance"])
+        # The stored score IS the cosine — never a value rescaled by the threshold, which
+        # would mean the same face scored differently whenever the threshold moved.
+        expected_match_score = np.dot(similar, base_embedding)
 
-        assert results[0][0].match_confidence == pytest.approx(expected_confidence, abs=1e-4)
+        assert results[0][0].match_score == pytest.approx(expected_match_score, abs=1e-4)
 
 
 # ---------------------------------------------------------------------------

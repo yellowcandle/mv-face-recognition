@@ -17,6 +17,8 @@ import json
 import logging
 from pathlib import Path
 
+import yaml
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,19 @@ DEFAULT_CSV = Path("../metadata/contestant_info.csv")
 DEFAULT_EMBEDDINGS_DIR = Path("../source/photo/contestants")
 DEFAULT_METADATA_DIR = Path("../metadata")
 DEFAULT_OUTPUT = Path("../data/coverage.json")
+
+# Anchored on this file, not the cwd: the cutoffs are the pipeline's, and there is one place
+# they are set. scripts/band_cutoffs.py recomputes them from the reference cache.
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "processing_config.yaml"
+
+
+def load_band_cutoffs() -> dict[str, float]:
+    """Band cutoffs from the pipeline config, as {high, medium}."""
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)["face_recognition"]["band_cutoffs"]
+
+
+BAND_CUTOFFS = load_band_cutoffs()
 
 
 def load_contestants(csv_path: Path) -> list[dict]:
@@ -59,16 +74,28 @@ def load_reference_counts(embeddings_dir: Path) -> dict[str, int]:
     return {str(k): int(v) for k, v in manifest.get("references_per_contestant", {}).items()}
 
 
+def is_current_contract(data: dict) -> bool:
+    """Whether a metadata file was written under the box/score contract in CONTEXT.md.
+
+    Files from before it store pixels and a threshold-relative score, so their counts and
+    scores are not comparable with the current ones. They are skipped rather than averaged in,
+    and named in a warning: `local_output/metadata/` legitimately holds both while the batch is
+    being reprocessed.
+    """
+    return "acceptance_threshold" in data.get("recognition_config", {})
+
+
 def aggregate_metadata(metadata_dir: Path) -> dict:
     """
     Aggregate recognition stats across all video metadata files.
 
     Returns:
         Dict mapping contestant nickname -> {
-            detection_count, avg_confidence, max_confidence, videos_seen_in
+            detection_count, match_scores, max_match_score, videos_seen_in
         }
     """
     stats: dict[str, dict] = {}
+    stale: list[str] = []
 
     for meta_file in sorted(metadata_dir.glob("*_metadata.json")):
         # Skip dense metadata files
@@ -82,6 +109,10 @@ def aggregate_metadata(metadata_dir: Path) -> dict:
             logger.warning(f"Skipping {meta_file.name}: {e}")
             continue
 
+        if not is_current_contract(data):
+            stale.append(meta_file.name)
+            continue
+
         video_name = meta_file.stem.replace("_metadata", "")
         timeline = data.get("contestant_timeline", {})
 
@@ -89,39 +120,55 @@ def aggregate_metadata(metadata_dir: Path) -> dict:
             if contestant_key not in stats:
                 stats[contestant_key] = {
                     "detection_count": 0,
-                    "confidences": [],
-                    "max_confidence": 0.0,
+                    "match_scores": [],
+                    "max_match_score": 0.0,
                     "videos_seen_in": [],
                 }
 
             appearances = info.get("total_appearances", 0)
-            avg_conf = info.get("avg_confidence", 0.0)
-            max_conf = info.get("max_confidence", 0.0)
+            # Match scores are raw cosines on every appearance; the mean of a contestant's
+            # scores in this video is what the coverage report averages across videos.
+            scores = [
+                a["match_score"]
+                for a in info.get("appearances", [])
+                if a.get("match_score") is not None
+            ]
 
             stats[contestant_key]["detection_count"] += appearances
-            if avg_conf > 0:
-                stats[contestant_key]["confidences"].append(avg_conf)
-            stats[contestant_key]["max_confidence"] = max(
-                stats[contestant_key]["max_confidence"], max_conf
-            )
+            if scores:
+                stats[contestant_key]["match_scores"].append(sum(scores) / len(scores))
+                stats[contestant_key]["max_match_score"] = max(
+                    stats[contestant_key]["max_match_score"], max(scores)
+                )
             stats[contestant_key]["videos_seen_in"].append(video_name)
 
     # Compute averages
     for key, s in stats.items():
-        confs = s.pop("confidences")
-        s["avg_confidence"] = sum(confs) / len(confs) if confs else 0.0
+        scores = s.pop("match_scores")
+        s["avg_match_score"] = sum(scores) / len(scores) if scores else 0.0
+
+    if stale:
+        logger.warning(
+            f"Skipped {len(stale)} metadata file(s) written before the current box/score "
+            f"contract (pixels, threshold-relative scores): {stale}. Reprocess them."
+        )
 
     return stats
 
 
-def classify_quality(has_embedding: bool, avg_confidence: float, detection_count: int) -> str:
-    """Classify embedding quality as good/weak/missing."""
-    if not has_embedding:
+def classify_quality(has_reference: bool, avg_match_score: float, detection_count: int) -> str:
+    """Classify reference/evidence quality as good/weak/missing.
+
+    `missing` means no usable reference photos. `good` means the evidence is strong: the
+    contestant's mean match score clears the *high* band cutoff — the score above which the
+    leave-one-out sweep observed no impostor pair at all — or they appear often enough to be
+    checked by eye. Everything else with references is `weak`. The cutoffs come from
+    scripts/band_cutoffs.py; they are provisional until ground-truth labels exist.
+    """
+    if not has_reference:
         return "missing"
-    if avg_confidence >= 0.4 or detection_count >= 10:
+    if avg_match_score >= BAND_CUTOFFS["high"] or detection_count >= 10:
         return "good"
-    if avg_confidence >= 0.25 or detection_count >= 3:
-        return "weak"
     return "weak"
 
 
@@ -139,23 +186,25 @@ def generate_coverage(
     good_count = 0
     weak_count = 0
     missing_count = 0
-    total_confidence = 0.0
-    conf_count = 0
+    total_match_score = 0.0
+    score_count = 0
 
     for c in contestants:
         # Reference sets are keyed by contestant number: nicknames are display labels and are
         # not stable (7 of 96 differ by whitespace across sources).
         reference_count = ref_counts.get(c["id"], 0)
 
-        # Look up metadata stats by nickname (primary key in contestant_timeline)
-        m = meta_stats.get(c["nickname"], {
+        # Stats are looked up by contestant number — the key `contestant_timeline` is actually
+        # under. Nicknames are display labels and are not stable (7 of 96 differ by whitespace
+        # across sources), which is why this used to miss every contestant and report zeros.
+        m = meta_stats.get(c["id"], {
             "detection_count": 0,
-            "avg_confidence": 0.0,
-            "max_confidence": 0.0,
+            "avg_match_score": 0.0,
+            "max_match_score": 0.0,
             "videos_seen_in": [],
         })
 
-        quality = classify_quality(reference_count > 0, m["avg_confidence"], m["detection_count"])
+        quality = classify_quality(reference_count > 0, m["avg_match_score"], m["detection_count"])
 
         if quality == "good":
             good_count += 1
@@ -164,9 +213,9 @@ def generate_coverage(
         else:
             missing_count += 1
 
-        if m["avg_confidence"] > 0:
-            total_confidence += m["avg_confidence"]
-            conf_count += 1
+        if m["avg_match_score"] > 0:
+            total_match_score += m["avg_match_score"]
+            score_count += 1
 
         results.append({
             "id": c["id"],
@@ -175,14 +224,15 @@ def generate_coverage(
             "age": c["age"],
             "has_embedding": reference_count > 0,
             "reference_count": reference_count,
-            "avg_confidence": round(m["avg_confidence"], 4),
-            "max_confidence": round(m["max_confidence"], 4),
+            "avg_match_score": round(m["avg_match_score"], 4),
+            "max_match_score": round(m["max_match_score"], 4),
             "detection_count": m["detection_count"],
             "videos_seen_in": len(m["videos_seen_in"]),
             "quality": quality,
         })
 
-    # Recognition rate from all metadata
+    # Recognition rate from all metadata. The pipeline writes these under
+    # `processing_summary`; `recognition_summary` was a name nothing ever produced.
     total_detected = 0
     total_recognized = 0
     for meta_file in metadata_dir.glob("*_metadata.json"):
@@ -191,9 +241,11 @@ def generate_coverage(
         try:
             with open(meta_file, encoding="utf-8") as f:
                 data = json.load(f)
-            rs = data.get("recognition_summary", {})
-            total_detected += rs.get("total_faces_detected", 0)
-            total_recognized += rs.get("total_faces_recognized", 0)
+            if not is_current_contract(data):
+                continue
+            ps = data.get("processing_summary", {})
+            total_detected += ps.get("total_faces_detected", 0)
+            total_recognized += ps.get("total_recognitions", 0)
         except (json.JSONDecodeError, OSError):
             continue
 
@@ -206,7 +258,7 @@ def generate_coverage(
             "good": good_count,
             "weak": weak_count,
             "missing": missing_count,
-            "avg_confidence": round(total_confidence / conf_count, 4) if conf_count > 0 else 0.0,
+            "avg_match_score": round(total_match_score / score_count, 4) if score_count > 0 else 0.0,
             "recognition_rate": round(recognition_rate, 6),
             "total_faces_detected": total_detected,
             "total_faces_recognized": total_recognized,
@@ -234,7 +286,7 @@ def main():
 
     s = coverage["summary"]
     logger.info(f"Coverage: {s['good']} good, {s['weak']} weak, {s['missing']} missing (of {s['total']})")
-    logger.info(f"Avg confidence: {s['avg_confidence']}, Recognition rate: {s['recognition_rate']:.4%}")
+    logger.info(f"Avg match score: {s['avg_match_score']}, Recognition rate: {s['recognition_rate']:.4%}")
     logger.info(f"Written to {args.output}")
 
 

@@ -62,8 +62,8 @@ def load_unmatched_embeddings(unmatched_dir: Path) -> tuple[list[dict], np.ndarr
                     "file": face_info["file"],
                     "frame_number": face_info["frame_number"],
                     "timestamp": face_info["timestamp"],
-                    "location": face_info["location"],
-                    "confidence": face_info["confidence"],
+                    "location": face_info["bbox"],
+                    "confidence": face_info["det_score"],
                 })
                 vectors.append(vec)
             except Exception as e:

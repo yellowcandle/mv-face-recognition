@@ -70,9 +70,17 @@ class MetadataGenerator:
             "frame_data": frame_data,
             "thumbnails": thumbnail_paths,
             "recognition_config": {
-                "tolerance": self.config["face_recognition"]["tolerance"],
-                "min_confidence": 0.5,
                 "detection_model": self.config["face_detection"]["model"],
+                # What actually ran, read from config — not a constant copied from elsewhere.
+                "acceptance_threshold": self.config["face_recognition"][
+                    "acceptance_threshold"
+                ],
+                "band_cutoffs": dict(
+                    self.config["face_recognition"]["band_cutoffs"]
+                ),
+                # Ground-truth labels (ticket 006) re-derive these; until then they are
+                # measured guesses and the metadata says so.
+                "provisional": True,
             },
         }
 
@@ -102,7 +110,7 @@ class MetadataGenerator:
             lambda: {
                 "appearances": [],
                 "total_appearances": 0,
-                "average_confidence": 0.0,
+                "average_match_score": 0.0,
                 "first_appearance": None,
                 "last_appearance": None,
                 "contestant_info": {},
@@ -116,8 +124,8 @@ class MetadataGenerator:
             appearance = {
                 "timestamp": float(recognition.detection.timestamp),
                 "frame_number": int(recognition.detection.frame_number),
-                "confidence": float(recognition.match_confidence),
-                "face_location": [int(x) for x in recognition.detection.location],
+                "match_score": float(recognition.match_score),
+                "bbox": [float(v) for v in recognition.detection.bbox],
             }
 
             if hasattr(recognition.detection, "roi_gated"):
@@ -144,8 +152,8 @@ class MetadataGenerator:
             data["total_appearances"] = len(appearances)
 
             if appearances:
-                confidences = [a["confidence"] for a in appearances]
-                data["average_confidence"] = sum(confidences) / len(confidences)
+                scores = [a["match_score"] for a in appearances]
+                data["average_match_score"] = sum(scores) / len(scores)
 
                 timestamps = [a["timestamp"] for a in appearances]
                 data["first_appearance"] = min(timestamps)
@@ -164,14 +172,14 @@ class MetadataGenerator:
         total_recognitions = len(recognitions)
         unique_contestants = len(set(r.contestant_id for r in recognitions))
 
-        # Calculate confidence distribution
+        # Calculate match-score distribution (raw cosines)
         if recognitions:
-            confidences = [r.match_confidence for r in recognitions]
-            avg_confidence = sum(confidences) / len(confidences)
-            min_confidence = min(confidences)
-            max_confidence = max(confidences)
+            match_scores = [r.match_score for r in recognitions]
+            avg_match_score = sum(match_scores) / len(match_scores)
+            min_match_score = min(match_scores)
+            max_match_score = max(match_scores)
         else:
-            avg_confidence = min_confidence = max_confidence = 0.0
+            avg_match_score = min_match_score = max_match_score = 0.0
 
         # Recognition rate
         recognition_rate = (
@@ -184,10 +192,10 @@ class MetadataGenerator:
             "total_recognitions": total_recognitions,
             "unique_contestants": unique_contestants,
             "recognition_rate": recognition_rate,
-            "confidence_stats": {
-                "average": avg_confidence,
-                "minimum": min_confidence,
-                "maximum": max_confidence,
+            "match_score_stats": {
+                "average": avg_match_score,
+                "minimum": min_match_score,
+                "maximum": max_match_score,
             },
             "processing_timestamp": datetime.now().isoformat(),
         }
@@ -219,8 +227,8 @@ class MetadataGenerator:
                 "end_time": end_time,
                 "contestants": contestants,
                 "recognition_count": len(interval_recognitions),
-                "average_confidence": sum(
-                    r.match_confidence for r in interval_recognitions
+                "average_match_score": sum(
+                    r.match_score for r in interval_recognitions
                 )
                 / len(interval_recognitions),
             }
@@ -260,8 +268,8 @@ class MetadataGenerator:
             if len(galleries[contestant_id]["face_samples"]) < 10:
                 face_sample = {
                     "timestamp": float(recognition.detection.timestamp),
-                    "confidence": float(recognition.match_confidence),
-                    "face_location": [int(x) for x in recognition.detection.location],
+                    "match_score": float(recognition.match_score),
+                    "bbox": [float(v) for v in recognition.detection.bbox],
                     "frame_number": int(recognition.detection.frame_number),
                 }
                 galleries[contestant_id]["face_samples"].append(face_sample)
@@ -272,14 +280,14 @@ class MetadataGenerator:
                 r for r in recognitions if r.contestant_id == contestant_id
             ]
 
-            confidences = [r.match_confidence for r in contestant_recognitions]
+            match_scores = [r.match_score for r in contestant_recognitions]
             timestamps = [r.detection.timestamp for r in contestant_recognitions]
 
             gallery["statistics"] = {
                 "total_appearances": len(contestant_recognitions),
-                "average_confidence": sum(confidences) / len(confidences),
-                "max_confidence": max(confidences),
-                "min_confidence": min(confidences),
+                "average_match_score": sum(match_scores) / len(match_scores),
+                "max_match_score": max(match_scores),
+                "min_match_score": min(match_scores),
                 "first_appearance": min(timestamps),
                 "last_appearance": max(timestamps),
                 "screen_time_percentage": self._calculate_screen_time_percentage(
@@ -290,8 +298,8 @@ class MetadataGenerator:
                 ),
             }
 
-            # Sort face samples by confidence (best first)
-            gallery["face_samples"].sort(key=lambda x: x["confidence"], reverse=True)
+            # Sort face samples by match score (best first)
+            gallery["face_samples"].sort(key=lambda x: x["match_score"], reverse=True)
 
         gallery_metadata = {
             "video_name": output_name,
@@ -361,8 +369,8 @@ class MetadataGenerator:
 - Unique contestants identified: {summary["unique_contestants"]}
 
 ## Confidence Statistics
-- Average confidence: {summary["confidence_stats"]["average"]:.3f}
-- Range: {summary["confidence_stats"]["minimum"]:.3f} - {summary["confidence_stats"]["maximum"]:.3f}
+- Average match score: {summary["match_score_stats"]["average"]:.3f}
+- Range: {summary["match_score_stats"]["minimum"]:.3f} - {summary["match_score_stats"]["maximum"]:.3f}
 
 ## Top Contestants (by appearances)
 """
@@ -375,6 +383,6 @@ class MetadataGenerator:
         for contestant_id, data in sorted_contestants[:10]:  # Top 10
             info = data["contestant_info"]
             report += f"- {info['nickname']} ({info['name']}): {data['total_appearances']} appearances "
-            report += f"(avg confidence: {data['average_confidence']:.3f})\\n"
+            report += f"(avg match score: {data['average_match_score']:.3f})\\n"
 
         return report

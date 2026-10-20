@@ -319,21 +319,27 @@ class VideoProcessor:
 
         detections = face_detector.detect_faces(roi_region, timestamp, frame_number)
 
+        # detect_faces reports fractions of the ROI crop; re-express them against the whole
+        # frame, which is what every stored box is measured in.
+        frame_height, frame_width = frame.shape[:2]
+        roi_width = roi.x2 - roi.x1
+        roi_height = roi.y2 - roi.y1
+
         adjusted_detections = []
         for detection in detections:
-            top, right, bottom, left = detection.location
-
-            full_top = top + roi.y1
-            full_right = right + roi.x1
-            full_bottom = bottom + roi.y1
-            full_left = left + roi.x1
+            x1, y1, x2, y2 = detection.bbox
 
             adjusted_detection = FaceDetection(
-                location=(full_top, full_right, full_bottom, full_left),
+                bbox=(
+                    (roi.x1 + x1 * roi_width) / frame_width,
+                    (roi.y1 + y1 * roi_height) / frame_height,
+                    (roi.x1 + x2 * roi_width) / frame_width,
+                    (roi.y1 + y2 * roi_height) / frame_height,
+                ),
                 encoding=detection.encoding,
                 timestamp=detection.timestamp,
                 frame_number=detection.frame_number,
-                confidence=detection.confidence,
+                det_score=detection.det_score,
             )
             adjusted_detections.append(adjusted_detection)
 

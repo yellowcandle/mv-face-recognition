@@ -21,21 +21,28 @@ video:
 face_detection:
   model: "insightface"  # Use InsightFace buffalo_l model
   model_path: "../models/buffalo_l"
-  min_confidence: 0.6
   max_faces_per_frame: 10
   min_face_size: 20  # Minimum face size in pixels (optimization)
   enable_hardware_acceleration: true  # Auto-detect Apple Silicon/CUDA
   enable_frame_similarity_skip: false  # Skip detection on very similar frames (experimental)
   
-# Face Recognition with ChromaDB Integration
+# Face Recognition — matching is max cosine over per-photo reference embeddings.
+# Scores are raw cosines throughout: higher = more similar, never rescaled.
 face_recognition:
-  similarity_threshold: 0.7  # Confidence threshold
-  tolerance: 0.55  # Cosine DISTANCE (1 - cosine similarity), so this accepts above 0.45 cosine. Lower = stricter. Provisional until ground truth exists.
-  max_distance: 0.55  # Maximum cosine distance for recognition
-  high_confidence_threshold: 0.85  # Early termination threshold (optimization)
+  # Lowest raw cosine that counts as a recognition. Same direction as the match score, so a
+  # higher value is stricter. 0.45 sits on the measured 1% false-match boundary (leave-one-out
+  # over the 663-reference cache: the 7 highest impostor scores are 0.5846, 0.5846, 0.5014,
+  # 0.4616, 0.4616, 0.4509, 0.4509 — 7 of 663 = 1.06%). Provisional until ground-truth labels
+  # exist — see scripts/band_cutoffs.py to recompute.
+  acceptance_threshold: 0.45
+  # Display bands, from the same sweep. `high` clears every impostor pair observed; `medium` is
+  # the 1% boundary. Two cutoffs, so three bands, and `low` also covers an unmatched detection,
+  # which has no score at all.
+  band_cutoffs:
+    high: 0.585
+    medium: 0.451
   use_existing_embeddings: true
   enable_interpolation: true  # Linear interpolation between detections
-  confidence_decay: 0.95  # For interpolated frames
   enable_batch_processing: true  # Batch process multiple frames (optimization)
 
 # Contestant Database (Critical Files)
@@ -98,13 +105,6 @@ integration:
   use_external_scripts: true  # Use Node.js upload scripts
   scripts_dir: "../scripts"
   auto_deploy_worker: false  # Manual deployment step
-
-# Annotated Video Output (bounding boxes + labels)
-annotated_video:
-  label_font_scale: 0.6
-  box_color: [0, 255, 0]  # BGR green
-  box_thickness: 2
-  quality: "high"  # low, medium, high (bitrate)
 
 # Audio Preservation (FFmpeg Integration)
 audio:

@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import logging
+import os
 import threading
 from dataclasses import dataclass, field
 import pandas as pd
@@ -31,7 +32,8 @@ def _get_insightface_app():
     with _insightface_lock:
         if _insightface_app is None:
             from insightface.app import FaceAnalysis
-            providers = ['CoreMLExecutionProvider', 'CPUExecutionProvider']
+            # ponytail: env override so a run can skip CoreML (per-shape compile fails on video frames)
+            providers = os.environ.get('INSIGHTFACE_PROVIDERS', 'CoreMLExecutionProvider,CPUExecutionProvider').split(',')
             app = FaceAnalysis(name='buffalo_l', providers=providers)
             app.prepare(ctx_id=0, det_size=(640, 640))
             _insightface_app = app
@@ -41,13 +43,20 @@ def _get_insightface_app():
 
 @dataclass
 class FaceDetection:
-    """Represents a detected face in a frame"""
+    """Represents a detected face in a frame.
 
-    location: Tuple[int, int, int, int]  # (top, right, bottom, left)
+    `bbox` is in **frame fractions** — a proportion of the frame's width/height in the range
+    0–1, canonical `[x1, y1, x2, y2]` order. InsightFace's native pixel box is converted once,
+    here, where the frame's dimensions are known; nothing downstream scales it again, so the
+    same box is correct against the source, the 1080p and the 720p rendition alike. See
+    docs/adr/0002-face-boxes-are-frame-fractions.md.
+    """
+
+    bbox: Tuple[float, float, float, float]  # [x1, y1, x2, y2] frame fractions
     encoding: np.ndarray
     timestamp: float
     frame_number: int
-    confidence: float = 0.0
+    det_score: float = 0.0  # the detector's own face confidence, not a match score
 
 
 @dataclass
@@ -58,7 +67,7 @@ class FaceRecognition:
     contestant_id: str
     contestant_name: str
     contestant_nickname: str
-    match_confidence: float
+    match_score: float  # raw cosine against the best reference; higher = more similar
 
 
 class ContestantDatabase:
@@ -188,7 +197,6 @@ class FaceDetector:
 
     def __init__(self, config: dict):
         self.config = config
-        self.min_confidence = config["face_detection"]["min_confidence"]
         self.min_face_size = config["face_detection"].get("min_face_size", 20)  # Minimum face size in pixels
         self.prev_frame_hash = None  # For frame difference detection
 
@@ -213,6 +221,11 @@ class FaceDetector:
             if not faces:
                 return []
 
+            frame_height, frame_width = frame.shape[:2]
+            if frame_height <= 0 or frame_width <= 0:
+                logger.error(f"Frame {frame_number} has zero extent; skipping detection")
+                return []
+
             detections = []
             for face in faces:
                 x1, y1, x2, y2 = face.bbox.astype(int)
@@ -226,15 +239,28 @@ class FaceDetector:
                     )
                     continue
 
-                # Map InsightFace bbox [x1, y1, x2, y2] to (top, right, bottom, left)
-                top, right, bottom, left = y1, x2, y2, x1
+                # InsightFace reports pixels, and its boxes can extend past the frame edge (a
+                # face entering or leaving). Convert once to frame fractions and clamp: a
+                # fraction is a proportion of the frame in 0–1 (CONTEXT.md), and nothing can
+                # render the part of a box that is not in the picture anyway. A box that clamps
+                # away to nothing was not visible, so it is not a detection.
+                fx1 = min(max(x1 / frame_width, 0.0), 1.0)
+                fy1 = min(max(y1 / frame_height, 0.0), 1.0)
+                fx2 = min(max(x2 / frame_width, 0.0), 1.0)
+                fy2 = min(max(y2 / frame_height, 0.0), 1.0)
+                if fx2 <= fx1 or fy2 <= fy1:
+                    logger.debug(
+                        f"Skipped face outside the frame at frame {frame_number} "
+                        f"(pixels {x1},{y1},{x2},{y2})"
+                    )
+                    continue
 
                 detection = FaceDetection(
-                    location=(top, right, bottom, left),
+                    bbox=(fx1, fy1, fx2, fy2),
                     encoding=face.normed_embedding,
                     timestamp=timestamp,
                     frame_number=frame_number,
-                    confidence=float(face.det_score),
+                    det_score=float(face.det_score),
                 )
                 detections.append(detection)
 
@@ -282,9 +308,9 @@ class FaceRecognizer:
     def __init__(self, config: dict, contestant_db: ContestantDatabase):
         self.config = config
         self.contestant_db = contestant_db
-        self.tolerance = config["face_recognition"]["tolerance"]
-        self.max_distance = config["face_recognition"]["max_distance"]
-        self.high_confidence_threshold = config["face_recognition"].get("high_confidence_threshold", 0.85)  # Early termination threshold
+        # Lowest raw cosine that counts as a recognition. Same direction as the match score, so
+        # a higher threshold is stricter. See CONTEXT.md — "acceptance threshold".
+        self.acceptance_threshold = config["face_recognition"]["acceptance_threshold"]
 
     def recognize_faces(self, detections: List[FaceDetection]) -> List[FaceRecognition]:
         """
@@ -323,31 +349,34 @@ class FaceRecognizer:
                 min_distance = best_distance
                 matched_index = best_match_idx
 
-                if min_distance < self.tolerance:
+                # Both vectors are L2-normalized, so the raw cosine *is* 1 - distance. Store that,
+                # never a rescaled value: a score that moves whenever the threshold moves is not
+                # comparable between runs.
+                match_score = 1 - min_distance
+
+                if match_score > self.acceptance_threshold:
                     contestant_id = known_names[matched_index]
                     contestant_info = self.contestant_db.get_contestant_info(
                         contestant_id
                     )
-
-                    # Convert distance to confidence (lower distance = higher confidence)
-                    confidence = 1 - (min_distance / self.tolerance)
 
                     recognition = FaceRecognition(
                         detection=detection,
                         contestant_id=contestant_id,
                         contestant_name=contestant_info.get("name", "Unknown"),
                         contestant_nickname=contestant_info.get("nickname", "Unknown"),
-                        match_confidence=confidence,
+                        match_score=match_score,
                     )
                     recognitions.append(recognition)
 
                     logger.debug(
                         f"Recognized {recognition.contestant_nickname} "
-                        f"(confidence: {confidence:.3f}, distance: {min_distance:.3f})"
+                        f"(match_score: {match_score:.3f})"
                     )
                 else:
                     logger.debug(
-                        f"No match for face at {detection.timestamp:.2f}s (min_distance: {min_distance:.3f})"
+                        f"No match for face at {detection.timestamp:.2f}s "
+                        f"(best match_score: {match_score:.3f})"
                     )
 
             except Exception as e:
@@ -398,22 +427,21 @@ class FaceRecognizer:
                 try:
                     det_distances = distances[det_idx]
                     min_distance = np.min(det_distances)
+                    match_score = 1 - min_distance
 
-                    if min_distance < self.tolerance:
+                    if match_score > self.acceptance_threshold:
                         matched_index = np.argmin(det_distances)
                         contestant_id = known_names[matched_index]
                         contestant_info = self.contestant_db.get_contestant_info(
                             contestant_id
                         )
 
-                        confidence = 1 - (min_distance / self.tolerance)
-
                         recognition = FaceRecognition(
                             detection=detection,
                             contestant_id=contestant_id,
                             contestant_name=contestant_info.get("name", "Unknown"),
                             contestant_nickname=contestant_info.get("nickname", "Unknown"),
-                            match_confidence=confidence,
+                            match_score=match_score,
                         )
                         frame_recognitions.append(recognition)
 
@@ -424,15 +452,4 @@ class FaceRecognizer:
 
         logger.debug(f"Batch recognition: processed {len(detections_batch)} frames")
         return results
-
-    def filter_recognitions(
-        self, recognitions: List[FaceRecognition], min_confidence: float = 0.5
-    ) -> List[FaceRecognition]:
-        """Filter recognitions by confidence threshold"""
-        filtered = [r for r in recognitions if r.match_confidence >= min_confidence]
-        logger.info(
-            f"Filtered {len(recognitions)} recognitions to {len(filtered)} "
-            f"(min_confidence: {min_confidence})"
-        )
-        return filtered
 
