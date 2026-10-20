@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { FrameData, VideoMetadata } from '../types';
+import type { FaceDetection, FrameData, VideoMetadata } from '../types';
 
 export function useViewerMetadata(apiBase: string, videoId: string | null) {
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
@@ -12,7 +12,7 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
     setLoading(true);
     setError(null);
 
-    fetch(`${apiBase}/api/videos/metadata/dense/${videoId}`)
+    fetch(`${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`)
       .then(r => {
         if (!r.ok) throw new Error(`Failed to load metadata: ${r.status}`);
         return r.json();
@@ -55,24 +55,23 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
     return result >= 0 ? sortedFrames[result] : null;
   }, [sortedFrames, timestamps]);
 
-  // Convert frame recognitions to FaceDetection format for FaceOverlay
-  const getFacesAtTime = useCallback((time: number) => {
+  // Stored detections already carry the served shape: frame-fraction bbox, raw cosine
+  // match_score (null when unmatched), det_score, ids. Pass them through — no reorder,
+  // no rescale, no duplication of one score under three names.
+  const getFacesAtTime = useCallback((time: number): FaceDetection[] => {
     const frame = getFrameAtTime(time);
-    if (!frame || !frame.recognitions) return [];
+    if (!frame?.detections) return [];
 
-    return frame.recognitions.map(r => {
-      const [top, right, bottom, left] = r.face_location;
-      return {
-        bbox: [left, top, right, bottom] as [number, number, number, number],
-        confidence: r.confidence,
-        contestant_name: r.contestant_nickname || r.contestant_name,
-        contestant_id: r.contestant_id,
-        contestant_nickname: r.contestant_nickname,
-        detection_confidence: r.confidence,
-        recognition_confidence: r.confidence,
-        matched: true,
-      };
-    });
+    return frame.detections.map(d => ({
+      bbox: d.bbox,
+      match_score: d.match_score,
+      det_score: d.det_score,
+      contestant_id: d.contestant_id,
+      contestant_name: d.contestant_name,
+      contestant_nickname: d.contestant_nickname,
+      tracker_id: d.tracker_id,
+      matched: d.contestant_id != null,
+    }));
   }, [getFrameAtTime]);
 
   // Stable identity so consumers can safely use the result in effect deps
