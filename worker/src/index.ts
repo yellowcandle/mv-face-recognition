@@ -36,6 +36,12 @@ interface Contestant {
   has_photos: boolean;
   has_embedding: boolean;
   reference_count: number;
+  /**
+   * Public crop of the contestant's face, served from R2 (`portraits/{id}.webp`).
+   * Absent when no portrait has been published — the viewer shows its 缺相 state
+   * rather than falling back to the Instagram originals, which are never served.
+   */
+  portrait_url?: string;
 }
 
 /**
@@ -73,7 +79,13 @@ interface WebSocketMessageData {
 
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch (error) {
+      logger.error('Malformed request URL', { message: (error as Error).message });
+      return new Response('Bad request', { status: 400 });
+    }
     const { pathname } = url;
 
     logger.info(`${request.method} ${pathname}`, {
@@ -81,9 +93,18 @@ export default {
       timestamp: new Date().toISOString()
     });
 
-    // CORS headers for all responses
+    // CORS headers for all responses.
+    // The Worker is read-only and serves public data (ADR 0003), so it carries no
+    // credentials and no per-user state; the origin is still restricted to the
+    // configured ALLOWED_ORIGINS so a browser on an unrelated site cannot read it.
+    const origin = request.headers.get('Origin');
+    const allowed = (env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
     const corsHeaders: CorsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin':
+        origin && allowed.includes(origin) ? origin : allowed.length ? '' : '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
@@ -432,7 +453,31 @@ const fallbackVideos: VideoData[] = [
 async function handleApiRequest(pathname: string, request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
   const path = pathname.replace('/api', '');
 
-  switch (path) {
+    // Public face crop for the cast sheet: /api/contestants/{id}/thumb/face
+    // The object is immutable (content-addressed by the publish step), so it is
+    // safe to cache hard at the edge. Handled before the switch: it is a
+    // distinct resource, not another case of the same shape.
+    const portrait = path.match(/^\/contestants\/(\d+)\/thumb\/(face|320|640)$/);
+    if (portrait) {
+      const key = `portraits/${portrait[1]}.webp`;
+      const object = await env.VIDEOS_BUCKET.get(key);
+      if (!object) {
+        return new Response('Portrait not found', {
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
+      return new Response(object.body, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'image/webp',
+          'Content-Length': String(object.size),
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+
+    switch (path) {
     case '/system/status/':
     case '/system/status':
       return new Response(JSON.stringify({
@@ -450,10 +495,12 @@ async function handleApiRequest(pathname: string, request: Request, env: Env, co
     case '/contestants/':
     case '/videos/contestants':
     case '/videos/contestants/':
-      const contestants = await env.METADATA_KV?.get('contestants_structured');
-      return new Response(contestants || JSON.stringify(allContestants), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      {
+        const contestants = await env.METADATA_KV?.get('contestants_structured');
+        return new Response(contestants || JSON.stringify(allContestants), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
     case '/videos':
     case '/videos/':
@@ -521,11 +568,26 @@ async function handleVideosEndpoint(env: Env, corsHeaders: CorsHeaders): Promise
   
   if (videoMetadataCollection) {
     logger.debug('Creating optimized response from full metadata collection');
-    const parsedData = JSON.parse(videoMetadataCollection) as Record<string, {
+    let parsedData: Record<string, {
       video_info?: unknown;
       processing_date?: string;
       recognition_summary?: unknown;
     }>;
+    try {
+      parsedData = JSON.parse(videoMetadataCollection) as Record<string, {
+        video_info?: unknown;
+        processing_date?: string;
+        recognition_summary?: unknown;
+      }>;
+    } catch (error) {
+      logger.error('Malformed video metadata collection in KV', {
+        message: (error as Error).message,
+      });
+      return new Response(JSON.stringify({ error: 'metadata unavailable' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     const optimizedVideos: Record<string, unknown> = {};
     for (const [videoId, videoData] of Object.entries(parsedData)) {
@@ -619,7 +681,16 @@ async function handleProcessedVideosEndpoint(env: Env, corsHeaders: CorsHeaders)
 
 
 async function handleFaceDetection(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
-  const url = new URL(request.url);
+  let url: URL;
+  try {
+    url = new URL(request.url);
+  } catch (error) {
+    logger.error('Malformed request URL', { message: (error as Error).message });
+    return new Response(JSON.stringify({ error: 'malformed request url' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
   const videoId = url.searchParams.get('video_id');
   const timestamp = parseFloat(url.searchParams.get('timestamp') || '0');
 
@@ -636,7 +707,7 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
   const denseMetadata = await env.METADATA_KV.get(`metadata_dense_${metadataKey}`);
 
   if (denseMetadata) {
-    const parsed = JSON.parse(denseMetadata) as {
+    let parsed: {
       frame_data?: Array<{
         timestamp: number;
         frame_number?: number;
@@ -654,6 +725,18 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
         }>;
       }>;
     };
+    try {
+      parsed = JSON.parse(denseMetadata) as typeof parsed;
+    } catch (error) {
+      logger.error('Malformed dense metadata in KV', {
+        message: (error as Error).message,
+        videoId: metadataKey,
+      });
+      return new Response(JSON.stringify({ error: 'metadata unavailable' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Floor match: most recent frame at or before the timestamp, so boxes
     // never appear ahead of the face (same convention as local_api.py).
@@ -702,7 +785,16 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
 }
 
 async function handleRecognitionResults(request: Request, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
-  const url = new URL(request.url);
+  let url: URL;
+  try {
+    url = new URL(request.url);
+  } catch (error) {
+    logger.error('Malformed request URL', { message: (error as Error).message });
+    return new Response(JSON.stringify({ error: 'malformed request url' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
   const videoIdFilter = url.searchParams.get('video_id');
   const contestantIdFilter = url.searchParams.get('contestant_id');
   
