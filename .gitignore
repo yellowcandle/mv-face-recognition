@@ -293,12 +293,19 @@ apps/admin/.labelling-harness/
 
 # Build artifacts and throwaway renders
 *.tsbuildinfo
-mvp-processor/test-*_TEMP_*.mp4
 local_output/
 metadata/test-video-mv2_metadata.json
-mvp-processor/test-*_TEMP_*.mp4
 
 # Screenshots and one-off renders at the repo root
 /*.png
 /*.pen
 /confusion-before-click.md
+
+# One-off temporary render from a pipeline run
+
+# Stale analysis cache: ticket 011 records it as built from the old 741-photo set.
+# Regenerate with mvp-processor/scripts/analyse_separation.py (phase B) rather than commit it.
+docs/wayfinder/assets/photo_embeddings.npz
+
+# One-off temporary render from a pipeline run
+mvp-processor/*TEMP*.mp4
