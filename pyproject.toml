@@ -132,11 +132,20 @@ module = [
     "numpy.*",
     "pandas.*",
     "yt_dlp.*",
+    "moto.*",
+    "yaml.*",
     # mvp-processor/src siblings import each other as top-level modules; they only
     # resolve when mypy runs from that directory.
     "face_detector",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Test support code (fixtures, moto/yaml shims). Quarantined per the refactor plan's
+# Workstream F: the module is exercised by pytest, and its third-party shims produce
+# checker noise that says nothing about product code.
+module = ["conftest", "tests.conftest", "unit.conftest", "contract.conftest"]
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 # Tests: none of the 30 test files annotate, and `-> None` on every test_* adds
@@ -156,6 +165,11 @@ module = [
     "performance.*",
     "benchmark.*",
     "validation.*",
+    # conftest modules are named bare or with the tests prefix depending on invocation.
+    "conftest",
+    "tests.conftest",
+    "unit.conftest",
+    "contract.conftest",
     # These test files sit outside a package, so mypy names them as bare modules when
     # invoked from inside their directory.
     "test_security",
