@@ -509,6 +509,7 @@ def main() -> int:
     videos = []
     payloads: dict[str, dict[str, Any]] = {}
     chosen: dict[str, str] = {}
+    video_ids: dict[str, str] = {}
     for vid, candidates in sorted(sources.items(), key=lambda kv: int(kv[0])):
         # Pick the candidate that actually recognises the most faces. With one file per
         # reel this is a no-op, but it kept the richer generation while both existed.
@@ -551,18 +552,12 @@ def main() -> int:
             f"{with_match:>4} matched detections, {len(payload['contestant_timeline']):>2} contestants "
             f"[{src}] from {os.path.basename(best_path)[:34]}"
         )
-        out = os.path.join(STAGE, f"metadata_dense_{vid}.json")
-        try:
-            with open(out, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
-        except OSError as exc:
-            sys.exit(f"cannot write {out}: {exc}")
-        size = os.path.getsize(out)
-        if size > 24 * 1024 * 1024:
-            sys.exit(f"{out} is {size / 1e6:.1f} MB, over the 25 MiB KV value limit")
-
         info = payload["video_info"]
         stem = os.path.splitext(str(info.get("filename") or f"{vid}-video.mp4"))[0]
+        # Ticket 007 Q1: the KV key is the full video id the list serves, not the
+        # numeric 編號 — a wrong prefix can no longer serve another reel's metadata.
+        video_id = f"{vid}-{stem.split('-', 1)[-1]}"
+        video_ids[vid] = video_id
         # Ticket 007 Q5: `stream_url` must name the same object `scripts/upload-to-r2.js`
         # writes. Use the 1080p encode when the pipeline produced one; a reel with no
         # local encode keeps its source filename (its R2 object predates the rule).
@@ -574,15 +569,34 @@ def main() -> int:
             )
             else f"{stem}.mp4"
         )
+        out = os.path.join(STAGE, f"metadata_{video_id}.json")
+        try:
+            with open(out, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        except OSError as exc:
+            sys.exit(f"cannot write {out}: {exc}")
+        size = os.path.getsize(out)
+        if size > 24 * 1024 * 1024:
+            sys.exit(f"{out} is {size / 1e6:.1f} MB, over the 25 MiB KV value limit")
+
         videos.append(
             {
-                "id": f"{vid}-{stem.split('-', 1)[-1]}",
+                "id": video_id,
                 "name": stem,
                 "filename": published,
                 "stream_url": f"/videos/processed_videos/{published}",
                 "has_metadata": True,
             }
         )
+
+    # Drop staged metadata from earlier keys/runs so the directory mirrors what KV gets.
+    expected = {f"metadata_{video_id}.json" for video_id in video_ids.values()}
+    for stale in glob.glob(os.path.join(STAGE, "metadata_*.json")):
+        if os.path.basename(stale) not in expected:
+            try:
+                os.remove(stale)
+            except OSError:
+                pass
 
     list_path = os.path.join(STAGE, "processed_videos_list.json")
     try:
@@ -616,12 +630,13 @@ def main() -> int:
         return 0
 
     for vid in sorted(chosen, key=int):
-        staged = os.path.join(STAGE, f"metadata_dense_{vid}.json")
+        video_id = video_ids[vid]
+        staged = os.path.join(STAGE, f"metadata_{video_id}.json")
         if not wrangler(
             "kv",
             "key",
             "put",
-            f"metadata_dense_{vid}",
+            f"metadata_{video_id}",
             "--path",
             staged,
             "--binding",
@@ -629,7 +644,7 @@ def main() -> int:
             "--remote",
         ):
             return 1
-        print(f"  put metadata_dense_{vid}")
+        print(f"  put metadata_{video_id}")
     if not wrangler(
         "kv",
         "key",

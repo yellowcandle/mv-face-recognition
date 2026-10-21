@@ -9,7 +9,7 @@
 
 | Target | Key | Written by | Read by |
 | --- | --- | --- | --- |
-| KV | `metadata_dense_<編號>` | `scripts/publish` | `/api/videos/metadata/dense/*` |
+| KV | `metadata_<video_id>` (full id, e.g. `4-《全民造星IV》極限拍MV`) | `scripts/publish` | `/api/videos/metadata/dense/*` |
 | KV | `contestants_structured` | `scripts/publish` | `/api/contestants` |
 | KV | `processed_videos_list` | `scripts/publish` | `/api/videos/processed/list` |
 | R2 | `processed_videos/<stem>_1080p.mp4`, `_720p.mp4` | `scripts/upload-to-r2.js` | `/videos/*` |
@@ -46,6 +46,11 @@ npm run deploy           # cd worker && wrangler deploy
 
 `npm run setup` runs 1 → 2(remote) → 3. Steps 2 and 3 are independent of step 4 and can be
 re-run whenever metadata or encodes change.
+
+Keys are the full video id (`metadata_4-《全民造星IV》極限拍MV`), the same string
+`processed_videos_list` serves; a missing key returns 404 naming it. Publishing after an
+older deploy leaves `metadata_dense_*` entries behind — delete them with
+`npx wrangler kv key delete <key> --binding METADATA_KV --remote` once the new keys are live.
 
 ## Verify a deploy
 

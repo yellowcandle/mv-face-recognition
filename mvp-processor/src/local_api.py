@@ -121,10 +121,10 @@ def _load_json_cached(path: Path) -> dict:
 def _metadata_path(video_id: str) -> Path:
     """Exact `<id>_metadata.json`; a bare digits id also resolves the full stem.
 
-    The published contract keys `metadata_dense_*` by numeric 編號 ("4"), while the
-    local files carry their verbatim stem ("4-《全民造星IV》…"), so the locally
-    served API accepts both forms. Only digit ids are glob-resolved, so nothing else
-    becomes a pattern.
+    The published contract keys `metadata_<video_id>` by the id `processed_videos_list`
+    serves ("4-極限拍MV"), while the local files carry their verbatim stem
+    ("4-《全民造星IV》…"), so the locally served API accepts both forms. Only digit ids
+    are glob-resolved, so nothing else becomes a pattern.
     """
     exact = _safe_child(METADATA_DIR, f"{video_id}_metadata.json")
     if exact.exists():

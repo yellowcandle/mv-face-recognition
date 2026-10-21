@@ -33,16 +33,17 @@ export function Analytics() {
   const [sortBy, setSortBy] = useState<'appearances' | 'avgMatchScore'>('appearances');
 
   const videoId = selectedVideoId || videos[0]?.id || '';
-  const numericId = videoId.match(/^(\d+)/)?.[1] || videoId;
 
   const { data: metadata, isLoading } = useQuery<VideoMetadata>({
-    queryKey: ['video-metadata', numericId],
+    queryKey: ['video-metadata', videoId],
     queryFn: async () => {
-      const res = await fetch(`/api/videos/metadata/dense/${numericId}`);
+      const res = await fetch(
+        `/api/videos/metadata/dense/${encodeURIComponent(videoId)}`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled: !!numericId,
+    enabled: !!videoId,
     staleTime: 5 * 60 * 1000,
   });
 

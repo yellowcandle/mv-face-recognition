@@ -153,5 +153,12 @@ so the old `require` version could not run at all), reads `local_output/processe
 uploads only `_1080p` / `_720p` under `processed_videos/`; `--dry-run` lists eight encodes.
 `stream_url` in the published list now names that same object: `/videos/processed_videos/<stem>_1080p.mp4`
 (reels 1–3), falling back to the source filename for reels 4–5, which have no local encode.
-The KV key scheme remains `metadata_dense_<編號>` in code; moving to full ids is still the
-ticket's open question.
+**Q1 executed 2026-10-22.** KV keys are now `metadata_<full video id>` — the same string
+`processed_videos_list` serves. The numeric-prefix extraction is gone from
+`handleDenseMetadata`, `handleVideoMetadata`, `handleFaceDetection` and the
+recognition-results scan (which now lists the `metadata_` prefix). The mocked dense/basic
+metadata fallbacks and the dead `video_metadata_dense_*` read are deleted: a miss returns 404
+naming the key. `worker/tests/metadata-keys.test.mjs` pins the key for all three routes
+(6/6 node:test pass). The orphaned `worker/tests/api.test.js` is deleted — it was never
+executed (`npm test` runs `node --test tests/*.test.mjs`, and vitest is not a dependency).
+The viewer's Analytics now requests the list's id instead of stripping digits.

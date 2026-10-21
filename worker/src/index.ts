@@ -598,15 +598,14 @@ async function handleVideosEndpoint(env: Env, corsHeaders: CorsHeaders): Promise
     
     const optimizedVideos: Record<string, unknown> = {};
     for (const [videoId, videoData] of Object.entries(parsedData)) {
-      const numericMatch = videoId.match(/^(\d+)/);
       optimizedVideos[videoId] = {
         video_info: videoData.video_info,
         processing_date: videoData.processing_date,
         recognition_summary: videoData.recognition_summary,
         has_detailed_metadata: true,
         metadata_endpoints: {
-          basic: `/api/videos/metadata/${numericMatch ? numericMatch[0] : videoId}`,
-          detailed: `/api/videos/metadata/dense/${numericMatch ? numericMatch[0] : videoId}`
+          basic: `/api/videos/metadata/${encodeURIComponent(videoId)}`,
+          detailed: `/api/videos/metadata/dense/${encodeURIComponent(videoId)}`
         }
       };
     }
@@ -708,10 +707,8 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
     });
   }
 
-  // Pipeline metadata is keyed by numeric prefix in KV (e.g. "5-《...》" → "5")
-  const numericMatch = videoId.match(/^(\d+)-/);
-  const metadataKey = numericMatch ? numericMatch[1] : videoId;
-  const denseMetadata = await env.METADATA_KV.get(`metadata_dense_${metadataKey}`);
+  // Ticket 007 Q1: keys are full video ids.
+  const denseMetadata = await env.METADATA_KV.get(`metadata_${videoId}`);
 
   if (denseMetadata) {
     let parsed: {
@@ -737,7 +734,7 @@ async function handleFaceDetection(request: Request, env: Env, corsHeaders: Cors
     } catch (error) {
       logger.error('Malformed dense metadata in KV', {
         message: (error as Error).message,
-        videoId: metadataKey,
+        videoId,
       });
       return new Response(JSON.stringify({ error: 'metadata unavailable' }), {
         status: 500,
@@ -812,13 +809,12 @@ async function handleRecognitionResults(request: Request, env: Env, corsHeaders:
     });
   }
 
-  // Pipeline metadata in KV is keyed by numeric prefix (e.g. "5-《...》" → "5")
+  // Ticket 007 Q1: keys are full video ids.
   let metadataKeys: string[];
   if (videoIdFilter) {
-    const numericMatch = videoIdFilter.match(/^(\d+)-/);
-    metadataKeys = [`metadata_dense_${numericMatch ? numericMatch[1] : videoIdFilter}`];
+    metadataKeys = [`metadata_${videoIdFilter}`];
   } else {
-    const listing = await env.METADATA_KV.list({ prefix: 'metadata_dense_' });
+    const listing = await env.METADATA_KV.list({ prefix: 'metadata_' });
     metadataKeys = listing.keys.map(k => k.name);
   }
 
@@ -834,7 +830,7 @@ async function handleRecognitionResults(request: Request, env: Env, corsHeaders:
       };
       const entry = parsed.contestant_timeline?.[contestantIdFilter];
       if (!entry?.appearances) continue;
-      const videoId = videoIdFilter || key.replace('metadata_dense_', '');
+      const videoId = videoIdFilter || key.replace('metadata_', '');
       for (const appearance of entry.appearances) {
         results.push({
           video_id: videoId,
@@ -880,117 +876,51 @@ async function handleRecognitionResults(request: Request, env: Env, corsHeaders:
 
 async function handleDenseMetadata(path: string, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
   let videoId = path.replace('/videos/metadata/dense/', '');
-  
+
   try {
     videoId = decodeURIComponent(videoId);
   } catch {
     // If decoding fails, use as-is
   }
-  
-  let metadataKey = videoId;
-  const numericMatch = videoId.match(/^(\d+)-/);
-  if (numericMatch) {
-    metadataKey = numericMatch[1];
-  }
-  
-  logger.debug(`Looking for dense metadata`, { key: `metadata_dense_${metadataKey}`, videoId });
-  
-  const storedDenseMetadata = await env.METADATA_KV?.get(`metadata_dense_${metadataKey}`);
-  
+
+  // Ticket 007 Q1: the key is the full video id from processed_videos_list, so a
+  // numeric prefix can never serve another reel's metadata.
+  const key = `metadata_${videoId}`;
+  const storedDenseMetadata = await env.METADATA_KV?.get(key);
+
   if (storedDenseMetadata) {
     return new Response(storedDenseMetadata, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  
-  // Mock fallback: placeholder data in the current metadata contract, served only when
-  // no stored metadata exists for the video. Values mirror the measured baseline of the
-  // 30 s test clip (399 detections / 139 recognitions, cosines 0.451–0.643).
-  const denseMetadata = {
-    "video_id": metadataKey,
-    "video_info": {
-      "filename": `${videoId}.mp4`,
-      "fps": 25.0,
-      "duration_seconds": 180.0,
-      "frame_count": 4500
-    },
-    "processing_summary": {
-      "frames_processed": 187,
-      "total_faces_detected": 399,
-      "total_recognitions": 139,
-      "unique_contestants": 15,
-      "recognition_rate": 0.348,
-      "match_score_stats": { "average": 0.51, "minimum": 0.451, "maximum": 0.643 }
-    },
-    "contestant_timeline": {
-      "33": {
-        "appearances": [
-          { "timestamp": 10.48, "frame_number": 262, "match_score": 0.51, "bbox": [0.41, 0.08, 0.62, 0.75], "tracker_id": 3 }
-        ],
-        "total_appearances": 1,
-        "average_match_score": 0.51,
-        "first_appearance": 10.48,
-        "last_appearance": 10.48,
-        "contestant_info": { "id": "33", "name": "黃敏蕎", "nickname": "阿妹" }
-      }
-    },
-    "recognition_config": {
-      "acceptance_threshold": 0.45,
-      "detection_model": "insightface",
-      "band_cutoffs": { "high": 0.585, "medium": 0.451 },
-      "provisional": true
-    }
-  };
-  
-  const storedMetadata = await env.METADATA_KV?.get(`video_metadata_dense_${videoId}`);
-  return new Response(storedMetadata || JSON.stringify(denseMetadata), {
+
+  // No mock, no dead key fallback (ticket 007 Q2): a missing reel fails loudly.
+  return new Response(JSON.stringify({ error: 'metadata not found', key }), {
+    status: 404,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
 
 async function handleVideoMetadata(path: string, env: Env, corsHeaders: CorsHeaders): Promise<Response> {
   let videoId = path.replace('/videos/metadata/', '');
-  
+
   try {
     videoId = decodeURIComponent(videoId);
   } catch {
     // If decoding fails, use as-is
   }
-  
-  let metadataKey = videoId;
-  const numericMatch = videoId.match(/^(\d+)-/);
-  if (numericMatch) {
-    metadataKey = numericMatch[1];
-  }
-  
-  logger.debug(`Looking for metadata`, { key: `metadata_${metadataKey}`, videoId });
-  
-  const storedVideoMetadata = await env.METADATA_KV?.get(`metadata_${metadataKey}`);
-  
+
+  const key = `metadata_${videoId}`;
+  const storedVideoMetadata = await env.METADATA_KV?.get(key);
+
   if (storedVideoMetadata) {
     return new Response(storedVideoMetadata, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  
-  // Mock fallback
-  const metadata = {
-    "video_id": metadataKey,
-    "video_info": {
-      "filename": `${metadataKey}.mp4`,
-      "fps": 25.0,
-      "duration_seconds": 180.0,
-      "frame_count": 4500
-    },
-    "recognition_summary": {
-      "unique_contestants": 8,
-      "total_faces_detected": 250,
-      "total_faces_recognized": 200
-    },
-    "contestant_timeline": {}
-  };
-  
-  return new Response(JSON.stringify(metadata), {
+
+  return new Response(JSON.stringify({ error: 'metadata not found', key }), {
+    status: 404,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
