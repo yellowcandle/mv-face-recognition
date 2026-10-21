@@ -144,35 +144,28 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Test support code (fixtures, moto/yaml shims). Quarantined per the refactor plan's
-# Workstream F: the module is exercised by pytest, and its third-party shims produce
-# checker noise that says nothing about product code.
-module = ["conftest", "tests.conftest", "unit.conftest", "contract.conftest"]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-# Tests: none of the 30 test files annotate, and `-> None` on every test_* adds
-# nothing. Keep bodies type-checked, drop the signature requirement. The module
-# names are the test package directories, not `tests.*` — tests/ has no
-# __init__.py, so mypy roots each test package at its own directory.
+# Quarantined debt (refactor plan F(2)). The tests were written against APIs that
+# have since moved, the debug/benchmark scripts are throwaway probes, and the test
+# support modules wrap moto/yaml shims. Counting all of it hid the product-code
+# number the ratchet gates. Both module-name forms are listed: tests/ has no
+# __init__.py, so mypy roots each test package at its own directory
+# (`contract.test_x`) or prefixes it (`tests.contract.test_x`) depending on invocation.
+# Delete entries as files are repaired or removed — never widen this list.
 module = [
-    # With explicit_package_bases the tests are `tests.<dir>.<mod>`; without it they are
-    # `<dir>.<mod>`. Both forms are listed so the override holds however mypy is invoked.
-    "tests.unit.*",
-    "tests.contract.*",
-    "tests.integration.*",
-    "tests.performance.*",
+    "tests.*",
+    "tests",
     "unit.*",
     "contract.*",
     "integration.*",
     "performance.*",
     "benchmark.*",
     "validation.*",
-    # conftest modules are named bare or with the tests prefix depending on invocation.
     "conftest",
     "tests.conftest",
     "unit.conftest",
     "contract.conftest",
+    "scripts.debug.*",
+    "scripts.benchmarks.*",
     # These test files sit outside a package, so mypy names them as bare modules when
     # invoked from inside their directory.
     "test_security",
@@ -192,8 +185,7 @@ module = [
     "test_metadata_compressor",
     "test_performance",
 ]
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
+ignore_errors = true
 
 [tool.pyright]
 # archive/ is the retired Gradio GUI and old copies: kept for reference, not built.

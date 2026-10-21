@@ -13,11 +13,11 @@ Two signals are gated, both environment-independent:
      this is exact anywhere. It is the ratchet: new code may not add debt.
   2. **Ruff total may not rise.** Ruff needs no imports to run, so the count is the
      same locally and in CI.
-
-A repo-wide mypy count is *reported* but not gated: without the 39 project
-dependencies installed, mypy cannot resolve imports that the project venv does, so
-the number differs by environment (824 with deps, 971 without). Gating on it would
-gate on which packages happen to be present.
+  3. **The repo-wide mypy total may not rise.** Measured with the pinned, isolated
+     `uvx mypy` (no project install), which is exactly what CI runs — so the number is
+     environment-independent. Tests, debug/benchmark scripts and conftest shims are
+     quarantined in `[tool.mypy.overrides]` (refactor plan F(2)); the count is product
+     code plus the still-untouched legacy scripts.
 
 Run from the repo root. Exit 1 on any regression.
 """
@@ -163,11 +163,18 @@ def main() -> int:
     if args.pytest_log is not None and not check_pytest_log(baseline, args.pytest_log):
         failed = True
 
-    # Reported, never gated: see the module docstring.
+    # Gated with the pinned isolated invocation (see the module docstring), so it is
+    # the same number in CI and on a developer machine.
     repo_wide = count_mypy((".",))
-    print(
-        f"mypy repo-wide: {repo_wide} (informational; needs project deps to be exact)"
-    )
+    repo_limit = baseline_int(baseline, "mypy_repo_wide")
+    if repo_wide < 0:
+        print("mypy failed to run repo-wide")
+        failed = True
+    elif repo_wide > repo_limit:
+        print(f"mypy repo-wide: {repo_wide} > baseline {repo_limit} — this change adds debt")
+        failed = True
+    else:
+        print(f"mypy repo-wide: {repo_wide} (baseline {repo_limit})")
 
     if failed:
         print(
