@@ -72,7 +72,7 @@ mvp-processor/               the live pipeline, local API and its pytest suite
 scripts/publish/             read-model normaliser, validation, KV publish
 scripts/hf/                  Hugging Face dataset/embedding upload helpers
 scripts/ci/check_baselines.py  the quality ratchet (ruff, mypy, pytest counts)
-src/                         legacy tree: CLI, Streamlit UI, DB init, HF integration
+src/                         utility glue only: DB init, HF integration, hardware checks
 docs/                        refactor plan, ADRs, pipeline and deployment notes
 ```
 
