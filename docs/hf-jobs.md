@@ -25,7 +25,7 @@ hf buckets cp source/contestant_info.csv \
 hf buckets sync ~/.insightface \
   hf://buckets/yellowcandle/mv-face-recognition/models/home/.insightface
 hf buckets sync source/photo/historical/contestants \
-  hf://buckets/yellowcandle/mv-face-recognition/photos/historical --include "*.jpg"
+  hf://buckets/yellowcandle/mv-face-recognition/photos/historical --include "*.jpg" --include "*.png"
 ```
 
 ## Run
