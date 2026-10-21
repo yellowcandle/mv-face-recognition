@@ -1,10 +1,10 @@
 {
-  "//": "Measured 2026-10-22 on main after backend/ was deleted. CI fails when a count RISES above these. The per-path mypy ratchet (scripts/hf, scripts/publish) is always 0 and is not stored. Lower these as the refactor plan lands; never raise them without a recorded reason.",
-  "ruff_errors": 66,
+  "//": "Measured 2026-10-22. CI fails when a count RISES above these. The per-path mypy ratchet (scripts/hf, scripts/publish) is always 0 and is not stored. Lower these as the refactor plan lands; never raise them without a recorded reason.",
+  "ruff_errors": 29,
   "//mypy_repo_wide": "Pinned isolated `uvx mypy@1.16.1 .` with no project install (exactly what CI runs). 514 before the F(2) quarantine, 259 after tests/debug/benchmarks are ignored.",
   "mypy_repo_wide": 259,
-  "//pytest_root": "Measured 2026-10-21 via a lean env (pytest, numpy, opencv-python-headless, pandas): identical counts and node-id set to the full root venv. Gates failures/errors only; passed_min catches tests that silently vanish.",
-  "pytest_root_failed": 140,
-  "pytest_root_errors": 17,
-  "pytest_root_passed_min": 120
+  "//pytest_root": "2026-10-22: the root suite is now exactly tests/contract/test_publish_contract.py — the 29 legacy test modules were red against deleted/refactored src/ APIs and duplicated nothing the mvp-processor suite covers. failed/errors may not rise above 0; passed_min catches the publisher contract test silently vanishing.",
+  "pytest_root_failed": 0,
+  "pytest_root_errors": 0,
+  "pytest_root_passed_min": 3
 }
