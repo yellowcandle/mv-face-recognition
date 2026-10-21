@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "apps/*/public/**",
+    "worker/embedded-assets.js",
+    "worker/public/**",
+    "local_output/**",
+    "data/**",
+    "source/**",
+    "metadata/**"
+  ]
+}

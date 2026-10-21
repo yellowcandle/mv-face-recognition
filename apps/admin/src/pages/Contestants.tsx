@@ -161,7 +161,9 @@ export function Contestants() {
                 />
               </span>
               <span className="ml-3 flex flex-1 items-baseline gap-2">
-                <span className="font-kai text-[15px] font-bold text-carbon-deep">{c.nickname}</span>
+                <span className="font-kai text-[15px] font-bold text-carbon-deep">
+                  {c.nickname}
+                </span>
                 <span className="font-kai text-[12px] text-carbon-soft">{c.name}</span>
               </span>
               <span className="w-[70px] text-right font-mono text-[11px] text-carbon-soft">
@@ -241,7 +243,9 @@ export function Contestants() {
                 ['影片', selectedContestant.videos_seen_in],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex flex-col gap-0.5">
-                  <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">{label}</span>
+                  <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
+                    {label}
+                  </span>
                   <span className="font-mono text-[16px] text-carbon">{value}</span>
                 </div>
               ))}
@@ -272,9 +276,7 @@ export function Contestants() {
                 </div>
               ))}
               {!isLoadingAppearances && appearances.length === 0 && (
-                <div className="py-6 font-kai text-[12px] text-carbon-soft">
-                  沒有已記錄的出場。
-                </div>
+                <div className="py-6 font-kai text-[12px] text-carbon-soft">沒有已記錄的出場。</div>
               )}
             </div>
 

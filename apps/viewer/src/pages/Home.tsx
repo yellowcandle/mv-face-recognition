@@ -12,12 +12,12 @@ export function Home() {
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-10 pt-7">
       <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="圖庫" latin="FILED REELS">
         <div className="flex flex-col items-end gap-0.5">
-        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
-        <span className="font-mono text-[12px] text-carbon">{videos.length} 卷</span>
+          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
+          <span className="font-mono text-[12px] text-carbon">{videos.length} 卷</span>
         </div>
         <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
-        <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
-        <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
+          <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
+          <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
         </div>
       </Masthead>
 
@@ -25,9 +25,7 @@ export function Home() {
 
       <div className="flex flex-row items-baseline justify-between pt-3 pb-4">
         <span className="font-kai text-[15px] font-bold text-carbon">已存影片</span>
-        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-          按處理次序編排
-        </span>
+        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">按處理次序編排</span>
       </div>
 
       <div className="flex flex-row items-center gap-6 border-b border-carbon/40 pb-2.5">
@@ -43,7 +41,9 @@ export function Home() {
         <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
       ) : videos.length === 0 ? (
         <div className="mt-2 border border-dashed border-carbon/35 px-4 py-14 text-center">
-          <div className="font-kai text-[15px] font-bold text-carbon-deep">尚未有任何已處理影片</div>
+          <div className="font-kai text-[15px] font-bold text-carbon-deep">
+            尚未有任何已處理影片
+          </div>
           <div className="mt-1 font-kai text-[12px] text-carbon-soft">
             處理完成的影片會存進這裡，附帶每一格的人臉紀錄。
           </div>

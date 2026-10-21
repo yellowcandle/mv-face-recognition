@@ -66,13 +66,15 @@ export function FaceOverlay({
             className={`
               pointer-events-auto cursor-pointer p-0 rounded-none
               border-2 transition-all duration-200
-              ${isSelected
-                ? 'border-stamp bg-stamp/20'
-                : isBatchSelected
+              ${
+                isSelected
                   ? 'border-stamp bg-stamp/20'
-                  : face.matched
-                    ? 'border-carbon/60 bg-carbon/10 hover:border-carbon hover:bg-carbon/20'
-                    : 'border-ledger/60 bg-ledger/10 hover:border-carbon hover:bg-carbon/20'}
+                  : isBatchSelected
+                    ? 'border-stamp bg-stamp/20'
+                    : face.matched
+                      ? 'border-carbon/60 bg-carbon/10 hover:border-carbon hover:bg-carbon/20'
+                      : 'border-ledger/60 bg-ledger/10 hover:border-carbon hover:bg-carbon/20'
+              }
             `}
             style={getBboxStyle(face.bbox)}
             onClick={() => onFaceClick(face)}

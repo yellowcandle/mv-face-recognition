@@ -128,9 +128,15 @@ export function AdminLayout() {
           />
           <div className="flex flex-col">
             <span className="font-mono text-[8px] tracking-[0.14em] text-carbon">
-              {status === 'online' ? 'LOCAL API ONLINE' : status === 'offline' ? 'API OFFLINE' : 'CHECKING'}
+              {status === 'online'
+                ? 'LOCAL API ONLINE'
+                : status === 'offline'
+                  ? 'API OFFLINE'
+                  : 'CHECKING'}
             </span>
-            <span className="font-mono text-[7px] tracking-[0.1em] text-ledger">127.0.0.1:8000</span>
+            <span className="font-mono text-[7px] tracking-[0.1em] text-ledger">
+              127.0.0.1:8000
+            </span>
           </div>
         </div>
       </nav>

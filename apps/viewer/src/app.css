@@ -1,11 +1,11 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* 點唱單 — the request slip. Ground, carbon copy, carbon ink, stamp red. */
 @theme {
-  --font-sans: "Noto Sans TC", system-ui, sans-serif;
-  --font-serif: "Noto Serif TC", serif;
-  --font-kai: "LXGW WenKai TC", "Noto Serif TC", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: 'Noto Sans TC', system-ui, sans-serif;
+  --font-serif: 'Noto Serif TC', serif;
+  --font-kai: 'LXGW WenKai TC', 'Noto Serif TC', serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   --color-paper: #f2e8bc;
   --color-paper-light: #faf3d7;

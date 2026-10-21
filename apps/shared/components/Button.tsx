@@ -8,9 +8,12 @@ interface ButtonProps extends PropsWithChildren<ButtonHTMLAttributes<HTMLButtonE
 /** A button is a rubber stamp: square, inked, and it leaves a mark. */
 const variantStyles: Record<string, string> = {
   primary: 'bg-stamp text-paper-light border border-stamp hover:bg-stamp/90 font-bold',
-  secondary: 'bg-transparent text-carbon border border-carbon/60 hover:bg-carbon hover:text-paper-light',
-  ghost: 'bg-transparent text-carbon-soft border border-transparent hover:text-carbon hover:border-carbon/30',
-  destructive: 'bg-transparent text-stamp border border-stamp/70 hover:bg-stamp hover:text-paper-light',
+  secondary:
+    'bg-transparent text-carbon border border-carbon/60 hover:bg-carbon hover:text-paper-light',
+  ghost:
+    'bg-transparent text-carbon-soft border border-transparent hover:text-carbon hover:border-carbon/30',
+  destructive:
+    'bg-transparent text-stamp border border-stamp/70 hover:bg-stamp hover:text-paper-light',
 };
 
 const sizeStyles: Record<string, string> = {

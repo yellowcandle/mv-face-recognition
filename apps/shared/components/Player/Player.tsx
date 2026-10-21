@@ -144,7 +144,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const loadVideoMetadata = useCallback(
     async (videoId: string) => {
       try {
-        const res = await fetch(`${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
+        const res = await fetch(
+          `${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`,
+        );
         if (res.ok) {
           setVideoMetadata(await res.json());
         }
@@ -452,9 +454,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const getContestantName = useCallback(
     (id: number): string => {
-      const c = (contestants as Array<{ number: number; id: string; nickname: string; name: string }>).find(
-        (c) => c.number === id || c.id === String(id),
-      );
+      const c = (
+        contestants as Array<{ number: number; id: string; nickname: string; name: string }>
+      ).find((c) => c.number === id || c.id === String(id));
       return c ? `${c.nickname} (${c.name})` : `Contestant #${id}`;
     },
     [contestants],
@@ -646,45 +648,45 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           {/* Batch controls — admin only: every button in here ends in a flag */}
           {canFlag && (
             <div className="flex items-center gap-2">
-            <button
-              className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
-                batchMode
-                  ? 'bg-stamp/20 text-stamp border-stamp/40'
-                  : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
-              }`}
-              onClick={handleToggleBatchMode}
-            >
-              {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
-            </button>
+              <button
+                className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
+                  batchMode
+                    ? 'bg-stamp/20 text-stamp border-stamp/40'
+                    : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
+                }`}
+                onClick={handleToggleBatchMode}
+              >
+                {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
+              </button>
 
               {batchMode && (
                 <>
                   <button
                     className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
                     onClick={handleSelectAllFaces}
-                  disabled={detectedFaces.length === 0}
-                >
-                  Select All
-                </button>
-                <button
-                  className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
-                  onClick={handleClearSelection}
-                  disabled={selectedFaces.size === 0}
-                >
-                  Clear
-                </button>
-                <button
-                  className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
-                  onClick={() => {
-                    if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
-                  }}
-                  disabled={selectedFaces.size === 0}
-                >
-                  Flag Selected ({selectedFaces.size})
-                </button>
-              </>
-            )}
-          </div>
+                    disabled={detectedFaces.length === 0}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
+                    onClick={handleClearSelection}
+                    disabled={selectedFaces.size === 0}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
+                    onClick={() => {
+                      if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
+                    }}
+                    disabled={selectedFaces.size === 0}
+                  >
+                    Flag Selected ({selectedFaces.size})
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
           {/* Timeline filter (admin mode only) */}
@@ -809,7 +811,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                       onClick={() => handleFaceClick(face)}
                     >
                       <span className="text-carbon-deep">
-                        {face.matched ? face.contestant_name || face.contestant_nickname || 'Unmatched' : 'Unmatched'}
+                        {face.matched
+                          ? face.contestant_name || face.contestant_nickname || 'Unmatched'
+                          : 'Unmatched'}
                       </span>
                       <span className={`${tier.className} font-medium`} title={tier.title}>
                         {tier.label}
@@ -868,10 +872,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
             ) : (
               <div className="space-y-2">
                 {flaggedFaces.map((flag) => (
-                  <div
-                    key={flag.id}
-                    className="bg-paper-dark rounded-none p-3 text-xs"
-                  >
+                  <div key={flag.id} className="bg-paper-dark rounded-none p-3 text-xs">
                     <div className="space-y-0.5">
                       <div className="text-carbon-deep font-medium">
                         {getContestantName(flag.contestant_id)}

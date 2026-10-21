@@ -37,9 +37,7 @@ export function Analytics() {
   const { data: metadata, isLoading } = useQuery<VideoMetadata>({
     queryKey: ['video-metadata', videoId],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/videos/metadata/dense/${encodeURIComponent(videoId)}`,
-      );
+      const res = await fetch(`/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
@@ -73,18 +71,18 @@ export function Analytics() {
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
       <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="紀錄" latin="RECOGNITION LEDGER">
         <div className="flex flex-col items-end gap-1">
-        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
-        <select
-        className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
-        value={selectedVideoId}
-        onChange={(e) => setSelectedVideoId(e.target.value)}
-        >
-        {videos.map((v) => (
-        <option key={v.id} value={v.id}>
-        {v.name}
-        </option>
-        ))}
-        </select>
+          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
+          <select
+            className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
+            value={selectedVideoId}
+            onChange={(e) => setSelectedVideoId(e.target.value)}
+          >
+            {videos.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
         </div>
       </Masthead>
 
@@ -140,7 +138,9 @@ export function Analytics() {
         <div className="overflow-hidden border border-carbon/35">
           <div className="flex flex-row items-center border-b border-carbon/40 bg-paper-dark px-4 py-2.5">
             <span className="w-[52px] font-mono text-[8px] tracking-[0.18em] text-ledger">NO.</span>
-            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">CONTESTANT</span>
+            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">
+              CONTESTANT
+            </span>
             <span className="w-[110px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
               APPEARANCES
             </span>
@@ -167,7 +167,9 @@ export function Analytics() {
                   {String(s.id).padStart(2, '0')}
                 </span>
                 <span className="flex flex-1 items-baseline gap-2">
-                  <span className="font-kai text-[15px] font-bold text-carbon-deep">{s.nickname}</span>
+                  <span className="font-kai text-[15px] font-bold text-carbon-deep">
+                    {s.nickname}
+                  </span>
                   <span className="font-mono text-[9px] text-ledger">#{s.id}</span>
                 </span>
                 <span className="w-[110px] text-right font-mono text-[12px] text-carbon">

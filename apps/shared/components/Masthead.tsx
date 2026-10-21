@@ -36,9 +36,7 @@ export function Masthead({ eyebrow, title, latin, size = 'lg', children }: Masth
           <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">{latin}</span>
         </div>
       </div>
-      {children ? (
-        <div className="flex flex-row items-center gap-4 pb-1">{children}</div>
-      ) : null}
+      {children ? <div className="flex flex-row items-center gap-4 pb-1">{children}</div> : null}
     </div>
   );
 }

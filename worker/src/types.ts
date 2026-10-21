@@ -184,7 +184,7 @@ export type WebSocketMessage =
 export type RequestHandler = (
   pathname: string,
   request: Request,
-  env: CloudflareEnv
+  env: CloudflareEnv,
 ) => Promise<Response>;
 
 /**
