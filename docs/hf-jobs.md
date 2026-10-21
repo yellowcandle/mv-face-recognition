@@ -42,6 +42,16 @@ The Python submitter exists because `hf jobs uv run` first uploads the script to
 `jobs-artifacts` bucket; a token with `job.write` but no bucket write fails there. It also avoids
 the CLI splitting a multi-word `bash -lc` command.
 
+GPU mode (`a10g-small`, CUDA image, `onnxruntime-gpu==1.22` for CUDA 12):
+
+```bash
+uv run --with "huggingface_hub>=1.8" python scripts/hf/jobs/submit.py --gpu
+```
+
+Measured on `test-video-mv2`: detection 3m45s → 18s, but encoding 1080p/720p stays on
+CPU (~4 min), so the whole job is ~6 min at $1/h. For the five reels that projects to
+~$0.60 each; `cpu-upgrade` is ~$0.05 each. Use GPU when wall-clock matters.
+
 Manual single stage:
 
 ```bash
