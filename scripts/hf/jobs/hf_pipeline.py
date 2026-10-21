@@ -44,7 +44,9 @@ REPO_BRANCH = os.environ.get("REPO_BRANCH", "hf-jobs")
 ENV = {
     **os.environ,
     "HOME": str(BUCKET / "models/home"),
-    "INSIGHTFACE_PROVIDERS": "CPUExecutionProvider",
+    "INSIGHTFACE_PROVIDERS": os.environ.get(
+        "INSIGHTFACE_PROVIDERS", "CPUExecutionProvider"
+    ),
     "UV_CACHE_DIR": "/tmp/uv-cache",
 }
 
@@ -73,7 +75,11 @@ def fetch_repo() -> Path:
 def install(repo: Path) -> Path:
     mvp = repo / "mvp-processor"
     run(["uv", "sync", "--frozen"], cwd=mvp)
-    return mvp / ".venv/bin/python"
+    python = mvp / ".venv/bin/python"
+    if os.environ.get("ONNXRUNTIME_GPU") == "1":
+        # The lock carries CPU onnxruntime; the GPU wheel provides the same module name.
+        run(["uv", "pip", "install", "--python", str(python), "onnxruntime-gpu"], cwd=mvp)
+    return python
 
 
 def stage_common(repo: Path) -> None:
