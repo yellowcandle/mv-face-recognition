@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   web:
-    name: Web typecheck
+    name: Web check + tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,12 +43,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # `check` is `tsc --noEmit` in both apps; shared is typechecked
-      # through them.
+      # `check` is `tsc --noEmit` in each package.
       - run: pnpm --filter @mv/viewer check
       - run: pnpm --filter @mv/admin check
       - run: pnpm --filter @mv/shared check
-      - run: pnpm --filter @mv/shared test
+
+      # Vite+ owns formatting, lint (type-aware) and the Vitest suites. The
+      # explicit tsc steps above stay because they are cheaper to attribute.
+      - run: pnpm exec vp check
+      - run: pnpm exec vp test
 
   worker:
     name: Worker typecheck + tests

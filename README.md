@@ -31,6 +31,10 @@ pnpm --filter @mv/admin dev
 The Vite apps proxy `/api` to `localhost:8000`. Video ids are accepted as the numeric
 編號 (`/player?video=4`) or the verbatim stem. Full detail: [START_APP.md](START_APP.md).
 
+Toolchain: Node **≥22.22**, pnpm **12.14** (pinned in `package.json`), and **Vite+** —
+`vp dev`, `vp build`, `vp check` (Oxfmt + Oxlint + type-aware checks) and `vp test`
+(Vitest). The apps' `dev`/`build`/`preview` scripts run through `vp`.
+
 ## The data path
 
 ```
@@ -90,6 +94,10 @@ cd mvp-processor && uv run python -m pytest tests/unit tests/contract -q
 # the publisher contract, over every reel on disk
 uv run --no-project --with pytest --with numpy --with opencv-python-headless --with pandas \
   python -m pytest tests/ -q
+
+# web: formatting, type-aware lint, type check and Vitest
+pnpm exec vp check
+pnpm exec vp test
 
 # worker
 cd worker && npx tsc --noEmit && npm test
