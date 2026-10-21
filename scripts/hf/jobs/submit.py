@@ -63,7 +63,7 @@ def main() -> None:
 
     ids = args.only or [1, 2, 3, 4, 5]
     jobs = [
-        submit(args.bucket, args.ref, args.flavor, "2h", f"mv-video-{i}", ["video", "--video-id", str(i)])
+        submit(args.bucket, args.ref, args.flavor, "3h", f"mv-video-{i}", ["video", "--video-id", str(i)])
         for i in ids
     ]
     if len(jobs) == 1:
