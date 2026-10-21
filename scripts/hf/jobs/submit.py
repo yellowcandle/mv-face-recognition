@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 
-from huggingface_hub import Volume, run_job
+from huggingface_hub import Volume, run_job  # type: ignore[import-not-found]
 
 IMAGE = "ghcr.io/astral-sh/uv:python3.12-bookworm"
 GPU_IMAGE = "pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime"
@@ -57,8 +56,9 @@ def submit(
         },
         volumes=[Volume(type="bucket", source=bucket, mount_path="/mnt/data")],
     )
-    print(f"{name}: {job.id}", flush=True)
-    return job.id
+    job_id = str(job.id)
+    print(f"{name}: {job_id}", flush=True)
+    return job_id
 
 
 def wait(job_id: str) -> None:
@@ -110,4 +110,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
