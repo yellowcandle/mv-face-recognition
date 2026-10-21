@@ -17,6 +17,7 @@ from metadata_generator import MetadataGenerator
 from cloudflare_uploader import CloudflareUploader
 import numpy as np
 import supervision as sv
+from trackers import ByteTrackTracker
 
 # Setup logging
 logging.basicConfig(
@@ -34,33 +35,25 @@ def _json_default(obj):
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
-def _create_tracker(frame_rate: int) -> sv.ByteTrack:
+def _create_tracker(frame_rate: int) -> ByteTrackTracker:
     """ByteTrack configured for faces tracked across sampled frames.
 
     Activation is on the detector score, which is what `detections.confidence` holds here.
 
-    `minimum_matching_threshold` is a **cost ceiling on `1 - IoU`**, not a quality floor: the
-    value is handed to `linear_assignment(1 - IoU, threshold)`, so 0.8 accepts pairs overlapping
-    at IoU 0.2 while 0.3 would accept only IoU 0.7. This used to be 0.3 — reading as "require 30%
-    of a match" and doing the opposite (the same inversion as the old `tolerance`/cosine mixup
-    CONTEXT.md was written to end). Measured on `test-video-mv2` by replaying the stored
-    detections, over 399 detections:
-
-        threshold   IoU needed   tracks   1-frame   untracked   longest
-        0.3         0.7          119      111       270         4
-        0.5         0.5          81       48        221         16
-        0.8         0.2          42       7         162         19     <- the library default
-        0.9         0.1          36       3         144         20
-
-    So the default it is: 0.9 buys a little more while merging far more aggressively (IoU 0.1
-    across a camera cut can join two different people). The detections that stay untracked even
-    at 0.9 are an artefact of `update_with_detections` re-associating at a fixed IoU 0.5, which
-    this setting does not reach.
+    The old `minimum_matching_threshold=0.8` was a **cost ceiling on `1 - IoU`** (IoU ≥ 0.2),
+    which read like a quality floor. The external tracker names the same knob
+    `minimum_iou_threshold` and means it literally, so the equivalent value is 0.2. The
+    two-stage split used to happen at `track_activation_threshold` (0.25); here it is a
+    separate `high_conf_det_threshold`, set to 0.25 to keep the same cohort spawning tracks.
+    `minimum_consecutive_frames=1` matches the removed wrapper default. Measured on
+    `test-video-mv2` in ticket 017: 42 tracks, 7 one-frame, 162 untracked, longest 19.
     """
-    return sv.ByteTrack(
+    return ByteTrackTracker(
         track_activation_threshold=0.25,
         lost_track_buffer=30,
-        minimum_matching_threshold=0.8,
+        minimum_iou_threshold=0.2,
+        high_conf_det_threshold=0.25,
+        minimum_consecutive_frames=1,
         frame_rate=frame_rate,
     )
 
@@ -268,7 +261,7 @@ class VideoProcessingPipeline:
                         [det.det_score for det in detections], dtype=np.float32
                     ),
                 )
-                tracked = tracker.update_with_detections(sv_detections)
+                tracked = tracker.update(sv_detections)
                 # ByteTrack returns only the detections it matched, so map each returned box
                 # back to its input entry by exact coordinates (the tracker copies them).
                 by_box = {

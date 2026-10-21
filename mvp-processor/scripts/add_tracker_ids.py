@@ -46,9 +46,7 @@ def add_ids(path: Path, frame_rate: float) -> tuple[int, int]:
             dtype=np.float32,
         )
         confidence = np.array([det["det_score"] for det in detections], dtype=np.float32)
-        tracked = tracker.update_with_detections(
-            sv.Detections(xyxy=boxes, confidence=confidence)
-        )
+        tracked = tracker.update(sv.Detections(xyxy=boxes, confidence=confidence))
         by_box = {tuple(np.round(box, 3)): i for i, box in enumerate(boxes)}
         for det in detections:
             det["tracker_id"] = -1

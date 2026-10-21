@@ -21,10 +21,11 @@ dependencies = [
     "onnxslim>=0.1.70",
     "onnxruntime>=1.20.1",
     "aiohttp>=3.13.3",
-    "supervision>=0.25.0",
+    "supervision>=0.31.1",
     "lap>=0.4",
     "fastapi>=0.115",
     "uvicorn>=0.32",
+    "trackers>=2.6.1",
 ]
 
 [tool.pytest.ini_options]
