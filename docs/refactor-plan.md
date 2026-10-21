@@ -168,6 +168,26 @@ all 96 — so the API claims embeddings that do not exist for 25 contestants.
 stamp stops lying.
 **Risk.** Low, mechanical.
 
+**Executed 2026-10-22 — C(1) + C(2) + C(3).** One resolver, `src/database/roster.py`, maps
+embedding filenames to 編號 (nickname, 姓名, `contestant_<編號>`; whitespace normalised so the
+`3 妹` / `3\xa0妹` pair is one person). `chroma_setup` keys its collection by id and keeps the
+first file per contestant, logging the rest; `src/ui/database_status.py` labels by id; the
+`inspect_npy.py` probe prints the mapping and the duplicate list. Two latent bugs surfaced
+and were fixed: the loader read `paths.contestant_photos` while `config.json` says
+`contestants_dir` (so it silently found zero files), and it globbed only the top level while
+the files live under `embeddings/contestants/`.
+
+Measured: 94 `.npy` files resolve to **71 contestants** (33 are `contestant_<編號>`
+duplicates of a nickname file; 編號 96 had two spellings). The *live* store is
+`reference_embeddings.npz` — 663 rows, 94 contestants, summing exactly to the manifest — so
+`has_embedding`/`reference_count` from `scripts/publish` describe the real cache, and
+contestants **67 (Sarah) and 77 (TABI)** are the only two with none. The worker's hardcoded
+`has_embedding: true` block is the development fallback only; KV ships `contestants_structured`.
+
+Verified: the real loader (chromadb stubbed) returns 71 numeric keys, all `(512,)`; every key
+is a 編號 present in the cast sheet; mypy 202 → 196 (also gained a `streamlit.*` stub override
+for the legacy UI).
+
 ---
 
 ## Workstream D — frontend consolidation
