@@ -76,8 +76,34 @@ Two findings worth keeping:
 - **Deleting files poisons mypy's incremental cache.** After the deletion `mypy .` aborts
   with `AssertionError: Cannot find module for google` (a `google` namespace-package
   resolution bug) even though `--no-incremental` reports normally. `rm -rf .mypy_cache`
-  clears it. Anyone deleting a tree should do that first, and CI starts cold so it is
+  clears it. Anyone deleting a tree should do it first, and CI starts cold so it is
   unaffected.
+
+**Executed 2026-10-22 — A(2) + A(4).** The 29 legacy root test modules are gone (every one
+imported `src/` APIs that moved or were deleted; 140 failures, 17 errors). The root suite is
+now exactly `tests/contract/test_publish_contract.py` (3 tests, green) and the baseline is
+0 failed / 0 errors / ≥3 passed. 18 dead root scripts went with them: two byte-identical
+`scripts/` copies, two deprecated/duplicated Modal wrappers, the `hello`/`main` scaffold, a
+launcher for the deleted `app.py`, and eleven unreferenced probes. Verified first that no
+executable file imported any of them (only stale markdown).
+
+| Signal | Before A(2)+A(4) | After |
+| --- | --- | --- |
+| root pytest | 140F / 120P / 17E | **0F / 3P / 0E** |
+| ruff | 66 | **27** |
+| mypy repo-wide (isolated) | 259 | **202** |
+| root Python scripts | 44 | 26 |
+
+**A(3) is blocked on a product decision, not on code.** The audit's premise — `src/` is kept
+alive only by tests and `backend/` — no longer holds: `scripts/upload_{dataset,video}_to_hf.py`
+import `src.integrations.huggingface_xet`, `scripts/{init_database,fix_embeddings}.py` import
+`src.database.chroma_setup`, `setup_hardware_acceleration` imports `src.core.hardware_acceleration`,
+and `modal_pipeline.py` imports `src.core.face_{detector,matcher}`. The transitive closure of
+those live roots is 6 modules / 2,798 lines of `src/`, against 9,138 total. The rest is only
+reachable through the console script (`src.cli.main:main`, declared in `pyproject.toml`) and
+the Streamlit `src/ui/`. Deciding whether to retire the HF-upload/Modal/CLI surfaces or move
+the 6 live modules under `mvp-processor/` is a product call; deleting `src/` before that
+would break four working utility scripts.
 
 ---
 
