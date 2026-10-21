@@ -55,7 +55,8 @@ def add_ids(path: Path, frame_rate: float) -> tuple[int, int]:
             index = by_box.get(tuple(np.round(box, 3)))
             if index is not None:
                 detections[index]["tracker_id"] = int(track_id)
-                tracked_count += 1
+                if int(track_id) != -1:
+                    tracked_count += 1
 
     path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
     return tracked_count, sum(len(f.get("detections") or []) for f in doc.get("frame_data", []))

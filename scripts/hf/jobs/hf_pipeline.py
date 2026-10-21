@@ -38,7 +38,7 @@ BUCKET = Path(os.environ.get("BUCKET_MOUNT", "/mnt/data"))
 WORK = Path(os.environ.get("JOB_WORK", "/work"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 REPO_SLUG = os.environ.get("REPO_SLUG", "yellowcandle/mv-face-recognition")
-REPO_BRANCH = os.environ.get("REPO_BRANCH", "hf-jobs")
+REPO_REF = os.environ.get("REPO_REF", "main")
 
 # HOME must be writable and executable (uv installs a Python under it). The InsightFace
 # weights live in the bucket, so ~/.insightface is symlinked to the mount instead.
@@ -71,7 +71,7 @@ def fetch_repo() -> Path:
     if repo.exists():
         return repo
     WORK.mkdir(parents=True, exist_ok=True)
-    url = f"https://github.com/{REPO_SLUG}/archive/refs/heads/{REPO_BRANCH}.tar.gz"
+    url = f"https://github.com/{REPO_SLUG}/archive/{REPO_REF}.tar.gz"
     archive = WORK / "repo.tar.gz"
     print(f"downloading {url}", flush=True)
     urllib.request.urlretrieve(url, archive)

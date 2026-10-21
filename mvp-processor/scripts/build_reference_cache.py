@@ -18,6 +18,7 @@ score, not identity, so group shots contaminate).
 
 import argparse
 import hashlib
+import os
 import json
 import logging
 from collections import defaultdict
@@ -90,7 +91,10 @@ def curate_references(
 def build(photos_dir: Path, out_dir: Path) -> dict:
     from insightface.app import FaceAnalysis
 
-    app = FaceAnalysis(name="buffalo_l", providers=["CoreMLExecutionProvider", "CPUExecutionProvider"])
+    providers = os.environ.get(
+        "INSIGHTFACE_PROVIDERS", "CoreMLExecutionProvider,CPUExecutionProvider"
+    ).split(",")
+    app = FaceAnalysis(name="buffalo_l", providers=providers)
     app.prepare(ctx_id=0, det_size=(640, 640))
 
     entries = list(iter_contestant_photos(photos_dir))

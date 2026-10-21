@@ -69,6 +69,7 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
 
       return frame.detections.map((d) => ({
         bbox: d.bbox,
+        tracker_id: d.tracker_id,
         match_score: d.match_score,
         det_score: d.det_score,
         contestant_id: d.contestant_id,

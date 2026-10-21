@@ -61,6 +61,8 @@ export interface FaceDetection {
 // One entry per DETECTION — matched or not: `frame_data[].detections` carries all 399
 // of them, 260 of which carry no contestant.
 export interface FrameDetection {
+  /** ByteTrack id within a shot; -1 when the detection was not tracked. */
+  tracker_id?: number | null;
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;

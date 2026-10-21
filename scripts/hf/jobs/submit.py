@@ -51,10 +51,10 @@ def submit(
         timeout=timeout,
         name=name,
         env={
+            "REPO_REF": ref,
             **({"ONNXRUNTIME_GPU": "1", "INSIGHTFACE_PROVIDERS": "CUDAExecutionProvider"} if gpu else {}),
             **({"METADATA_ONLY": "1"} if metadata_only else {}),
-        }
-        or None,
+        },
         volumes=[Volume(type="bucket", source=bucket, mount_path="/mnt/data")],
     )
     print(f"{name}: {job.id}", flush=True)
@@ -68,7 +68,7 @@ def wait(job_id: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bucket", default="yellowcandle/mv-face-recognition")
-    parser.add_argument("--ref", default="hf-jobs", help="branch, tag or commit the job downloads")
+    parser.add_argument("--ref", default="main", help="branch, tag or commit both the job script and the repo download")
     parser.add_argument("--flavor", default=None, help="default: cpu-upgrade, or a10g-small with --gpu")
     parser.add_argument("--gpu", action="store_true", help="CUDA image + onnxruntime-gpu (CUDA 12)")
     parser.add_argument(
