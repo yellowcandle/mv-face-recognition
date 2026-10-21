@@ -1,0 +1,30 @@
+{
+  "video_info": {
+    "fps": 25.0,
+    "frame_count": 250,
+    "width": 100,
+    "height": 100
+  },
+  "frame_data": [
+    {
+      "frame_number": 0,
+      "timestamp": 0.0,
+      "detections_count": 1,
+      "recognitions_count": 1,
+      "detections": [
+        {
+          "contestant_id": "33",
+          "contestant_name": "黃敏蕎",
+          "contestant_nickname": "阿妹",
+          "match_score": 0.5,
+          "det_score": 0.93,
+          "bbox": [0.1, 0.1, 0.2, 0.2]
+        }
+      ]
+    }
+  ],
+  "recognition_config": {
+    "tolerance": 0.68,
+    "min_confidence": 0.5
+  }
+}
