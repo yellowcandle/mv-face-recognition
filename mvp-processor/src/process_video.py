@@ -14,6 +14,12 @@ from tqdm import tqdm
 from video_processor import VideoProcessor
 from face_detector import FaceDetector, FaceRecognizer, ContestantDatabase
 from metadata_generator import MetadataGenerator
+from track_smoothing import (
+    MATCH_SOURCE_FRAME,
+    rebuild_timeline,
+    refresh_summary,
+    smooth_track_identities,
+)
 from cloudflare_uploader import CloudflareUploader
 import numpy as np
 import supervision as sv
@@ -227,6 +233,7 @@ class VideoProcessingPipeline:
                             "contestant_name": str(r.contestant_name) if r else None,
                             "contestant_nickname": str(r.contestant_nickname) if r else None,
                             "match_score": float(r.match_score) if r else None,
+                            "match_source": MATCH_SOURCE_FRAME if r else None,
                             "det_score": float(det.det_score),
                             "bbox": [float(v) for v in det.bbox],
                             "tracker_id": -1,
@@ -279,6 +286,14 @@ class VideoProcessingPipeline:
                     if i is not None:
                         entries[i]["tracker_id"] = int(track_id)
 
+        smoothing = smooth_track_identities(frame_data)
+        logger.info(
+            "Track smoothing filled %d detections across %d of %d tracks",
+            smoothing["filled"],
+            smoothing["tracks_filled"],
+            smoothing["tracks_considered"],
+        )
+
         # Save unmatched face embeddings for clustering
         if unmatched_faces:
             self._save_unmatched_embeddings(unmatched_faces, output_name)
@@ -300,6 +315,11 @@ class VideoProcessingPipeline:
             output_name=output_name,
             thumbnail_paths=thumbnail_paths,
         )
+
+        # Frame_data is authoritative: it includes track-filled detections, so the stored
+        # timeline must be derived from it rather than from the recognition list.
+        metadata["contestant_timeline"] = rebuild_timeline(frame_data)
+        refresh_summary(metadata)
 
         # Save metadata
         metadata_path = (

@@ -224,6 +224,7 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
     bad_boxes = 0
     bad_scores = 0
     bad_trackers = 0
+    bad_sources = 0
     for frame in frames:
         for det in frame.get("detections") or []:
             tracker_id = det.get("tracker_id")
@@ -231,6 +232,8 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
                 not isinstance(tracker_id, int) or tracker_id < -1
             ):
                 bad_trackers += 1
+            if det.get("match_source") not in (None, "frame", "track"):
+                bad_sources += 1
             box = det.get("bbox")
             if (
                 not isinstance(box, list)
@@ -252,6 +255,10 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
     if bad_trackers:
         problems.append(
             f"{bad_trackers} detections have a tracker_id that is not an int >= -1"
+        )
+    if bad_sources:
+        problems.append(
+            f"{bad_sources} detections have a match_source outside frame|track|null"
         )
 
     config = payload.get("recognition_config")
