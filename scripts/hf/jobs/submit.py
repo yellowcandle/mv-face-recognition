@@ -32,6 +32,7 @@ def submit(
     args: list[str],
     *,
     gpu: bool = False,
+    metadata_only: bool = False,
 ) -> str:
     url = (
         f"https://raw.githubusercontent.com/yellowcandle/mv-face-recognition/{ref}"
@@ -49,11 +50,11 @@ def submit(
         flavor=flavor,
         timeout=timeout,
         name=name,
-        env=(
-            {"ONNXRUNTIME_GPU": "1", "INSIGHTFACE_PROVIDERS": "CUDAExecutionProvider"}
-            if gpu
-            else None
-        ),
+        env={
+            **({"ONNXRUNTIME_GPU": "1", "INSIGHTFACE_PROVIDERS": "CUDAExecutionProvider"} if gpu else {}),
+            **({"METADATA_ONLY": "1"} if metadata_only else {}),
+        }
+        or None,
         volumes=[Volume(type="bucket", source=bucket, mount_path="/mnt/data")],
     )
     print(f"{name}: {job.id}", flush=True)
@@ -70,6 +71,11 @@ def main() -> None:
     parser.add_argument("--ref", default="hf-jobs", help="branch, tag or commit the job downloads")
     parser.add_argument("--flavor", default=None, help="default: cpu-upgrade, or a10g-small with --gpu")
     parser.add_argument("--gpu", action="store_true", help="CUDA image + onnxruntime-gpu (CUDA 12)")
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="skip rendition transcoding (pair with a CPU runner or existing videos)",
+    )
     parser.add_argument("--skip-cache", action="store_true")
     parser.add_argument("--only", type=int, action="append", help="restrict to these video ids")
     args = parser.parse_args()
@@ -91,6 +97,7 @@ def main() -> None:
             f"mv-video-{i}",
             ["video", "--video-id", str(i)],
             gpu=args.gpu,
+            metadata_only=args.metadata_only,
         )
         for i in ids
     ]

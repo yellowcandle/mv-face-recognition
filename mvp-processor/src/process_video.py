@@ -145,7 +145,10 @@ class VideoProcessingPipeline:
         )
 
     def process_video(
-        self, video_path: Path, output_name: Optional[str] = None,
+        self,
+        video_path: Path,
+        output_name: Optional[str] = None,
+        metadata_only: bool = False,
     ) -> Dict:
         """
         Process a single video through the complete pipeline
@@ -313,8 +316,11 @@ class VideoProcessingPipeline:
         # Save gallery data locally
         self.save_gallery_data(gallery_data, output_name)
 
-        # Convert video formats
-        processed_videos = self.convert_video_formats(video_path, output_name)
+        # Convert video formats. Skipped when a GPU/CPU split hands the transcode to another
+        # runner: the renditions are plain transcodes of the source; overlays are client-side.
+        processed_videos = (
+            [] if metadata_only else self.convert_video_formats(video_path, output_name)
+        )
 
         # No annotated rendition: overlays are drawn by the JS layer, which can toggle them.
         # `_annotated.mp4` burned boxes into pixels and was never published.
@@ -413,6 +419,11 @@ class VideoProcessingPipeline:
     help="Run in local-only mode without any cloud dependencies",
 )
 @click.option("--output-dir", help="Custom base output directory for local-only mode")
+@click.option(
+    "--metadata-only",
+    is_flag=True,
+    help="Write metadata/thumbnails/galleries without transcoding the renditions",
+)
 @click.option("--rebuild-db", is_flag=True, help="Force rebuild contestant database")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 def main(
@@ -422,6 +433,7 @@ def main(
     no_upload: bool,
     local_only: bool,
     output_dir: str,
+    metadata_only: bool,
     rebuild_db: bool,
     debug: bool,
 ):
@@ -485,7 +497,9 @@ def main(
             pipeline.initialize_database(force_rebuild=rebuild_db)
 
             # Process video
-            upload_package = pipeline.process_video(video_path, output_name)
+            upload_package = pipeline.process_video(
+                video_path, output_name, metadata_only=metadata_only
+            )
 
             # Upload to Cloudflare (unless disabled or in local-only mode)
             if not (no_upload or local_only) and pipeline.cloudflare_uploader:

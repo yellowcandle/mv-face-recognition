@@ -193,6 +193,7 @@ def video_stage(video_id: str) -> None:
             "--no-upload",
             "--output-dir",
             str(out),
+            *(["--metadata-only"] if os.environ.get("METADATA_ONLY") == "1" else []),
         ],
         cwd=repo / "mvp-processor",
     )
