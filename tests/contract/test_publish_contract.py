@@ -63,6 +63,7 @@ def test_normalise_backfills_the_fields_consumers_read(tmp_path: Path) -> None:
                         "match_score": 0.5,
                         "det_score": 0.93,
                         "bbox": [0.1, 0.1, 0.2, 0.2],
+                        "tracker_id": 7,
                     }
                 ],
             }
@@ -78,6 +79,7 @@ def test_normalise_backfills_the_fields_consumers_read(tmp_path: Path) -> None:
     assert payload["video_info"]["duration"] == 10.0
     assert payload["processing_summary"]["recognition_rate"] == 1.0
     assert payload["contestant_timeline"]["33"]["contestant_info"]["id"] == "33"
+    assert payload["frame_data"][0]["detections"][0]["tracker_id"] == 7
     assert payload["recognition_config"]["band_cutoffs"] == {
         "high": 0.445,
         "medium": 0.412,
@@ -104,7 +106,7 @@ def test_validation_rejects_a_payload_missing_the_backfilled_fields() -> None:
     assert any("contestant_info.id" in p for p in problems), problems
 
 
-def test_validation_rejects_tracker_id() -> None:
+def test_validation_accepts_tracker_id() -> None:
     payload: dict[str, Any] = {
         "video_info": {"duration": 1.0},
         "processing_summary": {"recognition_rate": 1.0},
@@ -133,4 +135,4 @@ def test_validation_rejects_tracker_id() -> None:
 
     problems = model.validate_payload("33", payload)
 
-    assert any("tracker_id" in p for p in problems), problems
+    assert problems == []

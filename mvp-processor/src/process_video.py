@@ -233,6 +233,7 @@ class VideoProcessingPipeline:
                             "match_score": float(r.match_score) if r else None,
                             "det_score": float(det.det_score),
                             "bbox": [float(v) for v in det.bbox],
+                            "tracker_id": -1,
                         }
                     )
 
@@ -267,9 +268,20 @@ class VideoProcessingPipeline:
                         [det.det_score for det in detections], dtype=np.float32
                     ),
                 )
-                tracker.update_with_detections(sv_detections)
-                # The tracker still drives the annotated video, but its ids are not part
-                # of the stored contract: nothing ever rendered them.
+                tracked = tracker.update_with_detections(sv_detections)
+                # ByteTrack returns only the detections it matched, so map each returned box
+                # back to its input entry by exact coordinates (the tracker copies them).
+                by_box = {
+                    tuple(np.round(box, 3)): i
+                    for i, box in enumerate(sv_detections.xyxy)
+                }
+                track_ids = (
+                    tracked.tracker_id if tracked.tracker_id is not None else []
+                )
+                for box, track_id in zip(tracked.xyxy, track_ids):
+                    i = by_box.get(tuple(np.round(box, 3)))
+                    if i is not None:
+                        entries[i]["tracker_id"] = int(track_id)
 
         # Save unmatched face embeddings for clustering
         if unmatched_faces:

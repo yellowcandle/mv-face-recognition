@@ -9,7 +9,7 @@ notes for in-flight work live in [TODOS.md](TODOS.md).
 All "Now" items from the 2026-06-10 review were fixed on 2026-06-11 (see Done).
 Remaining before the branch lands:
 
-- [x] Production `wrangler deploy` + live smoke test (2026-10-21): KV read model published, Worker deployed, all five videos return 206 on Range, dense metadata has no `tracker_id`.
+- [x] Production `wrangler deploy` + live smoke test (2026-10-21): KV read model published, Worker deployed, all five videos return 206 on Range, dense metadata carries ByteTrack `tracker_id`.
 - [x] Reprocess `test-video-mv2` (2026-06-30): metadata now carries `tracker_id` + post-fix embeddings. **But recognition is flat at 37.6% (was 35.2%) — the BGR fix produced no accuracy gain.** See accuracy track for the real root cause. Other videos still need a reprocess once matching is fixed (don't reprocess on the broken matcher).
 - [x] `scripts/modal_youtube_processor.py`: **retired 2026-10-22** with the rest of the Modal surface (the script, its setup/wrapper, the pipeline and both docs are deleted).
 
