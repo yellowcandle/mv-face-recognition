@@ -44,6 +44,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `vp check` type-checks worker/tsconfig.json, whose types live in the
+      # Worker's own npm tree (worker/node_modules), not the pnpm workspace.
+      - run: npm ci --prefix worker
+
       # `check` is `tsc --noEmit` in each package.
       - run: pnpm --filter @mv/viewer check
       - run: pnpm --filter @mv/admin check
