@@ -30,17 +30,17 @@ face_detection:
 # Scores are raw cosines throughout: higher = more similar, never rescaled.
 face_recognition:
   # Lowest raw cosine that counts as a recognition. Same direction as the match score, so a
-  # higher value is stricter. 0.45 sits on the measured 1% false-match boundary (leave-one-out
-  # over the 663-reference cache: the 7 highest impostor scores are 0.5846, 0.5846, 0.5014,
-  # 0.4616, 0.4616, 0.4509, 0.4509 — 7 of 663 = 1.06%). Provisional until ground-truth labels
-  # exist — see scripts/band_cutoffs.py to recompute.
-  acceptance_threshold: 0.45
+  # higher value is stricter. 0.412 sits on the measured 1% false-match boundary after
+  # reference curation (leave-one-out over the 638-reference cache: p99 impostor 0.412,
+  # max 0.445; genuine p05 0.377). Provisional until ground-truth labels exist — see
+  # scripts/band_cutoffs.py to recompute.
+  acceptance_threshold: 0.412
   # Display bands, from the same sweep. `high` clears every impostor pair observed; `medium` is
   # the 1% boundary. Two cutoffs, so three bands, and `low` also covers an unmatched detection,
   # which has no score at all.
   band_cutoffs:
-    high: 0.585
-    medium: 0.451
+    high: 0.445
+    medium: 0.412
   use_existing_embeddings: true
   enable_interpolation: true  # Linear interpolation between detections
   enable_batch_processing: true  # Batch process multiple frames (optimization)
