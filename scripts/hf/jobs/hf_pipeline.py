@@ -87,8 +87,19 @@ def install(repo: Path) -> Path:
     run(["uv", "sync", "--frozen"], cwd=mvp)
     python = mvp / ".venv/bin/python"
     if os.environ.get("ONNXRUNTIME_GPU") == "1":
-        # The lock carries CPU onnxruntime; the GPU wheel provides the same module name.
-        run(["uv", "pip", "install", "--python", str(python), "onnxruntime-gpu"], cwd=mvp)
+        # The lock carries CPU onnxruntime, which shadows the GPU wheel (same module name).
+        # 1.31 targets CUDA 13; the torch wheels in this venv are CUDA 12.8 + cuDNN 9, so pin
+        # the CUDA-12 build (1.22) and expose the nvidia wheels to the loader.
+        run(["uv", "pip", "uninstall", "--python", str(python), "onnxruntime"], cwd=mvp)
+        run(
+            ["uv", "pip", "install", "--python", str(python), "onnxruntime-gpu==1.22.0"],
+            cwd=mvp,
+        )
+        nvidia = mvp / ".venv/lib/python3.12/site-packages/nvidia"
+        lib_dirs = [str(path) for path in sorted(nvidia.glob("*/lib"))]
+        if lib_dirs:
+            existing = ENV.get("LD_LIBRARY_PATH", "")
+            ENV["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else []))
     return python
 
 
