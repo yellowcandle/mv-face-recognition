@@ -138,7 +138,12 @@ def convert_legacy(
                         round(float(conf), 4) if matched and conf is not None else None
                     ),
                     det_score=round(float(face.get("detection_confidence") or 0), 4),
-                    bbox=[round(v, 6) for v in clamp_box(x1 / width, y1 / height, x2 / width, y2 / height)],
+                    bbox=[
+                        round(v, 6)
+                        for v in clamp_box(
+                            x1 / width, y1 / height, x2 / width, y2 / height
+                        )
+                    ],
                     tracker_id=None,  # the legacy pipeline stored no tracker ids
                 )
             )
@@ -246,7 +251,12 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
                         else None
                     ),
                     det_score=0.0,  # not stored in this variant
-                    bbox=[round(v, 6) for v in clamp_box(left / width, top / height, right / width, bottom / height)],
+                    bbox=[
+                        round(v, 6)
+                        for v in clamp_box(
+                            left / width, top / height, right / width, bottom / height
+                        )
+                    ],
                     tracker_id=(trackers[i] if i < len(trackers) else None),
                 )
             )
@@ -315,7 +325,9 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
             if score is not None and not (-1 <= float(score) <= 1):
                 bad_scores += 1
     if bad_boxes:
-        problems.append(f"{bad_boxes} detections have a bbox outside [0,1] or misordered")
+        problems.append(
+            f"{bad_boxes} detections have a bbox outside [0,1] or misordered"
+        )
     if bad_scores:
         problems.append(f"{bad_scores} match scores outside the cosine range [-1,1]")
 
@@ -341,7 +353,10 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
                     problems.append(
                         f"band cutoff {band}={actual} disagrees with bands.ts ({expected})"
                     )
-            if acceptance is not None and abs(float(acceptance) - EXPECTED_ACCEPTANCE) > 1e-6:
+            if (
+                acceptance is not None
+                and abs(float(acceptance) - EXPECTED_ACCEPTANCE) > 1e-6
+            ):
                 problems.append(
                     f"acceptance_threshold={acceptance} disagrees with the config "
                     f"({EXPECTED_ACCEPTANCE})"
