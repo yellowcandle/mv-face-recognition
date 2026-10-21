@@ -103,6 +103,8 @@ def stage_photos() -> Path:
     if historical.is_dir():
         for directory in sorted(p for p in historical.iterdir() if p.is_dir()):
             cid = directory.name.removeprefix("contestant_")
+            if not cid.isdigit():
+                continue
             target = photos / f"contestant_{cid}"
             target.mkdir(parents=True, exist_ok=True)
             for photo in sorted(directory.iterdir()):
