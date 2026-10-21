@@ -213,6 +213,18 @@ components. (4) Fix the worker's CORS methods (see E).
 the shared masthead.
 **Risk.** Low.
 
+**Executed 2026-10-22 — D(1)–(3).** One `formatMmSs` (`apps/shared/lib/format.ts`) and one
+`BAND_STAMP` (`apps/shared/lib/bands.ts`) — the five local formatters and the local band map
+are gone (`9a1ff14a`). `<Masthead>` is extracted and used by all seven routed pages
+(`708da1bb`), verified in the browser smoke: viewer 圖庫/點唱單/名冊/紀錄 and admin
+儀表/待核/標註/參賽者/播放/紀錄/處理/向量 all render the shared chrome with no console errors.
+The Player components live in `apps/shared/components/Player/` (`Player`, `ContestantTimeline`,
+`FlagDialog`, `PlayerControls`, `DetectionBar`, plus `VideoCanvas`, `FaceOverlay`,
+`useAnnotations`, `pickInitialVideo`), with `apps/admin/src/pages/Player.tsx` now a five-line
+re-export and `PlayerPage` consuming the shared component.
+**Not done:** `apps/admin/src/pages/Ingestion.tsx` (404 lines, unrouted) is still on disk —
+retiring it is tied to the Ingestion/Modal product decision, not to this refactor.
+
 ---
 
 ## Workstream E — the worker is not quite read-only
@@ -226,6 +238,11 @@ Separately, non-GET on `/faces/detect` falls through to 404 rather than 405.
 
 **Gate.** The read-only test asserts the advertised methods too.
 **Risk.** None.
+
+**Executed 2026-10-22.** The header is `GET, OPTIONS` (`47a0f1f7`) and the read-only test
+asserts it. Step 2 was deliberately answered the other way: unknown methods and paths return
+**404, not 405**, because ADR 0003 removed the write routes and a 405 would advertise that they
+exist (`worker/src/index.ts:549`, with the reasoning inline).
 
 ---
 
@@ -283,15 +300,24 @@ About 24 tests come back with a two-line change and zero behavioural risk.
 **Gate.** CI on a clean tree reports the *number of new* failures, and that number is 0.
 **Risk.** The reprocess is the only expensive step; everything above it is hours, not days.
 
-**Executed 2026-10-22 — F(2) + F(3) ratchet.** `[tool.mypy.overrides]` quarantines
-`tests/**`, `scripts/debug/**`, `scripts/benchmarks/**` and the conftest moto/yaml shims
-via `ignore_errors` (both module-name forms listed, since `tests/` has no `__init__.py`).
-Repo-wide `uvx mypy@1.16.1 .`: **514 → 259 errors / 60 files**. The remaining count is now
-gated in `scripts/ci/check_baselines.py` against `mypy_repo_wide` in the baseline, measured
-with the same pinned isolated invocation CI runs, so it no longer depends on which
-packages are installed. `disallow_untyped_defs` remains on globally; the quarantined
-modules are the only relaxation. Gate output: mypy ratchet clean, ruff 66/66, pytest
-140F/17E/123P → exit 0.
+**Executed 2026-10-22 — F(1), F(2), F(3), F(5).** F(1) landed first (`shutil` at module scope,
+`src.roi` / `src.config` imports fixed: the mvp suite went from 26 failures to 100 passing).
+F(5) was already re-enabled as `.github/workflows/test.yml`, now gating web typecheck, worker
+tests, the mvp suite and the Python baselines.
+
+F(2) + F(3): `[tool.mypy.overrides]` quarantines `tests/**`, `scripts/debug/**`,
+`scripts/benchmarks/**` and the conftest moto/yaml shims via `ignore_errors` (both module-name
+forms listed, since `tests/` has no `__init__.py`). Repo-wide `uvx mypy@1.16.1 .`:
+**514 → 259 errors / 60 files**, and the remaining count is gated in
+`scripts/ci/check_baselines.py` against `mypy_repo_wide`, measured with the same pinned
+isolated invocation CI runs, so it no longer depends on which packages are installed.
+`disallow_untyped_defs` remains on globally; the quarantined modules are the only relaxation.
+Gate output at the time: mypy ratchet clean, ruff 66/66, pytest 140F/17E/123P → exit 0.
+(The ratchets have since been lowered to ruff 27 / mypy 196 / root 0F·0E·3P by A and C.)
+
+**F(4) is the only open step**: reels 1–3 are being reprocessed locally with
+`process_video.py --local-only`, which replaces metadata generation A with the current
+pipeline and removes the reason the publisher has to convert legacy payloads at all.
 
 ---
 
