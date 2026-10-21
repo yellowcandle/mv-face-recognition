@@ -193,8 +193,8 @@ REQUIRED_FIELDS = (
 )
 REQUIRED_FRAME_FIELDS = ("frame_number", "timestamp", "detections_count", "detections")
 # bands.ts and processing_config.yaml agree on these; a payload that disagrees is stale.
-EXPECTED_CUTOFFS = {"high": 0.585, "medium": 0.451}
-EXPECTED_ACCEPTANCE = 0.45
+EXPECTED_CUTOFFS = {"high": 0.445, "medium": 0.412}
+EXPECTED_ACCEPTANCE = 0.412
 
 
 def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
@@ -223,11 +223,14 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
     # bboxes are frame fractions in canonical [x1,y1,x2,y2] order (CONTEXT.md).
     bad_boxes = 0
     bad_scores = 0
-    tracker_fields = 0
+    bad_trackers = 0
     for frame in frames:
         for det in frame.get("detections") or []:
-            if "tracker_id" in det:
-                tracker_fields += 1
+            tracker_id = det.get("tracker_id")
+            if tracker_id is not None and (
+                not isinstance(tracker_id, int) or tracker_id < -1
+            ):
+                bad_trackers += 1
             box = det.get("bbox")
             if (
                 not isinstance(box, list)
@@ -246,10 +249,9 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
         )
     if bad_scores:
         problems.append(f"{bad_scores} match scores outside the cosine range [-1,1]")
-    if tracker_fields:
+    if bad_trackers:
         problems.append(
-            f"{tracker_fields} detections still carry tracker_id; it is not part of "
-            "the contract"
+            f"{bad_trackers} detections have a tracker_id that is not an int >= -1"
         )
 
     config = payload.get("recognition_config")
@@ -344,11 +346,6 @@ def normalise(path: str) -> dict[str, Any]:
     else:
         sys.exit(f"{path}: frame_data in an unknown shape")
 
-    # `tracker_id` was carried and never rendered; it is not part of the contract.
-    for frame in frames:
-        for det in frame.get("detections") or []:
-            det.pop("tracker_id", None)
-
     timeline = build_timeline(frames)
 
     # The pipeline's cutoffs, as bands.ts and processing_config.yaml agree on them. A run
@@ -396,7 +393,7 @@ def pick_sources() -> dict[str, list[str]]:
 
 # The high band cutoff from apps/shared/lib/bands.ts (measured false-match boundary).
 # Duplicated as a constant until workstream B gives both sides one source.
-HIGH_BAND = 0.585
+HIGH_BAND = 0.445
 
 
 def load_roster() -> list[dict[str, Any]]:

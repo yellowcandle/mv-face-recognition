@@ -124,7 +124,7 @@ worker 6/6, both web checks, root 3 passed, gate exit 0. The 31 remaining mypy e
 `src/` is deleted, along with the HF-upload scripts, `fix_embeddings`/`init_database`,
 `setup_hardware_acceleration`, the Chroma benchmarks and debug probes, `compare_recognition.py`
 and `inspect_npy.py`. The root project is now `package = false` with only the dependencies the
-retained `scripts/hf` and embedding checks use. `tracker_id` is also gone from the contract:
+retained `scripts/hf` and embedding checks use. `tracker_id` is retained: it links the same face across frames within a shot, which temporal identity smoothing needs. It is not a match score:
 the pipeline still tracks faces for the annotated video, but the field is not stored, served or
 published, and `validate_payload` rejects it.
 
