@@ -47,6 +47,7 @@ jobs:
       # through them.
       - run: pnpm --filter @mv/viewer check
       - run: pnpm --filter @mv/admin check
+      - run: pnpm --filter @mv/shared check
       - run: pnpm --filter @mv/shared test
 
   worker:

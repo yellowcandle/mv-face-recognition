@@ -22,11 +22,14 @@
         "../shared/*"
       ]
     },
-    "baseUrl": ".",
     "allowImportingTsExtensions": true
   },
   "include": [
     "src",
     "../shared"
+  ],
+  "exclude": [
+    "node_modules",
+    "../shared/**/*.test.ts"
   ]
 }
