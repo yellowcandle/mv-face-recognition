@@ -112,6 +112,16 @@ current pipeline (see Workstream F), which retires generation A entirely.
 reel with a stale `recognition_config` fails loudly.
 **Risk.** Low for validation, medium for the reprocess.
 
+**Executed 2026-10-22 — B(2) backfill.** The publisher derived the three fields the apps
+read unconditionally (`apps/shared/types`): `video_info.duration` (from `fps` ×
+`frame_count` — no generation stored it), `processing_summary.recognition_rate`, and
+`contestant_timeline[].contestant_info.id`; `validate_payload` now fails a publish that
+omits them. Contract tests (`tests/contract/test_publish_contract.py`) run the real
+normaliser over every reel on disk and over a synthetic stale-config doc. Evidence:
+dry run stages all 5 reels, each validating; `uvx ruff@0.7.3` clean on `scripts/publish`;
+pinned mypy clean; 3/3 new contract tests pass. Reel 5's stale `recognition_config`
+continues to be normalised (not failed) per the documented `normalise()` behaviour.
+
 ---
 
 ## Workstream C — embeddings keyed by 編號
