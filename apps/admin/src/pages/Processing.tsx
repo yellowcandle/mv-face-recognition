@@ -85,7 +85,7 @@ export function Processing() {
 
   // Initial load + polling
   useEffect(() => {
-    fetchJobs();
+    void fetchJobs();
     pollingRef.current = setInterval(fetchJobs, 5000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
@@ -163,7 +163,7 @@ export function Processing() {
       <div>
         <h1 className="text-2xl font-bold text-carbon-deep">Video Processing</h1>
         <p className="text-carbon-soft text-sm mt-1">
-          Manage cloud processing jobs for face recognition
+          Manage local processing jobs for face recognition
         </p>
       </div>
 
@@ -190,7 +190,7 @@ export function Processing() {
             <span className="w-2 h-2 rounded-full bg-carbon" />
           </div>
           <p className="text-sm text-carbon-soft mb-4 leading-relaxed">
-            Process all videos using cloud GPUs for initial face detection and recognition
+            Process all videos on this machine with the local pipeline
           </p>
           <Button
             variant="primary"
@@ -208,10 +208,10 @@ export function Processing() {
               <span className="text-carbon">&#x2713;</span> Detect and recognize faces
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-carbon">&#x2713;</span> Cloud GPU acceleration
+              <span className="text-carbon">&#x2713;</span> Hardware acceleration when available
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-carbon">&#x2713;</span> Automatic HuggingFace sync
+              <span className="text-carbon">&#x2713;</span> Results written to local_output/
             </li>
           </ul>
         </Card>

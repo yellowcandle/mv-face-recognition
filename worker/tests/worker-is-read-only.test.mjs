@@ -53,7 +53,7 @@ function routesFromSource() {
   for (const [, path] of source.matchAll(/case\s+'(\/[^']*)'\s*:/g)) {
     paths.add(path.replace(/\/+$/, '')); // `/x` and `/x/` are one route; same handler
   }
-  return [...paths].sort();
+  return [...paths].sort((a, b) => a.localeCompare(b));
 }
 
 let bundlePath = null;

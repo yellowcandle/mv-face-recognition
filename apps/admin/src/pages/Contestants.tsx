@@ -56,7 +56,7 @@ export function Contestants() {
         setAppearances(
           results.map((r: Record<string, unknown>) => ({
             video_id: String(r.video_id),
-            video_name: `Video ${r.video_id}`,
+            video_name: `Video ${String(r.video_id)}`,
             timestamp: r.timestamp as number,
             match_score: (r.match_score ?? null) as number | null,
           })),

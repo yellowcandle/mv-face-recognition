@@ -184,7 +184,7 @@ export function Flagging() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
     } catch (e) {
       console.error('Failed to update face status:', e);
     }
@@ -205,7 +205,7 @@ export function Flagging() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),
       });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
     } catch (e) {
       console.error('Failed to reassign face:', e);
     }
@@ -237,7 +237,7 @@ export function Flagging() {
       >
         <button
           type="button"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
+          onClick={() => void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
           className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
         >
           重新調閱

@@ -100,7 +100,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   // Auto-select the requested video, else the first
   useEffect(() => {
     if (videos.length > 0 && !selectedVideo) {
-      handleSelectVideo(pickInitialVideo(videos, initialVideoId)!);
+      void handleSelectVideo(pickInitialVideo(videos, initialVideoId)!);
     }
   }, [videos]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -164,7 +164,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     pollingRef.current = setInterval(() => {
       const video = getVideoEl();
       if (video && !video.paused) {
-        fetchFacesAtTime(video.currentTime);
+        void fetchFacesAtTime(video.currentTime);
       }
     }, 200);
   }, [fetchFacesAtTime, getVideoEl]);
@@ -199,7 +199,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     const video = getVideoEl();
     if (!video) return;
     if (video.paused) {
-      video.play();
+      void video.play();
     } else {
       video.pause();
     }
@@ -210,7 +210,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       const video = getVideoEl();
       if (video) {
         video.currentTime = time;
-        fetchFacesAtTime(time);
+        void fetchFacesAtTime(time);
       }
     },
     [getVideoEl, fetchFacesAtTime],
@@ -241,7 +241,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       const fps = videoMetadata?.video_info?.fps || 25;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + frames / fps));
       video.currentTime = newTime;
-      fetchFacesAtTime(newTime);
+      void fetchFacesAtTime(newTime);
     },
     [getVideoEl, videoMetadata, duration, fetchFacesAtTime],
   );
@@ -252,7 +252,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       if (!video) return;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
       video.currentTime = newTime;
-      fetchFacesAtTime(newTime);
+      void fetchFacesAtTime(newTime);
     },
     [getVideoEl, duration, fetchFacesAtTime],
   );
@@ -358,7 +358,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         if (res.ok) {
           setShowFlagDialog(false);
           setSelectedFace(null);
-          refetchFlagged();
+          void refetchFlagged();
           alert('Face flagged successfully!');
         } else {
           alert('Failed to flag face');
@@ -408,7 +408,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         setShowBatchFlagDialog(false);
         setSelectedFaces(new Set());
         setBatchMode(false);
-        refetchFlagged();
+        void refetchFlagged();
 
         if (failCount === 0) {
           alert(`Successfully flagged ${successCount} faces!`);
@@ -547,7 +547,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
               value={selectedVideo?.id ?? ''}
               onChange={(e) => {
                 const v = videos.find((v) => v.id === e.target.value);
-                if (v) handleSelectVideo(v);
+                if (v) void handleSelectVideo(v);
               }}
             >
               {videos.map((v) => (

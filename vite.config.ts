@@ -87,6 +87,14 @@ export default defineConfig({
     jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
     rules: { 'vite-plus/prefer-vite-plus-imports': 'error' },
     options: { typeAware: true, typeCheck: true },
+    overrides: [
+      {
+        // node:test consumes the promise returned by test(); the lint rule cannot
+        // see that contract.
+        files: ['worker/tests/**'],
+        rules: { 'typescript/no-floating-promises': 'off' },
+      },
+    ],
   },
   test: {
     // Current Vitest suites live with the apps; worker tests use node:test
