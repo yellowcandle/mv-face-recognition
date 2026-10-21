@@ -11,7 +11,7 @@ Remaining before the branch lands:
 
 - [ ] Production `wrangler deploy` + live smoke test (local `wrangler dev` already serves the React viewer end-to-end; deploy needs user approval)
 - [x] Reprocess `test-video-mv2` (2026-06-30): metadata now carries `tracker_id` + post-fix embeddings. **But recognition is flat at 37.6% (was 35.2%) — the BGR fix produced no accuracy gain.** See accuracy track for the real root cause. Other videos still need a reprocess once matching is fixed (don't reprocess on the broken matcher).
-- [ ] `scripts/modal_youtube_processor.py` lost `youtube_cookies.txt` support (age-restricted downloads now fail) and all webhook progress reporting — restore or consciously retire (deferred 2026-06-11: the admin Ingestion page that drove it is disabled until ingestion endpoints exist)
+- [x] `scripts/modal_youtube_processor.py`: **retired 2026-10-22** with the rest of the Modal surface (the script, its setup/wrapper, the pipeline and both docs are deleted).
 
 ## Next — cleanup confirmed in review
 
@@ -56,7 +56,7 @@ tuning and naive regeneration both can't fix this.
 Kept from the old backlog only where still plausible post-rewrite; everything
 referencing deleted SvelteKit/worker code was dropped.
 
-- Modal production integration: real Modal API calls from the worker, job persistence, webhook status endpoint (`modal.web_endpoint`) — needs redesign now that the worker's job routes were removed
+- ~~Modal production integration~~ retired 2026-10-22 with the Modal surface; the pipeline runs locally through `process_video.py`.
 - Error tracking (Sentry) + retry/alerting for processing jobs
 - API rate limiting and an input-validation pass on worker endpoints
 - Batch/multi-video processing UX and notifications

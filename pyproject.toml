@@ -5,8 +5,6 @@ description = "Face recognition system for MV contestants using ChromaDB and Ins
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # Core framework
-    "streamlit>=1.28.0",
     # Face recognition and computer vision
     "insightface>=0.7.3",
     "supervision>=0.19.0",
@@ -23,14 +21,8 @@ dependencies = [
     # Media processing
     "ffmpeg-python>=0.2.0",
     "yt-dlp>=2024.8.6",
-    # Cloud processing
-    "modal>=0.64.0",
     # Utilities
     "tqdm>=4.65.0",
-    # GUI Framework
-    "PyQt6>=6.6.0",
-    "PyQt6-Qt6>=6.6.0",
-    "nicegui>=3.5.0",
     "typing-extensions>=4.0.0",
     "python-socketio>=5.14.0",
     "python-engineio>=4.0.0",
@@ -53,9 +45,6 @@ dependencies = [
     "fonttools>=4.60.2",
     "huggingface-hub[hf-xet]>=0.33.1",
 ]
-
-[project.scripts]
-mv-face-recognition = "src.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -105,10 +94,7 @@ known_first_party = ["src"]
 python_version = "3.11"
 # mvp-processor is a separate project with its own pyproject and virtualenv; checking it
 # from here collided on two `conftest` modules. Run its checks from its own directory.
-# The Modal scripts need the `modal` package (and its google/protobuf deps) to
-# resolve; without it mypy aborts with "Cannot find module for google" instead of
-# reporting. They are deployment entry points, not library code.
-exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/|scripts/modal_.*\.py|scripts/upload_config\.py|modal_.*\.py)' 
+exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/)' 
 # `scripts/archive/` keeps a copy of the retired batch driver, and the test packages each
 # have their own conftest; explicit package bases lets mypy key modules by path instead of
 # basename.
@@ -138,9 +124,6 @@ module = [
     "yt_dlp.*",
     "moto.*",
     "yaml.*",
-    # Streamlit ships no py.typed marker; src/ui is the legacy desktop surface and is
-    # never imported by the live pipeline or the publisher.
-    "streamlit.*",
     # mvp-processor/src siblings import each other as top-level modules; they only
     # resolve when mypy runs from that directory.
     "face_detector",

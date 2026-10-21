@@ -12,7 +12,7 @@ pipeline that turns reels into per-detection metadata.
 | Admin (writable) | `apps/admin` | `localhost:5173` | 儀表, 待核, 標註, 參賽者, 播放, 處理, 向量 |
 | Local API | `mvp-processor/src/local_api.py` | `localhost:8000` | dense metadata, faces at a timestamp, labels, flag tray |
 | Worker | `worker/` | Cloudflare | serves KV; advertises `GET, OPTIONS` only ([ADR 0003](docs/adr/0003-the-deployed-worker-is-read-only.md)) |
-| Pipeline | `mvp-processor/src/process_video.py` | local or Modal | 6 fps sampling, InsightFace `buffalo_l`, per-detection metadata |
+| Pipeline | `mvp-processor/src/process_video.py` | local | 6 fps sampling, InsightFace `buffalo_l`, per-detection metadata |
 | Publisher | `scripts/publish/build_read_model.py` | local | normalises → validates → stages → KV |
 
 ## Quick start
@@ -76,9 +76,10 @@ src/                         legacy tree: CLI, Streamlit UI, DB init, HF integra
 docs/                        refactor plan, ADRs, pipeline and deployment notes
 ```
 
-`src/` is not part of the live pipeline. The modules still imported by the HF-upload
-scripts, DB init and the Modal entry points are recorded in
-[docs/refactor-plan.md](docs/refactor-plan.md) (Workstream A, step 3).
+`src/` is not part of the live pipeline: what remains (7 modules, ~2.9k lines) is imported
+only by the HF-upload scripts, `fix_embeddings.py` / `init_database.py` and
+`setup_hardware_acceleration.py`. The retired Modal and desktop surfaces are recorded in
+[docs/refactor-plan.md](docs/refactor-plan.md).
 
 ## Tests and gates
 
@@ -115,6 +116,5 @@ uv run --no-project python scripts/publish/build_read_model.py --publish
 - [DEPLOYMENT.md](DEPLOYMENT.md) — deploy the Worker and the apps
 - [docs/refactor-plan.md](docs/refactor-plan.md) — the whole-codebase plan and what executed
 - [docs/adr/](docs/adr) — the three decisions above
-- [docs/MODAL_PIPELINE.md](docs/MODAL_PIPELINE.md) — cloud processing
 
 There is no LICENSE file in this repository; add one before distributing.

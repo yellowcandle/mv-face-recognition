@@ -48,11 +48,6 @@ uv run --no-project python scripts/publish/build_read_model.py --publish # picks
 `--dry-run` is the default; the run validates every reel against the metadata contract
 (`tests/contract/test_publish_contract.py`) and fails loudly on a mismatch.
 
-## Featured processing (Modal cloud)
-
-Heavy transcription work runs on Modal; setup and the pipeline are documented in
-`MODAL_PROCESSING_SETUP.md` and `docs/MODAL_PIPELINE.md`.
-
 ## Tests and gates
 
 ```bash

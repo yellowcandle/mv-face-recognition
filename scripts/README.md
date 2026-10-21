@@ -37,14 +37,6 @@ node scripts/upload-to-r2.js --dry-run
 ## Hardware and configuration
 
 - `setup_hardware_acceleration.py` — detect CUDA / Apple Silicon and configure the runtime
-- `upload_config.py` — push processing config to the Modal volume
-
-## Legacy Modal entry points
-
-`modal_app.py`, `modal_batch_processor.py`, `modal_rich_parallel.py`,
-`modal_youtube_processor.py` and `process_videos_modal.sh` target the pre-reprocessor Modal
-path. `modal_youtube_processor.py` is under an open decision (restore or retire, `TODO.md`);
-treat the rest as reference until the Modal surface is settled.
 
 ## Archive
 

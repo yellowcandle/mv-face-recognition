@@ -33,7 +33,7 @@ source/photo/contestants/reference_embeddings.npz
 *.joblib
 *.h5
 *.hdf5
-models/
+/models/
 chroma_db/
 *.db
 *.sqlite
