@@ -105,7 +105,10 @@ known_first_party = ["src"]
 python_version = "3.11"
 # mvp-processor is a separate project with its own pyproject and virtualenv; checking it
 # from here collided on two `conftest` modules. Run its checks from its own directory.
-exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/)'
+# The Modal scripts need the `modal` package (and its google/protobuf deps) to
+# resolve; without it mypy aborts with "Cannot find module for google" instead of
+# reporting. They are deployment entry points, not library code.
+exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/|scripts/modal_.*\.py|scripts/upload_config\.py|modal_.*\.py)' 
 # Duplicate basenames exist (batch_process_videos.py at the root and under scripts/archive,
 # two conftests). Explicit package bases lets mypy key modules by path instead of basename.
 explicit_package_bases = true

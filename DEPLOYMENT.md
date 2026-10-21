@@ -1,5 +1,12 @@
 # MV Face Recognition - Deployment Guide
 
+> **Retired surface (2026-10-22).** The FastAPI `backend/` tree, its `Dockerfile` and the
+> Heroku `Procfile` were deleted. Nothing imported the backend, nothing deployed it
+> (`fly.toml` builds from buildpacks, and the `Procfile` pointed at a deleted `app.py`),
+> and it held 30 files of a second implementation of the same pipeline. The Cloudflare
+> Worker (`worker/`) plus `apps/viewer` and `apps/admin` are the product; the local API
+> lives in `mvp-processor/src/local_api.py`. See `docs/refactor-plan.md`.
+
 This guide explains how to deploy the MV Face Recognition application to Cloudflare with all components properly configured.
 
 ## Overview

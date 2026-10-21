@@ -54,6 +54,31 @@ and the frontend actually import, then move it under `mvp-processor/` as the one
 still runs; the pipeline produces a `metadata.json` for one reel.
 **Risk.** Medium — `src/` deletion is large. Sequence it last, after the contract work.
 
+**Executed 2026-10-22 — first deletion.** `backend/` (30 files), its `Dockerfile`, the
+Heroku `Procfile`, and the root `video_processor.py` shim are gone. Evidence gathered
+first: nothing in the repo imported `backend/`, it had no tests, `fly.toml` builds from
+buildpacks (so the Dockerfile was unused), and the `Procfile` pointed at the `app.py`
+that had already been deleted.
+
+| Signal | Before | After |
+| --- | --- | --- |
+| mypy (project venv) | 824 errors / 106 files | **488 / 74** |
+| ruff | 73 | **66** |
+| root pytest | 140F / 120P / 17E | unchanged |
+| mypy on `scripts/hf`+`scripts/publish` | 0 | 0 (ratchet holds) |
+
+Two findings worth keeping:
+
+- **`src/services/video_processor.py` is not unimported.** The audit called it dead (it
+  is a placeholder that returns its input), but three test modules import it, so deleting
+  it broke collection. It is restored; removing it and its tests has to be one change,
+  which belongs to Workstream F's quarantine.
+- **Deleting files poisons mypy's incremental cache.** After the deletion `mypy .` aborts
+  with `AssertionError: Cannot find module for google` (a `google` namespace-package
+  resolution bug) even though `--no-incremental` reports normally. `rm -rf .mypy_cache`
+  clears it. Anyone deleting a tree should do that first, and CI starts cold so it is
+  unaffected.
+
 ---
 
 ## Workstream B — one metadata contract
