@@ -1824,7 +1824,14 @@ async function handleVideoRequest(
   env: Env,
   corsHeaders: CorsHeaders,
 ): Promise<Response> {
-  const videoPath = pathname.replace('/videos/', '');
+  let videoPath = pathname.replace('/videos/', '');
+  try {
+    // R2 keys are raw UTF-8, while the URL pathname arrives percent-encoded for
+    // anything outside ASCII (every reel id contains CJK).
+    videoPath = decodeURIComponent(videoPath);
+  } catch {
+    // Keep the raw path when decoding fails.
+  }
 
   try {
     if (!env.VIDEOS_BUCKET) {
