@@ -1,0 +1,4 @@
+{
+  "//": "Measured 2026-10-21 on main. CI fails when a count RISES above these. The per-path mypy ratchet (scripts/hf, scripts/publish) is always 0 and is not stored. Lower ruff as the refactor plan lands; never raise it without a recorded reason.",
+  "ruff_errors": 73
+}
