@@ -25,8 +25,14 @@ model = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(model)
 
 
+FIXTURES = REPO / "tests" / "fixtures" / "metadata"
+
+
 def local_reels() -> list[str]:
+    # CI checks out no processed metadata (it is generated, not tracked), so the
+    # committed fixture keeps this test exercising the real normaliser there.
     paths = glob.glob(os.path.join(model.NEW_FMT, "*.json"))
+    paths += glob.glob(str(FIXTURES / "*.json"))
     return [p for p in paths if model.video_id_from(p) is not None]
 
 
