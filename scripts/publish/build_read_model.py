@@ -562,13 +562,24 @@ def main() -> int:
             sys.exit(f"{out} is {size / 1e6:.1f} MB, over the 25 MiB KV value limit")
 
         info = payload["video_info"]
-        filename = str(info.get("filename") or f"{vid}_annotated.mp4")
+        stem = os.path.splitext(str(info.get("filename") or f"{vid}-video.mp4"))[0]
+        # Ticket 007 Q5: `stream_url` must name the same object `scripts/upload-to-r2.js`
+        # writes. Use the 1080p encode when the pipeline produced one; a reel with no
+        # local encode keeps its source filename (its R2 object predates the rule).
+        encoded = f"{stem}_1080p.mp4"
+        published = (
+            encoded
+            if os.path.exists(
+                os.path.join(REPO, "local_output/processed_videos", encoded)
+            )
+            else f"{stem}.mp4"
+        )
         videos.append(
             {
-                "id": f"{vid}-{os.path.splitext(filename)[0].split('-', 1)[-1]}",
-                "name": os.path.splitext(filename)[0],
-                "filename": filename,
-                "stream_url": f"/videos/processed_videos/{filename}",
+                "id": f"{vid}-{stem.split('-', 1)[-1]}",
+                "name": stem,
+                "filename": published,
+                "stream_url": f"/videos/processed_videos/{published}",
                 "has_metadata": True,
             }
         )

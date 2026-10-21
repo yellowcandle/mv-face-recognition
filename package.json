@@ -2,23 +2,19 @@
   "name": "mv-face-recognition-cloudflare",
   "version": "1.0.0",
   "description": "MV Face Recognition on Cloudflare Workers",
-  "main": "worker/index.js",
+  "private": true,
   "scripts": {
     "build": "npm run build:frontend",
-    "build:frontend": "cd mvp-processor && npm run build",
+    "build:frontend": "pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js",
+    "dev": "cd worker && wrangler dev",
     "deploy": "cd worker && wrangler deploy",
     "deploy:staging": "cd worker && wrangler deploy --env staging",
+    "publish:metadata": "uv run --no-project python scripts/publish/build_read_model.py",
+    "publish:metadata:remote": "uv run --no-project python scripts/publish/build_read_model.py --publish",
     "upload:videos": "node scripts/upload-to-r2.js",
-    "upload:metadata": "node scripts/upload-metadata.js",
-    "dev": "wrangler dev",
-    "setup": "npm run build && npm run upload:metadata && npm run upload:videos"
+    "setup": "npm run build && npm run publish:metadata:remote && npm run upload:videos"
   },
   "devDependencies": {
     "wrangler": "^4.47.0"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.884.0",
-    "csv-parse": "^5.0.0",
-    "ws": "^8.18.3"
   }
 }

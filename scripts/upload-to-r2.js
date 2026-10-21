@@ -1,63 +1,66 @@
 #!/usr/bin/env node
 
 /**
- * Upload processed videos to Cloudflare R2
+ * Upload the published video encodes to Cloudflare R2.
+ *
+ * The settled layout (wayfinder ticket 007) is `processed_videos/<stem>_1080p.mp4`
+ * and `_720p.mp4` inside the `mv-face-recognition-videos` bucket — the Worker serves
+ * whatever key `stream_url` names, and those two are the only encodes the publish
+ * step may reference. `_annotated.mp4` is never published.
+ *
+ * `scripts/package.json` declares `"type": "module"`, so this file is ESM.
+ * Pass --dry-run to print the objects without touching R2.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
-async function main() {
-  console.log('🎥 Uploading videos to Cloudflare R2...');
+const BUCKET = 'mv-face-recognition-videos';
+const PREFIX = 'processed_videos';
+const VARIANTS = ['_1080p.mp4', '_720p.mp4'];
+const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-  try {
-    const videosDir = 'processed_videos';
-    
-    if (!fs.existsSync(videosDir)) {
-      console.log('❌ No processed_videos directory found. Please run video processing first.');
-      process.exit(1);
-    }
+function main() {
+  const dryRun = process.argv.includes('--dry-run');
+  console.log('🎥 Uploading published encodes to Cloudflare R2...');
 
-    const videoFiles = fs.readdirSync(videosDir).filter(f => f.endsWith('.mp4'));
-    
-    if (videoFiles.length === 0) {
-      console.log('❌ No video files found in processed_videos directory.');
-      process.exit(1);
-    }
-
-    console.log(`📹 Found ${videoFiles.length} videos to upload...`);
-
-    for (const video of videoFiles) {
-      const filePath = path.join(videosDir, video);
-      const fileSize = fs.statSync(filePath).size;
-      const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
-      
-      console.log(`⬆️  Uploading ${video} (${sizeMB} MB)...`);
-      
-      try {
-        // Upload to R2 using wrangler
-        execSync(`wrangler r2 object put mv-face-recognition-videos/${video} --file=${filePath}`, { 
-          stdio: 'pipe' // Reduce noise, only show errors
-        });
-        console.log(`✅ Uploaded ${video}`);
-      } catch (error) {
-        console.error(`❌ Failed to upload ${video}:`, error.message);
-      }
-    }
-
-    console.log('🎉 Video upload completed!');
-    console.log(`   📹 Total videos: ${videoFiles.length}`);
-    console.log(`   🌐 Available at: https://your-worker.your-domain.com/videos/[filename]`);
-
-  } catch (error) {
-    console.error('❌ Error uploading videos:', error.message);
+  const videosDir = path.join(REPO, 'local_output', 'processed_videos');
+  if (!fs.existsSync(videosDir)) {
+    console.error(`❌ ${videosDir} not found — run the pipeline first.`);
     process.exit(1);
   }
+
+  const files = fs
+    .readdirSync(videosDir)
+    .filter((f) => VARIANTS.some((suffix) => f.endsWith(suffix)));
+
+  if (files.length === 0) {
+    console.error(`❌ No ${VARIANTS.join(' / ')} files in ${videosDir}.`);
+    process.exit(1);
+  }
+
+  console.log(`📹 Found ${files.length} encodes to upload...`);
+
+  for (const file of files) {
+    const filePath = path.join(videosDir, file);
+    const key = `${BUCKET}/${PREFIX}/${file}`;
+    const sizeMB = (fs.statSync(filePath).size / 1024 / 1024).toFixed(1);
+    console.log(`⬆️  ${key} (${sizeMB} MB)`);
+    if (dryRun) continue;
+    try {
+      execSync(`wrangler r2 object put "${key}" --file="${filePath}" --remote`, {
+        stdio: 'pipe',
+      });
+      console.log(`✅ Uploaded ${file}`);
+    } catch (error) {
+      console.error(`❌ Failed to upload ${file}:`, error.message);
+      process.exitCode = 1;
+    }
+  }
+
+  console.log(dryRun ? 'Dry run: nothing written.' : '🎉 Video upload completed.');
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = { main };
+main();
