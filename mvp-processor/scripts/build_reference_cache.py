@@ -53,6 +53,40 @@ def photo_list_hash(entries: list[tuple[str, Path]], photos_dir: Path) -> str:
     return h.hexdigest()
 
 
+def curate_references(
+    embeddings: np.ndarray, contestant_ids: np.ndarray, min_keep: int = 2
+) -> np.ndarray:
+    """Drop references that match another contestant better than their own.
+
+    A single-face photo can still be the wrong person (a friend in the shot). Comparing every
+    reference against the same matching rule the pipeline uses — max cosine over references —
+    exposes it: such a reference scores higher against someone else's photos than against its
+    own. Each contestant keeps every reference with a positive margin, but never fewer than
+    ``min_keep`` (or all of them when they have fewer), so a thin roster entry is not erased.
+    """
+    sims = embeddings @ embeddings.T
+    np.fill_diagonal(sims, -1.0)
+    keep = np.zeros(len(embeddings), dtype=bool)
+
+    for cid in np.unique(contestant_ids):
+        idx = np.flatnonzero(contestant_ids == cid)
+        if len(idx) <= min_keep:
+            keep[idx] = True
+            continue
+        same = contestant_ids == cid
+        margins = []
+        for i in idx:
+            genuine = sims[i][same].max()
+            impostor = sims[i][~same].max()
+            margins.append((genuine - impostor, i))
+        chosen = [i for margin, i in margins if margin > 0]
+        if len(chosen) < min_keep:
+            chosen = [i for _, i in sorted(margins, reverse=True)[:min_keep]]
+        keep[chosen] = True
+
+    return keep
+
+
 def build(photos_dir: Path, out_dir: Path) -> dict:
     from insightface.app import FaceAnalysis
 
@@ -104,6 +138,21 @@ def build(photos_dir: Path, out_dir: Path) -> dict:
     embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
     contestant_ids = np.array([cids[i] for i in keep])
     photo_paths = np.array([paths[i] for i in keep])
+    kept_faces = np.array([nfaces[i] for i in keep])
+    kept_scores = np.array([scores[i] for i in keep])
+
+    curated = curate_references(embeddings, contestant_ids)
+    dropped["outlier"] = int((~curated).sum())
+    logger.info(
+        "Curation dropped %d references that matched another contestant better than their own",
+        dropped["outlier"],
+    )
+    embeddings, contestant_ids, photo_paths = (
+        embeddings[curated],
+        contestant_ids[curated],
+        photo_paths[curated],
+    )
+    kept_faces, kept_scores = kept_faces[curated], kept_scores[curated]
 
     if embeddings.shape[1] != EMBED_DIM:
         raise SystemExit(f"Expected {EMBED_DIM}-d embeddings, got {embeddings.shape[1]}")
@@ -114,8 +163,8 @@ def build(photos_dir: Path, out_dir: Path) -> dict:
         embeddings=embeddings,
         contestant_ids=contestant_ids,
         photo_paths=photo_paths,
-        n_faces=np.array([nfaces[i] for i in keep]),
-        det_scores=np.array([scores[i] for i in keep]),
+        n_faces=kept_faces,
+        det_scores=kept_scores,
     )
 
     per_contestant = defaultdict(int)

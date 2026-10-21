@@ -9,7 +9,7 @@ notes for in-flight work live in [TODOS.md](TODOS.md).
 All "Now" items from the 2026-06-10 review were fixed on 2026-06-11 (see Done).
 Remaining before the branch lands:
 
-- [ ] Production `wrangler deploy` + live smoke test (local `wrangler dev` already serves the React viewer end-to-end; deploy needs user approval)
+- [x] Production `wrangler deploy` + live smoke test (2026-10-21): KV read model published, Worker deployed, all five videos return 206 on Range, dense metadata has no `tracker_id`.
 - [x] Reprocess `test-video-mv2` (2026-06-30): metadata now carries `tracker_id` + post-fix embeddings. **But recognition is flat at 37.6% (was 35.2%) — the BGR fix produced no accuracy gain.** See accuracy track for the real root cause. Other videos still need a reprocess once matching is fixed (don't reprocess on the broken matcher).
 - [x] `scripts/modal_youtube_processor.py`: **retired 2026-10-22** with the rest of the Modal surface (the script, its setup/wrapper, the pipeline and both docs are deleted).
 
@@ -38,10 +38,10 @@ separation 0.07). Bottleneck is **reference-photo quality + averaging**: a conte
 match each other only at mean ~0.3, and the pipeline averages 5 into one mushy centroid. Threshold
 tuning and naive regeneration both can't fix this.
 
-- [ ] **(cheap, do first) Max-over-photos matching**: store all per-photo embeddings per contestant; match a video face by max cosine over photos instead of cosine-to-averaged-centroid. Within-person max ~0.7 vs mean ~0.3 → ~doubles true-match score. Small change in `mvp-processor/src/face_detector.py`. Re-measure on `test-video-mv2`.
-- [ ] **Curate references (HDBSCAN)**: cluster each contestant's photo embeddings, drop outlier/wrong-person shots before building references (= Embedding Workbench T0.5). `app.get` currently takes the *largest* face — wrong person in group shots.
+- [x] **Max-over-photos matching** — references are flattened per photo (`flatten_references`), so the recognition argmin is max cosine over the whole reference set. Implemented with the consolidated cache.
+- [x] **Curate references** (2026-10-21): `build_reference_cache.py` drops a reference when its best cosine against another contestant beats its best against its own photos, with a two-reference floor. HDBSCAN was rejected: with 2–16 photos per contestant it labels most valid poses as noise. 25 of 663 references dropped; impostor p99 0.447→0.412, max 0.585→0.445; genuine p05 0.316→0.377. Recall on `test-video-mv2` is flat (34.8%→34.1%), so the remaining gap is domain, not contamination.
 - [ ] Fix `regenerate_embeddings_from_contestant_photos`: it reads `photos/contestant_{id}/` (4KB Git-LFS pointers); real photos are in `source/photo/contestants/ig_photos/contestant_{id}/{id}_ig_N.jpg`.
-- [ ] Then re-tune `tolerance` in `processing_config.yaml` against the *new* distribution — current `min_confidence` 0.15 rubber-stamps near-random matches.
+- [x] Re-tuned the acceptance threshold against the curated cache: `acceptance_threshold` 0.45→0.412, `band_cutoffs` high 0.585→0.445 / medium 0.451→0.412. On `test-video-mv2` recall rises 34.1%→48.4% at the measured 1% reference-level FPR. Still provisional: needs ground-truth labels from `admin → 標記` to measure video-level precision.
 - [ ] Reset expectations: even clean IG photos top ~0.5-0.7 and MV faces are small/moving — ~37% may be near the ceiling for this reference set. Better refs raise it; don't assume 90%.
 - [ ] Embedding Workbench remaining phases: save unmatched embeddings (T0.4), HDBSCAN clustering (T0.5), face crops via canvas (Phase 3), unmatched-faces UI (Phase 5) — see `openspec/changes/embedding-workbench/`
 
