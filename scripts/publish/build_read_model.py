@@ -1,15 +1,16 @@
 """Build and publish the KV read model the Worker serves.
 
-Two generations of metadata exist on disk and only one matches the contract the code
-reads (`frame_data[].detections[]`, frame-fraction bboxes, raw `match_score`):
+One metadata generation is current: `local_output/metadata/{id}-*_metadata.json`,
+written by `mvp-processor/src/process_video.py` (`frame_data[].detections[]`,
+frame-fraction bboxes, raw `match_score`). The July 2025 generation
+(`frame_results[].faces[]`, pixel bboxes, timeline keyed by name) was retired on
+2026-10-22 when reels 1–3 were reprocessed; its files are gone and `normalise()`
+refuses that shape with a message pointing at the pipeline.
 
-- `local_output/metadata/{id}-*_metadata.json` — current format (reels 4, 5)
-- `metadata/{id}-*_annotated_dense_metadata.json` — July 2025 legacy: `frame_results[].faces[]`,
-  pixel bboxes, `detection_confidence` / `recognition_confidence`, timeline keyed by name
-
-This normalises both into one payload per reel, derives `contestant_timeline` from
-`frame_data` (so every reel is consistent regardless of source), and either stages the
-result for review (`--dry-run`) or writes it to KV (`--publish`).
+This still normalises the *current* generation's two frame shapes (`detections` and the
+older `recognitions` arrays), derives `contestant_timeline` from `frame_data` (so every
+reel is consistent), and either stages the result for review (default) or writes it to
+KV (`--publish`).
 
 Why the normalisation matters: the Worker and `useViewerMetadata` both read `frame_data`,
 while every published value carried `frame_results`, so `/api/faces/detect` returned
@@ -31,7 +32,6 @@ from typing import Any, TypedDict
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 NEW_FMT = os.path.join(REPO, "local_output/metadata")
-LEGACY_FMT = os.path.join(REPO, "metadata")
 CSV = os.path.join(REPO, "metadata/contestant_info.csv")
 STAGE = os.path.expanduser("~/.cache/mv-read-model")
 BUCKET = "mv-face-recognition-videos"
@@ -50,37 +50,12 @@ class Detection(TypedDict):
     tracker_id: int | None
 
 
-# (編號, 姓名, 暱稱)
-Contestant = tuple[str, str, str]
-Roster = dict[str, Contestant]
-
-
 class Frame(TypedDict):
     frame_number: int
     timestamp: float
     detections_count: int
     recognitions_count: int
     detections: list[Detection]
-
-
-def load_contestants() -> tuple[Roster, Roster]:
-    """(by nickname, by full name) -> (id, 姓名, 暱稱)."""
-    try:
-        with open(CSV, encoding="utf-8-sig") as f:
-            rows = list(csv.DictReader(f))
-    except OSError as exc:
-        sys.exit(f"cannot read {CSV}: {exc}")
-    by_nick: Roster = {}
-    by_name: Roster = {}
-    for row in rows:
-        try:
-            cid = str(int(row["編號"].strip()))
-        except (KeyError, ValueError) as exc:
-            sys.exit(f"bad 編號 in {CSV}: {row!r} ({exc})")
-        name, nick = row["姓名"].strip(), row["暱稱"].strip()
-        by_nick[nick] = (cid, name, nick)
-        by_name[name] = (cid, name, nick)
-    return by_nick, by_name
 
 
 def video_id_from(path: str) -> str | None:
@@ -100,70 +75,7 @@ def clamp_box(x1: float, y1: float, x2: float, y2: float) -> list[float]:
     return [lo_x, lo_y, hi_x, hi_y]
 
 
-def convert_legacy(
-    doc: dict[str, Any], by_nick: Roster, by_name: Roster
-) -> dict[str, Any]:
-    """Legacy `frame_results[].faces[]` -> contract `frame_data[].detections[]`."""
-    info = doc.get("video_info") or {}
-    width = float(info.get("width") or 0)
-    height = float(info.get("height") or 0)
-    if not width or not height:
-        sys.exit("legacy metadata has no video_info.width/height; cannot scale boxes")
-
-    frames: list[Frame] = []
-    for raw in doc.get("frame_results") or []:
-        dets: list[Detection] = []
-        for face in raw.get("faces") or []:
-            box = face.get("bbox") or []
-            if len(box) != 4:
-                continue
-            # Legacy boxes are pixels; the contract is frame fractions, canonical order.
-            x1, y1, x2, y2 = (float(v) for v in box)
-            name = face.get("contestant_name")
-            known: Contestant | None = None
-            if name:
-                known = by_nick.get(name) or by_name.get(name)
-            matched = bool(face.get("matched")) and known is not None
-            conf = face.get("recognition_confidence")
-            if matched and known is not None:
-                cid, cname, cnick = known
-            else:
-                cid, cname, cnick = None, None, None
-            dets.append(
-                Detection(
-                    contestant_id=cid,
-                    contestant_name=cname,
-                    contestant_nickname=cnick,
-                    match_score=(
-                        round(float(conf), 4) if matched and conf is not None else None
-                    ),
-                    det_score=round(float(face.get("detection_confidence") or 0), 4),
-                    bbox=[
-                        round(v, 6)
-                        for v in clamp_box(
-                            x1 / width, y1 / height, x2 / width, y2 / height
-                        )
-                    ],
-                    tracker_id=None,  # the legacy pipeline stored no tracker ids
-                )
-            )
-        frames.append(
-            Frame(
-                frame_number=int(raw.get("frame_number") or 0),
-                timestamp=float(raw.get("timestamp") or 0),
-                detections_count=len(dets),
-                recognitions_count=sum(
-                    1 for d in dets if d["contestant_id"] is not None
-                ),
-                detections=dets,
-            )
-        )
-    return {"video_info": info, "legacy_source": True, "frame_data": frames}
-
-
-def build_timeline(
-    frames: list[Frame], by_nick: Roster, by_name: Roster
-) -> dict[str, Any]:
+def build_timeline(frames: list[Frame]) -> dict[str, Any]:
     """Derive the contract's contestant_timeline from frame_data alone."""
     per: dict[str, dict[str, Any]] = {}
     for frame in frames:
@@ -404,30 +316,29 @@ def normalise_video_info(info: dict[str, Any], frames: list[Frame]) -> dict[str,
     return out
 
 
-def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
+def normalise(path: str) -> dict[str, Any]:
     try:
         with open(path, encoding="utf-8") as f:
             doc = json.load(f)
     except (OSError, ValueError) as exc:
         sys.exit(f"cannot read {path}: {exc}")
 
-    if "frame_data" in doc:
-        frames = doc["frame_data"]
-        if frames and "detections" in frames[0]:
-            source = "current"
-        elif frames and "recognitions" in frames[0]:
-            frames = convert_recognitions(doc)["frame_data"]
-            source = "recognitions-converted"
-        else:
-            sys.exit(f"{path}: frame_data in an unknown shape")
-    elif "frame_results" in doc:
-        converted = convert_legacy(doc, by_nick, by_name)
-        frames = converted["frame_data"]
-        source = "legacy-converted"
+    if "frame_data" not in doc:
+        sys.exit(
+            f"{path}: no frame_data. Generation A (`frame_results`) was retired on "
+            "2026-10-22; reprocess the reel with "
+            "`mvp-processor/src/process_video.py --local-only`."
+        )
+    frames = doc["frame_data"]
+    if frames and "detections" in frames[0]:
+        source = "current"
+    elif frames and "recognitions" in frames[0]:
+        frames = convert_recognitions(doc)["frame_data"]
+        source = "recognitions-converted"
     else:
-        sys.exit(f"{path} has neither frame_data nor frame_results")
+        sys.exit(f"{path}: frame_data in an unknown shape")
 
-    timeline = build_timeline(frames, by_nick, by_name)
+    timeline = build_timeline(frames)
 
     # The pipeline's cutoffs, as bands.ts and processing_config.yaml agree on them. A run
     # that carries its own contract block is trusted but checked by validate_payload(); a
@@ -462,16 +373,13 @@ def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
 
 
 def pick_sources() -> dict[str, list[str]]:
-    """video id -> every candidate local file, so the richest can be chosen per reel."""
+    """video id -> local metadata files. One file per reel today; the caller still
+    keeps the richest, which is what let the two generations coexist."""
     candidates: dict[str, list[str]] = {}
-    for pattern in (
-        os.path.join(LEGACY_FMT, "*_annotated_dense_metadata.json"),
-        os.path.join(NEW_FMT, "*.json"),
-    ):
-        for path in sorted(glob.glob(pattern)):
-            vid = video_id_from(path)
-            if vid:
-                candidates.setdefault(vid, []).append(path)
+    for path in sorted(glob.glob(os.path.join(NEW_FMT, "*.json"))):
+        vid = video_id_from(path)
+        if vid:
+            candidates.setdefault(vid, []).append(path)
     return candidates
 
 
@@ -589,7 +497,6 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    by_nick, by_name = load_contestants()
     sources = pick_sources()
     if not sources:
         sys.exit("no metadata sources found")
@@ -603,14 +510,14 @@ def main() -> int:
     payloads: dict[str, dict[str, Any]] = {}
     chosen: dict[str, str] = {}
     for vid, candidates in sorted(sources.items(), key=lambda kv: int(kv[0])):
-        # Pick the candidate that actually recognises the most faces: the generations
-        # differ enormously (one reel: 0 matched in legacy, 596 in another variant).
+        # Pick the candidate that actually recognises the most faces. With one file per
+        # reel this is a no-op, but it kept the richer generation while both existed.
         best: dict[str, Any] | None = None
         best_path = ""
         best_matches = -1
         for candidate in candidates:
             try:
-                payload = normalise(candidate, by_nick, by_name)
+                payload = normalise(candidate)
             except SystemExit as exc:
                 logger.warning("skipping %s: %s", candidate, exc)
                 continue

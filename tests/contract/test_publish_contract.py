@@ -26,19 +26,17 @@ _SPEC.loader.exec_module(model)
 
 
 def local_reels() -> list[str]:
-    paths = glob.glob(os.path.join(model.LEGACY_FMT, "*_annotated_dense_metadata.json"))
-    paths += glob.glob(os.path.join(model.NEW_FMT, "*.json"))
+    paths = glob.glob(os.path.join(model.NEW_FMT, "*.json"))
     return [p for p in paths if model.video_id_from(p) is not None]
 
 
 def test_every_reel_on_disk_satisfies_the_contract() -> None:
     reels = local_reels()
     assert reels, "no metadata sources found"
-    by_nick, by_name = model.load_contestants()
     for path in reels:
         vid = model.video_id_from(path)
         assert vid is not None, path
-        payload = model.normalise(path, by_nick, by_name)
+        payload = model.normalise(path)
         assert model.validate_payload(vid, payload) == [], path
 
 
@@ -70,8 +68,7 @@ def test_normalise_backfills_the_fields_consumers_read(tmp_path: Path) -> None:
     path = tmp_path / "33-test_metadata.json"
     path.write_text(json.dumps(doc), encoding="utf-8")
 
-    by_nick, by_name = model.load_contestants()
-    payload = model.normalise(str(path), by_nick, by_name)
+    payload = model.normalise(str(path))
 
     assert payload["video_info"]["duration"] == 10.0
     assert payload["processing_summary"]["recognition_rate"] == 1.0
