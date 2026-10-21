@@ -31,6 +31,7 @@ import sys
 from typing import Any, TypedDict
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WORKER = os.path.join(REPO, "worker")
 NEW_FMT = os.path.join(REPO, "local_output/metadata")
 CSV = os.path.join(REPO, "metadata/contestant_info.csv")
 STAGE = os.path.expanduser("~/.cache/mv-read-model")
@@ -487,8 +488,11 @@ def build_roster(
 
 
 def wrangler(*args: str) -> bool:
+    # The namespace has a preview id too; `--preview false` is required to write the
+    # production namespace from a non-interactive shell.
+    extra = ("--preview", "false") if args and args[0] == "kv" else ()
     proc = subprocess.run(
-        ["npx", "wrangler", *args], cwd=REPO, capture_output=True, text=True
+        ["npx", "wrangler", *args, *extra], cwd=WORKER, capture_output=True, text=True
     )
     if proc.returncode != 0:
         logger.error(
