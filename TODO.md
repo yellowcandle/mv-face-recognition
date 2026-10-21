@@ -23,7 +23,7 @@ Remaining before the branch lands:
 - [ ] Serve coverage/similarity data from `local_api` instead of committed snapshots in `apps/admin/public/data/` (11k+ lines of generated JSON that goes stale after every reprocessing run)
 - [ ] Player component: replace scattered `mode === 'admin' | 'viewer'` branches with capability props (annotation source, canFlag, timeline visibility)
 - [ ] One `flagFace()` helper + `Promise.allSettled` for batch flagging (two ~50-line copy-pasted callbacks, sequential awaits)
-- [ ] Shared `useInterval` hook to replace the three hand-rolled setInterval/ref patterns (Player, Ingestion, Processing)
+- [ ] Shared `useInterval` hook to replace the two hand-rolled setInterval/ref patterns (Player, Processing)
 - [ ] `Contestants.tsx`: derive `stats` from `appearances` with `useMemo` instead of parallel state reset in three places
 - [ ] `Processing.tsx`: drop or implement the request fields `ProcessRequest` silently discards (`mode`, `similarity_threshold`, …) — "Embedding Update" currently queues the same job as "Initial Processing"
 - [ ] `ContestantTimeline`: isolate the playhead into its own component so `currentTime` updates stop re-rendering every contestant row

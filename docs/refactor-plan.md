@@ -248,8 +248,8 @@ The Player components live in `apps/shared/components/Player/` (`Player`, `Conte
 `FlagDialog`, `PlayerControls`, `DetectionBar`, plus `VideoCanvas`, `FaceOverlay`,
 `useAnnotations`, `pickInitialVideo`), with `apps/admin/src/pages/Player.tsx` now a five-line
 re-export and `PlayerPage` consuming the shared component.
-**Not done:** `apps/admin/src/pages/Ingestion.tsx` (404 lines, unrouted) is still on disk —
-retiring it is tied to the Ingestion/Modal product decision, not to this refactor.
+**Ingestion deleted 2026-10-22:** `apps/admin/src/pages/Ingestion.tsx` (404 lines, unrouted)
+is gone with the Modal ingestion path; the orphaned route comment went too.
 
 ---
 
@@ -372,8 +372,7 @@ Then the workstreams:
 ## Open product decisions (not engineering calls)
 
 - ~~`scripts/modal_youtube_processor.py`~~: **retired 2026-10-22** with the rest of the Modal surface.
-- `apps/admin/src/pages/Ingestion.tsx` (404 lines): unrouted because its backend does not exist.
-  Keep as the placeholder for the feature, or delete now that the Modal ingestion path is gone.
+- ~~`apps/admin/src/pages/Ingestion.tsx`~~: **deleted 2026-10-22** (unrouted, and its backend never existed).
 - ~~`backend/`~~: deleted (`58507562`); nothing called it.
 
 ## What must not break
