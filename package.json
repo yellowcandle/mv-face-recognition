@@ -1,8 +1,8 @@
 {
   "name": "mv-face-recognition-cloudflare",
   "version": "1.0.0",
-  "description": "MV Face Recognition on Cloudflare Workers",
   "private": true,
+  "description": "MV Face Recognition on Cloudflare Workers",
   "scripts": {
     "build": "npm run build:frontend",
     "build:frontend": "pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js",

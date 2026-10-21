@@ -35,15 +35,31 @@ function loadWorker() {
 /** Env that records every KV key read and returns nothing for all of them. */
 function keyRecordingEnv(reads) {
   const kv = {
-    get: async (key) => { reads.push(key); return null; },
+    get: async (key) => {
+      reads.push(key);
+      return null;
+    },
     put: async () => {},
     delete: async () => {},
-    list: async (options = {}) => { reads.push(`list:${options.prefix ?? ''}`); return { keys: [], list_complete: true }; },
+    list: async (options = {}) => {
+      reads.push(`list:${options.prefix ?? ''}`);
+      return { keys: [], list_complete: true };
+    },
   };
   return {
     METADATA_KV: kv,
-    MODAL_JOBS: { ...kv, get: async (key) => { reads.push(`MODAL_JOBS.get ${key}`); return null; } },
-    VIDEOS_BUCKET: { get: async () => null, head: async () => null, list: async () => ({ objects: [], truncated: false }) },
+    MODAL_JOBS: {
+      ...kv,
+      get: async (key) => {
+        reads.push(`MODAL_JOBS.get ${key}`);
+        return null;
+      },
+    },
+    VIDEOS_BUCKET: {
+      get: async () => null,
+      head: async () => null,
+      list: async () => ({ objects: [], truncated: false }),
+    },
     CF_ACCESS_AUD: 'test-aud',
     CF_ACCESS_TEAM: 'test-team',
   };
@@ -71,7 +87,9 @@ test('faces at a timestamp read the same full-id key', async () => {
   const worker = await loadWorker();
   const reads = [];
   await worker.fetch(
-    new Request(`https://worker.test/api/faces/detect?video_id=${encodeURIComponent(VIDEO_ID)}&timestamp=12`),
+    new Request(
+      `https://worker.test/api/faces/detect?video_id=${encodeURIComponent(VIDEO_ID)}&timestamp=12`,
+    ),
     keyRecordingEnv(reads),
     CONTEXT,
   );

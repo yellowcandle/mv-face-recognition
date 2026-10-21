@@ -1,11 +1,11 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* 存根 — the office copy of the request slip. Same paper, one step dirtier. */
 @theme {
-  --font-sans: "Noto Sans TC", system-ui, sans-serif;
-  --font-serif: "Noto Serif TC", serif;
-  --font-kai: "LXGW WenKai TC", "Noto Serif TC", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: 'Noto Sans TC', system-ui, sans-serif;
+  --font-serif: 'Noto Serif TC', serif;
+  --font-kai: 'LXGW WenKai TC', 'Noto Serif TC', serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   --color-paper: #ede3b6;
   --color-paper-light: #faf3d7;

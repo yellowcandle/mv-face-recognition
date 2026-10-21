@@ -3,8 +3,16 @@ import type { FaceDetection } from '../../types';
 import { bandFor } from '../../lib/bands';
 
 const COLOR_PALETTE = [
-  '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
+  '#22c55e',
+  '#3b82f6',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
+  '#06b6d4',
+  '#84cc16',
 ];
 
 /** Unmatched detections are neither a contestant nor a band — they get slate. */
@@ -31,7 +39,10 @@ export function getVideoRenderRect(
   const videoAspect = videoW / videoH;
   const containerAspect = containerW / containerH;
 
-  let renderW: number, renderH: number, offsetX = 0, offsetY = 0;
+  let renderW: number,
+    renderH: number,
+    offsetX = 0,
+    offsetY = 0;
 
   if (videoAspect > containerAspect) {
     renderW = containerW;

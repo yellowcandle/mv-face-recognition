@@ -100,7 +100,9 @@ export function Dashboard() {
                 <span className="font-kai text-[14px] font-bold text-carbon-deep group-hover:text-stamp">
                   {l.cn}
                 </span>
-                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">{l.latin}</span>
+                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
+                  {l.latin}
+                </span>
               </Link>
             ))}
           </div>

@@ -31,9 +31,14 @@ export function FlagDialog({
 
   const facesToShow = mode === 'batch' ? selectedFaces : face ? [face] : [];
   const title = mode === 'batch' ? `Batch Flag Faces (${selectedFaces.length})` : 'Flag Face';
-  const submitLabel = mode === 'batch'
-    ? isSubmitting ? 'Flagging...' : `Flag ${selectedFaces.length} Faces`
-    : isSubmitting ? 'Flagging...' : 'Flag Face';
+  const submitLabel =
+    mode === 'batch'
+      ? isSubmitting
+        ? 'Flagging...'
+        : `Flag ${selectedFaces.length} Faces`
+      : isSubmitting
+        ? 'Flagging...'
+        : 'Flag Face';
 
   return (
     <div
@@ -59,10 +64,14 @@ export function FlagDialog({
             <div>
               <label className="block text-sm text-carbon-soft mb-1">Detected As:</label>
               <p className="text-carbon-deep">
-                {face.matched ? face.contestant_name || face.contestant_nickname || 'Unmatched' : 'Unmatched'}{' '}
-                ({face.matched && face.match_score != null
+                {face.matched
+                  ? face.contestant_name || face.contestant_nickname || 'Unmatched'
+                  : 'Unmatched'}{' '}
+                (
+                {face.matched && face.match_score != null
                   ? `${face.match_score.toFixed(2)} cosine (${bandFor(face.match_score)} band)`
-                  : 'no match score'})
+                  : 'no match score'}
+                )
               </p>
             </div>
           )}
@@ -76,7 +85,9 @@ export function FlagDialog({
                     key={i}
                     className="bg-paper-dark text-carbon text-xs px-2 py-1 rounded-full border border-paper-deep"
                   >
-                    {f.matched ? f.contestant_name || f.contestant_nickname || 'Unmatched' : 'Unmatched'}{' '}
+                    {f.matched
+                      ? f.contestant_name || f.contestant_nickname || 'Unmatched'
+                      : 'Unmatched'}{' '}
                     ({f.matched ? bandFor(f.match_score) : 'unmatched'})
                   </span>
                 ))}

@@ -19,7 +19,7 @@ export enum LogLevel {
   INFO = 1,
   WARN = 2,
   ERROR = 3,
-  NONE = 4  // Disable all logging
+  NONE = 4, // Disable all logging
 }
 
 /**
@@ -44,11 +44,11 @@ export interface RequestMetadata extends LogMetadata {
  * Map string log level names to numeric values
  */
 const LogLevelMap: Record<string, LogLevel> = {
-  'debug': LogLevel.DEBUG,
-  'info': LogLevel.INFO,
-  'warn': LogLevel.WARN,
-  'error': LogLevel.ERROR,
-  'none': LogLevel.NONE
+  debug: LogLevel.DEBUG,
+  info: LogLevel.INFO,
+  warn: LogLevel.WARN,
+  error: LogLevel.ERROR,
+  none: LogLevel.NONE,
 };
 
 /**
@@ -164,11 +164,11 @@ export class Logger {
       path: url.pathname,
       status: status ?? undefined,
       durationMs: durationMs ?? undefined,
-      userAgent: request.headers.get('User-Agent')?.substring(0, 100) ?? undefined
+      userAgent: request.headers.get('User-Agent')?.substring(0, 100) ?? undefined,
     };
 
     // Remove undefined values
-    Object.keys(meta).forEach(key => {
+    Object.keys(meta).forEach((key) => {
       const k = key as keyof RequestMetadata;
       if (meta[k] === undefined) {
         delete meta[k];

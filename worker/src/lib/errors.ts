@@ -53,7 +53,7 @@ export class AppError extends Error {
     message: string,
     statusCode: number = 500,
     code: string = 'INTERNAL_ERROR',
-    details: ErrorDetails = {}
+    details: ErrorDetails = {},
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -62,9 +62,11 @@ export class AppError extends Error {
     this.details = details;
     this.timestamp = new Date().toISOString();
 
-    const captureStackTrace = (Error as unknown as {
-      captureStackTrace?: (targetObject: object, constructorOpt?: Function) => void;
-    }).captureStackTrace;
+    const captureStackTrace = (
+      Error as unknown as {
+        captureStackTrace?: (targetObject: object, constructorOpt?: Function) => void;
+      }
+    ).captureStackTrace;
     if (captureStackTrace) {
       captureStackTrace(this, this.constructor as unknown as Function);
     }
@@ -109,12 +111,10 @@ export class ValidationError extends AppError {
 
 export class NotFoundError extends AppError {
   constructor(resource: string, identifier: string | null = null) {
-    super(
-      `${resource} not found${identifier ? `: ${identifier}` : ''}`,
-      404,
-      'NOT_FOUND',
-      { resource, identifier }
-    );
+    super(`${resource} not found${identifier ? `: ${identifier}` : ''}`, 404, 'NOT_FOUND', {
+      resource,
+      identifier,
+    });
   }
 }
 
@@ -228,7 +228,7 @@ export const ErrorFactory = {
 export type WorkerHandler = (
   request: Request,
   env: unknown,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ) => Promise<Response>;
 
 /**
@@ -237,7 +237,7 @@ export type WorkerHandler = (
  */
 export function withErrorHandling(
   handler: WorkerHandler,
-  corsHeaders: CorsHeaders = {}
+  corsHeaders: CorsHeaders = {},
 ): WorkerHandler {
   return async (request: Request, env: unknown, ctx: ExecutionContext): Promise<Response> => {
     try {

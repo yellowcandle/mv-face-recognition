@@ -5,9 +5,9 @@
   "type": "module",
   "main": "index.ts",
   "types": "index.ts",
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+  "scripts": {
+    "test": "node --test 'components/**/*.test.ts'",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5"
@@ -18,8 +18,8 @@
     "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2"
   },
-  "scripts": {
-    "test": "node --test 'components/**/*.test.ts'",
-    "check": "tsc --noEmit"
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }

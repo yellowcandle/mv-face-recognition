@@ -38,14 +38,14 @@ export function Cast() {
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
       <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="名冊" latin="CAST SHEET">
         <div className="flex flex-col items-end gap-0.5">
-        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
-        <span className="font-mono text-[12px] text-carbon">
-        {all.length} 位 · {withPhoto} 有相
-        </span>
+          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
+          <span className="font-mono text-[12px] text-carbon">
+            {all.length} 位 · {withPhoto} 有相
+          </span>
         </div>
         <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
-        <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
-        <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
+          <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
+          <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
         </div>
       </Masthead>
 
@@ -85,7 +85,10 @@ export function Cast() {
             // Only the cropped derivative is public; no portrait_url means the 缺相 stamp shows.
             const src = c.portrait_url ?? null;
             return (
-              <figure key={c.id} className="group flex flex-col border-b border-r border-carbon/25 bg-paper">
+              <figure
+                key={c.id}
+                className="group flex flex-col border-b border-r border-carbon/25 bg-paper"
+              >
                 <div className="relative aspect-[3/4] overflow-hidden bg-paper-dark">
                   {/* The stamp sits underneath; a loaded portrait covers it, a missing one shows it. */}
                   <div className="absolute inset-0 flex items-center justify-center">

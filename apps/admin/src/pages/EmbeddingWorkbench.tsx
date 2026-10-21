@@ -160,7 +160,9 @@ export function EmbeddingWorkbench() {
               {/* Stats row */}
               <div className="flex gap-4">
                 <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">COVERAGE</span>
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">
+                    COVERAGE
+                  </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[32px] font-semibold text-carbon-deep">
                       {summary.good + summary.weak}/{summary.total}
@@ -177,7 +179,9 @@ export function EmbeddingWorkbench() {
                   </div>
                 </div>
                 <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">AVG MATCH SCORE</span>
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">
+                    AVG MATCH SCORE
+                  </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[32px] font-semibold text-carbon-deep">
                       {summary.avg_match_score.toFixed(2)}
@@ -185,7 +189,9 @@ export function EmbeddingWorkbench() {
                   </div>
                 </div>
                 <div className="flex-1 bg-paper-light border border-paper-dark p-5 flex flex-col gap-2">
-                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">RECOGNITION RATE</span>
+                  <span className="text-[11px] font-semibold tracking-[2px] text-carbon-soft">
+                    RECOGNITION RATE
+                  </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[32px] font-semibold text-carbon-deep">
                       {(summary.recognition_rate * 100).toFixed(1)}%
@@ -199,13 +205,16 @@ export function EmbeddingWorkbench() {
                 <span className="text-base font-semibold text-carbon-deep">Contestants</span>
                 <div className="flex gap-4 text-xs text-carbon-soft">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-carbon inline-block" /> Good ({summary.good})
+                    <span className="w-2 h-2 rounded-full bg-carbon inline-block" /> Good (
+                    {summary.good})
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Weak ({summary.weak})
+                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Weak (
+                    {summary.weak})
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Missing ({summary.missing})
+                    <span className="w-2 h-2 rounded-full bg-stamp inline-block" /> Missing (
+                    {summary.missing})
                   </span>
                 </div>
               </div>
@@ -216,14 +225,20 @@ export function EmbeddingWorkbench() {
                   <button
                     key={c.id}
                     className="flex flex-col items-center gap-0.5 py-2.5 px-1.5 border rounded cursor-pointer bg-transparent transition-all hover:-translate-y-px hover:brightness-125"
-                    style={{ borderColor: qualityColor(c.quality), background: qualityBg(c.quality) }}
+                    style={{
+                      borderColor: qualityColor(c.quality),
+                      background: qualityBg(c.quality),
+                    }}
                     onClick={() => selectContestantForDetail(c)}
                   >
                     <span className="text-[11px] text-ledger">#{c.id}</span>
                     <span className="text-[13px] font-semibold text-carbon-deep text-center overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
                       {c.nickname}
                     </span>
-                    <span className="text-[11px] text-carbon-soft" title={`${c.avg_match_score.toFixed(4)} cosine average`}>
+                    <span
+                      className="text-[11px] text-carbon-soft"
+                      title={`${c.avg_match_score.toFixed(4)} cosine average`}
+                    >
                       {c.avg_match_score.toFixed(2)}
                     </span>
                   </button>
@@ -270,7 +285,9 @@ export function EmbeddingWorkbench() {
                     <div className="w-[340px] shrink-0">
                       <Card padding="none">
                         <div className="p-5">
-                          <h3 className="text-sm font-semibold text-carbon-deep mb-3">Reference Sources</h3>
+                          <h3 className="text-sm font-semibold text-carbon-deep mb-3">
+                            Reference Sources
+                          </h3>
                           <div className="p-6 bg-paper-dark rounded-none text-center text-carbon-soft mb-3">
                             <span>{selectedContestant.nickname}</span>
                             <p className="text-ledger text-[13px] mt-1">
@@ -285,27 +302,39 @@ export function EmbeddingWorkbench() {
                           <h3 className="text-sm font-semibold text-carbon-deep mb-3">Stats</h3>
                           <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Avg Match Score</span>
-                            <strong className="text-carbon-deep" title={`${selectedContestant.avg_match_score.toFixed(4)} cosine average`}>
+                            <strong
+                              className="text-carbon-deep"
+                              title={`${selectedContestant.avg_match_score.toFixed(4)} cosine average`}
+                            >
                               {selectedContestant.avg_match_score.toFixed(2)}
                             </strong>
                           </div>
                           <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Max Match Score</span>
-                            <strong className="text-carbon-deep" title={`${selectedContestant.max_match_score.toFixed(4)} cosine max`}>
+                            <strong
+                              className="text-carbon-deep"
+                              title={`${selectedContestant.max_match_score.toFixed(4)} cosine max`}
+                            >
                               {selectedContestant.max_match_score.toFixed(2)}
                             </strong>
                           </div>
                           <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Detection Count</span>
-                            <strong className="text-carbon-deep">{selectedContestant.detection_count}</strong>
+                            <strong className="text-carbon-deep">
+                              {selectedContestant.detection_count}
+                            </strong>
                           </div>
                           <div className="flex justify-between py-2 border-b border-paper-dark text-[13px] text-carbon-soft">
                             <span>Videos Seen In</span>
-                            <strong className="text-carbon-deep">{selectedContestant.videos_seen_in}</strong>
+                            <strong className="text-carbon-deep">
+                              {selectedContestant.videos_seen_in}
+                            </strong>
                           </div>
                           <div className="flex justify-between py-2 text-[13px] text-carbon-soft">
                             <span>Reference Photos</span>
-                            <strong className="text-carbon-deep">{selectedContestant.reference_count}</strong>
+                            <strong className="text-carbon-deep">
+                              {selectedContestant.reference_count}
+                            </strong>
                           </div>
                         </div>
                       </Card>
@@ -314,9 +343,12 @@ export function EmbeddingWorkbench() {
                     {/* Right panel */}
                     <div className="flex-1">
                       <Card padding="md">
-                        <h3 className="text-sm font-semibold text-carbon-deep mb-3">Detected Faces from Videos</h3>
+                        <h3 className="text-sm font-semibold text-carbon-deep mb-3">
+                          Detected Faces from Videos
+                        </h3>
                         <p className="text-ledger text-[13px]">
-                          Face crops will be extracted on-demand from video frames using canvas (Phase 3).
+                          Face crops will be extracted on-demand from video frames using canvas
+                          (Phase 3).
                         </p>
                       </Card>
                     </div>
@@ -370,14 +402,18 @@ export function EmbeddingWorkbench() {
 
                   {/* Pairs sidebar */}
                   <div className="w-[320px] shrink-0">
-                    <h3 className="text-sm font-semibold text-carbon-deep mb-3">Top Confusion Pairs</h3>
+                    <h3 className="text-sm font-semibold text-carbon-deep mb-3">
+                      Top Confusion Pairs
+                    </h3>
                     <div className="flex flex-col gap-1">
                       {topPairs.map((pair, i) => (
                         <button
                           key={i}
                           className="flex items-center gap-2 px-3 py-2.5 bg-paper-light border border-paper-dark rounded cursor-pointer transition-colors text-left w-full hover:bg-paper-dark"
                           onClick={() => {
-                            const c = contestants.find((x) => x.nickname === pair.contestant_a.nickname);
+                            const c = contestants.find(
+                              (x) => x.nickname === pair.contestant_a.nickname,
+                            );
                             if (c) selectContestantForDetail(c);
                           }}
                         >
@@ -400,7 +436,8 @@ export function EmbeddingWorkbench() {
               ) : (
                 <div className="py-12 text-center text-carbon-soft">
                   <p>
-                    No similarity data available. Run: <code>python scripts/compute_similarity.py</code>
+                    No similarity data available. Run:{' '}
+                    <code>python scripts/compute_similarity.py</code>
                   </p>
                 </div>
               )}
@@ -411,7 +448,10 @@ export function EmbeddingWorkbench() {
           {activeTab === 'unmatched' && (
             <div className="py-12 text-center text-carbon-soft">
               <h3 className="text-carbon-deep mb-2">Unmatched Faces</h3>
-              <p>Clustered unrecognized faces will appear here after running the clustering pipeline (Phase 5).</p>
+              <p>
+                Clustered unrecognized faces will appear here after running the clustering pipeline
+                (Phase 5).
+              </p>
               <p className="text-ledger text-[13px] mt-1">
                 Requires: T0.4 (save unmatched embeddings) + T0.5 (HDBSCAN clustering)
               </p>

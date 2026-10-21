@@ -12,12 +12,7 @@ const paddingStyles: Record<string, string> = {
 };
 
 /** A card is a slip of the same paper: a ruled edge, no shadow, no rounding. */
-export function Card({
-  padding = 'md',
-  className = '',
-  children,
-  ...props
-}: CardProps) {
+export function Card({ padding = 'md', className = '', children, ...props }: CardProps) {
   return (
     <div
       className={`rounded-none border border-carbon/35 bg-paper-light ${paddingStyles[padding]} ${className}`}
