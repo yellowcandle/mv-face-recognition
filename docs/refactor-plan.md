@@ -94,16 +94,31 @@ executable file imported any of them (only stale markdown).
 | mypy repo-wide (isolated) | 259 | **202** |
 | root Python scripts | 44 | 26 |
 
-**A(3) is blocked on a product decision, not on code.** The audit's premise — `src/` is kept
-alive only by tests and `backend/` — no longer holds: `scripts/upload_{dataset,video}_to_hf.py`
-import `src.integrations.huggingface_xet`, `scripts/{init_database,fix_embeddings}.py` import
-`src.database.chroma_setup`, `setup_hardware_acceleration` imports `src.core.hardware_acceleration`,
-and `modal_pipeline.py` imports `src.core.face_{detector,matcher}`. The transitive closure of
-those live roots is 6 modules / 2,798 lines of `src/`, against 9,138 total. The rest is only
-reachable through the console script (`src.cli.main:main`, declared in `pyproject.toml`) and
-the Streamlit `src/ui/`. Deciding whether to retire the HF-upload/Modal/CLI surfaces or move
-the 6 live modules under `mvp-processor/` is a product call; deleting `src/` before that
-would break four working utility scripts.
+**A(3) executed 2026-10-22 — B + Modal retirement (user decision).** The unreachable half of
+`src/` is deleted: CLI, Streamlit UI, middleware, encryption/validation/compliance/logging,
+face tracker, task manager, the placeholder processor, the unused models, and the
+`mv-face-recognition` console script that was the CLI's only reference. What remains is the
+7-module closure (~2.9k lines) the utility scripts need. `src/models/` is trackable now:
+`.gitignore` had `models/` (any depth), which also hid `src/models` — those files had never
+been committed.
+
+The Modal surface is retired in full, as chosen: `modal_pipeline.py`, the six `scripts/modal_*`
+entry points, `process_videos_modal.sh`, `test_modal_pipeline.py`, `MODAL_PROCESSING_SETUP.md`
+and `docs/MODAL_PIPELINE.md`; `modal`, `streamlit`, `PyQt6` and `nicegui` leave `pyproject.toml`
+(`uv.lock` updated). The `scripts/modal_youtube_processor.py` restore-or-retire question is
+therefore closed as **retired**.
+
+| Signal | After A(2)+A(4) | After A(3) |
+| --- | --- | --- |
+| `src/` | 9,138 lines | **~2.9k lines / 7 modules** |
+| mypy repo-wide (isolated) | 202 | **69** |
+| ruff | 27 | **15** |
+| Modal entry points | 7 | **0** |
+
+Verified: `src` imports resolve statically (no relative or `src.*` target missing); the
+restored embedding round-trips through `DetectedFace.to_dict/from_dict`; mvp 100 passed,
+worker 6/6, both web checks, root 3 passed, gate exit 0. The 31 remaining mypy errors under
+`src/` are the tracked debt of `face_detector/face_matcher/detection/hardware_acceleration`.
 
 ---
 
@@ -356,12 +371,10 @@ Then the workstreams:
 
 ## Open product decisions (not engineering calls)
 
-- `scripts/modal_youtube_processor.py`: TODO.md asks *"restore or consciously retire"*. It has
-  10 mypy errors and belongs to the disabled ingestion feature; nothing imports it.
-- `apps/admin/src/pages/Ingestion.tsx` (406 lines): unrouted because its backend does not exist.
-  Keep as the placeholder for the feature, or delete with the Modal script.
-- `backend/`: deleting it removes the only FastAPI surface — confirm nothing external calls it
-  before Workstream A.
+- ~~`scripts/modal_youtube_processor.py`~~: **retired 2026-10-22** with the rest of the Modal surface.
+- `apps/admin/src/pages/Ingestion.tsx` (404 lines): unrouted because its backend does not exist.
+  Keep as the placeholder for the feature, or delete now that the Modal ingestion path is gone.
+- ~~`backend/`~~: deleted (`58507562`); nothing called it.
 
 ## What must not break
 
