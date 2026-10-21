@@ -30,7 +30,7 @@ The product's mechanism that a neighboring product could not truthfully copy: **
 ## Operating Context
 
 - **Content domain:** 96 contestants from the show *King Maker* (全民造星); contestant numbers (編號 1–96) are the stable identifier; nicknames are unstable and may contain spaces or CJK characters. Reference photos come from Instagram (`source/photo/contestants/ig_photos/contestant_{id}/`).
-- **Pipeline:** Python processing stack (InsightFace detection, ByteTrack tracking, ChromaDB/embedding matching, Modal.com cloud GPUs for heavy batches), dense metadata output, Cloudflare Worker + R2 serving.
+- **Pipeline:** Python processing stack (InsightFace detection, ByteTrack tracking, ChromaDB/embedding matching), dense metadata output, Cloudflare Worker + R2 serving.
 - **Deployment:** production URL `https://mv-face-recognition-api.herballemon.workers.dev/`. Admin is local-only (`local_api.py` + Vite, never deployed). Video IDs with CJK/space characters must round-trip end-to-end.
 - **Terminology is contractual:** CONTEXT.md is the glossary and must be honored — *reference photo / reference embedding / reference set / match score / detection score / band / acceptance threshold / detection / recognition / flag / contestant / viewer / admin / frame fraction / bounding box / detection space*. Several of these have caused real bugs when renamed.
 

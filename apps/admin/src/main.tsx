@@ -30,18 +30,21 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Dashboard />} />
             <Route path="player" element={<Player />} />
             <Route path="contestants" element={<Contestants />} />
-            {/* Ingestion page disabled: its /api/ingestion/* backend no longer
-                exists (worker routes deleted, local_api never had them).
-                Re-enable once local ingestion endpoints are implemented — see TODO.md. */}
-            <Route path="analytics" element={<div className="text-carbon-soft">Analytics — coming soon</div>} />
+            <Route
+              path="analytics"
+              element={<div className="text-carbon-soft">Analytics — coming soon</div>}
+            />
             <Route path="flagging" element={<Flagging />} />
             <Route path="labelling" element={<Labelling />} />
             <Route path="processing" element={<Processing />} />
             <Route path="embedding-workbench" element={<EmbeddingWorkbench />} />
-            <Route path="admin" element={<div className="text-carbon-soft">Admin — coming soon</div>} />
+            <Route
+              path="admin"
+              element={<div className="text-carbon-soft">Admin — coming soon</div>}
+            />
           </Route>
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
-  </StrictMode>
+  </StrictMode>,
 );

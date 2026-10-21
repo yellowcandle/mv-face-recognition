@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useVideos } from '@mv/shared';
+import { Masthead, useVideos } from '@mv/shared';
 import { BAND_STAMP, bandFor, formatMmSs } from '@mv/shared';
 import type { Band, VideoMetadata } from '@mv/shared';
 
@@ -33,16 +33,15 @@ export function Analytics() {
   const [sortBy, setSortBy] = useState<'appearances' | 'avgMatchScore'>('appearances');
 
   const videoId = selectedVideoId || videos[0]?.id || '';
-  const numericId = videoId.match(/^(\d+)/)?.[1] || videoId;
 
   const { data: metadata, isLoading } = useQuery<VideoMetadata>({
-    queryKey: ['video-metadata', numericId],
+    queryKey: ['video-metadata', videoId],
     queryFn: async () => {
-      const res = await fetch(`/api/videos/metadata/dense/${numericId}`);
+      const res = await fetch(`/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled: !!numericId,
+    enabled: !!videoId,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -70,35 +69,22 @@ export function Analytics() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
-      <div className="flex flex-row items-end justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-            MV FACE RECOGNITION · 全民造星 IV
-          </div>
-          <div className="flex flex-row items-baseline gap-3.5">
-            <h1 className="font-serif text-[46px] font-black leading-none tracking-[0.06em] text-carbon">
-              紀錄
-            </h1>
-            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">RECOGNITION LEDGER</span>
-          </div>
+      <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="紀錄" latin="RECOGNITION LEDGER">
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
+          <select
+            className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
+            value={selectedVideoId}
+            onChange={(e) => setSelectedVideoId(e.target.value)}
+          >
+            {videos.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex flex-row items-center gap-4 pb-1">
-          <div className="flex flex-col items-end gap-1">
-            <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
-            <select
-              className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
-              value={selectedVideoId}
-              onChange={(e) => setSelectedVideoId(e.target.value)}
-            >
-              {videos.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
 
@@ -152,7 +138,9 @@ export function Analytics() {
         <div className="overflow-hidden border border-carbon/35">
           <div className="flex flex-row items-center border-b border-carbon/40 bg-paper-dark px-4 py-2.5">
             <span className="w-[52px] font-mono text-[8px] tracking-[0.18em] text-ledger">NO.</span>
-            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">CONTESTANT</span>
+            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">
+              CONTESTANT
+            </span>
             <span className="w-[110px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
               APPEARANCES
             </span>
@@ -179,7 +167,9 @@ export function Analytics() {
                   {String(s.id).padStart(2, '0')}
                 </span>
                 <span className="flex flex-1 items-baseline gap-2">
-                  <span className="font-kai text-[15px] font-bold text-carbon-deep">{s.nickname}</span>
+                  <span className="font-kai text-[15px] font-bold text-carbon-deep">
+                    {s.nickname}
+                  </span>
                   <span className="font-mono text-[9px] text-ledger">#{s.id}</span>
                 </span>
                 <span className="w-[110px] text-right font-mono text-[12px] text-carbon">

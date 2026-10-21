@@ -50,15 +50,13 @@ export function DetectionBar({
         Frame: <span className="text-carbon-deep font-mono">{frameNumber}</span>
       </span>
 
-      {faceCount > 0 && canFlag && (
-        batchMode ? (
-          <span className="text-stamp font-medium">
-            Selected: {selectedCount}
-          </span>
+      {faceCount > 0 &&
+        canFlag &&
+        (batchMode ? (
+          <span className="text-stamp font-medium">Selected: {selectedCount}</span>
         ) : (
           <span className="text-ledger text-xs italic">Click a face to flag it</span>
-        )
-      )}
+        ))}
     </div>
   );
 }

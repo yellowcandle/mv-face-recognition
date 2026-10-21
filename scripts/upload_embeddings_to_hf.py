@@ -20,17 +20,21 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import shutil
 
 try:
     from huggingface_hub import HfApi, hf_hub_download
+
     HF_AVAILABLE = True
 except ImportError:
     HF_AVAILABLE = False
-    print("Warning: huggingface_hub not installed. Install with: pip install huggingface_hub")
+    print(
+        "Warning: huggingface_hub not installed. Install with: pip install huggingface_hub"
+    )
 
 if TYPE_CHECKING:
+    # The checker always sees the names; at runtime every use is behind HF_AVAILABLE.
     from huggingface_hub import HfApi, hf_hub_download
 
 import numpy as np
@@ -49,6 +53,7 @@ DEFAULT_REPO_ID = "yellowcandle/mv-face-recognition-data"
 @dataclass
 class HuggingFaceUploadResult:
     """Result of HuggingFace upload operation."""
+
     success: bool
     files_uploaded: int
     files_failed: int
@@ -142,14 +147,15 @@ def upload_embeddings_to_huggingface(
             success=False,
             files_uploaded=0,
             files_failed=0,
-            failed_files=[{"path": str(embeddings_dir), "error": "huggingface_hub not installed"}],
+            failed_files=[
+                {"path": str(embeddings_dir), "error": "huggingface_hub not installed"}
+            ],
         )
 
     from huggingface_hub import HfApi
-    import shutil
 
     start_time = time.time()
-    failed_files = []
+    failed_files: List[Dict[str, str]] = []
     files_uploaded = 0
 
     # Get token - try explicit token, env var, then CLI cache
@@ -177,7 +183,9 @@ def upload_embeddings_to_huggingface(
             success=False,
             files_uploaded=0,
             files_failed=0,
-            failed_files=[{"path": str(embeddings_dir), "error": f"Authentication failed: {e}"}],
+            failed_files=[
+                {"path": str(embeddings_dir), "error": f"Authentication failed: {e}"}
+            ],
         )
 
     # Get embedding files
@@ -248,7 +256,9 @@ def upload_embeddings_to_huggingface(
         except Exception as e:
             logger.error(f"Failed to upload embeddings: {e}")
             if not failed_files:
-                failed_files = [{"path": str(emb), "error": str(e)} for emb in embedding_files]
+                failed_files = [
+                    {"path": str(emb), "error": str(e)} for emb in embedding_files
+                ]
 
     duration = time.time() - start_time
     repo_url = f"https://huggingface.co/datasets/{repo_id}"
@@ -264,7 +274,7 @@ def upload_embeddings_to_huggingface(
     )
 
     logger.info(f"\n{'=' * 60}")
-    logger.info(f"Upload Summary:")
+    logger.info("Upload Summary:")
     logger.info(f"  Files uploaded: {result.files_uploaded}")
     logger.info(f"  Files failed: {result.files_failed}")
     logger.info(f"  Manifest created: {result.manifest_created}")
@@ -297,7 +307,9 @@ def verify_uploaded_embeddings(
     token = token or os.getenv("HF_TOKEN")
     if not token or not isinstance(token, str):
         try:
-            from huggingface_hub import HfApi
+            # Module-level HfApi (guarded by HF_AVAILABLE above). A local import here
+            # made HfApi function-local, so `HfApi(token=token)` below raised
+            # UnboundLocalError whenever a token was passed in.
             api_inst = HfApi()
             raw_token = api_inst.token
             if raw_token is None or not isinstance(raw_token, str):
@@ -317,7 +329,9 @@ def verify_uploaded_embeddings(
         # List files in embeddings directory
         api = HfApi(token=token)
         files = api.list_repo_files(repo_id=repo_id, repo_type="dataset")
-        embedding_files = [f for f in files if f.startswith("embeddings/") and f.endswith(".npy")]
+        embedding_files = [
+            f for f in files if f.startswith("embeddings/") and f.endswith(".npy")
+        ]
 
         for filename in embedding_files[:sample_count]:
             try:
@@ -333,10 +347,12 @@ def verify_uploaded_embeddings(
                 if dim == 512:
                     results["dimension_matched"] += 1
                 else:
-                    results["errors"].append({
-                        "file": filename,
-                        "issue": f"Dimension {dim}, expected 512",
-                    })
+                    results["errors"].append(
+                        {
+                            "file": filename,
+                            "issue": f"Dimension {dim}, expected 512",
+                        }
+                    )
 
             except Exception as e:
                 results["errors"].append({"file": filename, "error": str(e)})
@@ -417,7 +433,9 @@ def main() -> None:
 
     if args.verify and result.success:
         logger.info("Verifying uploaded embeddings...")
-        verify_result = verify_uploaded_embeddings(repo_id=args.repo_id, token=args.token)
+        verify_result = verify_uploaded_embeddings(
+            repo_id=args.repo_id, token=args.token
+        )
         if verify_result.get("verified"):
             logger.info(
                 f"✅ Verified {verify_result['samples_checked']} samples, "
@@ -427,7 +445,9 @@ def main() -> None:
             logger.warning(f"Verification issues: {verify_result.get('errors', [])}")
 
     if result.success:
-        logger.info(f"✅ Upload complete: {result.files_uploaded} files to {result.repo_url}")
+        logger.info(
+            f"✅ Upload complete: {result.files_uploaded} files to {result.repo_url}"
+        )
         sys.exit(0)
     else:
         logger.error(f"❌ Upload failed: {result.failed_files}")

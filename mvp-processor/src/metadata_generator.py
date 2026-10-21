@@ -4,7 +4,7 @@ Creates structured metadata for processed videos and face recognition results
 """
 
 import json
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 from collections import defaultdict
 import logging
@@ -28,8 +28,8 @@ class MetadataGenerator:
         frame_data: List[Dict],
         output_name: str,
         thumbnail_paths: List[str],
-        segmentation_config: Dict = None,
-        face_parsing_config: Dict = None,
+        segmentation_config: Optional[Dict] = None,
+        face_parsing_config: Optional[Dict] = None,
     ) -> Dict:
         """
         Generate comprehensive metadata for a processed video
@@ -75,9 +75,7 @@ class MetadataGenerator:
                 "acceptance_threshold": self.config["face_recognition"][
                     "acceptance_threshold"
                 ],
-                "band_cutoffs": dict(
-                    self.config["face_recognition"]["band_cutoffs"]
-                ),
+                "band_cutoffs": dict(self.config["face_recognition"]["band_cutoffs"]),
                 # Ground-truth labels (ticket 006) re-derive these; until then they are
                 # measured guesses and the metadata says so.
                 "provisional": True,
@@ -106,7 +104,7 @@ class MetadataGenerator:
 
     def _build_contestant_timeline(self, recognitions: List[FaceRecognition]) -> Dict:
         """Build timeline of contestant appearances"""
-        timeline = defaultdict(
+        timeline: Dict[str, Dict[str, Any]] = defaultdict(
             lambda: {
                 "appearances": [],
                 "total_appearances": 0,
@@ -128,14 +126,20 @@ class MetadataGenerator:
                 "bbox": [float(v) for v in recognition.detection.bbox],
             }
 
+            # Optional per-detection fields set only by the segmentation/parsing passes;
+            # getattr because pyright cannot narrow through hasattr.
             if hasattr(recognition.detection, "roi_gated"):
-                appearance["roi_gated"] = recognition.detection.roi_gated
+                appearance["roi_gated"] = getattr(recognition.detection, "roi_gated")
 
             if hasattr(recognition.detection, "parsing_validated"):
-                appearance["parsing_validated"] = recognition.detection.parsing_validated
+                appearance["parsing_validated"] = getattr(
+                    recognition.detection, "parsing_validated"
+                )
 
             if hasattr(recognition.detection, "skin_ratio"):
-                appearance["skin_ratio"] = float(recognition.detection.skin_ratio)
+                appearance["skin_ratio"] = float(
+                    getattr(recognition.detection, "skin_ratio")
+                )
 
             timeline[contestant_id]["appearances"].append(appearance)
 
@@ -227,9 +231,7 @@ class MetadataGenerator:
                 "end_time": end_time,
                 "contestants": contestants,
                 "recognition_count": len(interval_recognitions),
-                "average_match_score": sum(
-                    r.match_score for r in interval_recognitions
-                )
+                "average_match_score": sum(r.match_score for r in interval_recognitions)
                 / len(interval_recognitions),
             }
             markers.append(marker)
@@ -249,7 +251,7 @@ class MetadataGenerator:
         Returns:
             Gallery data structure
         """
-        galleries = defaultdict(
+        galleries: Dict[str, Dict[str, Any]] = defaultdict(
             lambda: {"contestant_info": {}, "face_samples": [], "statistics": {}}
         )
 
@@ -292,9 +294,9 @@ class MetadataGenerator:
                 "last_appearance": max(timestamps),
                 "screen_time_percentage": self._calculate_screen_time_percentage(
                     timestamps,
-                    recognitions[0].detection.timestamp
-                    if recognitions
-                    else 0,  # Total duration proxy
+                    (
+                        recognitions[0].detection.timestamp if recognitions else 0
+                    ),  # Total duration proxy
                 ),
             }
 
@@ -321,7 +323,7 @@ class MetadataGenerator:
         unique_seconds = len(set(int(t) for t in timestamps))
         return (unique_seconds / total_duration) * 100 if total_duration > 0 else 0.0
 
-    def export_web_metadata(self, metadata: Dict, output_dir: str):
+    def export_web_metadata(self, metadata: Dict, output_dir: str) -> None:
         """Export metadata optimized for web consumption"""
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -333,16 +335,20 @@ class MetadataGenerator:
             "timeline_markers": metadata["timeline_markers"],
         }
 
-        with open(output_path / "basic_metadata.json", "w", encoding="utf-8") as f:
-            json.dump(basic_metadata, f, indent=2, ensure_ascii=False)
-
-        # Contestant timeline (for detailed analysis)
-        with open(output_path / "contestant_timeline.json", "w", encoding="utf-8") as f:
-            json.dump(metadata["contestant_timeline"], f, indent=2, ensure_ascii=False)
-
-        # Dense frame data (for debugging/detailed analysis)
-        with open(output_path / "frame_data.json", "w", encoding="utf-8") as f:
-            json.dump(metadata["frame_data"], f, indent=2, ensure_ascii=False)
+        exports = {
+            "basic_metadata.json": basic_metadata,
+            "contestant_timeline.json": metadata[
+                "contestant_timeline"
+            ],  # detailed analysis
+            "frame_data.json": metadata["frame_data"],  # dense, for debugging
+        }
+        for name, payload in exports.items():
+            try:
+                with open(output_path / name, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2, ensure_ascii=False)
+            except OSError:
+                logger.exception("Failed to write %s", output_path / name)
+                raise
 
         logger.info(f"Exported web metadata to {output_path}")
 

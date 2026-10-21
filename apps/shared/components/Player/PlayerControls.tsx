@@ -1,3 +1,5 @@
+import { formatMmSs } from '../../lib/format';
+
 interface PlayerControlsProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   isPlaying: boolean;
@@ -15,12 +17,6 @@ interface PlayerControlsProps {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
 export function PlayerControls({
   isPlaying,
@@ -83,7 +79,7 @@ export function PlayerControls({
 
       {/* Time display */}
       <span className="text-carbon-soft text-sm font-mono whitespace-nowrap">
-        {formatTime(currentTime)} / {formatTime(duration)}
+        {formatMmSs(currentTime)} / {formatMmSs(duration)}
       </span>
 
       {/* Seek bar */}

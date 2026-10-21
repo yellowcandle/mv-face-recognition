@@ -1,70 +1,22 @@
 [project]
 name = "mv-face-recognition"
 version = "0.1.0"
-description = "Face recognition system for MV contestants using ChromaDB and InsightFace"
+description = "Tooling for the MV face-recognition pipeline (publisher, HF staging, checks)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # Core framework
-    "streamlit>=1.28.0",
-    # Face recognition and computer vision
+    # Used by the retained utility scripts (portraits, HF staging, embeddings).
     "insightface>=0.7.3",
-    "supervision>=0.19.0",
     "opencv-python>=4.8.0",
-    "torch>=2.9.1",
-    "torchvision>=0.20.1",
-    "onnxruntime>=1.20.1",
-    # Data processing
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "pillow>=11.3.0",
-    # Vector database for fast similarity search
-    "chromadb>=0.4.0",
-    # Media processing
-    "ffmpeg-python>=0.2.0",
-    "yt-dlp>=2024.8.6",
-    # Cloud processing
-    "modal>=0.64.0",
-    # Utilities
-    "tqdm>=4.65.0",
-    # GUI Framework
-    "PyQt6>=6.6.0",
-    "PyQt6-Qt6>=6.6.0",
-    "nicegui>=3.5.0",
-    "typing-extensions>=4.0.0",
-    "python-socketio>=5.14.0",
-    "python-engineio>=4.0.0",
-    "bidict>=0.22.0",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.34.0",
-    "orjson>=3.6.0",
-    "pydantic>=2.10.0",
-    "pydantic-settings>=2.7.0",
-    "starlette>=0.49.1",
-    "python-multipart>=0.0.20",
-    "aiofiles>=24.1.0",
-    "aiohttp>=3.13.3",
-    "urllib3>=2.6.3",
-    "pyyaml>=6.0",
-    "click>=8.2.1",
-    "PyJWT>=2.10.1",
-    "cryptography>=43.0.0",
-    "filelock>=3.20.1",
-    "fonttools>=4.60.2",
     "huggingface-hub[hf-xet]>=0.33.1",
 ]
 
-[project.scripts]
-mv-face-recognition = "src.cli.main:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src"]
 
 [tool.uv]
+package = false
 dev-dependencies = [
     "pytest",
     "black",
@@ -103,6 +55,14 @@ known_first_party = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
+# mvp-processor is a separate project with its own pyproject and virtualenv; checking it
+# from here collided on two `conftest` modules. Run its checks from its own directory.
+exclude = '^(mvp-processor/|archive/|node_modules/|\.venv/)' 
+# `scripts/archive/` keeps a copy of the retired batch driver, and the test packages each
+# have their own conftest; explicit package bases lets mypy key modules by path instead of
+# basename.
+explicit_package_bases = true
+mypy_path = "."
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -123,17 +83,60 @@ module = [
     "chromadb.*",
     "ffmpeg.*",
     "numpy.*",
+    "pandas.*",
+    "yt_dlp.*",
+    "moto.*",
+    "yaml.*",
+    # mvp-processor/src siblings import each other as top-level modules; they only
+    # resolve when mypy runs from that directory.
+    "face_detector",
 ]
 ignore_missing_imports = true
 
-[tool.pyright]
-# The Gradio GUI is retired: the product moved to the React apps (apps/viewer,
-# apps/admin) and mvp-processor. What is left under archive/ — plus the two root
-# scripts that drove it — is kept for reference, not built, not type-checked.
-# app.py is the HF Spaces entry point and still imports the archived GUI, so it
-# no longer launches; see docs/void-migration.md for the storage/edge plan.
-exclude = [
-    "archive",
-    "app.py",
-    "add_performance_flag.py",
+[[tool.mypy.overrides]]
+# Quarantined debt (refactor plan F(2)). The tests were written against APIs that
+# have since moved, the debug/benchmark scripts are throwaway probes, and the test
+# support modules wrap moto/yaml shims. Counting all of it hid the product-code
+# number the ratchet gates. Both module-name forms are listed: tests/ has no
+# __init__.py, so mypy roots each test package at its own directory
+# (`contract.test_x`) or prefixes it (`tests.contract.test_x`) depending on invocation.
+# Delete entries as files are repaired or removed — never widen this list.
+module = [
+    "tests.*",
+    "tests",
+    "unit.*",
+    "contract.*",
+    "integration.*",
+    "performance.*",
+    "benchmark.*",
+    "validation.*",
+    "conftest",
+    "tests.conftest",
+    "unit.conftest",
+    "contract.conftest",
+    "scripts.debug.*",
+    "scripts.benchmarks.*",
+    # These test files sit outside a package, so mypy names them as bare modules when
+    # invoked from inside their directory.
+    "test_security",
+    "test_access_control",
+    "test_compliance",
+    "test_error_handling",
+    "test_input_validation",
+    "test_security_fixes",
+    "test_security_performance",
+    "test_face_detector",
+    "test_face_parser",
+    "test_recall",
+    "test_quickstart",
+    "test_roi_cache",
+    "test_person_segmenter",
+    "test_frame_optimizer",
+    "test_metadata_compressor",
+    "test_performance",
 ]
+ignore_errors = true
+
+[tool.pyright]
+# archive/ is the retired Gradio GUI and old copies: kept for reference, not built.
+exclude = ["archive"]

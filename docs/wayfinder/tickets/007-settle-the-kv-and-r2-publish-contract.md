@@ -141,3 +141,24 @@ Not written any more: `videos_list`, `processing_report`, `annotated_metadata_co
 
 Open for confirmation: the KV key name `metadata_<video_id>` (the worker's current `metadata_dense_`
 prefix is dropped) and the thumbnail R2 key layout above.
+
+---
+
+**Executed 2026-10-22 (repo side).** `build:frontend` now builds `apps/viewer` and runs
+`scripts/update-worker-assets.js`; the root `wrangler.toml` (pointing at the deleted
+`worker/index.js`) is gone and `dev`/`deploy` run from `worker/`. `upload_metadata_to_kv.js`,
+`upload-metadata.js` and `upload_videos_to_r2.js` are deleted — `scripts/publish` owns KV.
+`upload-to-r2.js` is rewritten as ESM (the file lives under `scripts/` with `"type": "module"`,
+so the old `require` version could not run at all), reads `local_output/processed_videos/`, and
+uploads only `_1080p` / `_720p` under `processed_videos/`; `--dry-run` lists eight encodes.
+`stream_url` in the published list now names that same object: `/videos/processed_videos/<stem>_1080p.mp4`
+(reels 1–3), falling back to the source filename for reels 4–5, which have no local encode.
+**Q1 executed 2026-10-22.** KV keys are now `metadata_<full video id>` — the same string
+`processed_videos_list` serves. The numeric-prefix extraction is gone from
+`handleDenseMetadata`, `handleVideoMetadata`, `handleFaceDetection` and the
+recognition-results scan (which now lists the `metadata_` prefix). The mocked dense/basic
+metadata fallbacks and the dead `video_metadata_dense_*` read are deleted: a miss returns 404
+naming the key. `worker/tests/metadata-keys.test.mjs` pins the key for all three routes
+(6/6 node:test pass). The orphaned `worker/tests/api.test.js` is deleted — it was never
+executed (`npm test` runs `node --test tests/*.test.mjs`, and vitest is not a dependency).
+The viewer's Analytics now requests the list's id instead of stripping digits.

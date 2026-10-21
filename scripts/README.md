@@ -1,182 +1,41 @@
-# MV Face Recognition Scripts
+# Scripts
 
-This directory contains scripts for the MV Face Recognition system using the Cloudflare Workers + Modal.com architecture.
+Entry points for processing, publishing and maintenance. The pipeline itself lives in
+`mvp-processor/`; nothing here re-implements it.
 
-## Current Architecture Scripts
+## Pipeline and publishing
 
-### 🚀 Video Processing (Modal.com)
-
-#### `modal_batch_processor.py`
-**Primary video processing script for Modal.com cloud infrastructure**
-- Processes videos using GPU acceleration on Modal
-- Handles face detection, recognition, and annotation
-- Generates dense metadata for smooth video playback
-- Supports single video or batch processing
-
-```bash
-# Process all videos
-modal run modal_batch_processor.py
-
-# Process single video  
-modal run modal_batch_processor.py --single-video "video.mp4"
-
-# Force reprocess with different threshold
-modal run modal_batch_processor.py --force-reprocess --similarity-threshold 0.3
-```
-
-#### `modal_rich_parallel.py`
-**Enhanced parallel processing with Rich UI**
-- True parallel processing using Modal's starmap
-- Rich console output with progress tracking
-- Container-level parallelization for faster processing
+| Script | Purpose |
+| --- | --- |
+| `run-full-pipeline.cjs` | orchestrates process → build viewer → publish KV → upload R2 → deploy Worker (`--process-only`, `--skip-upload`, `--skip-deploy`) |
+| `publish/build_read_model.py` | normalises each reel, backfills contract fields, validates, stages (default) or writes KV (`--publish`) |
+| `upload-to-r2.js` | uploads `local_output/processed_videos/*_{1080p,720p}.mp4` to `processed_videos/` in R2 (`--dry-run` lists them) |
+| `update-worker-assets.js` | embeds `apps/viewer/dist` into `worker/embedded-assets.js` |
+| `ci/check_baselines.py` | ruff / mypy / pytest ratchets against `scripts/ci/baseline.json` |
 
 ```bash
-# Parallel processing
-modal run modal_rich_parallel.py --parallel --max-containers 4
-
-# Single video with Rich UI
-modal run modal_rich_parallel.py --single-video "video.mp4"
+node scripts/run-full-pipeline.cjs --skip-processing   # deploy the current artifacts
+uv run --no-project python scripts/publish/build_read_model.py --publish
+node scripts/upload-to-r2.js --dry-run
 ```
 
-#### `process_videos_modal.sh`
-**Shell wrapper for Modal video processing**
-- Handles Modal setup, data sync, and result download
-- Provides user-friendly interface for Modal operations
+## Portraits and Hugging Face
 
-```bash
-# First-time setup
-./scripts/process_videos_modal.sh --setup
+`hf/` stages and materialises the photo corpora and publishes the cropped portraits:
 
-# Sync data to Modal
-./scripts/process_videos_modal.sh --sync-data
+- `stage_sources.py`, `stage_curated.py`, `materialize_source_photo.py` — dataset staging
+- `make_portraits.py` — per-contestant face crop (512 px WebP + provenance manifest)
+- `publish_portraits_r2.py` — uploads `portraits/<id>.webp` and the manifest the Worker reads
 
-# Process videos
-./scripts/process_videos_modal.sh
+## Embeddings and contestant data
 
-# Download results
-./scripts/process_videos_modal.sh --download-results
-```
+- `check_stored_embeddings.py` — integrity and normalisation checks
+- `validate_embeddings.py` — compare stored embeddings against the reference manifest
+- `upload_embeddings_to_hf.py` — upload the embedding cache to Hugging Face
 
-### ☁️ Cloudflare Deployment
-
-#### `upload-metadata.js`
-**Upload metadata to Cloudflare KV storage**
-- Converts CSV contestant data to JSON
-- Uploads video metadata for web interface
-- Stores processing reports and app settings
-
-```bash
-node scripts/upload-metadata.js
-```
-
-#### `upload-to-r2.js`
-**Upload processed videos to Cloudflare R2**
-- Bulk upload of annotated videos
-- Provides CDN-backed video delivery
-
-```bash
-node scripts/upload-to-r2.js
-```
-
-### 🔧 Utility Scripts
-
-#### `check_stored_embeddings.py`
-**Verify face embedding quality**
-- Checks normalization of stored embeddings
-- Validates embedding file formats
-
-```bash
-python scripts/check_stored_embeddings.py
-```
-
-#### `debug_similarity.py`
-**Debug face recognition similarity scores**
-- Analyzes why faces might not be matching
-- Tests similarity thresholds with sample data
-
-```bash
-python scripts/debug_similarity.py
-```
-
-#### `deduplicate_embeddings.py`
-**Clean up duplicate embeddings in database**
-- Removes exact and similar duplicates
-- Prioritizes real names over contestant numbers
-- Optimizes database performance
-
-```bash
-# Analyze duplicates
-python scripts/deduplicate_embeddings.py --analyze
-
-# Remove exact duplicates
-python scripts/deduplicate_embeddings.py --remove exact
-
-# Remove all duplicates
-python scripts/deduplicate_embeddings.py --remove all
-```
-
-#### `fix_embeddings.py`
-**Fix and refresh face embeddings database**
-- Downloads LFS files if needed
-- Verifies embedding validity
-- Refreshes ChromaDB database
-
-```bash
-# Complete database refresh
-python scripts/fix_embeddings.py --all
-
-# Force refresh
-python scripts/fix_embeddings.py --all --force
-```
-
-#### `setup_hardware_acceleration.py`
-**Optimize hardware for processing**
-- Detects available GPU/CPU acceleration
-- Installs optimal dependencies
-- Configures CUDA or Apple Silicon support
-
-```bash
-python scripts/setup_hardware_acceleration.py
-```
-
-#### `upload_config.py`
-**Upload configuration to Modal volume**
-- Ensures Modal has latest config settings
-
-```bash
-modal run scripts/upload_config.py
-```
-
-## Workflow Overview
-
-### Initial Setup
-1. **Hardware Setup**: `python scripts/setup_hardware_acceleration.py`
-2. **Modal Setup**: `./scripts/process_videos_modal.sh --setup`
-3. **Database Cleanup**: `python scripts/fix_embeddings.py --all`
-
-### Video Processing
-1. **Sync Data**: `./scripts/process_videos_modal.sh --sync-data`
-2. **Process Videos**: `modal run scripts/modal_batch_processor.py`
-3. **Download Results**: `./scripts/process_videos_modal.sh --download-results`
-
-### Deployment to Cloudflare
-1. **Upload Videos**: `node scripts/upload-to-r2.js`
-2. **Upload Metadata**: `node scripts/upload-metadata.js`
-3. **Deploy Workers**: (via `wrangler deploy` in worker directory)
-
-### Maintenance
-- **Debug Issues**: `python scripts/debug_similarity.py`
-- **Clean Database**: `python scripts/deduplicate_embeddings.py --remove all`
-- **Verify Embeddings**: `python scripts/check_stored_embeddings.py`
-
-## Architecture Notes
-
-- **Modal.com**: Handles compute-intensive video processing with GPU acceleration
-- **Cloudflare R2**: Stores processed videos with global CDN delivery
-- **Cloudflare KV**: Stores metadata for fast access by Workers
-- **Cloudflare Workers**: Serves API endpoints and handles requests
-- **Cloudflare Pages**: Hosts the static SvelteKit frontend
+The Chroma collection, its roster resolver and the scripts that populated it are deleted.
+`source/photo/contestants/reference_manifest.json` is the record (ADR 0001).
 
 ## Archive
 
-See `archive/` directory for scripts from the previous Docker/Fly.io architecture.
+`archive/` holds the Docker/Fly.io-era scripts. Nothing imports them.

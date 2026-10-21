@@ -4,15 +4,14 @@ Handles face detection, encoding, and recognition against contestant database
 Using InsightFace buffalo_l model for 512-dim ArcFace embeddings
 """
 
-import cv2
 import json
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 import logging
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -32,9 +31,12 @@ def _get_insightface_app():
     with _insightface_lock:
         if _insightface_app is None:
             from insightface.app import FaceAnalysis
+
             # ponytail: env override so a run can skip CoreML (per-shape compile fails on video frames)
-            providers = os.environ.get('INSIGHTFACE_PROVIDERS', 'CoreMLExecutionProvider,CPUExecutionProvider').split(',')
-            app = FaceAnalysis(name='buffalo_l', providers=providers)
+            providers = os.environ.get(
+                "INSIGHTFACE_PROVIDERS", "CoreMLExecutionProvider,CPUExecutionProvider"
+            ).split(",")
+            app = FaceAnalysis(name="buffalo_l", providers=providers)
             app.prepare(ctx_id=0, det_size=(640, 640))
             _insightface_app = app
             logger.info("InsightFace buffalo_l model initialized")
@@ -81,7 +83,9 @@ class ContestantDatabase:
         self.info_csv = config["contestants"]["info_csv"]
 
         self.contestants_info = {}
-        self.face_encodings = {}  # contestant_id -> (K, 512), one row per reference photo
+        self.face_encodings = (
+            {}
+        )  # contestant_id -> (K, 512), one row per reference photo
         self.contestant_names = []
         # Flat, parallel lists — one entry per reference photo. Built once, read every frame.
         self.reference_encodings: List[np.ndarray] = []
@@ -126,7 +130,7 @@ class ContestantDatabase:
         """
         cache_path = self.photo_dir / "reference_embeddings.npz"
         manifest_path = self.photo_dir / "reference_manifest.json"
-        rebuild_hint = f"Rebuild it with: python scripts/build_reference_cache.py"
+        rebuild_hint = "Rebuild it with: python scripts/build_reference_cache.py"
 
         if not cache_path.exists():
             raise FileNotFoundError(
@@ -160,7 +164,9 @@ class ContestantDatabase:
                     f"{len(embeddings)}. {rebuild_hint}"
                 )
         else:
-            logger.warning(f"No reference manifest at {manifest_path}; cannot verify cache freshness")
+            logger.warning(
+                f"No reference manifest at {manifest_path}; cannot verify cache freshness"
+            )
 
         self.face_encodings = {
             contestant_id: embeddings[contestant_ids == contestant_id]
@@ -197,7 +203,9 @@ class FaceDetector:
 
     def __init__(self, config: dict):
         self.config = config
-        self.min_face_size = config["face_detection"].get("min_face_size", 20)  # Minimum face size in pixels
+        self.min_face_size = config["face_detection"].get(
+            "min_face_size", 20
+        )  # Minimum face size in pixels
         self.prev_frame_hash = None  # For frame difference detection
 
     def detect_faces(
@@ -223,7 +231,9 @@ class FaceDetector:
 
             frame_height, frame_width = frame.shape[:2]
             if frame_height <= 0 or frame_width <= 0:
-                logger.error(f"Frame {frame_number} has zero extent; skipping detection")
+                logger.error(
+                    f"Frame {frame_number} has zero extent; skipping detection"
+                )
                 return []
 
             detections = []
@@ -338,7 +348,7 @@ class FaceRecognizer:
                 # Cosine distance: both detection.encoding and known_encoding
                 # are already L2-normalized from InsightFace normed_embedding
                 best_match_idx = -1
-                best_distance = float('inf')
+                best_distance = float("inf")
 
                 for idx, known_encoding in enumerate(known_encodings):
                     distance = 1 - np.dot(detection.encoding, known_encoding)
@@ -440,7 +450,9 @@ class FaceRecognizer:
                             detection=detection,
                             contestant_id=contestant_id,
                             contestant_name=contestant_info.get("name", "Unknown"),
-                            contestant_nickname=contestant_info.get("nickname", "Unknown"),
+                            contestant_nickname=contestant_info.get(
+                                "nickname", "Unknown"
+                            ),
                             match_score=match_score,
                         )
                         frame_recognitions.append(recognition)
@@ -452,4 +464,3 @@ class FaceRecognizer:
 
         logger.debug(f"Batch recognition: processed {len(detections_batch)} frames")
         return results
-

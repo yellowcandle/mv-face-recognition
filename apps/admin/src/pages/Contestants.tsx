@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { formatMmSs, useContestants } from '@mv/shared';
+import { Masthead, formatMmSs, useContestants } from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 interface Appearance {
@@ -56,7 +56,7 @@ export function Contestants() {
         setAppearances(
           results.map((r: Record<string, unknown>) => ({
             video_id: String(r.video_id),
-            video_name: `Video ${r.video_id}`,
+            video_name: `Video ${String(r.video_id)}`,
             timestamp: r.timestamp as number,
             match_score: (r.match_score ?? null) as number | null,
           })),
@@ -88,20 +88,12 @@ export function Contestants() {
   return (
     <div className="flex min-h-0 flex-1 flex-row px-9 pb-6 pt-7">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-row items-end justify-between gap-6">
-          <div className="flex flex-col gap-1.5">
-            <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-              BACK OFFICE · LOCAL ONLY · 127.0.0.1
-            </div>
-            <div className="flex flex-row items-baseline gap-3.5">
-              <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-                名冊
-              </h1>
-              <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">
-                CAST · 全民造星 IV
-              </span>
-            </div>
-          </div>
+        <Masthead
+          eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
+          title="名冊"
+          latin="CAST · 全民造星 IV"
+          size="md"
+        >
           <button
             type="button"
             onClick={() => void refetch()}
@@ -109,7 +101,7 @@ export function Contestants() {
           >
             重新調閱
           </button>
-        </div>
+        </Masthead>
 
         <div className="mt-4 h-px bg-carbon/45" />
 
@@ -169,7 +161,9 @@ export function Contestants() {
                 />
               </span>
               <span className="ml-3 flex flex-1 items-baseline gap-2">
-                <span className="font-kai text-[15px] font-bold text-carbon-deep">{c.nickname}</span>
+                <span className="font-kai text-[15px] font-bold text-carbon-deep">
+                  {c.nickname}
+                </span>
                 <span className="font-kai text-[12px] text-carbon-soft">{c.name}</span>
               </span>
               <span className="w-[70px] text-right font-mono text-[11px] text-carbon-soft">
@@ -249,7 +243,9 @@ export function Contestants() {
                 ['影片', selectedContestant.videos_seen_in],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex flex-col gap-0.5">
-                  <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">{label}</span>
+                  <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
+                    {label}
+                  </span>
                   <span className="font-mono text-[16px] text-carbon">{value}</span>
                 </div>
               ))}
@@ -280,9 +276,7 @@ export function Contestants() {
                 </div>
               ))}
               {!isLoadingAppearances && appearances.length === 0 && (
-                <div className="py-6 font-kai text-[12px] text-carbon-soft">
-                  沒有已記錄的出場。
-                </div>
+                <div className="py-6 font-kai text-[12px] text-carbon-soft">沒有已記錄的出場。</div>
               )}
             </div>
 

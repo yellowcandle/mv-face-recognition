@@ -2,14 +2,24 @@
 Test configuration and fixtures for MVP processor tests
 """
 
-import pytest
+import sys
 import tempfile
 import shutil
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 import numpy as np
 import cv2
 import yaml
-from unittest.mock import Mock, patch
+
+# The modules under src/ import each other flat (`from roi import ROI`, `from config
+# import FaceParsingConfig`) because they are run as scripts with src/ as the script
+# directory. Put src/ on the path here so the same modules import under pytest; the
+# pythonpath ini option did not take effect for collection-time imports.
+_SRC = str(Path(__file__).resolve().parents[1] / "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
 # Lightweight boto3 fallback for environments without boto3 installed
 try:
@@ -31,7 +41,7 @@ except Exception:
 
 try:
     from moto import mock_aws as mock_s3
-except ImportError:
+except ImportError:  # older moto exposed mock_s3 directly
     try:
         from moto import mock_s3
     except ImportError:
@@ -145,7 +155,7 @@ def sample_video(temp_dir):
     video_path = temp_dir / "test_video.mp4"
 
     # Create a simple test video using OpenCV
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
     out = cv2.VideoWriter(str(video_path), fourcc, 30.0, (640, 480))
 
     # Create 30 frames of test video (1 second at 30fps)
@@ -221,9 +231,8 @@ def contestant_data(temp_dir):
 
             # Create a unique colored face for each contestant
             image = np.zeros((200, 200, 3), dtype=np.uint8)
-            color = [(255, 100, 100), (100, 255, 100), (100, 100, 255)][
-                contestant["編號"] - 1
-            ]
+            number = int(contestant["編號"])
+            color = [(255, 100, 100), (100, 255, 100), (100, 100, 255)][number - 1]
             image[:, :] = color
 
             # Draw face features
@@ -342,7 +351,7 @@ def large_video(temp_dir):
     """Create a larger video for performance testing"""
     video_path = temp_dir / "large_test_video.mp4"
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
     out = cv2.VideoWriter(str(video_path), fourcc, 30.0, (1920, 1080))
 
     # Create 300 frames (10 seconds at 30fps)

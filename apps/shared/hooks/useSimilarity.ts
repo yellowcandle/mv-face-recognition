@@ -26,8 +26,8 @@ export function useSimilarity() {
   });
 
   function load() {
-    matrix.refetch();
-    pairs.refetch();
+    void matrix.refetch();
+    void pairs.refetch();
   }
 
   return { matrix, pairs, load };

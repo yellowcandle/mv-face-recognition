@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, useContestants, useVideos, bandFor } from '@mv/shared';
+import { BAND_STAMP, Badge, Button, Card, useContestants, useVideos, bandFor } from '@mv/shared';
 import type { Band, Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 
 // ---------------------------------------------------------------------------
@@ -50,9 +50,7 @@ interface LabelsFile {
 }
 
 /** `GET /api/labels/{video_id}` either yields the file or refuses a stale one (409). */
-type LabelsResult =
-  | { status: 'conflict'; detail: string }
-  | { status: 'loaded'; file: LabelsFile };
+type LabelsResult = { status: 'conflict'; detail: string } | { status: 'loaded'; file: LabelsFile };
 
 interface Detection {
   key: string;
@@ -64,7 +62,6 @@ interface Detection {
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
-  tracker_id: number | null;
 }
 
 /** The metadata route also stamps the run's `processing_date`, which `VideoInfo` does not declare. */
@@ -86,14 +83,6 @@ const GATE = { trueMatchMean: 0.45, worstImpostor: 0.2 } as const;
 const MIN_LABELS_FOR_GATE = 10;
 const MIN_TRUE_MATCHES_FOR_MEAN = 5;
 const MIN_IMPOSTORS_FOR_WORST = 3;
-
-const BAND_PILL: Record<Band, string> = {
-  high: 'bg-carbon/20 text-carbon border-carbon/50',
-  medium: 'bg-stamp/20 text-stamp border-stamp/50',
-  low: 'bg-stamp/20 text-stamp border-stamp/50',
-};
-
-const BAND_LABEL: Record<Band, string> = { high: 'high', medium: 'medium', low: 'low' };
 
 const VERDICT_PILL: Record<Verdict, string> = {
   contestant: 'bg-carbon/20 text-carbon border-carbon/50',
@@ -172,16 +161,20 @@ function metadataContractIssue(metadata: DenseMetadata | undefined): string | nu
   if (!Array.isArray(frames)) return 'it carries no `frame_data` array';
   const stale = frames.find((frame) => !Array.isArray(frame.detections));
   if (!stale) return null;
-  const fields = Object.keys(stale).filter((field) => field !== 'frame_number' && field !== 'timestamp');
+  const fields = Object.keys(stale).filter(
+    (field) => field !== 'frame_number' && field !== 'timestamp',
+  );
   return `frame ${stale.frame_number} carries ${fields.length > 0 ? fields.join(', ') : 'no fields'} instead of a \`detections\` array`;
 }
 
 function BandPill({ band, className = '' }: { band: Band; className?: string }) {
+  // One stamp map for the whole product: BAND_STAMP carries the word and its ink.
+  const stamp = BAND_STAMP[band];
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BAND_PILL[band]} ${className}`}
+      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${stamp.ink} ${className}`}
     >
-      {BAND_LABEL[band]}
+      {stamp.word}
     </span>
   );
 }
@@ -356,7 +349,10 @@ export function Labelling() {
 
   // ---- detections --------------------------------------------------------
 
-  const metadataIssue = useMemo(() => metadataContractIssue(metadataQuery.data), [metadataQuery.data]);
+  const metadataIssue = useMemo(
+    () => metadataContractIssue(metadataQuery.data),
+    [metadataQuery.data],
+  );
 
   // Defensive by construction: a frame without a `detections` array contributes nothing rather
   // than throwing through the render. The contract check above is what tells the user why.
@@ -381,7 +377,6 @@ export function Labelling() {
           contestant_id: d.contestant_id,
           contestant_name: d.contestant_name,
           contestant_nickname: d.contestant_nickname,
-          tracker_id: d.tracker_id,
         });
       });
     }
@@ -393,23 +388,6 @@ export function Labelling() {
     for (const d of detections) byKey[d.key] = d;
     return byKey;
   }, [detections]);
-
-  // ---- tracks ------------------------------------------------------------
-
-  const tracksById = useMemo(() => {
-    const map = new Map<number, Detection[]>();
-    for (const d of detections) {
-      if (d.tracker_id === null) continue;
-      const list = map.get(d.tracker_id);
-      if (list) list.push(d);
-      else map.set(d.tracker_id, [d]);
-    }
-    return map;
-  }, [detections]);
-
-  function trackOf(detection: Detection): Detection[] {
-    return detection.tracker_id === null ? [] : tracksById.get(detection.tracker_id) ?? [];
-  }
 
   const processingDate = metadataQuery.data?.video_info?.processing_date ?? null;
   // The server identifies a run by `{processing_date, detections}` where detections is the
@@ -500,7 +478,7 @@ export function Labelling() {
         );
         // Keep the cache equal to disk so remounting the page mid-session shows
         // the verdicts that were just written.
-        queryClient.setQueryData<LabelsResult>(['labels', videoId], {
+        queryClient.setQueryData<LabelsResult>(['labels', videoId], (): LabelsResult => ({
           status: 'loaded',
           file: {
             schema: 'labels/v1',
@@ -509,7 +487,7 @@ export function Labelling() {
             source,
             labels: labelList,
           },
-        });
+        }));
       } catch (e) {
         if (seq !== saveSeqRef.current) return;
         setSaveState('failed');
@@ -560,14 +538,10 @@ export function Labelling() {
   // ---- the sheet ---------------------------------------------------------
 
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [applyToTrack, setApplyToTrack] = useState(false);
-  const [pendingApply, setPendingApply] = useState<Label | null>(null);
-  const openDetection = openKey ? detectionByKey[openKey] ?? null : null;
+  const openDetection = openKey ? (detectionByKey[openKey] ?? null) : null;
 
   const closeSheet = useCallback(() => {
     setOpenKey(null);
-    setApplyToTrack(false);
-    setPendingApply(null);
   }, []);
 
   useEffect(() => {
@@ -614,7 +588,6 @@ export function Labelling() {
         else delete next[key];
       }
       setLabels(next);
-      setPendingApply(null);
       advanceFrom(next, fromKey);
     },
     [labels, advanceFrom],
@@ -628,14 +601,9 @@ export function Labelling() {
         verdict,
         ...(verdict === 'contestant' && contestantId ? { contestant_id: contestantId } : {}),
       };
-      const track = detection.tracker_id === null ? [] : tracksById.get(detection.tracker_id) ?? [];
-      if (applyToTrack && track.length > 1) {
-        setPendingApply(label);
-        return;
-      }
       commit([[detection.key, label]], detection.key);
     },
-    [applyToTrack, commit, tracksById],
+    [commit],
   );
 
   const clearLabel = useCallback(
@@ -715,7 +683,9 @@ export function Labelling() {
     if (!label) return null;
     if (label.verdict === 'contestant') {
       const contestant = label.contestant_id ? contestantsById[label.contestant_id] : undefined;
-      return contestant ? `#${contestant.id} ${contestant.nickname}` : `#${label.contestant_id ?? '?'}`;
+      return contestant
+        ? `#${contestant.id} ${contestant.nickname}`
+        : `#${label.contestant_id ?? '?'}`;
     }
     return VERDICT_LABEL[label.verdict].toLowerCase();
   }
@@ -734,12 +704,16 @@ export function Labelling() {
         <div>
           <h1 className="text-2xl font-bold text-carbon-deep">Labelling</h1>
           <p className="text-carbon-soft text-sm mt-1">
-            One verdict per detection — the ground truth the separation gate is computed from.
-            Crops come from the processed rendition; nothing here rescales a score.
+            One verdict per detection — the ground truth the separation gate is computed from. Crops
+            come from the processed rendition; nothing here rescales a score.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {saveState === 'saving' && <Badge variant="warning" size="md">Saving…</Badge>}
+          {saveState === 'saving' && (
+            <Badge variant="warning" size="md">
+              Saving…
+            </Badge>
+          )}
           {saveState === 'saved' && (
             <Badge variant="success" size="md">
               Saved{savedAt ? ` ${savedAt.toLocaleTimeString()}` : ''}
@@ -747,7 +721,9 @@ export function Labelling() {
           )}
           {saveState === 'failed' && (
             <>
-              <Badge variant="error" size="md">Save failed</Badge>
+              <Badge variant="error" size="md">
+                Save failed
+              </Badge>
               <Button variant="secondary" size="sm" onClick={() => void save(labelsJson)}>
                 Retry
               </Button>
@@ -786,10 +762,13 @@ export function Labelling() {
               <div className="text-ledger">
                 {file?.source ? (
                   <span>
-                    processing_date {file.source.processing_date} · detections {file.source.detections}
+                    processing_date {file.source.processing_date} · detections{' '}
+                    {file.source.detections}
                   </span>
                 ) : (
-                  <span>pins the run quoted in the message above; the 409 carries no other copy of it</span>
+                  <span>
+                    pins the run quoted in the message above; the 409 carries no other copy of it
+                  </span>
                 )}
               </div>
             </div>
@@ -831,7 +810,9 @@ export function Labelling() {
             }}
             className={FIELD}
           >
-            {videos.length === 0 && <option value="">{videosLoading ? 'Loading…' : 'No processed videos'}</option>}
+            {videos.length === 0 && (
+              <option value="">{videosLoading ? 'Loading…' : 'No processed videos'}</option>
+            )}
             {videos.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name}
@@ -913,8 +894,8 @@ export function Labelling() {
               in a different space and its scores are not comparable.
             </p>
             <p className="text-carbon-soft text-sm">
-              Reprocess the video, then reload this page. Metadata is never migrated in place, and no
-              labels are written for it.
+              Reprocess the video, then reload this page. Metadata is never migrated in place, and
+              no labels are written for it.
             </p>
             {videos.length > 1 && (
               <p className="text-ledger text-sm">
@@ -926,217 +907,238 @@ export function Labelling() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
-        {/* Grid */}
-        <div>
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-carbon-soft">
-              <div className="w-10 h-10 border-3 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
-              <p>Loading detections…</p>
-            </div>
-          ) : metadataQuery.error ? (
-            <Card padding="lg">
-              <div className="text-center py-8">
-                <p className="text-stamp mb-4">Failed to load video metadata</p>
-                <Button variant="secondary" size="sm" onClick={() => metadataQuery.refetch()}>
-                  Retry
-                </Button>
+          {/* Grid */}
+          <div>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-carbon-soft">
+                <div className="w-10 h-10 border-3 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
+                <p>Loading detections…</p>
               </div>
-            </Card>
-          ) : filtered.length === 0 ? (
-            <Card padding="lg">
-              <div className="text-center py-8 text-carbon-soft">
-                <p className="text-carbon mb-1">No detections match the current filters</p>
-                <p className="text-sm">
-                  {detections.length === 0
-                    ? 'This video has no detections in its metadata.'
-                    : 'Clear the filter or the unlabelled-only toggle.'}
-                </p>
-              </div>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-2.5">
-                {visible.map((d) => {
-                  const label = labels[d.key];
-                  const chip = chipText(d.key);
-                  const claim = d.contestant_nickname ?? (d.contestant_id ? `#${d.contestant_id}` : 'unmatched');
-                  return (
-                    <button
-                      key={d.key}
-                      ref={(el) => {
-                        tileRefs.current.set(d.key, el);
-                      }}
-                      type="button"
-                      disabled={blocked}
-                      onClick={() => {
-                        setPendingApply(null);
-                        setOpenKey(d.key);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Backspace' || e.key === 'Delete') {
-                          e.preventDefault();
-                          clearLabel(d.key);
-                        }
-                      }}
-                      title={`Frame ${d.frame_number}, detection ${d.detection_index} — click to label, Backspace to clear`}
-                      className={`relative bg-paper-light border rounded-none p-2 text-left transition-colors ${
-                        label ? 'border-carbon/50' : 'border-paper-dark'
-                      } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
-                    >
-                      <img
-                        src={cropSrc(videoId ?? '', d.frame_number, d.detection_index)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full aspect-square object-cover rounded bg-black"
-                      />
-                      <div className="mt-1.5 flex items-center justify-between gap-1">
-                        <span className="text-[10.5px] text-ledger font-mono">f{d.frame_number}</span>
-                        <BandPill band={bandFor(d.match_score)} />
-                      </div>
-                      <div
-                        className={`text-[11px] truncate ${d.contestant_id ? 'text-carbon' : 'text-ledger'}`}
-                        title={d.contestant_name ?? undefined}
-                      >
-                        {claim}
-                      </div>
-                      {label && chip && (
-                        <span
-                          className={`absolute top-1 right-1 max-w-[calc(100%-0.5rem)] truncate rounded-full border px-1.5 py-0.5 text-[9.5px] font-medium ${VERDICT_PILL[label.verdict]}`}
-                        >
-                          {chip}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {visibleCount < filtered.length && (
-                <div className="flex justify-center mt-4">
-                  <Button variant="secondary" size="sm" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
-                    Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more (
-                    {filtered.length - visibleCount} remaining)
+            ) : metadataQuery.error ? (
+              <Card padding="lg">
+                <div className="text-center py-8">
+                  <p className="text-stamp mb-4">Failed to load video metadata</p>
+                  <Button variant="secondary" size="sm" onClick={() => metadataQuery.refetch()}>
+                    Retry
                   </Button>
                 </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Rail */}
-        <div className="space-y-4 xl:sticky xl:top-4">
-          <Card padding="md">
-            <h2 className="text-sm font-semibold text-carbon-deep mb-3">Verdicts</h2>
-            <div className="space-y-1.5">
-              {VERDICTS.map((v) => (
-                <div key={v} className="flex items-center justify-between text-xs">
-                  <span className="text-carbon-soft">{VERDICT_LABEL[v]}</span>
-                  <span className="text-carbon-deep font-mono">{rail.counts[v]}</span>
+              </Card>
+            ) : filtered.length === 0 ? (
+              <Card padding="lg">
+                <div className="text-center py-8 text-carbon-soft">
+                  <p className="text-carbon mb-1">No detections match the current filters</p>
+                  <p className="text-sm">
+                    {detections.length === 0
+                      ? 'This video has no detections in its metadata.'
+                      : 'Clear the filter or the unlabelled-only toggle.'}
+                  </p>
                 </div>
-              ))}
-              <div className="flex items-center justify-between text-xs border-t border-paper-dark pt-1.5">
-                <span className="text-carbon-soft">Unlabelled</span>
-                <span className="text-carbon-deep font-mono">{detections.length - rail.labelled}</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card padding="md">
-            <h2 className="text-sm font-semibold text-carbon-deep mb-1">The gate these labels unlock</h2>
-            <p className="text-[11px] text-ledger mb-3">
-              Computed over the {rail.labelled} labelled detections only. Gate = mean true-match
-              cosine ≥ {GATE.trueMatchMean} and worst impostor cosine ≤ {GATE.worstImpostor}.
-            </p>
-            {!gateReady && (
-              <p className="text-xs text-stamp mb-3">
-                Not enough labelled yet ({rail.labelled} of {MIN_LABELS_FOR_GATE} minimum) — the
-                counts below are counts, not a verdict.
-              </p>
+              </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-2.5">
+                  {visible.map((d) => {
+                    const label = labels[d.key];
+                    const chip = chipText(d.key);
+                    const claim =
+                      d.contestant_nickname ??
+                      (d.contestant_id ? `#${d.contestant_id}` : 'unmatched');
+                    return (
+                      <button
+                        key={d.key}
+                        ref={(el) => {
+                          tileRefs.current.set(d.key, el);
+                        }}
+                        type="button"
+                        disabled={blocked}
+                        onClick={() => {
+                          setOpenKey(d.key);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Backspace' || e.key === 'Delete') {
+                            e.preventDefault();
+                            clearLabel(d.key);
+                          }
+                        }}
+                        title={`Frame ${d.frame_number}, detection ${d.detection_index} — click to label, Backspace to clear`}
+                        className={`relative bg-paper-light border rounded-none p-2 text-left transition-colors ${
+                          label ? 'border-carbon/50' : 'border-paper-dark'
+                        } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
+                      >
+                        <img
+                          src={cropSrc(videoId ?? '', d.frame_number, d.detection_index)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full aspect-square object-cover rounded bg-black"
+                        />
+                        <div className="mt-1.5 flex items-center justify-between gap-1">
+                          <span className="text-[10.5px] text-ledger font-mono">
+                            f{d.frame_number}
+                          </span>
+                          <BandPill band={bandFor(d.match_score)} />
+                        </div>
+                        <div
+                          className={`text-[11px] truncate ${d.contestant_id ? 'text-carbon' : 'text-ledger'}`}
+                          title={d.contestant_name ?? undefined}
+                        >
+                          {claim}
+                        </div>
+                        {label && chip && (
+                          <span
+                            className={`absolute top-1 right-1 max-w-[calc(100%-0.5rem)] truncate rounded-full border px-1.5 py-0.5 text-[9.5px] font-medium ${VERDICT_PILL[label.verdict]}`}
+                          >
+                            {chip}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {visibleCount < filtered.length && (
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                    >
+                      Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more (
+                      {filtered.length - visibleCount} remaining)
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-carbon-soft">True matches labelled</span>
-                <span className="text-carbon-deep font-mono">{rail.trueMatches}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-carbon-soft">…their cosine mean</span>
-                {meanReady && rail.trueMatchMean !== null ? (
-                  <span
-                    className={`font-mono ${
-                      gateReady ? (rail.trueMatchMean >= GATE.trueMatchMean ? 'text-carbon' : 'text-stamp') : 'text-carbon-deep'
-                    }`}
-                  >
-                    {rail.trueMatchMean.toFixed(3)}
-                    <span className="text-ledger">
-                      {' '}
-                      {rail.trueMatchMean >= GATE.trueMatchMean ? '≥' : '<'} {GATE.trueMatchMean}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-ledger">not enough labelled yet</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-carbon-soft">Impostor events</span>
-                <span className="text-carbon-deep font-mono">{rail.impostors}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-carbon-soft">…worst impostor cosine</span>
-                {impostorReady && rail.worstImpostor !== null ? (
-                  <span
-                    className={`font-mono ${
-                      gateReady ? (rail.worstImpostor <= GATE.worstImpostor ? 'text-carbon' : 'text-stamp') : 'text-carbon-deep'
-                    }`}
-                  >
-                    {rail.worstImpostor.toFixed(3)}
-                    <span className="text-ledger">
-                      {' '}
-                      {rail.worstImpostor <= GATE.worstImpostor ? '≤' : '>'} {GATE.worstImpostor}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-ledger">not enough labelled yet</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between border-t border-paper-dark pt-1.5">
-                <span className="text-carbon-soft">Matcher missed (left unnamed)</span>
-                <span className="text-carbon-deep font-mono">{rail.missed}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-carbon-soft">Matcher misnamed (someone else)</span>
-                <span className="text-carbon-deep font-mono">{rail.misnamed}</span>
-              </div>
-            </div>
-          </Card>
+          </div>
 
-          <Card padding="md">
-            <h2 className="text-sm font-semibold text-carbon-deep mb-3">Labels file</h2>
-            <div className="space-y-1.5 text-xs text-carbon-soft">
-              <div className="flex justify-between gap-3">
-                <span>schema</span>
-                <span className="font-mono text-carbon-deep">{file?.schema ?? 'labels/v1'}</span>
+          {/* Rail */}
+          <div className="space-y-4 xl:sticky xl:top-4">
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-carbon-deep mb-3">Verdicts</h2>
+              <div className="space-y-1.5">
+                {VERDICTS.map((v) => (
+                  <div key={v} className="flex items-center justify-between text-xs">
+                    <span className="text-carbon-soft">{VERDICT_LABEL[v]}</span>
+                    <span className="text-carbon-deep font-mono">{rail.counts[v]}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between text-xs border-t border-paper-dark pt-1.5">
+                  <span className="text-carbon-soft">Unlabelled</span>
+                  <span className="text-carbon-deep font-mono">
+                    {detections.length - rail.labelled}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between gap-3">
-                <span>labels</span>
-                <span className="font-mono text-carbon-deep">{rail.labelled}</span>
+            </Card>
+
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-carbon-deep mb-1">
+                The gate these labels unlock
+              </h2>
+              <p className="text-[11px] text-ledger mb-3">
+                Computed over the {rail.labelled} labelled detections only. Gate = mean true-match
+                cosine ≥ {GATE.trueMatchMean} and worst impostor cosine ≤ {GATE.worstImpostor}.
+              </p>
+              {!gateReady && (
+                <p className="text-xs text-stamp mb-3">
+                  Not enough labelled yet ({rail.labelled} of {MIN_LABELS_FOR_GATE} minimum) — the
+                  counts below are counts, not a verdict.
+                </p>
+              )}
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-carbon-soft">True matches labelled</span>
+                  <span className="text-carbon-deep font-mono">{rail.trueMatches}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-carbon-soft">…their cosine mean</span>
+                  {meanReady && rail.trueMatchMean !== null ? (
+                    <span
+                      className={`font-mono ${
+                        gateReady
+                          ? rail.trueMatchMean >= GATE.trueMatchMean
+                            ? 'text-carbon'
+                            : 'text-stamp'
+                          : 'text-carbon-deep'
+                      }`}
+                    >
+                      {rail.trueMatchMean.toFixed(3)}
+                      <span className="text-ledger">
+                        {' '}
+                        {rail.trueMatchMean >= GATE.trueMatchMean ? '≥' : '<'} {GATE.trueMatchMean}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-ledger">not enough labelled yet</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-carbon-soft">Impostor events</span>
+                  <span className="text-carbon-deep font-mono">{rail.impostors}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-carbon-soft">…worst impostor cosine</span>
+                  {impostorReady && rail.worstImpostor !== null ? (
+                    <span
+                      className={`font-mono ${
+                        gateReady
+                          ? rail.worstImpostor <= GATE.worstImpostor
+                            ? 'text-carbon'
+                            : 'text-stamp'
+                          : 'text-carbon-deep'
+                      }`}
+                    >
+                      {rail.worstImpostor.toFixed(3)}
+                      <span className="text-ledger">
+                        {' '}
+                        {rail.worstImpostor <= GATE.worstImpostor ? '≤' : '>'} {GATE.worstImpostor}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-ledger">not enough labelled yet</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between border-t border-paper-dark pt-1.5">
+                  <span className="text-carbon-soft">Matcher missed (left unnamed)</span>
+                  <span className="text-carbon-deep font-mono">{rail.missed}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-carbon-soft">Matcher misnamed (someone else)</span>
+                  <span className="text-carbon-deep font-mono">{rail.misnamed}</span>
+                </div>
               </div>
-              <div className="flex justify-between gap-3">
-                <span>labelled_at</span>
-                <span className="font-mono text-carbon-deep">
-                  {savedAt ? savedAt.toLocaleString() : '—'}
-                </span>
+            </Card>
+
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-carbon-deep mb-3">Labels file</h2>
+              <div className="space-y-1.5 text-xs text-carbon-soft">
+                <div className="flex justify-between gap-3">
+                  <span>schema</span>
+                  <span className="font-mono text-carbon-deep">{file?.schema ?? 'labels/v1'}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>labels</span>
+                  <span className="font-mono text-carbon-deep">{rail.labelled}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>labelled_at</span>
+                  <span className="font-mono text-carbon-deep">
+                    {savedAt ? savedAt.toLocaleString() : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>source</span>
+                  <span className="font-mono text-carbon-deep text-right">
+                    {source ? `${source.processing_date} · ${source.detections}` : 'unknown run'}
+                  </span>
+                </div>
+                {savedPath && (
+                  <p className="font-mono text-[10.5px] text-ledger break-all">{savedPath}</p>
+                )}
               </div>
-              <div className="flex justify-between gap-3">
-                <span>source</span>
-                <span className="font-mono text-carbon-deep text-right">
-                  {source ? `${source.processing_date} · ${source.detections}` : 'unknown run'}
-                </span>
-              </div>
-              {savedPath && <p className="font-mono text-[10.5px] text-ledger break-all">{savedPath}</p>}
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
-      </div>
       )}
 
       {/* The sheet */}
@@ -1153,7 +1155,8 @@ export function Labelling() {
               <div>
                 <h3 className="text-lg font-semibold text-carbon-deep">Label this detection</h3>
                 <p className="text-xs text-ledger">
-                  tile {filtered.findIndex((d) => d.key === openKey) + 1} of {filtered.length} in view
+                  tile {filtered.findIndex((d) => d.key === openKey) + 1} of {filtered.length} in
+                  view
                 </p>
               </div>
               <button
@@ -1168,7 +1171,12 @@ export function Labelling() {
             <div className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <img
-                  src={cropSrc(videoId ?? '', openDetection.frame_number, openDetection.detection_index, 320)}
+                  src={cropSrc(
+                    videoId ?? '',
+                    openDetection.frame_number,
+                    openDetection.detection_index,
+                    320,
+                  )}
                   alt=""
                   className="w-full sm:w-[200px] shrink-0 aspect-square object-cover rounded bg-black"
                 />
@@ -1192,9 +1200,6 @@ export function Labelling() {
                     ) : (
                       openDetection.match_score.toFixed(3)
                     )}
-                  </div>
-                  <div className="font-mono">
-                    track {openDetection.tracker_id ?? '—'}
                   </div>
                   <div className="pt-1">
                     Matcher says:{' '}
@@ -1232,166 +1237,39 @@ export function Labelling() {
                 </div>
               </div>
 
-              {pendingApply ? (
-                <div className="border border-stamp/60 bg-stamp/10/20 rounded-none p-3 space-y-3">
-                  <p className="text-sm text-carbon-deep">
-                    Apply{' '}
-                    <span className="font-semibold">
-                      {pendingApply.verdict === 'contestant'
-                        ? pendingApply.contestant_id
-                          ? `“${contestantsById[pendingApply.contestant_id]?.nickname ?? `#${pendingApply.contestant_id}`}”`
-                          : 'contestant'
-                        : VERDICT_LABEL[pendingApply.verdict].toLowerCase()}
-                    </span>{' '}
-                    to the{' '}
-                    {trackFramesLabel(openDetection)
-                      ? `${trackFramesLabel(openDetection)} of this track?`
-                      : 'frames of this track?'}
-                  </p>
-                  <TrackFrameList
-                    videoId={videoId ?? ''}
-                    detections={trackOf(openDetection)}
-                    note={mixedTrackNote(trackOf(openDetection))}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => setPendingApply(null)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() =>
-                        commit(
-                          trackOf(openDetection).map((d) => [
-                            d.key,
-                            {
-                              frame_number: d.frame_number,
-                              detection_index: d.detection_index,
-                              verdict: pendingApply.verdict,
-                              ...(pendingApply.verdict === 'contestant' && pendingApply.contestant_id
-                                ? { contestant_id: pendingApply.contestant_id }
-                                : {}),
-                            },
-                          ]),
-                          openDetection.key,
-                        )
-                      }
+              <>
+                <ContestantPicker
+                  key={openKey}
+                  contestants={contestants}
+                  onPick={(contestantId) => commitOne(openDetection, 'contestant', contestantId)}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {(['not_a_contestant', 'unsure', 'box_wrong'] as Verdict[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => commitOne(openDetection, v)}
+                      title={VERDICT_BLURB[v]}
+                      className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
                     >
-                      Apply to {trackFramesLabel(openDetection) ?? 'this track'}
-                    </Button>
-                  </div>
+                      <span className="block font-semibold">{VERDICT_LABEL[v]}</span>
+                      <span className="block text-[10.5px] text-carbon-soft">
+                        {VERDICT_BLURB[v]}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <>
-                  <ContestantPicker
-                    key={openKey}
-                    contestants={contestants}
-                    onPick={(contestantId) => commitOne(openDetection, 'contestant', contestantId)}
-                  />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {(['not_a_contestant', 'unsure', 'box_wrong'] as Verdict[]).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => commitOne(openDetection, v)}
-                        title={VERDICT_BLURB[v]}
-                        className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
-                      >
-                        <span className="block font-semibold">{VERDICT_LABEL[v]}</span>
-                        <span className="block text-[10.5px] text-carbon-soft">{VERDICT_BLURB[v]}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <p className="text-[11px] text-ledger">
-                    Picking a verdict records the label and moves to the next unlabelled tile.
-                    Escape closes this sheet; Backspace or Delete on a tile clears its label.
-                  </p>
-
-                  {openDetection.tracker_id !== null && trackOf(openDetection).length > 1 && (
-                    <div className="border-t border-paper-dark pt-3 space-y-2">
-                      <label className="flex items-start gap-2 text-xs text-carbon cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={applyToTrack}
-                          onChange={(e) => setApplyToTrack(e.target.checked)}
-                          className="w-4 h-4 mt-0.5 cursor-pointer accent-stamp"
-                        />
-                        <span>
-                          Apply to the {trackFramesLabel(openDetection)} of this track
-                          {mixedTrackNote(trackOf(openDetection))
-                            ? ' — it claims two different contestants, so the frames are shown before applying'
-                            : ''}
-                        </span>
-                      </label>
-                      <p className="text-[11px] text-ledger">
-                        The stored label stays per detection; this only writes the same verdict into
-                        each of the track's frames.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
+                <p className="text-[11px] text-ledger">
+                  Picking a verdict records the label and moves to the next unlabelled tile. Escape
+                  closes this sheet; Backspace or Delete on a tile clears its label.
+                </p>
+              </>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-
-  /** "N frames" (or "N detections across M frames" when a track repeats one) for the confirm step. */
-  function trackFramesLabel(detection: Detection): string | null {
-    const track = trackOf(detection);
-    if (track.length === 0) return null;
-    const frames = new Set(track.map((d) => d.frame_number)).size;
-    if (frames === track.length) return `${frames} ${frames === 1 ? 'frame' : 'frames'}`;
-    return `${frames} frames (${track.length} detections)`;
-  }
-
-  /** Tracks whose frames claim more than one named contestant get reviewed before applying. */
-  function mixedTrackNote(track: Detection[]): string | null {
-    const claimed = new Set(
-      track.filter((d) => d.contestant_id !== null).map((d) => d.contestant_id as string),
-    );
-    return claimed.size > 1 ? `${claimed.size} different claimed contestants` : null;
-  }
-}
-
-/** The frames a track covers — crops included, so a mixed-claim track can be eyeballed. */
-function TrackFrameList({
-  videoId,
-  detections,
-  note,
-}: {
-  videoId: string;
-  detections: Detection[];
-  note: string | null;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {note && <p className="text-xs text-stamp">This track holds {note} across its frames.</p>}
-      <div className="max-h-56 overflow-y-auto border border-paper-dark rounded">
-        {detections.map((d) => (
-          <div
-            key={d.key}
-            className="flex items-center gap-2 px-2 py-1 border-b border-paper-dark last:border-b-0"
-          >
-            <img
-              src={cropSrc(videoId, d.frame_number, d.detection_index)}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="w-8 h-8 object-cover rounded bg-black shrink-0"
-            />
-            <span className="text-[11px] font-mono text-carbon-soft">f{d.frame_number}</span>
-            <span className={`text-[11px] ${d.contestant_id ? 'text-carbon' : 'text-ledger'}`}>
-              {d.contestant_nickname ?? (d.contestant_id ? `#${d.contestant_id}` : 'unmatched')}
-            </span>
-            <BandPill band={bandFor(d.match_score)} className="ml-auto" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

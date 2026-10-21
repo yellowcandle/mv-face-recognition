@@ -4,16 +4,13 @@ Tests for frame optimization modules
 
 import pytest
 import numpy as np
-import cv2
-from pathlib import Path
 
 import sys
 sys.path.insert(0, 'mvp-processor')
 
 from src.frame_optimizer import (
     FrameDifferenceDetector,
-    FaceTracker,
-    FrameMetrics
+    FaceTracker
 )
 
 

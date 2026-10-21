@@ -2,10 +2,11 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BAND_STAMP,
+  Masthead,
   bandFor,
   formatMmSs,
-  useFlaggedFaces,
   useContestants,
+  useFlaggedFaces,
   useVideos,
 } from '@mv/shared';
 import type { Band, FlaggedFace, Contestant, FrameData, VideoMetadata } from '@mv/shared';
@@ -35,7 +36,8 @@ function flagContext(meta: VideoMetadata | undefined, face: FlaggedFace) {
   const bbox = face.bbox;
   const sameBox = (b: number[] | undefined) =>
     !!bbox && !!b && b.length === 4 && b.every((v, j) => Math.abs(v - bbox[j]) < 1e-6);
-  const det = i >= 0 ? (frames[i].detections?.find((d) => sameBox(d.bbox))?.det_score ?? null) : null;
+  const det =
+    i >= 0 ? (frames[i].detections?.find((d) => sameBox(d.bbox))?.det_score ?? null) : null;
   const strip: (FrameData | null)[] = [-2, -1, 0, 1, 2].map((o) =>
     i >= 0 ? (frames[i + o] ?? null) : null,
   );
@@ -138,7 +140,12 @@ export function Flagging() {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const target = e.target as HTMLElement | null;
-      if (target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      if (
+        target?.closest?.(
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+        )
+      )
+        return;
       if (document.querySelector('[role="dialog"], [aria-modal="true"], dialog[open]')) return;
       if (!focused) return;
       if (e.key === '1' || e.key === '2') {
@@ -177,7 +184,7 @@ export function Flagging() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
     } catch (e) {
       console.error('Failed to update face status:', e);
     }
@@ -198,7 +205,7 @@ export function Flagging() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),
       });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
     } catch (e) {
       console.error('Failed to reassign face:', e);
     }
@@ -222,39 +229,28 @@ export function Flagging() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
-      {/* Masthead */}
-      <div className="flex flex-row items-end justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-            BACK OFFICE · LOCAL ONLY · 127.0.0.1
+      <Masthead
+        eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
+        title="存根"
+        latin="OFFICE COPY · WRITABLE"
+        size="md"
+      >
+        <button
+          type="button"
+          onClick={() => void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
+          className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
+        >
+          重新調閱
+        </button>
+        <div className="-rotate-[6deg] border-2 border-stamp px-3 py-1.5">
+          <div className="text-center font-serif text-[14px] font-bold tracking-[0.14em] text-stamp">
+            待核 {pendingCount}
           </div>
-          <div className="flex flex-row items-baseline gap-3.5">
-            <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-              存根
-            </h1>
-            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">
-              OFFICE COPY · WRITABLE
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-row items-center gap-3">
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
-            className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
-          >
-            重新調閱
-          </button>
-          <div className="-rotate-[6deg] border-2 border-stamp px-3 py-1.5">
-            <div className="text-center font-serif text-[14px] font-bold tracking-[0.14em] text-stamp">
-              待核 {pendingCount}
-            </div>
-            <div className="text-center font-mono text-[7px] tracking-[0.16em] text-stamp">
-              PENDING FLAGS
-            </div>
+          <div className="text-center font-mono text-[7px] tracking-[0.16em] text-stamp">
+            PENDING FLAGS
           </div>
         </div>
-      </div>
+      </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
 
@@ -469,7 +465,11 @@ export function Flagging() {
                 <div className="flex flex-col gap-2">
                   <div className="h-[210px] w-[186px] overflow-hidden border border-carbon bg-[#191922]">
                     {focused.thumbnail ? (
-                      <img src={focused.thumbnail} alt="被標記的人臉" className="h-full w-full object-cover" />
+                      <img
+                        src={focused.thumbnail}
+                        alt="被標記的人臉"
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <span className="font-mono text-[9px] tracking-[0.16em] text-paper/40">
@@ -494,7 +494,9 @@ export function Flagging() {
                     <span className="font-kai text-[26px] font-bold leading-none text-carbon-deep">
                       {focusedContestant?.nickname ?? `#${focused.contestant_id}`}
                     </span>
-                    <span className="font-mono text-[10px] text-ledger">#{focused.contestant_id}</span>
+                    <span className="font-mono text-[10px] text-ledger">
+                      #{focused.contestant_id}
+                    </span>
                   </div>
                   {/* The flag asserts no score of its own (CONTEXT.md, "Flag"). `confidence` is the
                       flagged detection's match score, carried as context for the claim. */}
@@ -504,7 +506,9 @@ export function Flagging() {
                   <div className="relative h-[3px] w-full bg-carbon-deep/15">
                     <div
                       className="h-[3px] bg-stamp"
-                      style={{ width: `${Math.max(0, Math.min(1, focused.confidence ?? 0)) * 100}%` }}
+                      style={{
+                        width: `${Math.max(0, Math.min(1, focused.confidence ?? 0)) * 100}%`,
+                      }}
                     />
                     <div
                       className="absolute -top-[3px] h-[9px] w-px bg-carbon-deep"
@@ -570,7 +574,9 @@ export function Flagging() {
               <div className="mt-4 h-px bg-carbon/25" />
 
               <div className="mt-3 flex flex-col gap-2">
-                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">REASSIGN TO</span>
+                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
+                  REASSIGN TO
+                </span>
                 <div className="flex flex-row items-center gap-2">
                   <select
                     ref={reassignRef}
@@ -598,7 +604,9 @@ export function Flagging() {
                   real frame of the served rendition (`stream_url` seeked by a #t media fragment).
                   Slots with no frame — no dense metadata, or past either end — say so. */}
               <div className="mt-4 flex flex-col gap-2">
-                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">CONTEXT · 前後五格</span>
+                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
+                  CONTEXT · 前後五格
+                </span>
                 <div className="flex flex-row gap-1">
                   {context.strip.map((frame, k) => (
                     <div
@@ -623,7 +631,9 @@ export function Flagging() {
                   ))}
                 </div>
                 {!streamUrl || context.strip.every((f) => f == null) ? (
-                  <span className="font-kai text-[11px] text-carbon-soft">此片段無前後影格可調閱。</span>
+                  <span className="font-kai text-[11px] text-carbon-soft">
+                    此片段無前後影格可調閱。
+                  </span>
                 ) : null}
               </div>
 

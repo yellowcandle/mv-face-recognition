@@ -1,189 +1,92 @@
-# MV Face Recognition - Deployment Guide
+# Deployment
 
-This guide explains how to deploy the MV Face Recognition application to Cloudflare with all components properly configured.
+> **Retired surface (2026-10-22).** The FastAPI `backend/` tree, its `Dockerfile`, the Heroku
+> `Procfile` and the four ad-hoc upload scripts are gone. The deployable product is the
+> Cloudflare Worker in `worker/` (API + embedded viewer build), the KV read model it serves,
+> and the encodes in R2. The admin app is a local back office and is not deployed.
 
-## Overview
+## What gets written
 
-The deployment includes:
-- **Frontend**: Svelte application on Cloudflare Pages
-- **Backend**: Python FastAPI on Cloudflare Workers (Python Workers)
-- **Metadata**: JSON files in Cloudflare KV storage
-- **Videos**: Processed MP4 files in Cloudflare R2 storage
+| Target | Key | Written by | Read by |
+| --- | --- | --- | --- |
+| KV | `metadata_<video_id>` (full id, e.g. `4-《全民造星IV》極限拍MV`) | `scripts/publish` | `/api/videos/metadata/dense/*` |
+| KV | `contestants_structured` | `scripts/publish` | `/api/contestants` |
+| KV | `processed_videos_list` | `scripts/publish` | `/api/videos/processed/list` |
+| R2 | `processed_videos/<stem>_1080p.mp4`, `_720p.mp4` | `scripts/upload-to-r2.js` | `/videos/*` |
+| R2 | `portraits/<id>.webp` | publish step (Phase 3) | `/api/contestants/<id>/thumb/face` |
 
-## Issues Fixed
+Nothing writes the old families (`video_metadata_collection`, `contestants`,
+`video_metadata_<id>`, `videos_list`, `annotated_metadata_collection`, `app_settings`) any
+more; the Worker's remaining reads of them are fallbacks, not the contract.
 
-### 1. Python Workers Compatibility
-- ✅ Added `python_workers` compatibility flag
-- ✅ Created separate `backend/wrangler.toml` for Python deployment
-- ✅ Fixed main wrangler.toml for Pages deployment
+## Prerequisites
 
-### 2. Metadata Upload
-- ✅ Created automated script to upload all metadata to KV
-- ✅ Organized video metadata into collections
-- ✅ Converted CSV contestant data to structured JSON
+- `wrangler login` with the account that owns the KV namespace and R2 bucket in
+  [worker/wrangler.toml](worker/wrangler.toml).
+- `pnpm install` (viewer build) and `uv` (publisher).
+- Reels processed into `local_output/metadata/` and `local_output/processed_videos/`.
 
-### 3. Video Upload
-- ✅ Created script to upload processed videos to R2
-- ✅ Added safety confirmation for large file uploads
-- ✅ Generated manifest and access information
+## Steps
 
-## Quick Deployment
-
-### Option 1: All-in-One Script
 ```bash
-./scripts/deploy_all.sh
+# 1. Build the viewer and embed it into the Worker
+npm run build            # pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js
+
+# 2. Stage and validate the read model (no writes), then publish to KV
+npm run publish:metadata
+npm run publish:metadata:remote
+
+# 3. Upload the encodes to R2 (dry run first: -- --dry-run)
+npm run upload:videos -- --dry-run
+npm run upload:videos
+
+# 4. Deploy the Worker
+npm run deploy           # cd worker && wrangler deploy
 ```
 
-### Option 2: Step-by-Step
+`npm run setup` runs 1 → 2(remote) → 3. Steps 2 and 3 are independent of step 4 and can be
+re-run whenever metadata or encodes change.
 
-#### Step 1: Deploy Frontend
+Keys are the full video id (`metadata_4-《全民造星IV》極限拍MV`), the same string
+`processed_videos_list` serves; a missing key returns 404 naming it. Publishing after an
+older deploy leaves `metadata_dense_*` entries behind — delete them with
+`npx wrangler kv key delete <key> --binding METADATA_KV --remote` once the new keys are live.
+
+## Verify a deploy
+
 ```bash
-npx wrangler pages deploy frontend/build --project-name=mv-face-recognition
+# the list the viewer reads
+curl -s https://<worker-host>/api/videos/processed/list | head -c 200
+
+# one reel's dense metadata (numeric 編號)
+curl -s https://<worker-host>/api/videos/metadata/dense/4 | head -c 200
+
+# an encode the list points at (must be 200/206, not 404)
+curl -sI -H 'Range: bytes=0-1023' "https://<worker-host>/videos/processed_videos/<stem>_1080p.mp4"
 ```
 
-#### Step 2: Deploy Backend
+Then open the Worker host in a browser: 圖庫 lists the reels, 點唱單 plays one and draws boxes.
+
+## Inspecting KV and R2
+
 ```bash
-cd backend
-npx wrangler deploy
-cd ..
-```
-
-#### Step 3: Upload Metadata
-```bash
-node scripts/upload_metadata_to_kv.js
-```
-
-#### Step 4: Upload Videos (Optional)
-```bash
-# Warning: This uploads ~3GB of video files
-node scripts/upload_videos_to_r2.js --confirm
-```
-
-## Configuration Files
-
-### Main wrangler.toml
-```toml
-name = "mv-face-recognition"
-main = "worker/index.js"
-compatibility_date = "2024-11-08"
-compatibility_flags = ["nodejs_compat"]
-
-# Pages configuration
-pages_build_output_dir = "frontend/build"
-
-[[r2_buckets]]
-binding = "VIDEOS_BUCKET"
-bucket_name = "mv-face-recognition-videos"
-
-[[kv_namespaces]]
-binding = "METADATA_KV"
-id = "890d77e11bfc4623ac4ef56db6b9a4ab"
-```
-
-### Backend wrangler.toml
-```toml
-name = "mv-face-recognition-api"
-main = "main.py"
-compatibility_date = "2024-11-08"
-compatibility_flags = ["python_workers"]
-
-[[kv_namespaces]]
-binding = "METADATA_KV"
-id = "890d77e11bfc4623ac4ef56db6b9a4ab"
-
-[[r2_buckets]]
-binding = "VIDEOS_BUCKET"
-bucket_name = "mv-face-recognition-videos"
-```
-
-## Data Structure
-
-### KV Storage Keys
-- `batch_processing_summary` - Processing summary
-- `contestant_info` - Raw CSV data
-- `contestants_structured` - Parsed contestant data as JSON
-- `video_metadata_collection` - All video metadata organized
-- `annotated_metadata_collection` - Dense annotation data
-- `processed_videos_manifest` - Video inventory and access info
-- Individual video metadata: `1-《全民造星IV》...`, `2-《全民造星IV》...`, etc.
-
-### R2 Storage Structure
-```
-mv-face-recognition-videos/
-├── processed_videos/
-│   ├── 1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_annotated.mp4
-│   ├── 2-《全民造星IV》主題曲 《前傳》MV 2021夏の次部曲：始発の駅_annotated.mp4
-│   ├── 3-《全民造星IV》主題曲 《前傳》MV 2021夏の三部曲：女團の駅_annotated.mp4
-│   ├── 4-《全民造星IV》極限拍MV_annotated.mp4
-│   └── 5-《全民造星IV》播前熱身！率先表演《前傳》_annotated.mp4
-└── manifest/
-    └── processed_videos_manifest.json
-```
-
-## Deployment URLs
-
-After successful deployment:
-- **Frontend**: https://29374aab.mv-face-recognition.pages.dev
-- **Backend API**: https://mv-face-recognition-api.{your-subdomain}.workers.dev
-
-## Useful Commands
-
-### View KV Data
-```bash
-# List all KV keys
-npx wrangler kv:key list --binding=METADATA_KV
-
-# Get specific key
-npx wrangler kv:key get "contestants_structured" --binding=METADATA_KV
-```
-
-### View R2 Objects
-```bash
-# List all R2 objects
-npx wrangler r2 object list --bucket=mv-face-recognition-videos
-
-# Get object info
-npx wrangler r2 object head "processed_videos/1-《全民造星IV》主題曲 《前傳》MV 2021夏の首部曲：造星の駅_annotated.mp4" --bucket=mv-face-recognition-videos
-```
-
-### Monitor Deployments
-```bash
-# View worker logs
-npx wrangler tail
-
-# View deployment status
-npx wrangler deployments list
+cd worker
+npx wrangler kv key list --binding METADATA_KV --remote
+npx wrangler kv key get "processed_videos_list" --binding METADATA_KV --remote
+npx wrangler r2 object list mv-face-recognition-videos --prefix processed_videos/
+npx wrangler tail     # live Worker logs
 ```
 
 ## Troubleshooting
 
-### Python Workers Error
-If you see: `The python_workers compatibility flag is required to use Python`
-- Ensure `backend/wrangler.toml` has `compatibility_flags = ["python_workers"]`
-- Deploy from the backend directory: `cd backend && npx wrangler deploy`
-
-### Large File Upload Timeout
-For video uploads that timeout:
-- Videos are large (500MB-700MB each)
-- Ensure stable internet connection
-- Upload can be resumed by re-running the script
-
-### KV Namespace Not Found
-If KV operations fail:
-- Verify the KV namespace ID in wrangler.toml
-- Create namespace if needed: `npx wrangler kv:namespace create "METADATA_KV"`
-
-## Next Steps
-
-1. **Custom Domain**: Configure custom domains for your deployed applications
-2. **Environment Variables**: Set up production environment variables
-3. **Monitoring**: Set up alerts and monitoring for your applications
-4. **Security**: Configure access controls and security headers
-5. **CDN**: Set up custom R2 domain for direct video access
-
-## Security Considerations
-
-- R2 bucket access is currently through Cloudflare APIs
-- For public video access, configure custom domain with appropriate CORS settings
-- Consider implementing authentication for sensitive metadata
-- Use environment variables for sensitive configuration 
+- **Video 404 but the reel is listed** — the key named by `stream_url` is not in R2. List the
+  bucket and compare; re-run `npm run upload:videos` after checking the encode exists in
+  `local_output/processed_videos/`.
+- **`/api/contestants` returns the CSV fallback** — `contestants_structured` is missing from
+  KV; run `npm run publish:metadata:remote`. The fallback claims no embeddings on purpose.
+- **Publish fails on a reel** — `validate_payload` rejected it; the message names the field
+  (bbox outside `[0,1]`, band cutoff disagreeing with `bands.ts`, missing duration/rate/id).
+  Fix the source metadata; do not bypass the check.
+- **KV value too large** — the publisher refuses anything over 25 MiB, Cloudflare's limit.
+- **`wrangler` auth / namespace errors** — `wrangler whoami`, then check the binding ids in
+  `worker/wrangler.toml`.

@@ -356,6 +356,65 @@ check passes.
   in the repo, from a reproducible snapshot, and a fresh deploy serves real reels — the
   current bug is closed.
 
+#### Executed 2026-10-21 — `scripts/publish/build_read_model.py`
+
+Shipped ahead of the HF-snapshot input described above: the sources are the local metadata
+files (the HF `runs/` layout does not exist yet). What it fixed, and what it found:
+
+**Three metadata generations exist on disk, and only one matched the contract.**
+
+| Generation | Shape | Reels |
+| --- | --- | --- |
+| `metadata/*_annotated_dense_metadata.json` (Jul 2025) | `frame_results[].faces[]`, **pixel** bboxes, `detection_confidence` / `recognition_confidence` | 1, 2, 3 |
+| `local_output/metadata/4-*` (Mar 2026) | already the contract: `frame_data[].detections[]` | 4 |
+| `local_output/metadata/5-*` | `recognitions[]` with `face_location` in **`[top,right,bottom,left]`** px | 5 |
+
+The Worker and `useViewerMetadata` both read `frame_data`; every published value carried
+`frame_results`, so `/api/faces/detect` returned `faces: []` for **every** reel.
+
+**Sources are chosen per reel by how many faces they actually recognise**, not by recency.
+Reel 5 recognises 0 faces in its legacy file and 1448 in the recognitions variant, so a
+"newest file wins" rule would have published an empty reel.
+
+| Reel | Frames | Matched detections | Contestants | Source |
+| --- | --- | --- | --- | --- |
+| 1 | 859 | 23 | 10 | legacy-converted |
+| 2 | 947 | 17 | 4 | legacy-converted |
+| 3 | 968 | 58 | 10 | legacy-converted |
+| 4 | 1,882 | 1,131 | 52 | current |
+| 5 | 1,023 | 1,448 | 67 | recognitions-converted |
+
+**Published:** the 5 `metadata_dense_*` keys and the canonical `processed_videos_list`.
+**Deployed:** the merged Worker (version `21dd4edd`) — this was the missing half. The
+previously deployed build read `contestant_timeline[].detailed_timeline` and ignored
+`frame_data`, so publishing alone would not have shown a single box.
+**Verified live:** all 5 reels return faces at a matched timestamp (`faces=4/1/4/1/2`, with
+matched contestants named), `dense/1..5` are 475 KB–1.78 MB, and
+`/api/contestants/67/thumb/face` returns `200 image/webp`.
+
+**KV cleaned:** 16 orphan keys removed (9 CJK-suffixed legacy names, 2 `ingestion_*`, 4
+`youtube_queue_*`, 1 `temp_test_*`) after backing them up to
+`~/.cache/mv-kv-backup-*/` (16 keys, 15 MB). Kept: the 5 `metadata_*`, 5 `metadata_dense_*`,
+`processed_videos_list`, `contestants_structured`, `contestant_info`,
+`videos_list_optimized`, `video_metadata_collection`, `batch_processing_summary` — 16 keys.
+**`metadata_1..5` are live** (the Worker reads `metadata_${id}` for
+`/api/videos/metadata/<id>`); they are not orphans and must not be deleted.
+
+**Residual data-quality gap.** Reels 1–3 still carry the July-2025 pipeline's ~1% recognition
+rate (23/17/58 matched detections against 1,131 and 1,448 on reels 4–5). Publishing cannot
+fix that; they need a reprocess with the current pipeline:
+
+```bash
+cd mvp-processor && uv run python src/process_video.py \
+  -i "../source/videos/<reel>.mp4" --output-name "<reel>" --local-only
+```
+
+Inputs are all present (source videos 301–344 MB, `reference_embeddings.npz`, `buffalo_l`);
+sampling runs at 6 fps on CoreML/CPU. The face pass is minutes, but `convert_video_format`
+re-encodes each 4K reel to 1080p **and** 720p, so expect ~20–40 min per reel end-to-end
+(emptying `video.output_formats` skips the transcodes — metadata does not depend on them).
+Output lands in `local_output/metadata/`, which `build_read_model.py` already prefers.
+
 ### Phase 3 — Storage and streaming (1 day)
 
 - Port the R2 video route *including* Range handling (the worker already has the correct

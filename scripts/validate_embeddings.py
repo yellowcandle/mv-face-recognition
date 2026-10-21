@@ -14,7 +14,6 @@ Usage:
 
 import argparse
 import logging
-import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,6 +37,7 @@ EXPECTED_EMBEDDING_DIMENSION = 512
 @dataclass
 class EmbeddingValidationResult:
     """Result of embedding validation."""
+
     all_valid: bool
     needs_regeneration: bool
     total_contestants: int
@@ -195,7 +195,7 @@ def validate_all_embeddings(
     Returns:
         EmbeddingValidationResult with validation details
     """
-    invalid_contestants = []
+    invalid_contestants: List[Dict[str, Any]] = []
     dimension_mismatch_count = 0
     missing_count = 0
     photo_changed_count = 0
@@ -224,12 +224,14 @@ def validate_all_embeddings(
 
             if not embedding_path.exists():
                 missing_count += 1
-                invalid_contestants.append({
-                    "contestant_id": contestant_id,
-                    "nickname": nickname,
-                    "reason": "missing",
-                    "path": str(embedding_path),
-                })
+                invalid_contestants.append(
+                    {
+                        "contestant_id": contestant_id,
+                        "nickname": nickname,
+                        "reason": "missing",
+                        "path": str(embedding_path),
+                    }
+                )
             else:
                 # Check dimension
                 compatible, actual_dim, _ = check_embedding_compatibility(
@@ -237,26 +239,32 @@ def validate_all_embeddings(
                 )
                 if not compatible:
                     dimension_mismatch_count += 1
-                    invalid_contestants.append({
-                        "contestant_id": contestant_id,
-                        "nickname": nickname,
-                        "reason": "dimension_mismatch",
-                        "path": str(embedding_path),
-                        "actual_dim": actual_dim,
-                        "expected_dim": expected_dim,
-                    })
+                    invalid_contestants.append(
+                        {
+                            "contestant_id": contestant_id,
+                            "nickname": nickname,
+                            "reason": "dimension_mismatch",
+                            "path": str(embedding_path),
+                            "actual_dim": actual_dim,
+                            "expected_dim": expected_dim,
+                        }
+                    )
                 else:
                     # Check if photos are newer
                     if check_photo_changes:
-                        photo_dir = photo_base_dir / "photos" / f"contestant_{contestant_id}"
+                        photo_dir = (
+                            photo_base_dir / "photos" / f"contestant_{contestant_id}"
+                        )
                         if are_photos_newer_than_embedding(photo_dir, embedding_path):
                             photo_changed_count += 1
-                            invalid_contestants.append({
-                                "contestant_id": contestant_id,
-                                "nickname": nickname,
-                                "reason": "photo_changed",
-                                "path": str(embedding_path),
-                            })
+                            invalid_contestants.append(
+                                {
+                                    "contestant_id": contestant_id,
+                                    "nickname": nickname,
+                                    "reason": "photo_changed",
+                                    "path": str(embedding_path),
+                                }
+                            )
                         else:
                             valid_count += 1
                     else:
@@ -265,13 +273,19 @@ def validate_all_embeddings(
     total = valid_count + dimension_mismatch_count + missing_count + photo_changed_count
 
     # Determine overall status and reason
-    needs_regeneration = dimension_mismatch_count > 0 or missing_count > 0 or photo_changed_count > 0
+    needs_regeneration = (
+        dimension_mismatch_count > 0 or missing_count > 0 or photo_changed_count > 0
+    )
 
     if dimension_mismatch_count > 0 and missing_count == 0 and photo_changed_count == 0:
         reason = "dimension_mismatch"
-    elif missing_count > 0 and dimension_mismatch_count == 0 and photo_changed_count == 0:
+    elif (
+        missing_count > 0 and dimension_mismatch_count == 0 and photo_changed_count == 0
+    ):
         reason = "missing"
-    elif photo_changed_count > 0 and dimension_mismatch_count == 0 and missing_count == 0:
+    elif (
+        photo_changed_count > 0 and dimension_mismatch_count == 0 and missing_count == 0
+    ):
         reason = "photo_changed"
     elif dimension_mismatch_count > 0 or missing_count > 0:
         reason = "mixed"
@@ -293,7 +307,7 @@ def validate_all_embeddings(
     )
 
     # Log summary
-    logger.info(f"Validation Summary:")
+    logger.info("Validation Summary:")
     logger.info(f"  Total contestants: {result.total_contestants}")
     logger.info(f"  Valid embeddings: {result.valid_count}")
     logger.info(f"  Dimension mismatch: {result.dimension_mismatch_count}")
@@ -304,7 +318,7 @@ def validate_all_embeddings(
     return result
 
 
-def main():
+def main() -> None:
     """Main entry point for command-line usage."""
     parser = argparse.ArgumentParser(
         description="Validate face embeddings for dimension compatibility and freshness"
@@ -370,14 +384,17 @@ def main():
 
     if args.json:
         import json
+
         print(json.dumps(result.to_dict(), indent=2))
     else:
         if result.needs_regeneration:
             logger.info(f"\n⚠️  Embeddings need regeneration: {result.reason}")
-            logger.info(f"   Run regeneration to fix {len(result.invalid_contestants)} contestants")
+            logger.info(
+                f"   Run regeneration to fix {len(result.invalid_contestants)} contestants"
+            )
             sys.exit(1)
         else:
-            logger.info(f"\n✅ All embeddings are valid")
+            logger.info("\n✅ All embeddings are valid")
             sys.exit(0)
 
 

@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from "react";
-import { bandFor } from "../../lib/bands";
+import React, { useMemo, useCallback } from 'react';
+import { bandFor } from '../../lib/bands';
 
 interface Appearance {
   timestamp: number;
@@ -29,14 +29,7 @@ interface Segment {
   end: number;
 }
 
-const SEGMENT_COLORS = [
-  "#22C55E",
-  "#FF8400",
-  "#4363D8",
-  "#E6194B",
-  "#42D4F4",
-  "#F032E6",
-];
+const SEGMENT_COLORS = ['#22C55E', '#FF8400', '#4363D8', '#E6194B', '#42D4F4', '#F032E6'];
 
 function buildSegments(appearances: Appearance[], gap = 1.0): Segment[] {
   if (appearances.length === 0) return [];
@@ -87,35 +80,27 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
   const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div
-      className="w-full rounded-none p-4"
-      style={{ backgroundColor: "#1A1A1A" }}
-    >
+    <div className="w-full rounded-none p-4" style={{ backgroundColor: '#1A1A1A' }}>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">
-          Contestant Timeline
-        </h3>
+        <h3 className="text-sm font-semibold text-white">Contestant Timeline</h3>
       </div>
 
-      <div
-        className="overflow-y-auto"
-        style={{ maxHeight: `${5 * (36 + 8 * 2)}px` }}
-      >
+      <div className="overflow-y-auto" style={{ maxHeight: `${5 * (36 + 8 * 2)}px` }}>
         {entries.map((entry) => (
           <div
             key={entry.key}
             className="flex items-center"
             style={{
-              height: "36px",
-              paddingTop: "8px",
-              paddingBottom: "8px",
-              borderBottom: "1px solid #2E2E2E",
+              height: '36px',
+              paddingTop: '8px',
+              paddingBottom: '8px',
+              borderBottom: '1px solid #2E2E2E',
             }}
           >
             <div
               className="shrink-0 truncate pr-2 text-xs text-gray-300"
               style={{
-                width: "60px",
+                width: '60px',
                 fontFamily:
                   'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", sans-serif',
               }}
@@ -126,16 +111,13 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
 
             <div
               className="relative flex-1 cursor-pointer rounded-none"
-              style={{ backgroundColor: "#2E2E2E", height: "20px" }}
+              style={{ backgroundColor: '#2E2E2E', height: '20px' }}
               onClick={(e) => handleBarClick(e, entry)}
             >
               {entry.segments.map((seg, i) => {
                 if (duration <= 0) return null;
                 const left = (seg.start / duration) * 100;
-                const width = Math.max(
-                  ((seg.end - seg.start) / duration) * 100,
-                  0.3,
-                );
+                const width = Math.max(((seg.end - seg.start) / duration) * 100, 0.3);
                 return (
                   <div
                     key={i}
@@ -154,8 +136,8 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
                 className="pointer-events-none absolute top-0 h-full"
                 style={{
                   left: `${playheadPercent}%`,
-                  width: "2px",
-                  backgroundColor: "#FF8400",
+                  width: '2px',
+                  backgroundColor: '#FF8400',
                   zIndex: 10,
                 }}
               />

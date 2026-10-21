@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Card, Badge, Button } from '@mv/shared';
+import { Card, Badge, Button, formatMmSs } from '@mv/shared';
 
 interface ProcessingJob {
   id: string;
@@ -17,30 +17,36 @@ interface ProcessingJob {
 
 function getStatusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
   switch (status) {
-    case 'completed': return 'success';
-    case 'running': return 'warning';
-    case 'failed': return 'error';
-    default: return 'neutral';
+    case 'completed':
+      return 'success';
+    case 'running':
+      return 'warning';
+    case 'failed':
+      return 'error';
+    default:
+      return 'neutral';
   }
 }
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'completed': return 'bg-carbon';
-    case 'running': return 'bg-carbon';
-    case 'failed': return 'bg-stamp';
-    case 'cancelled': return 'bg-ledger';
-    default: return 'bg-stamp';
+    case 'completed':
+      return 'bg-carbon';
+    case 'running':
+      return 'bg-carbon';
+    case 'failed':
+      return 'bg-stamp';
+    case 'cancelled':
+      return 'bg-ledger';
+    default:
+      return 'bg-stamp';
   }
 }
 
 function formatDuration(start?: number, end?: number): string {
   if (!start) return '--';
   const endTime = end || Date.now();
-  const diff = Math.floor((endTime - start) / 1000);
-  const mins = Math.floor(diff / 60);
-  const secs = diff % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return formatMmSs(Math.floor((endTime - start) / 1000));
 }
 
 function formatTimestamp(iso?: string): string {
@@ -59,7 +65,10 @@ export function Processing() {
   const [isProcessing, setIsProcessing] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const activeCount = useMemo(() => jobs.filter((j) => j.status === 'running' || j.status === 'queued').length, [jobs]);
+  const activeCount = useMemo(
+    () => jobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
+    [jobs],
+  );
   const completedCount = useMemo(() => jobs.filter((j) => j.status === 'completed').length, [jobs]);
 
   const fetchJobs = useCallback(async () => {
@@ -76,7 +85,7 @@ export function Processing() {
 
   // Initial load + polling
   useEffect(() => {
-    fetchJobs();
+    void fetchJobs();
     pollingRef.current = setInterval(fetchJobs, 5000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
@@ -153,7 +162,9 @@ export function Processing() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-carbon-deep">Video Processing</h1>
-        <p className="text-carbon-soft text-sm mt-1">Manage cloud processing jobs for face recognition</p>
+        <p className="text-carbon-soft text-sm mt-1">
+          Manage local processing jobs for face recognition
+        </p>
       </div>
 
       {/* Error Banner */}
@@ -179,7 +190,7 @@ export function Processing() {
             <span className="w-2 h-2 rounded-full bg-carbon" />
           </div>
           <p className="text-sm text-carbon-soft mb-4 leading-relaxed">
-            Process all videos using cloud GPUs for initial face detection and recognition
+            Process all videos on this machine with the local pipeline
           </p>
           <Button
             variant="primary"
@@ -190,10 +201,18 @@ export function Processing() {
             {isProcessing ? 'Starting...' : 'Start Processing'}
           </Button>
           <ul className="space-y-1.5 text-xs text-ledger">
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Process all unprocessed videos</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Detect and recognize faces</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Cloud GPU acceleration</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Automatic HuggingFace sync</li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Process all unprocessed videos
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Detect and recognize faces
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Hardware acceleration when available
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Results written to local_output/
+            </li>
           </ul>
         </Card>
 
@@ -214,10 +233,18 @@ export function Processing() {
             {isProcessing ? 'Starting...' : 'Update Embeddings'}
           </Button>
           <ul className="space-y-1.5 text-xs text-ledger">
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Improve face recognition accuracy</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Incorporate user feedback</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Fast embedding recalculation</li>
-            <li className="flex items-center gap-2"><span className="text-carbon">&#x2713;</span> Automatic database rebuild</li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Improve face recognition accuracy
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Incorporate user feedback
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Fast embedding recalculation
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-carbon">&#x2713;</span> Automatic database rebuild
+            </li>
           </ul>
         </Card>
       </div>
@@ -227,8 +254,12 @@ export function Processing() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-semibold text-carbon-deep">Processing Jobs</h2>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">{activeCount} Active</Badge>
-            <Badge variant="success" size="sm">{completedCount} Completed</Badge>
+            <Badge variant="warning" size="sm">
+              {activeCount} Active
+            </Badge>
+            <Badge variant="success" size="sm">
+              {completedCount} Completed
+            </Badge>
             {completedCount > 0 && (
               <Button variant="ghost" size="sm" onClick={clearCompleted}>
                 Clear Completed
@@ -283,25 +314,21 @@ export function Processing() {
                     </span>
                   </div>
 
-                  {job.error && (
-                    <p className="text-xs text-stamp mt-2">{job.error}</p>
-                  )}
+                  {job.error && <p className="text-xs text-stamp mt-2">{job.error}</p>}
                 </div>
 
                 {/* Actions & Times */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   {(job.status === 'queued' || job.status === 'running') && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => cancelJob(job.id)}
-                    >
+                    <Button variant="destructive" size="sm" onClick={() => cancelJob(job.id)}>
                       Cancel
                     </Button>
                   )}
                   <div className="text-right space-y-0.5">
                     {job.created_at && (
-                      <p className="text-[11px] text-ledger">Created: {formatTimestamp(job.created_at)}</p>
+                      <p className="text-[11px] text-ledger">
+                        Created: {formatTimestamp(job.created_at)}
+                      </p>
                     )}
                     {job.started_at && (
                       <p className="text-[11px] text-ledger">

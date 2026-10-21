@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { useVideos, useFlaggedFaces } from '@mv/shared';
+import { Masthead, formatMmSs, useFlaggedFaces, useVideos } from '@mv/shared';
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
@@ -18,22 +18,9 @@ export function Dashboard() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-8 pt-7">
-      <div className="flex flex-row items-end justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-            BACK OFFICE · LOCAL ONLY · 127.0.0.1
-          </div>
-          <div className="flex flex-row items-baseline gap-3.5">
-            <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-              儀表
-            </h1>
-            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">DESK</span>
-          </div>
-        </div>
-        <div className="pb-1 font-kai text-[12px] text-carbon-soft">
-          所有寫入只在這一台機器上發生
-        </div>
-      </div>
+      <Masthead eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1" title="儀表" latin="DESK" size="md">
+        所有寫入只在這一台機器上發生
+      </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
 
@@ -70,8 +57,7 @@ export function Dashboard() {
                   className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2.5"
                 >
                   <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
-                    {String(Math.floor(f.timestamp / 60)).padStart(2, '0')}:
-                    {String(Math.floor(f.timestamp % 60)).padStart(2, '0')}
+                    {formatMmSs(f.timestamp)}
                   </span>
                   <span className="flex-1 truncate font-kai text-[14px] font-bold text-carbon-deep">
                     #{f.contestant_id}
@@ -114,7 +100,9 @@ export function Dashboard() {
                 <span className="font-kai text-[14px] font-bold text-carbon-deep group-hover:text-stamp">
                   {l.cn}
                 </span>
-                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">{l.latin}</span>
+                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
+                  {l.latin}
+                </span>
               </Link>
             ))}
           </div>

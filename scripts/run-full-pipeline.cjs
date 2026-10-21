@@ -16,7 +16,8 @@ const { execSync, spawn } = require('child_process');
 
 // Configuration
 const PROCESSOR_DIR = path.join(__dirname, '..', 'mvp-processor');
-const FRONTEND_DIR = path.join(__dirname, '..', 'mvp-processor');
+const FRONTEND_DIR = path.join(__dirname, '..', 'apps', 'viewer');
+const REPO_DIR = path.join(__dirname, '..');
 const WORKER_DIR = path.join(__dirname, '..', 'worker');
 const SOURCE_VIDEOS_DIR = path.join(__dirname, '..', 'source', 'videos');
 
@@ -123,7 +124,7 @@ function processVideos(videoFiles, options = {}) {
     console.log(`📹 Processing: ${videoFile}`);
     
     // Build Python command
-    let command = `python src/process_video.py --input "${videoPath}" --output-name "${outputName}"`;
+    let command = `uv run python src/process_video.py --input "${videoPath}" --output-name "${outputName}"`;
     
     if (skipUpload) {
       command += ' --no-upload';
@@ -149,28 +150,21 @@ function processVideos(videoFiles, options = {}) {
  * Build SvelteKit frontend
  */
 function buildFrontend() {
-  console.log('🏗️  Building SvelteKit frontend...');
-  
-  // Install dependencies if node_modules doesn't exist
-  if (!fs.existsSync(path.join(FRONTEND_DIR, 'node_modules'))) {
-    executeCommand('npm install', FRONTEND_DIR, 'Installing frontend dependencies');
+  console.log('🏗️  Building the viewer...');
+
+  // `apps/viewer` is the published frontend; pnpm installs the workspace once.
+  executeCommand(
+    'pnpm --filter @mv/viewer build',
+    REPO_DIR,
+    'Building apps/viewer'
+  );
+
+  const distDir = path.join(FRONTEND_DIR, 'dist');
+  if (!fs.existsSync(path.join(distDir, 'index.html'))) {
+    throw new Error(`Viewer build failed - ${distDir}/index.html not found`);
   }
-  
-  // Build frontend
-  executeCommand('npm run build', FRONTEND_DIR, 'Building SvelteKit application');
-  
-  // Verify build output
-  const buildDir = path.join(FRONTEND_DIR, 'build');
-  if (!fs.existsSync(buildDir)) {
-    throw new Error('Frontend build failed - build directory not found');
-  }
-  
-  const appDir = path.join(buildDir, '_app');
-  if (!fs.existsSync(appDir)) {
-    throw new Error('Frontend build failed - _app directory not found');
-  }
-  
-  const buildFiles = fs.readdirSync(appDir, { recursive: true }).length;
+
+  const buildFiles = fs.readdirSync(distDir, { recursive: true }).length;
   console.log(`   ✅ Build completed with ${buildFiles} assets\n`);
 }
 
@@ -183,19 +177,19 @@ function uploadToCloudflare(skipVideoUpload = false) {
   if (!skipVideoUpload) {
     // Upload videos to R2
     executeCommand(
-      'node upload-to-r2.js', 
-      __dirname, 
-      'Uploading videos and metadata to R2'
+      'node scripts/upload-to-r2.js', 
+      REPO_DIR, 
+      'Uploading published encodes to R2'
     );
   } else {
     console.log('   ⏭️  Skipping video upload (already processed)');
   }
   
-  // Upload metadata to KV
+  // Publish the validated read model to KV (scripts/publish owns KV)
   executeCommand(
-    'node upload-metadata.js', 
-    __dirname, 
-    'Uploading metadata to KV'
+    'uv run --no-project python scripts/publish/build_read_model.py --publish', 
+    REPO_DIR, 
+    'Publishing metadata to KV'
   );
   
   console.log('✅ Cloudflare upload completed!\n');
@@ -209,9 +203,9 @@ function deployWorker() {
   
   // Update worker with embedded assets
   executeCommand(
-    'node update-worker-assets.js', 
-    __dirname, 
-    'Embedding SvelteKit assets in worker'
+    'node scripts/update-worker-assets.js', 
+    REPO_DIR, 
+    'Embedding viewer assets in the worker'
   );
   
   // Deploy worker
@@ -232,18 +226,17 @@ function printSummary(videoFiles, options) {
   
   console.log('📊 Summary:');
   console.log(`   Videos processed: ${videoFiles.length}`);
-  console.log(`   Frontend: SvelteKit built and deployed`);
+  console.log(`   Frontend: apps/viewer built and embedded in the Worker`);
   console.log(`   Backend: Cloudflare Worker deployed`);
-  console.log(`   Storage: R2 (videos) + KV (metadata)`);
+  console.log(`   Storage: R2 (encodes) + KV (read model)`);
   console.log('');
   
   console.log('🌐 Access your application:');
   console.log('   🔗 https://mv-face-recognition-api.herballemon.workers.dev/');
   console.log('');
-  
   console.log('🛠️  Development commands:');
-  console.log('   📹 Process new video: python mvp-processor/src/process_video.py -i path/to/video.mp4');
-  console.log('   🏗️  Rebuild frontend: cd frontend && npm run build');
+  console.log('   📹 Process new video: uv run python mvp-processor/src/process_video.py -i path/to/video.mp4 --local-only');
+  console.log('   🏗️  Rebuild viewer: pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js');
   console.log('   ☁️  Redeploy worker: cd worker && wrangler deploy');
   console.log('');
 }
@@ -317,7 +310,7 @@ if (require.main === module) {
     console.log(`
 MV Face Recognition - Full Pipeline Runner
 
-Usage: node run-full-pipeline.js [options]
+Usage: node scripts/run-full-pipeline.cjs [options]
 
 Options:
   -h, --help           Show this help message

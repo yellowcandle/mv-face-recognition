@@ -3,16 +3,13 @@ Tests for metadata compression modules
 """
 
 import pytest
-import json
-import gzip
 
 import sys
 sys.path.insert(0, 'mvp-processor')
 
 from src.metadata_compressor import (
     MetadataCompressor,
-    MetadataOptimizer,
-    DeltaFrame
+    MetadataOptimizer
 )
 
 

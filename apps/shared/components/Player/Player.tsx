@@ -10,6 +10,7 @@ import { PlayerControls } from './PlayerControls';
 import { DetectionBar } from './DetectionBar';
 import { FlagDialog } from './FlagDialog';
 import { getVideoRenderRect } from './useAnnotations';
+import { formatMmSs } from '../../lib/format';
 import { useViewerMetadata } from '../../hooks/useViewerMetadata';
 import { ContestantTimeline } from './ContestantTimeline';
 import { pickInitialVideo } from './pickInitialVideo';
@@ -19,12 +20,6 @@ interface PlayerProps {
   apiBase: string;
   /** Video to open on mount. Falls back to the first video when absent or unmatched. */
   initialVideoId?: string | null;
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -105,7 +100,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   // Auto-select the requested video, else the first
   useEffect(() => {
     if (videos.length > 0 && !selectedVideo) {
-      handleSelectVideo(pickInitialVideo(videos, initialVideoId)!);
+      void handleSelectVideo(pickInitialVideo(videos, initialVideoId)!);
     }
   }, [videos]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -149,7 +144,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const loadVideoMetadata = useCallback(
     async (videoId: string) => {
       try {
-        const res = await fetch(`${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
+        const res = await fetch(
+          `${apiBase}/api/videos/metadata/dense/${encodeURIComponent(videoId)}`,
+        );
         if (res.ok) {
           setVideoMetadata(await res.json());
         }
@@ -167,7 +164,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     pollingRef.current = setInterval(() => {
       const video = getVideoEl();
       if (video && !video.paused) {
-        fetchFacesAtTime(video.currentTime);
+        void fetchFacesAtTime(video.currentTime);
       }
     }, 200);
   }, [fetchFacesAtTime, getVideoEl]);
@@ -202,7 +199,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     const video = getVideoEl();
     if (!video) return;
     if (video.paused) {
-      video.play();
+      void video.play();
     } else {
       video.pause();
     }
@@ -213,7 +210,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       const video = getVideoEl();
       if (video) {
         video.currentTime = time;
-        fetchFacesAtTime(time);
+        void fetchFacesAtTime(time);
       }
     },
     [getVideoEl, fetchFacesAtTime],
@@ -244,7 +241,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       const fps = videoMetadata?.video_info?.fps || 25;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + frames / fps));
       video.currentTime = newTime;
-      fetchFacesAtTime(newTime);
+      void fetchFacesAtTime(newTime);
     },
     [getVideoEl, videoMetadata, duration, fetchFacesAtTime],
   );
@@ -255,7 +252,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       if (!video) return;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
       video.currentTime = newTime;
-      fetchFacesAtTime(newTime);
+      void fetchFacesAtTime(newTime);
     },
     [getVideoEl, duration, fetchFacesAtTime],
   );
@@ -354,14 +351,14 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
             timestamp: currentTime,
             bbox: selectedFace?.bbox,
             confidence: selectedFace?.match_score ?? null,
-            user_label: userLabel || `Flagged by user at ${formatTime(currentTime)}`,
+            user_label: userLabel || `Flagged by user at ${formatMmSs(currentTime)}`,
             thumbnail,
           }),
         });
         if (res.ok) {
           setShowFlagDialog(false);
           setSelectedFace(null);
-          refetchFlagged();
+          void refetchFlagged();
           alert('Face flagged successfully!');
         } else {
           alert('Failed to flag face');
@@ -397,7 +394,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                 timestamp: currentTime,
                 bbox: face.bbox,
                 confidence: face.match_score ?? null,
-                user_label: `Batch flagged (${facesArray.length} faces) at ${formatTime(currentTime)}`,
+                user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(currentTime)}`,
                 thumbnail,
               }),
             });
@@ -411,7 +408,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         setShowBatchFlagDialog(false);
         setSelectedFaces(new Set());
         setBatchMode(false);
-        refetchFlagged();
+        void refetchFlagged();
 
         if (failCount === 0) {
           alert(`Successfully flagged ${successCount} faces!`);
@@ -457,9 +454,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const getContestantName = useCallback(
     (id: number): string => {
-      const c = (contestants as Array<{ number: number; id: string; nickname: string; name: string }>).find(
-        (c) => c.number === id || c.id === String(id),
-      );
+      const c = (
+        contestants as Array<{ number: number; id: string; nickname: string; name: string }>
+      ).find((c) => c.number === id || c.id === String(id));
       return c ? `${c.nickname} (${c.name})` : `Contestant #${id}`;
     },
     [contestants],
@@ -550,7 +547,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
               value={selectedVideo?.id ?? ''}
               onChange={(e) => {
                 const v = videos.find((v) => v.id === e.target.value);
-                if (v) handleSelectVideo(v);
+                if (v) void handleSelectVideo(v);
               }}
             >
               {videos.map((v) => (
@@ -651,45 +648,45 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           {/* Batch controls — admin only: every button in here ends in a flag */}
           {canFlag && (
             <div className="flex items-center gap-2">
-            <button
-              className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
-                batchMode
-                  ? 'bg-stamp/20 text-stamp border-stamp/40'
-                  : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
-              }`}
-              onClick={handleToggleBatchMode}
-            >
-              {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
-            </button>
+              <button
+                className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
+                  batchMode
+                    ? 'bg-stamp/20 text-stamp border-stamp/40'
+                    : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
+                }`}
+                onClick={handleToggleBatchMode}
+              >
+                {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
+              </button>
 
               {batchMode && (
                 <>
                   <button
                     className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
                     onClick={handleSelectAllFaces}
-                  disabled={detectedFaces.length === 0}
-                >
-                  Select All
-                </button>
-                <button
-                  className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
-                  onClick={handleClearSelection}
-                  disabled={selectedFaces.size === 0}
-                >
-                  Clear
-                </button>
-                <button
-                  className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
-                  onClick={() => {
-                    if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
-                  }}
-                  disabled={selectedFaces.size === 0}
-                >
-                  Flag Selected ({selectedFaces.size})
-                </button>
-              </>
-            )}
-          </div>
+                    disabled={detectedFaces.length === 0}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
+                    onClick={handleClearSelection}
+                    disabled={selectedFaces.size === 0}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
+                    onClick={() => {
+                      if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
+                    }}
+                    disabled={selectedFaces.size === 0}
+                  >
+                    Flag Selected ({selectedFaces.size})
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
           {/* Timeline filter (admin mode only) */}
@@ -731,7 +728,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                         left: `${duration > 0 ? (a.timestamp / duration) * 100 : 0}%`,
                       }}
                       onClick={() => handleSeek(a.timestamp)}
-                      title={`Jump to ${formatTime(a.timestamp)}`}
+                      title={`Jump to ${formatMmSs(a.timestamp)}`}
                     />
                   ))}
                   <div
@@ -814,7 +811,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                       onClick={() => handleFaceClick(face)}
                     >
                       <span className="text-carbon-deep">
-                        {face.matched ? face.contestant_name || face.contestant_nickname || 'Unmatched' : 'Unmatched'}
+                        {face.matched
+                          ? face.contestant_name || face.contestant_nickname || 'Unmatched'
+                          : 'Unmatched'}
                       </span>
                       <span className={`${tier.className} font-medium`} title={tier.title}>
                         {tier.label}
@@ -873,16 +872,13 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
             ) : (
               <div className="space-y-2">
                 {flaggedFaces.map((flag) => (
-                  <div
-                    key={flag.id}
-                    className="bg-paper-dark rounded-none p-3 text-xs"
-                  >
+                  <div key={flag.id} className="bg-paper-dark rounded-none p-3 text-xs">
                     <div className="space-y-0.5">
                       <div className="text-carbon-deep font-medium">
                         {getContestantName(flag.contestant_id)}
                       </div>
                       <div className="text-ledger">Video: {flag.video_id}</div>
-                      <div className="text-ledger">@ {formatTime(flag.timestamp)}</div>
+                      <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
                     </div>
                     <span
                       className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${

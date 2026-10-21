@@ -233,7 +233,6 @@ class VideoProcessingPipeline:
                             "match_score": float(r.match_score) if r else None,
                             "det_score": float(det.det_score),
                             "bbox": [float(v) for v in det.bbox],
-                            "tracker_id": None,
                         }
                     )
 
@@ -269,12 +268,8 @@ class VideoProcessingPipeline:
                     ),
                 )
                 tracker.update_with_detections(sv_detections)
-                # update_with_detections assigns tracker_id onto the *input* detections,
-                # index-aligned with how sv_detections was built; -1 means no track.
-                if sv_detections.tracker_id is not None:
-                    for entry, track_id in zip(entries, sv_detections.tracker_id):
-                        track_id = int(track_id)
-                        entry["tracker_id"] = track_id if track_id >= 0 else None
+                # The tracker still drives the annotated video, but its ids are not part
+                # of the stored contract: nothing ever rendered them.
 
         # Save unmatched face embeddings for clustering
         if unmatched_faces:

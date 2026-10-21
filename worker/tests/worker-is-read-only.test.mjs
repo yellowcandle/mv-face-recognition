@@ -28,9 +28,22 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /** Field names a write-capable route might require before it does anything. */
 const PLAUSIBLE_BODY = JSON.stringify({
-  contestant_id: 33, video_id: 'test-video-mv2', timestamp: 1, flag_id: 'flag_1', action: 'approve',
-  video_url: 'https://example.test/x.mp4', video_name: 'x', filename: 'x.mp4', url: 'https://example.test/x',
-  contestantId: 33, id: '1', name: 'x', status: 'queued', theme: 'dark', settings: {}, keys: [],
+  contestant_id: 33,
+  video_id: 'test-video-mv2',
+  timestamp: 1,
+  flag_id: 'flag_1',
+  action: 'approve',
+  video_url: 'https://example.test/x.mp4',
+  video_name: 'x',
+  filename: 'x.mp4',
+  url: 'https://example.test/x',
+  contestantId: 33,
+  id: '1',
+  name: 'x',
+  status: 'queued',
+  theme: 'dark',
+  settings: {},
+  keys: [],
 });
 
 /** Every `case '<path>':` in the source — the routes the API switch answers. */
@@ -38,9 +51,9 @@ function routesFromSource() {
   const source = readFileSync(ENTRY, 'utf8');
   const paths = new Set();
   for (const [, path] of source.matchAll(/case\s+'(\/[^']*)'\s*:/g)) {
-    paths.add(path.replace(/\/+$/, ''));   // `/x` and `/x/` are one route; same handler
+    paths.add(path.replace(/\/+$/, '')); // `/x` and `/x/` are one route; same handler
   }
-  return [...paths].sort();
+  return [...paths].sort((a, b) => a.localeCompare(b));
 }
 
 let bundlePath = null;
@@ -66,8 +79,12 @@ async function loadWorker() {
 function recordingEnv(effects) {
   const kv = (name) => ({
     get: async () => null,
-    put: async (key) => { effects.push(`${name}.put ${key}`); },
-    delete: async (key) => { effects.push(`${name}.delete ${key}`); },
+    put: async (key) => {
+      effects.push(`${name}.put ${key}`);
+    },
+    delete: async (key) => {
+      effects.push(`${name}.delete ${key}`);
+    },
     list: async () => ({ keys: [], list_complete: true }),
   });
   return {
@@ -77,8 +94,12 @@ function recordingEnv(effects) {
       get: async () => null,
       head: async () => null,
       list: async () => ({ objects: [], truncated: false }),
-      put: async (key) => { effects.push(`VIDEOS_BUCKET.put ${key}`); },
-      delete: async (key) => { effects.push(`VIDEOS_BUCKET.delete ${key}`); },
+      put: async (key) => {
+        effects.push(`VIDEOS_BUCKET.put ${key}`);
+      },
+      delete: async (key) => {
+        effects.push(`VIDEOS_BUCKET.delete ${key}`);
+      },
     },
     // Set, so the gate is live rather than bypassed — the production shape.
     CF_ACCESS_AUD: 'test-aud',
@@ -103,7 +124,10 @@ test('no route has an effect: the Worker is read-only', async () => {
           const effects = [];
           globalThis.fetch = async (input) => {
             effects.push(`outbound fetch ${typeof input === 'string' ? input : input?.url}`);
-            return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response('{}', {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
           };
           const request = new Request(`https://worker.test/api${route}`, {
             method,
@@ -111,7 +135,10 @@ test('no route has an effect: the Worker is read-only', async () => {
             body: method === 'GET' || method === 'DELETE' ? undefined : body,
           });
           try {
-            await worker.fetch(request, recordingEnv(effects), { waitUntil() {}, passThroughOnException() {} });
+            await worker.fetch(request, recordingEnv(effects), {
+              waitUntil() {},
+              passThroughOnException() {},
+            });
           } catch {
             // Throwing on a stub env is fine — the assertion is about what it did before that.
           }
@@ -125,11 +152,14 @@ test('no route has an effect: the Worker is read-only', async () => {
   }
 
   assert.deepEqual(
-    offenders, [],
-    `these requests had a side effect:\n${offenders.map(o => `  ${o}`).join('\n')}\n` +
-    `The deployed Worker reads and streams; it does not write. See ADR 0003.`,
+    offenders,
+    [],
+    `these requests had a side effect:\n${offenders.map((o) => `  ${o}`).join('\n')}\n` +
+      `The deployed Worker reads and streams; it does not write. See ADR 0003.`,
   );
-  console.log(`checked ${routes.length} routes × ${METHODS.length} methods: no writes, no outbound calls`);
+  console.log(
+    `checked ${routes.length} routes × ${METHODS.length} methods: no writes, no outbound calls`,
+  );
 });
 
 test('every admin and write route is gone, not gated', async () => {
@@ -139,13 +169,22 @@ test('every admin and write route is gone, not gated', async () => {
 
   // Deleted by ticket 015 (flagging) and ticket 016 (everything else that could write).
   const removed = [
-    ['POST', '/api/faces/flag'], ['GET', '/api/faces/flagged'], ['GET', '/api/faces/thumbnail'],
-    ['POST', '/api/admin/flagged/approve'], ['GET', '/api/settings'], ['PUT', '/api/settings'],
-    ['POST', '/api/embeddings/sync'], ['POST', '/api/admin/trigger-modal'],
-    ['POST', '/api/admin/upload-video'], ['POST', '/api/admin/youtube/submit'],
-    ['GET', '/api/admin/youtube/queue'], ['POST', '/api/admin/youtube/status'],
-    ['GET', '/api/admin/youtube/samples'], ['POST', '/api/admin/youtube/validate'],
-    ['POST', '/api/admin/youtube/bootstrap'], ['GET', '/api/admin/embeddings/compare'],
+    ['POST', '/api/faces/flag'],
+    ['GET', '/api/faces/flagged'],
+    ['GET', '/api/faces/thumbnail'],
+    ['POST', '/api/admin/flagged/approve'],
+    ['GET', '/api/settings'],
+    ['PUT', '/api/settings'],
+    ['POST', '/api/embeddings/sync'],
+    ['POST', '/api/admin/trigger-modal'],
+    ['POST', '/api/admin/upload-video'],
+    ['POST', '/api/admin/youtube/submit'],
+    ['GET', '/api/admin/youtube/queue'],
+    ['POST', '/api/admin/youtube/status'],
+    ['GET', '/api/admin/youtube/samples'],
+    ['POST', '/api/admin/youtube/validate'],
+    ['POST', '/api/admin/youtube/bootstrap'],
+    ['GET', '/api/admin/embeddings/compare'],
     ['POST', '/api/admin/embeddings/trigger-sync'],
   ];
 
@@ -156,7 +195,8 @@ test('every admin and write route is gone, not gated', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: method === 'GET' ? undefined : '{}',
       }),
-      env, ctx,
+      env,
+      ctx,
     );
     assert.equal(response.status, 404, `${method} ${path} should be gone, got ${response.status}`);
   }
@@ -169,8 +209,12 @@ test('the read surface still answers', async () => {
 
   // The routes the viewer actually depends on. A 200 is not the point; not-404 is.
   const kept = [
-    '/api/system/status', '/api/contestants', '/api/videos', '/api/videos/processed/list',
-    '/api/faces/detect?video_id=4-x&timestamp=0', '/api/recognition/results?contestant_id=17',
+    '/api/system/status',
+    '/api/contestants',
+    '/api/videos',
+    '/api/videos/processed/list',
+    '/api/faces/detect?video_id=4-x&timestamp=0',
+    '/api/recognition/results?contestant_id=17',
   ];
   for (const path of kept) {
     const response = await worker.fetch(new Request(`https://worker.test${path}`), env, ctx);

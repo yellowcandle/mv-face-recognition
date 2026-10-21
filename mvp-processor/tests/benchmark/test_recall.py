@@ -1,7 +1,6 @@
 import pytest
 import cv2
 import numpy as np
-from pathlib import Path
 import logging
 
 import sys
