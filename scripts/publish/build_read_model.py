@@ -193,8 +193,8 @@ REQUIRED_FIELDS = (
 )
 REQUIRED_FRAME_FIELDS = ("frame_number", "timestamp", "detections_count", "detections")
 # bands.ts and processing_config.yaml agree on these; a payload that disagrees is stale.
-EXPECTED_CUTOFFS = {"high": 0.585, "medium": 0.451}
-EXPECTED_ACCEPTANCE = 0.45
+EXPECTED_CUTOFFS = {"high": 0.445, "medium": 0.412}
+EXPECTED_ACCEPTANCE = 0.412
 
 
 def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
@@ -396,7 +396,7 @@ def pick_sources() -> dict[str, list[str]]:
 
 # The high band cutoff from apps/shared/lib/bands.ts (measured false-match boundary).
 # Duplicated as a constant until workstream B gives both sides one source.
-HIGH_BAND = 0.585
+HIGH_BAND = 0.445
 
 
 def load_roster() -> list[dict[str, Any]]:

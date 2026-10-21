@@ -79,8 +79,8 @@ def test_normalise_backfills_the_fields_consumers_read(tmp_path: Path) -> None:
     assert payload["processing_summary"]["recognition_rate"] == 1.0
     assert payload["contestant_timeline"]["33"]["contestant_info"]["id"] == "33"
     assert payload["recognition_config"]["band_cutoffs"] == {
-        "high": 0.585,
-        "medium": 0.451,
+        "high": 0.445,
+        "medium": 0.412,
     }
     assert model.validate_payload("33", payload) == []
 
