@@ -4,11 +4,11 @@ import { BAND_STAMP, Badge, Button, Card, useContestants, useVideos, bandFor } f
 import type { Band, Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 
 // ---------------------------------------------------------------------------
-// labels/v1 — the vocabulary settled by ticket 005 and served by local_api.py.
-// One label per DETECTION, keyed by frame_number + detection_index (the index
-// into frame_data[].detections[]). An absent entry means "not labelled", never
-// a verdict. Declared here rather than in @mv/shared: nothing else in either app
-// reads this file yet.
+// labels/v2 — one verdict per TRACK, keyed by `tracker_id`. The tracker links a
+// face across frames, so one verdict covers every detection in that track.
+// Detections with `tracker_id < 0` were never tracked and are not labelable.
+// An absent entry means "not labelled", never a verdict. Declared here rather
+// than in @mv/shared: nothing else in either app reads this file yet.
 // ---------------------------------------------------------------------------
 
 type Verdict = 'contestant' | 'not_a_contestant' | 'unsure' | 'box_wrong';
@@ -23,17 +23,17 @@ const VERDICT_LABEL: Record<Verdict, string> = {
 };
 
 const VERDICT_BLURB: Record<Verdict, string> = {
-  contestant: 'This box is that contestant',
+  contestant: 'This track is that contestant',
   not_a_contestant: 'Not one of the 96 — crew, background, an extra',
   unsure: 'Cannot tell from this crop; decides nothing in the gate',
   box_wrong: 'Not a face / the wrong region — a detector error, not a matcher error',
 };
 
 interface Label {
-  frame_number: number;
-  detection_index: number;
+  tracker_id: number;
   verdict: Verdict;
   contestant_id?: string;
+  note?: string;
 }
 
 interface LabelSource {
@@ -47,21 +47,42 @@ interface LabelsFile {
   labelled_at: string | null;
   source?: LabelSource;
   labels?: Label[];
+  /** A labels/v1 file was found, could not be mapped onto tracks, and was left on disk. */
+  legacy_ignored?: boolean;
+  legacy_detail?: string;
 }
 
-/** `GET /api/labels/{video_id}` either yields the file or refuses a stale one (409). */
+/** `GET /api/labels/{video_id}` either yields the file or refuses a stale v2 one (409). */
 type LabelsResult = { status: 'conflict'; detail: string } | { status: 'loaded'; file: LabelsFile };
 
 interface Detection {
-  key: string;
   frame_number: number;
   detection_index: number;
-  bbox: [number, number, number, number];
+  tracker_id: number | null;
   match_score: number | null;
   det_score: number;
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
+}
+
+interface TrackVote {
+  contestant_id: string;
+  nickname: string | null;
+  name: string | null;
+  count: number;
+}
+
+interface Track {
+  key: string;
+  tracker_id: number;
+  frame_count: number;
+  /** Highest match_score in the track; earliest frame on a tie, first detection on a fallback. */
+  representative: Detection;
+  /** Contestant ids claimed by this track's detections, most votes first. */
+  votes: TrackVote[];
+  /** The plurality claim shown in the UI; null when no detection in the track was named. */
+  claim: TrackVote | null;
 }
 
 /** The metadata route also stamps the run's `processing_date`, which `VideoInfo` does not declare. */
@@ -73,13 +94,13 @@ type DenseMetadata = Omit<VideoMetadata, 'video_info'> & {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-/** Tiles rendered at once. 399 lazy images at once is a request storm, not a grid. */
+/** Tracks rendered at once. 530 lazy images at once is a request storm, not a grid. */
 const PAGE_SIZE = 120;
 const AUTOSAVE_DEBOUNCE_MS = 400;
 
 /** The separation gate the labels exist to decide (ticket 005). */
 const GATE = { trueMatchMean: 0.45, worstImpostor: 0.2 } as const;
-/** Below this many labelled detections neither number means anything, so neither is coloured. */
+/** Below this many labelled tracks neither number means anything, so neither is coloured. */
 const MIN_LABELS_FOR_GATE = 10;
 const MIN_TRUE_MATCHES_FOR_MEAN = 5;
 const MIN_IMPOSTORS_FOR_WORST = 3;
@@ -93,10 +114,6 @@ const VERDICT_PILL: Record<Verdict, string> = {
 
 const FIELD =
   'bg-paper-dark border border-paper-deep text-carbon-deep text-xs rounded-none px-2 py-1.5 focus:ring-stamp focus:outline-none';
-
-function detectionKey(frameNumber: number, detectionIndex: number): string {
-  return `${frameNumber}:${detectionIndex}`;
-}
 
 /**
  * The crop endpoint does the pixel work from the stored frame fractions; never scaled here.
@@ -112,11 +129,29 @@ function cropSrc(
   return `/api/faces/crop?video_id=${encodeURIComponent(videoId)}&frame_number=${frameNumber}&detection_index=${detectionIndex}&width=${width}`;
 }
 
-/** Stable, frame-ordered output so a save only rewrites what actually changed. */
+/** Stable, track-ordered output so a save only rewrites what actually changed. */
 function serializeLabels(labels: Record<string, Label>): Label[] {
-  return Object.values(labels).sort(
-    (a, b) => a.frame_number - b.frame_number || a.detection_index - b.detection_index,
-  );
+  return Object.values(labels).sort((a, b) => a.tracker_id - b.tracker_id);
+}
+
+/** The model's plurality claim for a track, in the same shape the cards use. */
+function claimText(track: Track, contestantsById: Record<string, Contestant>): string {
+  if (!track.claim) return 'unmatched';
+  const contestant = contestantsById[track.claim.contestant_id];
+  if (contestant) return `#${contestant.id} ${contestant.nickname}`;
+  return `#${track.claim.contestant_id}${track.claim.nickname ? ` ${track.claim.nickname}` : ''}`;
+}
+
+/** Every named identity the track's frames voted for, with counts. */
+function voteBreakdown(track: Track, contestantsById: Record<string, Contestant>): string {
+  if (track.votes.length === 0) return 'no named frames';
+  return track.votes
+    .map((vote) => {
+      const contestant = contestantsById[vote.contestant_id];
+      const name = contestant ? contestant.nickname : vote.nickname;
+      return `${name ?? `#${vote.contestant_id}`} ${vote.count}`;
+    })
+    .join(' · ');
 }
 
 // ---------------------------------------------------------------------------
@@ -330,8 +365,9 @@ export function Labelling() {
         };
       }
       if (!res.ok) throw new Error(`Failed to load labels: HTTP ${res.status}`);
-      // `labels/v1` on the wire: the server rejects anything else on PUT, so a file that reads
-      // back through GET was well-formed when it was written.
+      // `labels/v2` on the wire: the server rejects anything else on PUT, so a file that reads
+      // back through GET was well-formed when it was written. A v1 file is not an error: it
+      // comes back as an empty v2 set with `legacy_ignored`, so the page can explain re-labelling.
       return { status: 'loaded' as const, file: (await res.json()) as LabelsFile };
     },
     staleTime: 5 * 60 * 1000,
@@ -339,6 +375,7 @@ export function Labelling() {
 
   const file = labelsQuery.data?.status === 'loaded' ? labelsQuery.data.file : null;
   const conflict = labelsQuery.data?.status === 'conflict' ? labelsQuery.data.detail : null;
+  const legacyIgnored = file?.legacy_ignored === true;
   // A labels file that cannot be read must not be silently replaced by an empty set, so the
   // failure is surfaced and labelling is blocked until it is readable.
   const labelsLoadError = labelsQuery.isError
@@ -347,7 +384,7 @@ export function Labelling() {
       : 'Failed to load labels'
     : null;
 
-  // ---- detections --------------------------------------------------------
+  // ---- detections and tracks ---------------------------------------------
 
   const metadataIssue = useMemo(
     () => metadataContractIssue(metadataQuery.data),
@@ -363,15 +400,13 @@ export function Labelling() {
     const out: Detection[] = [];
     for (const frame of ordered) {
       // detection_index is the index into this frame's own detections array — the same index
-      // the crop endpoint and the labels file are keyed by. A frame without that array (metadata
-      // from before the current contract) contributes nothing instead of throwing.
+      // the crop endpoint takes. tracker_id decides which track a detection belongs to.
       const frameDetections = Array.isArray(frame.detections) ? frame.detections : [];
       frameDetections.forEach((d, index) => {
         out.push({
-          key: detectionKey(frame.frame_number, index),
           frame_number: frame.frame_number,
           detection_index: index,
-          bbox: d.bbox,
+          tracker_id: typeof d.tracker_id === 'number' ? d.tracker_id : null,
           match_score: d.match_score,
           det_score: d.det_score,
           contestant_id: d.contestant_id,
@@ -383,17 +418,91 @@ export function Labelling() {
     return out;
   }, [metadataQuery.data]);
 
-  const detectionByKey = useMemo(() => {
-    const byKey: Record<string, Detection> = {};
-    for (const d of detections) byKey[d.key] = d;
-    return byKey;
+  // One row per tracked face. `tracker_id` is the label key; detections with a negative or
+  // missing id never become a row and are counted in `untrackedCount` instead.
+  const tracks = useMemo<Track[]>(() => {
+    interface Builder {
+      representative: Detection;
+      frameCount: number;
+      votes: Map<string, TrackVote>;
+    }
+    const byTracker = new Map<number, Builder>();
+
+    for (const detection of detections) {
+      const trackerId = detection.tracker_id;
+      if (trackerId === null || trackerId < 0) continue;
+
+      let builder = byTracker.get(trackerId);
+      if (!builder) {
+        builder = { representative: detection, frameCount: 0, votes: new Map() };
+        byTracker.set(trackerId, builder);
+      }
+      builder.frameCount += 1;
+
+      // Representative: the highest match_score wins; an equal score keeps the earliest frame.
+      // If nothing in the track is matched, the first detection (frame order) stands in.
+      const representative = builder.representative;
+      const score = detection.match_score;
+      if (
+        score !== null &&
+        (representative.match_score === null ||
+          score > representative.match_score ||
+          (score === representative.match_score &&
+            detection.frame_number < representative.frame_number))
+      ) {
+        builder.representative = detection;
+      }
+
+      if (detection.contestant_id) {
+        const vote = builder.votes.get(detection.contestant_id);
+        if (vote) {
+          vote.count += 1;
+        } else {
+          builder.votes.set(detection.contestant_id, {
+            contestant_id: detection.contestant_id,
+            nickname: detection.contestant_nickname,
+            name: detection.contestant_name,
+            count: 1,
+          });
+        }
+      }
+    }
+
+    return [...byTracker.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([trackerId, builder]) => {
+        const votes = [...builder.votes.values()].sort(
+          (a, b) =>
+            b.count - a.count ||
+            Number(a.contestant_id) - Number(b.contestant_id) ||
+            a.contestant_id.localeCompare(b.contestant_id),
+        );
+        return {
+          key: String(trackerId),
+          tracker_id: trackerId,
+          frame_count: builder.frameCount,
+          representative: builder.representative,
+          votes,
+          claim: votes[0] ?? null,
+        };
+      });
   }, [detections]);
+
+  const trackByKey = useMemo(() => {
+    const byKey: Record<string, Track> = {};
+    for (const track of tracks) byKey[track.key] = track;
+    return byKey;
+  }, [tracks]);
+
+  const untrackedCount = useMemo(
+    () => detections.filter((d) => d.tracker_id === null || d.tracker_id < 0).length,
+    [detections],
+  );
 
   const processingDate = metadataQuery.data?.video_info?.processing_date ?? null;
   // The server identifies a run by `{processing_date, detections}` where detections is the
   // number of detections it walks out of frame_data — so the pin this page sends is the count
-  // of detections it parsed, not the summary's `total_faces_detected`. They agree, and if the
-  // summary ever drifted the labels would still pin the boxes they actually describe.
+  // of detections it parsed, not the summary's `total_faces_detected` or the number of tracks.
   const detectionsCount = detections.length;
 
   const source = useMemo<LabelSource | null>(() => {
@@ -406,8 +515,6 @@ export function Labelling() {
     () => ({ processing_date: processingDate ?? 'unknown', detections: detectionsCount }),
     [processingDate, detectionsCount],
   );
-
-  // ---- detections --------------------------------------------------------
 
   // ---- labels state ------------------------------------------------------
 
@@ -428,7 +535,7 @@ export function Labelling() {
     if (!videoId || !file || hydratedFor === videoId) return;
     const next: Record<string, Label> = {};
     for (const label of file.labels ?? []) {
-      next[detectionKey(label.frame_number, label.detection_index)] = label;
+      next[String(label.tracker_id)] = label;
     }
     setLabels(next);
     savedJsonRef.current = JSON.stringify(serializeLabels(next));
@@ -481,11 +588,12 @@ export function Labelling() {
         queryClient.setQueryData<LabelsResult>(['labels', videoId], (): LabelsResult => ({
           status: 'loaded',
           file: {
-            schema: 'labels/v1',
+            schema: 'labels/v2',
             video_id: videoId,
             labelled_at: new Date().toISOString(),
             source,
             labels: labelList,
+            legacy_ignored: false,
           },
         }));
       } catch (e) {
@@ -521,37 +629,37 @@ export function Labelling() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return detections.filter((d) => {
-      const label = labels[d.key];
+    return tracks.filter((track) => {
+      const label = labels[track.key];
       if (unlabelledOnly && label) return false;
       if (verdictFilter !== 'all' && label?.verdict !== verdictFilter) return false;
       if (!q) return true;
       return (
-        String(d.frame_number).includes(q) ||
-        String(d.contestant_id ?? '').startsWith(q) ||
-        (d.contestant_nickname ?? '').toLowerCase().includes(q) ||
-        (d.contestant_name ?? '').toLowerCase().includes(q)
+        String(track.tracker_id).includes(q) ||
+        String(track.claim?.contestant_id ?? '').startsWith(q) ||
+        (track.claim?.nickname ?? '').toLowerCase().includes(q) ||
+        (track.claim?.name ?? '').toLowerCase().includes(q)
       );
     });
-  }, [detections, labels, query, unlabelledOnly, verdictFilter]);
+  }, [tracks, labels, query, unlabelledOnly, verdictFilter]);
 
   // ---- the sheet ---------------------------------------------------------
 
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const openDetection = openKey ? (detectionByKey[openKey] ?? null) : null;
+  const openTrack = openKey ? (trackByKey[openKey] ?? null) : null;
 
   const closeSheet = useCallback(() => {
     setOpenKey(null);
   }, []);
 
   useEffect(() => {
-    if (!openDetection) return;
+    if (!openTrack) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeSheet();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [openDetection, closeSheet]);
+  }, [openTrack, closeSheet]);
 
   const tileRefs = useRef(new Map<string, HTMLButtonElement | null>());
 
@@ -560,16 +668,16 @@ export function Labelling() {
     tileRefs.current.get(openKey)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [openKey]);
 
-  /** After a write, move on to the next still-unlabelled tile in the current view. */
+  /** After a write, move on to the next still-unlabelled track in the current view. */
   const advanceFrom = useCallback(
     (next: Record<string, Label>, fromKey: string) => {
       // -1 when the tile just left the filtered view (an "unlabelled only" filter):
       // the wrap then starts the scan at the top of what is still shown.
-      const index = filtered.findIndex((d) => d.key === fromKey);
+      const index = filtered.findIndex((t) => t.key === fromKey);
       for (let step = 1; step <= filtered.length; step++) {
         const candidate = filtered[(index + step) % filtered.length];
         if (!next[candidate.key]) {
-          const candidateIndex = filtered.findIndex((d) => d.key === candidate.key);
+          const candidateIndex = filtered.findIndex((t) => t.key === candidate.key);
           if (candidateIndex >= visibleCount) setVisibleCount(candidateIndex + 1);
           setOpenKey(candidate.key);
           return;
@@ -594,14 +702,13 @@ export function Labelling() {
   );
 
   const commitOne = useCallback(
-    (detection: Detection, verdict: Verdict, contestantId?: string) => {
+    (track: Track, verdict: Verdict, contestantId?: string) => {
       const label: Label = {
-        frame_number: detection.frame_number,
-        detection_index: detection.detection_index,
+        tracker_id: track.tracker_id,
         verdict,
         ...(verdict === 'contestant' && contestantId ? { contestant_id: contestantId } : {}),
       };
-      commit([[detection.key, label]], detection.key);
+      commit([[track.key, label]], track.key);
     },
     [commit],
   );
@@ -637,22 +744,35 @@ export function Labelling() {
     let missed = 0;
     let misnamed = 0;
 
-    for (const d of detections) {
-      const label = labels[d.key];
+    // Gate statistics are per track, one score per track (the representative detection's
+    // match_score):
+    //   true match — verdict `contestant` and the label agrees with the matcher's plurality
+    //                claim for the track;
+    //   missed     — verdict `contestant` but the matcher left the track unnamed;
+    //   misnamed   — verdict `contestant` but the matcher claimed another contestant;
+    //   impostor   — verdict `not_a_contestant` while the matcher named the track anyway,
+    //                i.e. the human label differs from the model's claim.
+    for (const track of tracks) {
+      const label = labels[track.key];
       if (!label) continue;
       labelled++;
       counts[label.verdict]++;
 
+      const claimed = track.claim?.contestant_id ?? null;
       if (label.verdict === 'contestant') {
-        if (d.contestant_id !== null && d.contestant_id === label.contestant_id) {
-          if (d.match_score !== null) trueMatches.push(d.match_score);
-        } else if (d.contestant_id === null) {
+        if (claimed !== null && claimed === label.contestant_id) {
+          if (track.representative.match_score !== null) {
+            trueMatches.push(track.representative.match_score);
+          }
+        } else if (claimed === null) {
           missed++;
         } else {
           misnamed++;
         }
-      } else if (label.verdict === 'not_a_contestant' && d.contestant_id !== null) {
-        if (d.match_score !== null) impostors.push(d.match_score);
+      } else if (label.verdict === 'not_a_contestant' && claimed !== null) {
+        if (track.representative.match_score !== null) {
+          impostors.push(track.representative.match_score);
+        }
       }
     }
 
@@ -671,9 +791,9 @@ export function Labelling() {
       missed,
       misnamed,
     };
-  }, [detections, labels]);
+  }, [tracks, labels]);
 
-  const progressPct = detections.length > 0 ? (rail.labelled / detections.length) * 100 : 0;
+  const progressPct = tracks.length > 0 ? (rail.labelled / tracks.length) * 100 : 0;
   const gateReady = rail.labelled >= MIN_LABELS_FOR_GATE;
   const meanReady = rail.trueMatches >= MIN_TRUE_MATCHES_FOR_MEAN;
   const impostorReady = rail.impostors >= MIN_IMPOSTORS_FOR_WORST;
@@ -704,8 +824,9 @@ export function Labelling() {
         <div>
           <h1 className="text-2xl font-bold text-carbon-deep">Labelling</h1>
           <p className="text-carbon-soft text-sm mt-1">
-            One verdict per detection — the ground truth the separation gate is computed from. Crops
-            come from the processed rendition; nothing here rescales a score.
+            One verdict per track — `tracker_id` links a face across frames, so the ground truth the
+            separation gate is computed from is one label per track. Crops come from the processed
+            rendition; nothing here rescales a score.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -740,6 +861,21 @@ export function Labelling() {
       {saveError && (
         <div className="border border-stamp/50 bg-stamp/10/40 text-stamp text-sm rounded-none px-4 py-2">
           Save failed: {saveError}
+        </div>
+      )}
+
+      {legacyIgnored && (
+        <div className="border border-stamp/50 bg-stamp/10/40 rounded-none px-4 py-3 space-y-2">
+          <p className="text-stamp text-sm font-semibold">
+            An older <span className="font-mono">labels/v1</span> file was found and ignored — it
+            labels individual detections, not tracks.
+          </p>
+          {file?.legacy_detail && <p className="text-stamp/80 text-xs">{file.legacy_detail}</p>}
+          <p className="text-stamp/70 text-xs">
+            The old file has been left untouched. The first verdict you save writes a new{' '}
+            <span className="font-mono">labels/v2</span> file for this video, replacing the
+            per-detection verdicts.
+          </p>
         </div>
       )}
 
@@ -830,7 +966,7 @@ export function Labelling() {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="name, number or frame…"
+                placeholder="track, name or number…"
                 className={`${FIELD} min-w-[200px]`}
               />
             </div>
@@ -867,7 +1003,7 @@ export function Labelling() {
           <>
             <div className="flex items-center gap-3 ml-auto">
               <span className="text-xs text-carbon whitespace-nowrap">
-                {rail.labelled} of {detections.length} labelled
+                {rail.labelled} of {tracks.length} tracks labelled
               </span>
               <span className="w-32 h-1.5 bg-paper-dark rounded overflow-hidden">
                 <span className="block h-full bg-stamp" style={{ width: `${progressPct}%` }} />
@@ -880,6 +1016,15 @@ export function Labelling() {
           </>
         )}
       </div>
+
+      {labelable && untrackedCount > 0 && (
+        <p className="border border-paper-deep bg-paper-dark/40 text-carbon-soft text-xs px-4 py-2">
+          <span className="font-mono text-carbon-deep">{untrackedCount}</span> detection
+          {untrackedCount === 1 ? '' : 's'} skipped as untracked (
+          <span className="font-mono">tracker_id &lt; 0</span>): there is no track to attach a
+          verdict to.
+        </p>
+      )}
 
       {!labelable ? (
         <Card padding="lg">
@@ -912,7 +1057,7 @@ export function Labelling() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16 text-carbon-soft">
                 <div className="w-10 h-10 border-3 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
-                <p>Loading detections…</p>
+                <p>Loading tracks…</p>
               </div>
             ) : metadataQuery.error ? (
               <Card padding="lg">
@@ -926,47 +1071,51 @@ export function Labelling() {
             ) : filtered.length === 0 ? (
               <Card padding="lg">
                 <div className="text-center py-8 text-carbon-soft">
-                  <p className="text-carbon mb-1">No detections match the current filters</p>
+                  <p className="text-carbon mb-1">No tracks match the current filters</p>
                   <p className="text-sm">
-                    {detections.length === 0
-                      ? 'This video has no detections in its metadata.'
+                    {tracks.length === 0
+                      ? 'This video has no tracked detections in its metadata.'
                       : 'Clear the filter or the unlabelled-only toggle.'}
                   </p>
                 </div>
               </Card>
             ) : (
               <>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-2.5">
-                  {visible.map((d) => {
-                    const label = labels[d.key];
-                    const chip = chipText(d.key);
-                    const claim =
-                      d.contestant_nickname ??
-                      (d.contestant_id ? `#${d.contestant_id}` : 'unmatched');
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
+                  {visible.map((track) => {
+                    const label = labels[track.key];
+                    const chip = chipText(track.key);
+                    const claim = claimText(track, contestantsById);
+                    const votes = voteBreakdown(track, contestantsById);
+                    const topVote = track.votes[0];
                     return (
                       <button
-                        key={d.key}
+                        key={track.key}
                         ref={(el) => {
-                          tileRefs.current.set(d.key, el);
+                          tileRefs.current.set(track.key, el);
                         }}
                         type="button"
                         disabled={blocked}
                         onClick={() => {
-                          setOpenKey(d.key);
+                          setOpenKey(track.key);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Backspace' || e.key === 'Delete') {
                             e.preventDefault();
-                            clearLabel(d.key);
+                            clearLabel(track.key);
                           }
                         }}
-                        title={`Frame ${d.frame_number}, detection ${d.detection_index} — click to label, Backspace to clear`}
+                        title={`Track ${track.tracker_id} · ${track.frame_count} frame${track.frame_count === 1 ? '' : 's'} · matcher claim: ${votes} — click to label, Backspace to clear`}
                         className={`relative bg-paper-light border rounded-none p-2 text-left transition-colors ${
                           label ? 'border-carbon/50' : 'border-paper-dark'
                         } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
                       >
                         <img
-                          src={cropSrc(videoId ?? '', d.frame_number, d.detection_index)}
+                          src={cropSrc(
+                            videoId ?? '',
+                            track.representative.frame_number,
+                            track.representative.detection_index,
+                          )}
                           alt=""
                           loading="lazy"
                           decoding="async"
@@ -974,15 +1123,22 @@ export function Labelling() {
                         />
                         <div className="mt-1.5 flex items-center justify-between gap-1">
                           <span className="text-[10.5px] text-ledger font-mono">
-                            f{d.frame_number}
+                            track {track.tracker_id} · {track.frame_count}f
                           </span>
-                          <BandPill band={bandFor(d.match_score)} />
+                          <BandPill band={bandFor(track.representative.match_score)} />
                         </div>
                         <div
-                          className={`text-[11px] truncate ${d.contestant_id ? 'text-carbon' : 'text-ledger'}`}
-                          title={d.contestant_name ?? undefined}
+                          className={`text-[11px] truncate ${track.claim ? 'text-carbon' : 'text-ledger'}`}
+                          title={track.claim?.name ?? undefined}
                         >
                           {claim}
+                        </div>
+                        <div className="text-[10px] text-ledger truncate" title={votes}>
+                          {topVote
+                            ? `votes ${topVote.count}/${track.frame_count}${
+                                track.votes.length > 1 ? ` · +${track.votes.length - 1}` : ''
+                              }`
+                            : 'no named frames'}
                         </div>
                         {label && chip && (
                           <span
@@ -1023,9 +1179,9 @@ export function Labelling() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between text-xs border-t border-paper-dark pt-1.5">
-                  <span className="text-carbon-soft">Unlabelled</span>
+                  <span className="text-carbon-soft">Unlabelled tracks</span>
                   <span className="text-carbon-deep font-mono">
-                    {detections.length - rail.labelled}
+                    {tracks.length - rail.labelled}
                   </span>
                 </div>
               </div>
@@ -1036,8 +1192,9 @@ export function Labelling() {
                 The gate these labels unlock
               </h2>
               <p className="text-[11px] text-ledger mb-3">
-                Computed over the {rail.labelled} labelled detections only. Gate = mean true-match
-                cosine ≥ {GATE.trueMatchMean} and worst impostor cosine ≤ {GATE.worstImpostor}.
+                Computed over the {rail.labelled} labelled tracks only, with one cosine per track
+                (its representative detection's match_score). Gate = mean true-match cosine ≥{' '}
+                {GATE.trueMatchMean} and worst impostor cosine ≤ {GATE.worstImpostor}.
               </p>
               {!gateReady && (
                 <p className="text-xs text-stamp mb-3">
@@ -1073,7 +1230,7 @@ export function Labelling() {
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-carbon-soft">Impostor events</span>
+                  <span className="text-carbon-soft">Impostor tracks</span>
                   <span className="text-carbon-deep font-mono">{rail.impostors}</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1114,10 +1271,10 @@ export function Labelling() {
               <div className="space-y-1.5 text-xs text-carbon-soft">
                 <div className="flex justify-between gap-3">
                   <span>schema</span>
-                  <span className="font-mono text-carbon-deep">{file?.schema ?? 'labels/v1'}</span>
+                  <span className="font-mono text-carbon-deep">{file?.schema ?? 'labels/v2'}</span>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <span>labels</span>
+                  <span>tracks labelled</span>
                   <span className="font-mono text-carbon-deep">{rail.labelled}</span>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -1142,7 +1299,7 @@ export function Labelling() {
       )}
 
       {/* The sheet */}
-      {openDetection && !blocked && (
+      {openTrack && !blocked && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
           onClick={closeSheet}
@@ -1153,10 +1310,11 @@ export function Labelling() {
           >
             <div className="flex justify-between items-center p-4 border-b border-paper-dark">
               <div>
-                <h3 className="text-lg font-semibold text-carbon-deep">Label this detection</h3>
+                <h3 className="text-lg font-semibold text-carbon-deep">Label this track</h3>
                 <p className="text-xs text-ledger">
-                  tile {filtered.findIndex((d) => d.key === openKey) + 1} of {filtered.length} in
-                  view
+                  track {openTrack.tracker_id} · {openTrack.frame_count} frame
+                  {openTrack.frame_count === 1 ? '' : 's'} · tile{' '}
+                  {filtered.findIndex((t) => t.key === openKey) + 1} of {filtered.length} in view
                 </p>
               </div>
               <button
@@ -1173,8 +1331,8 @@ export function Labelling() {
                 <img
                   src={cropSrc(
                     videoId ?? '',
-                    openDetection.frame_number,
-                    openDetection.detection_index,
+                    openTrack.representative.frame_number,
+                    openTrack.representative.detection_index,
                     320,
                   )}
                   alt=""
@@ -1183,53 +1341,61 @@ export function Labelling() {
                 <div className="space-y-1.5 text-xs text-carbon-soft">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-carbon-deep">
-                      frame {openDetection.frame_number} · det {openDetection.detection_index}
+                      frame {openTrack.representative.frame_number} · det{' '}
+                      {openTrack.representative.detection_index}
                     </span>
-                    <BandPill band={bandFor(openDetection.match_score)} />
+                    <BandPill band={bandFor(openTrack.representative.match_score)} />
                   </div>
                   <div className="font-mono">
                     det_score{' '}
-                    {typeof openDetection.det_score === 'number'
-                      ? openDetection.det_score.toFixed(3)
+                    {typeof openTrack.representative.det_score === 'number'
+                      ? openTrack.representative.det_score.toFixed(3)
                       : 'not recorded'}
                   </div>
                   <div className="font-mono">
                     match cos{' '}
-                    {openDetection.match_score === null ? (
+                    {openTrack.representative.match_score === null ? (
                       <span className="text-ledger">none</span>
                     ) : (
-                      openDetection.match_score.toFixed(3)
+                      openTrack.representative.match_score.toFixed(3)
                     )}
+                  </div>
+                  <div>
+                    Track: {openTrack.frame_count} frame
+                    {openTrack.frame_count === 1 ? '' : 's'} ·{' '}
+                    {openTrack.votes.length > 0
+                      ? `${openTrack.votes.length} claimed identit${openTrack.votes.length === 1 ? 'y' : 'ies'}`
+                      : 'no claimed identity'}
                   </div>
                   <div className="pt-1">
                     Matcher says:{' '}
-                    {openDetection.contestant_id ? (
+                    {openTrack.claim ? (
                       <span className="text-carbon-deep">
-                        {openDetection.contestant_nickname ?? '—'} (#
-                        {openDetection.contestant_id}
-                        {openDetection.contestant_name ? ` ${openDetection.contestant_name}` : ''})
+                        {openTrack.claim.nickname ?? '—'} (#
+                        {openTrack.claim.contestant_id}
+                        {openTrack.claim.name ? ` ${openTrack.claim.name}` : ''}) —{' '}
+                        {openTrack.claim.count}/{openTrack.frame_count} frames
                       </span>
                     ) : (
                       <span className="text-ledger">nobody</span>
                     )}
                   </div>
-                  {labels[openDetection.key] && (
+                  <div className="font-mono text-[10.5px] text-ledger break-words">
+                    votes: {voteBreakdown(openTrack, contestantsById)}
+                  </div>
+                  {labels[openTrack.key] && (
                     <div className="flex items-center gap-2 pt-1">
                       <span className="text-ledger">Labelled:</span>
                       <span
                         className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${
-                          VERDICT_PILL[labels[openDetection.key].verdict]
+                          VERDICT_PILL[labels[openTrack.key].verdict]
                         }`}
                       >
-                        {labels[openDetection.key].verdict === 'contestant'
-                          ? chipText(openDetection.key)
-                          : VERDICT_LABEL[labels[openDetection.key].verdict]}
+                        {labels[openTrack.key].verdict === 'contestant'
+                          ? chipText(openTrack.key)
+                          : VERDICT_LABEL[labels[openTrack.key].verdict]}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => clearLabel(openDetection.key)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => clearLabel(openTrack.key)}>
                         Clear label
                       </Button>
                     </div>
@@ -1241,7 +1407,7 @@ export function Labelling() {
                 <ContestantPicker
                   key={openKey}
                   contestants={contestants}
-                  onPick={(contestantId) => commitOne(openDetection, 'contestant', contestantId)}
+                  onPick={(contestantId) => commitOne(openTrack, 'contestant', contestantId)}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1249,7 +1415,7 @@ export function Labelling() {
                     <button
                       key={v}
                       type="button"
-                      onClick={() => commitOne(openDetection, v)}
+                      onClick={() => commitOne(openTrack, v)}
                       title={VERDICT_BLURB[v]}
                       className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
                     >
@@ -1262,8 +1428,9 @@ export function Labelling() {
                 </div>
 
                 <p className="text-[11px] text-ledger">
-                  Picking a verdict records the label and moves to the next unlabelled tile. Escape
-                  closes this sheet; Backspace or Delete on a tile clears its label.
+                  Picking a verdict records one label for the whole track and moves to the next
+                  unlabelled track. Escape closes this sheet; Backspace or Delete on a card clears
+                  its label.
                 </p>
               </>
             </div>
