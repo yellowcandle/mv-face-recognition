@@ -175,6 +175,7 @@ def build_timeline(
                 cid,
                 {
                     "contestant_info": {
+                        "id": cid,
                         "name": det["contestant_name"],
                         "nickname": det["contestant_nickname"],
                     },
@@ -213,6 +214,8 @@ def summarise(frames: list[Frame], timeline: dict[str, Any]) -> dict[str, Any]:
         "total_faces_detected": faces,
         "total_recognitions": recogs,
         "unique_contestants": len(timeline),
+        # Required by apps/shared/types (ProcessingSummary); no generation stored it.
+        "recognition_rate": round(recogs / faces, 4) if faces else 0.0,
     }
 
 
@@ -361,7 +364,44 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
                     f"acceptance_threshold={acceptance} disagrees with the config "
                     f"({EXPECTED_ACCEPTANCE})"
                 )
+
+    # Fields the apps read unconditionally (apps/shared/types): a payload without
+    # them renders blank or NaN instead of failing at publish time.
+    info = payload.get("video_info") or {}
+    duration = info.get("duration")
+    if not isinstance(duration, (int, float)) or duration <= 0:
+        problems.append("video_info.duration is missing or not positive")
+
+    summary = payload.get("processing_summary") or {}
+    rate = summary.get("recognition_rate")
+    if not isinstance(rate, (int, float)) or not 0 <= float(rate) <= 1:
+        problems.append("processing_summary.recognition_rate missing or outside [0,1]")
+
+    for cid, entry in (payload.get("contestant_timeline") or {}).items():
+        person = (entry or {}).get("contestant_info") or {}
+        if person.get("id") != cid:
+            problems.append(
+                f"contestant_timeline[{cid}].contestant_info.id is {person.get('id')!r}"
+            )
+
     return problems
+
+
+def normalise_video_info(info: dict[str, Any], frames: list[Frame]) -> dict[str, Any]:
+    """Backfill what every consumer reads but no generation stores.
+
+    `VideoInfo.duration` is required by apps/shared/types and the Player's timeline,
+    and no source file carries it: both generations stored only `fps` and
+    `frame_count`. Derive seconds from those rather than publish a missing field; when
+    neither exists, leave 0.0 so validate_payload fails loudly instead of guessing.
+    """
+    out = dict(info)
+    duration = out.get("duration")
+    if not isinstance(duration, (int, float)) or duration <= 0:
+        fps = float(out.get("fps") or 0)
+        frame_count = float(out.get("frame_count") or len(frames) or 0)
+        out["duration"] = round(frame_count / fps, 3) if fps > 0 and frame_count else 0.0
+    return out
 
 
 def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
@@ -407,7 +447,7 @@ def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
         run_config = canonical
 
     payload = {
-        "video_info": doc.get("video_info") or {},
+        "video_info": normalise_video_info(doc.get("video_info") or {}, frames),
         "processing_summary": summarise(frames, timeline),
         "contestant_timeline": timeline,
         "frame_data": frames,
