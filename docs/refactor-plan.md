@@ -148,6 +148,17 @@ dry run stages all 5 reels, each validating; `uvx ruff@0.7.3` clean on `scripts/
 pinned mypy clean; 3/3 new contract tests pass. Reel 5's stale `recognition_config`
 continues to be normalised (not failed) per the documented `normalise()` behaviour.
 
+**Executed 2026-10-22 — B(4)/F(4) reprocess + generation-A retirement.** Reels 1–3 were
+reprocessed locally with `mvp-processor/src/process_video.py --local-only` (24, 24 and 27
+minutes wall clock; detection then 1080p + 720p encodes). Matched detections per reel:
+**626 / 776 / 1659**, against **23 / 17 / 58** in the legacy files (reels 4–5 were already
+1131 / 1448). The ten generation-A files (17 MB, `metadata/[1-5]-*`) and `convert_legacy()`
+are deleted; `normalise()` refuses `frame_results` with a message pointing at the pipeline, and
+`pick_sources()` scans only `local_output/metadata`. Roster quality moved from
+36 good / 58 weak / 2 missing to **68 / 26 / 2**; 67 (Sarah) and 77 (TABI) are still the two
+with no references. Every reprocessed file validates with zero contract problems, and the
+publish dry run stages all five reels.
+
 ---
 
 ## Workstream C — embeddings keyed by 編號
@@ -315,9 +326,8 @@ isolated invocation CI runs, so it no longer depends on which packages are insta
 Gate output at the time: mypy ratchet clean, ruff 66/66, pytest 140F/17E/123P → exit 0.
 (The ratchets have since been lowered to ruff 27 / mypy 196 / root 0F·0E·3P by A and C.)
 
-**F(4) is the only open step**: reels 1–3 are being reprocessed locally with
-`process_video.py --local-only`, which replaces metadata generation A with the current
-pipeline and removes the reason the publisher has to convert legacy payloads at all.
+**F(4) executed 2026-10-22.** Reels 1–3 were reprocessed and generation A was deleted; the
+numbers are recorded under Workstream B's B(4) note. Nothing in Workstream F remains open.
 
 ---
 
