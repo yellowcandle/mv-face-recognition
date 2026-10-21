@@ -494,7 +494,7 @@ export function Labelling() {
         );
         // Keep the cache equal to disk so remounting the page mid-session shows
         // the verdicts that were just written.
-        queryClient.setQueryData<LabelsResult>(['labels', videoId], {
+        queryClient.setQueryData<LabelsResult>(['labels', videoId], (): LabelsResult => ({
           status: 'loaded',
           file: {
             schema: 'labels/v1',
@@ -503,7 +503,7 @@ export function Labelling() {
             source,
             labels: labelList,
           },
-        });
+        }));
       } catch (e) {
         if (seq !== saveSeqRef.current) return;
         setSaveState('failed');
