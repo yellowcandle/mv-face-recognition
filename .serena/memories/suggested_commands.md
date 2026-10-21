@@ -70,13 +70,10 @@ node scripts/run-full-pipeline.js --process-only
 ### Deployment
 ```bash
 # Full deployment pipeline
-cd mvp-processor && npm run build
-cd ../scripts && node update-worker-assets.js
-cd ../worker && wrangler deploy
-
-# Upload assets
+pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js
+uv run --no-project python scripts/publish/build_read_model.py --publish
 node scripts/upload-to-r2.js
-node scripts/upload-metadata.js
+cd worker && wrangler deploy
 ```
 
 ## System Commands (Darwin/macOS)
