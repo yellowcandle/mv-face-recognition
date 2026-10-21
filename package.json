@@ -15,9 +15,11 @@
     "setup": "npm run build && npm run publish:metadata:remote && npm run upload:videos"
   },
   "devDependencies": {
+    "vite-plus": "catalog:",
     "wrangler": "^4.47.0"
   },
   "engines": {
     "node": ">=22.22.0"
-  }
+  },
+  "packageManager": "pnpm@12.14.0"
 }

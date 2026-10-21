@@ -312,3 +312,4 @@ mvp-processor/*TEMP*.mp4
 
 # Rewritten with temp paths by tests/contract/test_cli_*.py on every run.
 /db/init_state.json
+.vitest/

@@ -29,7 +29,6 @@ export function FlagDialog({
     onSubmit(contestantId, userLabel);
   };
 
-  const facesToShow = mode === 'batch' ? selectedFaces : face ? [face] : [];
   const title = mode === 'batch' ? `Batch Flag Faces (${selectedFaces.length})` : 'Flag Face';
   const submitLabel =
     mode === 'batch'
