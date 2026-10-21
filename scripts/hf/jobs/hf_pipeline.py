@@ -40,15 +40,25 @@ IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 REPO_SLUG = os.environ.get("REPO_SLUG", "yellowcandle/mv-face-recognition")
 REPO_BRANCH = os.environ.get("REPO_BRANCH", "hf-jobs")
 
-# InsightFace resolves its cache as ~/.insightface; HOME points at the mounted bucket copy.
+# HOME must be writable and executable (uv installs a Python under it). The InsightFace
+# weights live in the bucket, so ~/.insightface is symlinked to the mount instead.
 ENV = {
     **os.environ,
-    "HOME": str(BUCKET / "models/home"),
+    "HOME": "/tmp/home",
     "INSIGHTFACE_PROVIDERS": os.environ.get(
         "INSIGHTFACE_PROVIDERS", "CPUExecutionProvider"
     ),
     "UV_CACHE_DIR": "/tmp/uv-cache",
 }
+
+
+def prepare_home() -> None:
+    home = Path(ENV["HOME"])
+    home.mkdir(parents=True, exist_ok=True)
+    target = BUCKET / "models/home/.insightface"
+    link = home / ".insightface"
+    if target.exists() and not link.exists():
+        link.symlink_to(target)
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> None:
@@ -136,6 +146,7 @@ def stage_video(video_id: str) -> Path:
 
 
 def cache_stage() -> None:
+    prepare_home()
     repo = fetch_repo()
     python = install(repo)
     photos = stage_photos()
@@ -155,6 +166,7 @@ def cache_stage() -> None:
 
 
 def video_stage(video_id: str) -> None:
+    prepare_home()
     repo = fetch_repo()
     python = install(repo)
     stage_common(repo)
