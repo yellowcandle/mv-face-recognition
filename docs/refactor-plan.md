@@ -237,6 +237,16 @@ About 24 tests come back with a two-line change and zero behavioural risk.
 **Gate.** CI on a clean tree reports the *number of new* failures, and that number is 0.
 **Risk.** The reprocess is the only expensive step; everything above it is hours, not days.
 
+**Executed 2026-10-22 — F(2) + F(3) ratchet.** `[tool.mypy.overrides]` quarantines
+`tests/**`, `scripts/debug/**`, `scripts/benchmarks/**` and the conftest moto/yaml shims
+via `ignore_errors` (both module-name forms listed, since `tests/` has no `__init__.py`).
+Repo-wide `uvx mypy@1.16.1 .`: **514 → 259 errors / 60 files**. The remaining count is now
+gated in `scripts/ci/check_baselines.py` against `mypy_repo_wide` in the baseline, measured
+with the same pinned isolated invocation CI runs, so it no longer depends on which
+packages are installed. `disallow_untyped_defs` remains on globally; the quarantined
+modules are the only relaxation. Gate output: mypy ratchet clean, ruff 66/66, pytest
+140F/17E/123P → exit 0.
+
 ---
 
 ## Sequencing
