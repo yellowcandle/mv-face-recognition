@@ -88,6 +88,18 @@ def video_id_from(path: str) -> str | None:
     return str(int(m.group(1))) if m else None
 
 
+def clamp_box(x1: float, y1: float, x2: float, y2: float) -> list[float]:
+    """Clamp a pixel box to the frame, then convert to frame fractions.
+
+    Legacy runs stored boxes that extend past the frame edge (y = -127, x = 3867 on a
+    3840-wide source). CONTEXT.md's contract says a bbox is a fraction of the frame in
+    0-1, so the off-frame part is trimmed here rather than published out of range.
+    """
+    lo_x, hi_x = sorted((max(0.0, x1), min(1.0, x2)))
+    lo_y, hi_y = sorted((max(0.0, y1), min(1.0, y2)))
+    return [lo_x, lo_y, hi_x, hi_y]
+
+
 def convert_legacy(
     doc: dict[str, Any], by_nick: Roster, by_name: Roster
 ) -> dict[str, Any]:
@@ -126,12 +138,7 @@ def convert_legacy(
                         round(float(conf), 4) if matched and conf is not None else None
                     ),
                     det_score=round(float(face.get("detection_confidence") or 0), 4),
-                    bbox=[
-                        round(x1 / width, 6),
-                        round(y1 / height, 6),
-                        round(x2 / width, 6),
-                        round(y2 / height, 6),
-                    ],
+                    bbox=[round(v, 6) for v in clamp_box(x1 / width, y1 / height, x2 / width, y2 / height)],
                     tracker_id=None,  # the legacy pipeline stored no tracker ids
                 )
             )
@@ -239,12 +246,7 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
                         else None
                     ),
                     det_score=0.0,  # not stored in this variant
-                    bbox=[
-                        round(left / width, 6),
-                        round(top / height, 6),
-                        round(right / width, 6),
-                        round(bottom / height, 6),
-                    ],
+                    bbox=[round(v, 6) for v in clamp_box(left / width, top / height, right / width, bottom / height)],
                     tracker_id=(trackers[i] if i < len(trackers) else None),
                 )
             )
@@ -258,6 +260,93 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
             )
         )
     return {"video_info": info, "frame_data": frames}
+
+
+REQUIRED_FIELDS = (
+    "video_info",
+    "processing_summary",
+    "contestant_timeline",
+    "frame_data",
+)
+REQUIRED_FRAME_FIELDS = ("frame_number", "timestamp", "detections_count", "detections")
+# bands.ts and processing_config.yaml agree on these; a payload that disagrees is stale.
+EXPECTED_CUTOFFS = {"high": 0.585, "medium": 0.451}
+EXPECTED_ACCEPTANCE = 0.45
+
+
+def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
+    """The contract, checked at publish time.
+
+    Reel 5 shipped `recognition_config {tolerance: 0.68, min_confidence: 0.5}` — the
+    pre-contract shape — while every confidence it stored sat below its own
+    min_confidence. Nothing caught it because the publisher copied the block verbatim.
+    These checks make that a failed publish instead of a silent lie.
+    """
+    problems: list[str] = []
+
+    for field in REQUIRED_FIELDS:
+        if field not in payload:
+            problems.append(f"missing required field {field!r}")
+
+    frames = payload.get("frame_data") or []
+    if not frames:
+        problems.append("frame_data is empty")
+    else:
+        first = frames[0]
+        for field in REQUIRED_FRAME_FIELDS:
+            if field not in first:
+                problems.append(f"frame is missing {field!r}")
+
+    # bboxes are frame fractions in canonical [x1,y1,x2,y2] order (CONTEXT.md).
+    bad_boxes = 0
+    bad_scores = 0
+    for frame in frames:
+        for det in frame.get("detections") or []:
+            box = det.get("bbox")
+            if (
+                not isinstance(box, list)
+                or len(box) != 4
+                or any(not isinstance(v, (int, float)) or v < 0 or v > 1 for v in box)
+                or box[2] < box[0]
+                or box[3] < box[1]
+            ):
+                bad_boxes += 1
+            score = det.get("match_score")
+            if score is not None and not (-1 <= float(score) <= 1):
+                bad_scores += 1
+    if bad_boxes:
+        problems.append(f"{bad_boxes} detections have a bbox outside [0,1] or misordered")
+    if bad_scores:
+        problems.append(f"{bad_scores} match scores outside the cosine range [-1,1]")
+
+    config = payload.get("recognition_config")
+    if config is None:
+        logger.warning(
+            "reel %s: no recognition_config; the bands applied are unknown", vid
+        )
+    elif not isinstance(config, dict):
+        problems.append("recognition_config is not an object")
+    else:
+        cutoffs = config.get("band_cutoffs")
+        acceptance = config.get("acceptance_threshold")
+        if cutoffs is None and acceptance is None:
+            problems.append(
+                "recognition_config has neither band_cutoffs nor acceptance_threshold "
+                f"(stale shape: {sorted(config)})"
+            )
+        else:
+            for band, expected in EXPECTED_CUTOFFS.items():
+                actual = (cutoffs or {}).get(band)
+                if actual is not None and abs(float(actual) - expected) > 1e-6:
+                    problems.append(
+                        f"band cutoff {band}={actual} disagrees with bands.ts ({expected})"
+                    )
+            if acceptance is not None and abs(float(acceptance) - EXPECTED_ACCEPTANCE) > 1e-6:
+                problems.append(
+                    f"acceptance_threshold={acceptance} disagrees with the config "
+                    f"({EXPECTED_ACCEPTANCE})"
+                )
+    return problems
 
 
 def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
@@ -284,15 +373,36 @@ def normalise(path: str, by_nick: Roster, by_name: Roster) -> dict[str, Any]:
         sys.exit(f"{path} has neither frame_data nor frame_results")
 
     timeline = build_timeline(frames, by_nick, by_name)
+
+    # The pipeline's cutoffs, as bands.ts and processing_config.yaml agree on them. A run
+    # that carries its own contract block is trusted but checked by validate_payload(); a
+    # run from before the contract (reel 5: {tolerance, min_confidence}) is normalised here
+    # and says so, rather than publishing a block that contradicts what the UI renders.
+    canonical = {
+        "acceptance_threshold": EXPECTED_ACCEPTANCE,
+        "band_cutoffs": dict(EXPECTED_CUTOFFS),
+        "provisional": True,
+    }
+    run_config = doc.get("recognition_config")
+    config_source = "run"
+    if not isinstance(run_config, dict) or (
+        "band_cutoffs" not in run_config and "acceptance_threshold" not in run_config
+    ):
+        config_source = "normalised" if run_config is not None else "absent"
+        run_config = canonical
+
     payload = {
         "video_info": doc.get("video_info") or {},
         "processing_summary": summarise(frames, timeline),
         "contestant_timeline": timeline,
         "frame_data": frames,
-        "read_model": {"source": source, "frames": len(frames)},
+        "recognition_config": run_config,
+        "read_model": {
+            "source": source,
+            "frames": len(frames),
+            "config": config_source,
+        },
     }
-    if "recognition_config" in doc:
-        payload["recognition_config"] = doc["recognition_config"]
     return payload
 
 
@@ -461,6 +571,11 @@ def main() -> int:
             logger.error("no usable metadata for reel %s", vid)
             continue
         payload = best
+        problems = validate_payload(vid, payload)
+        if problems:
+            for problem in problems:
+                logger.error("reel %s: %s", vid, problem)
+            sys.exit(f"reel {vid} does not satisfy the metadata contract")
         chosen[vid] = best_path
         payloads[vid] = payload
         frames = payload["frame_data"]
