@@ -1,11 +1,16 @@
 import glob
 import os
+from collections import Counter
 
 import numpy as np
 
-# Path to the embeddings directory
+from src.database.roster import Roster
+
+# Path to the embeddings directory (files sit one level down: embeddings/contestants/)
 EMBEDDING_DIR = "source/photo/contestants/embeddings"
 print(f"[INFO] Checking directory: {os.path.abspath(EMBEDDING_DIR)}")
+
+roster = Roster.from_csv()
 
 # List files in the directory to confirm they are seen by Python's os module
 try:
@@ -18,9 +23,9 @@ except Exception as e:
     exit()
 
 # Try glob to find .npy files
-glob_pattern = os.path.join(EMBEDDING_DIR, "*_embedding.npy")
+glob_pattern = os.path.join(EMBEDDING_DIR, "**", "*_embedding.npy")
 print(f"[INFO] Glob pattern: {glob_pattern}")
-npy_files_glob = glob.glob(glob_pattern)
+npy_files_glob = sorted(glob.glob(glob_pattern, recursive=True))
 print(f"[INFO] .npy files found by glob.glob: {npy_files_glob}")
 
 if not npy_files_glob:
@@ -32,6 +37,31 @@ if not npy_files_glob:
             "[INFO] os.listdir found .npy files, so the issue might be with glob pattern or special characters."
         )
     exit()
+
+# Resolve every file to its 編號: this is what the database keys on (ADR 0001).
+resolved: list[tuple[str, str | None]] = [
+    (path, roster.id_for_embedding_stem(os.path.basename(path)[: -len("_embedding.npy")]))
+    for path in npy_files_glob
+]
+unresolved = [path for path, file_id in resolved if file_id is None]
+duplicates = [
+    file_id
+    for file_id, count in Counter(f for _, f in resolved if f).items()
+    if count > 1
+]
+
+print(
+    f"\n[INFO] {len(resolved)} files -> "
+    f"{len({file_id for _, file_id in resolved if file_id})} contestants"
+)
+if unresolved:
+    print(f"[WARN] No contestant matches: {unresolved}")
+for file_id in duplicates:
+    files = [p for p, c in resolved if c == file_id]
+    print(f"[WARN] 編號 {file_id} has {len(files)} files; the loader keeps the first: {files}")
+
+for path, resolved_id in resolved:
+    print(f"  {resolved_id or '???':>3}  {os.path.basename(path)}")
 
 # Pick the first file found by glob for inspection
 file_path = npy_files_glob[0]

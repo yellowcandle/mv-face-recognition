@@ -137,6 +137,9 @@ module = [
     "yt_dlp.*",
     "moto.*",
     "yaml.*",
+    # Streamlit ships no py.typed marker; src/ui is the legacy desktop surface and is
+    # never imported by the live pipeline or the publisher.
+    "streamlit.*",
     # mvp-processor/src siblings import each other as top-level modules; they only
     # resolve when mypy runs from that directory.
     "face_detector",

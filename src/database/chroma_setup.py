@@ -32,8 +32,12 @@ class ChromaDBManager:
             "chromadb_path",
             self.config.get("paths", {}).get("chroma_db_path", ".chroma_db"),
         )
+        # config.json uses `contestants_dir`; older configs used `contestant_photos`.
         self.contestants_dir = self.config.get("paths", {}).get(
-            "contestant_photos", "source/photos/contestants"
+            "contestants_dir",
+            self.config.get("paths", {}).get(
+                "contestant_photos", "source/photo/contestants"
+            ),
         )
         self.similarity_threshold = self.config.get("face_recognition", {}).get(
             "similarity_threshold",
@@ -62,21 +66,44 @@ class ChromaDBManager:
         )
 
     def load_embeddings_from_npy(self) -> Dict[str, np.ndarray]:
-        """Load all .npy embedding files from contestants directory with integrity verification."""
+        """Load every .npy embedding under the contestants directory, keyed by 編號.
+
+        The files are named after the person (`{暱稱}_embedding.npy`) and live a level
+        or two down (`embeddings/contestants/`); both forms resolve through
+        `src.database.roster`, so the returned keys are contestant numbers and a
+        duplicated nickname (the two `3 妹` files) collapses to one entry.
+        """
         import hashlib
 
+        from src.database.roster import Roster
+
+        roster = Roster.from_csv()
         embeddings = {}
         contestants_path = Path(self.contestants_dir)
 
-        # Find all .npy files (only embedding files, not other npy files)
-        npy_files = list(contestants_path.glob("*_embedding.npy"))
+        # Recursive: the files sit under embeddings/contestants/ today, but older
+        # checkouts had them directly in the contestants directory.
+        npy_files = sorted(contestants_path.rglob("*_embedding.npy"))
 
         logger.info(f"Found {len(npy_files)} embedding files")
 
         for npy_file in npy_files:
             try:
                 # Extract name from filename (remove "_embedding.npy")
-                name = npy_file.stem.replace("_embedding", "")
+                stem = npy_file.stem.replace("_embedding", "")
+                contestant_id = roster.id_for_embedding_stem(stem)
+                if contestant_id is None:
+                    logger.warning(
+                        f"{npy_file.name} names no contestant in the cast sheet; skipped"
+                    )
+                    continue
+                if contestant_id in embeddings:
+                    logger.warning(
+                        f"Duplicate embedding for {roster.label(contestant_id)} "
+                        f"({npy_file.name}); keeping the first file and ignoring this one"
+                    )
+                    continue
+                name = roster.label(contestant_id)
 
                 # Load embedding
                 embedding = np.load(npy_file)
@@ -107,12 +134,12 @@ class ChromaDBManager:
                 if embedding.ndim == 2 and embedding.shape == (1, 512):
                     # Reshape from (1, 512) to (512,)
                     embedding = embedding.flatten()
-                    embeddings[name] = embedding
+                    embeddings[contestant_id] = embedding
                     logger.debug(
                         f"Loaded and reshaped embedding for {name}: shape {embedding.shape}"
                     )
                 elif embedding.ndim == 1 and len(embedding) == 512:
-                    embeddings[name] = embedding
+                    embeddings[contestant_id] = embedding
                     logger.debug(
                         f"Loaded embedding for {name}: shape {embedding.shape}"
                     )
@@ -137,7 +164,7 @@ class ChromaDBManager:
             logger.info(
                 f"Database already contains {self.collection.count()} embeddings"
             )
-            return self.collection.count()
+            return int(self.collection.count())
 
         # Clear existing data if force refresh
         if force_refresh:
@@ -167,10 +194,20 @@ class ChromaDBManager:
         embeddings_list: list[Any] = []
         metadatas: list[Any] = []
 
-        for name, embedding in embeddings.items():
-            ids.append(name)
+        from src.database.roster import Roster
+
+        roster = Roster.from_csv()
+        for contestant_id, embedding in embeddings.items():
+            ids.append(contestant_id)
             embeddings_list.append(embedding.tolist())  # ChromaDB needs lists
-            metadatas.append({"name": name, "embedding_dim": len(embedding)})
+            metadatas.append(
+                {
+                    "contestant_id": contestant_id,
+                    "name": roster.by_id[contestant_id][0],
+                    "nickname": roster.by_id[contestant_id][1],
+                    "embedding_dim": len(embedding),
+                }
+            )
 
         # Add to ChromaDB
         self.collection.add(embeddings=embeddings_list, metadatas=metadatas, ids=ids)

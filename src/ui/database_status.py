@@ -2,7 +2,7 @@ import streamlit as st
 from pathlib import Path
 
 
-def database_status_page():
+def database_status_page() -> None:
     """Database status and management."""
     st.header("Database Status")
 
@@ -45,22 +45,29 @@ def database_status_page():
     if stats["total_embeddings"] > 0:
         st.subheader("Available Contestants")
 
-        # Load contestant names from .npy files
-        contestants_dir = Path("source/photo/contestants")
-        npy_files = list(contestants_dir.glob("*.npy"))
+        # Files are named after the person; show the 編號 the database is keyed by.
+        from src.database.roster import Roster
 
-        if npy_files:
-            contestant_names = []
-            for npy_file in npy_files:
-                name = npy_file.stem.replace("_embedding", "")
-                contestant_names.append(name)
+        roster = Roster.from_csv()
+        contestants_dir = Path("source/photo/contestants")
+        npy_files = list(contestants_dir.rglob("*_embedding.npy"))
+
+        seen: dict[str, str] = {}
+        for npy_file in npy_files:
+            stem = npy_file.stem.replace("_embedding", "")
+            contestant_id = roster.id_for_embedding_stem(stem)
+            if contestant_id is not None:
+                seen.setdefault(contestant_id, roster.label(contestant_id))
+
+        if seen:
+            labels = [seen[cid] for cid in sorted(seen, key=int)]
 
             # Display in columns
             num_cols = 4
             cols = st.columns(num_cols)
 
-            for i, name in enumerate(sorted(contestant_names)):
+            for i, label in enumerate(labels):
                 with cols[i % num_cols]:
-                    st.text(name)
+                    st.text(label)
         else:
             st.warning("No contestant embedding files found")
