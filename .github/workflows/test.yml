@@ -67,6 +67,22 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
 
+  mvp-tests:
+    name: mvp-processor tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mvp-processor
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      # 100/100 today, and verified to pass with the InsightFace model cache removed,
+      # so this suite needs no weights, video files or network at test time.
+      - run: uv sync --frozen
+      - run: uv run python -m pytest tests/unit tests/contract -q
+
   python:
     name: Python baselines
     runs-on: ubuntu-latest
