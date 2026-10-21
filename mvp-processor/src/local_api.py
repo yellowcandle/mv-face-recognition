@@ -383,6 +383,7 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
         faces.append({
             "bbox": detection["bbox"],
             "tracker_id": detection.get("tracker_id"),
+            "match_source": detection.get("match_source"),
             "match_score": detection.get("match_score"),
             "det_score": detection.get("det_score"),
             "contestant_name": detection.get("contestant_name"),

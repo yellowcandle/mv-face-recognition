@@ -49,6 +49,8 @@ export interface FaceDetection {
   bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
   /** ByteTrack id within a shot; -1 when the detection was not tracked. */
   tracker_id?: number | null;
+  /** How the identity was assigned: this frame, or inherited from the track. */
+  match_source?: 'frame' | 'track' | null;
   match_score: number | null; // raw cosine; null when the detection is unmatched
   det_score: number; // the detector's own face score — always present, and the only score an unmatched detection carries
   contestant_id: string | null;
@@ -63,6 +65,8 @@ export interface FaceDetection {
 export interface FrameDetection {
   /** ByteTrack id within a shot; -1 when the detection was not tracked. */
   tracker_id?: number | null;
+  /** How the identity was assigned: this frame, or inherited from the track. */
+  match_source?: 'frame' | 'track' | null;
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;

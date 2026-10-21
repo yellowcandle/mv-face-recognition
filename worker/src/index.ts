@@ -1601,6 +1601,7 @@ async function handleFaceDetection(
         detections?: Array<{
           /** ByteTrack id within a shot; -1 when untracked. */
           tracker_id?: number | null;
+          match_source?: 'frame' | 'track' | null;
           contestant_id?: string | null;
           contestant_name?: string | null;
           contestant_nickname?: string | null;
@@ -1644,6 +1645,7 @@ async function handleFaceDetection(
       .map((d) => ({
         bbox: d.bbox as [number, number, number, number],
         tracker_id: d.tracker_id ?? null,
+        match_source: d.match_source ?? null,
         match_score: d.match_score ?? null,
         det_score: d.det_score ?? 0,
         contestant_id: d.contestant_id ?? null,
