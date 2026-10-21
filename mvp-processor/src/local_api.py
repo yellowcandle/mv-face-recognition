@@ -119,7 +119,20 @@ def _load_json_cached(path: Path) -> dict:
 
 
 def _metadata_path(video_id: str) -> Path:
-    return _safe_child(METADATA_DIR, f"{video_id}_metadata.json")
+    """Exact `<id>_metadata.json`; a bare digits id also resolves the full stem.
+
+    The published contract keys `metadata_dense_*` by numeric 編號 ("4"), while the
+    local files carry their verbatim stem ("4-《全民造星IV》…"), so the locally
+    served API accepts both forms. Only digit ids are glob-resolved, so nothing else
+    becomes a pattern.
+    """
+    exact = _safe_child(METADATA_DIR, f"{video_id}_metadata.json")
+    if exact.exists():
+        return exact
+    if video_id.isdigit() and METADATA_DIR.exists():
+        for path in sorted(METADATA_DIR.glob(f"{video_id}-*_metadata.json")):
+            return path
+    return exact
 
 
 def _iter_metadata_files():
@@ -177,10 +190,18 @@ async def list_processed_videos():
 @app.get("/api/videos/stream/{video_id}")
 async def stream_video(video_id: str):
     """Stream a processed video (FileResponse handles HTTP Range)."""
-    candidates = [
-        _safe_child(PROCESSED_DIR, f"{video_id}_1080p.mp4"),
-        _safe_child(PROCESSED_DIR, f"{video_id}_720p.mp4"),
-    ] + [_safe_child(SOURCE_DIR, f"{video_id}{ext}") for ext in VIDEO_EXTENSIONS]
+    stems = [video_id]
+    if video_id.isdigit():
+        source = _metadata_path(video_id)
+        if source.name.endswith("_metadata.json"):
+            stems.append(source.name[: -len("_metadata.json")])
+    candidates = []
+    for stem in stems:
+        candidates += [
+            _safe_child(PROCESSED_DIR, f"{stem}_1080p.mp4"),
+            _safe_child(PROCESSED_DIR, f"{stem}_720p.mp4"),
+            *(_safe_child(SOURCE_DIR, f"{stem}{ext}") for ext in VIDEO_EXTENSIONS),
+        ]
 
     for path in candidates:
         if path.exists():
