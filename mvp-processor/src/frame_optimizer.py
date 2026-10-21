@@ -99,52 +99,59 @@ class FrameDifferenceDetector:
     
     def _calculate_diff(self, frame: np.ndarray) -> float:
         """Calculate normalized difference score between frames"""
-        if self.prev_frame is None:
+        # Narrow once and pass the previous frame down: a None check here does not
+        # narrow `self.prev_frame` inside the helpers, which is why every one of them
+        # used to dereference an Optional.
+        prev = self.prev_frame
+        if prev is None:
             return 1.0
-            
+
         if self.method == "histogram":
-            return self._histogram_diff(frame)
+            return self._histogram_diff(prev, frame)
         elif self.method == "mse":
-            return self._mse_diff(frame)
+            return self._mse_diff(prev, frame)
         elif self.method == "structural":
-            return self._structural_diff(frame)
+            return self._structural_diff(prev, frame)
         else:
             raise ValueError(f"Unknown method: {self.method}")
     
-    def _histogram_diff(self, frame: np.ndarray) -> float:
+    def _histogram_diff(self, prev: np.ndarray, frame: np.ndarray) -> float:
         """Calculate histogram-based difference (fastest)"""
         # Convert to HSV for better color diff detection
-        prev_hsv = cv2.cvtColor(self.prev_frame, cv2.COLOR_BGR2HSV)
+        prev_hsv = cv2.cvtColor(prev, cv2.COLOR_BGR2HSV)
         curr_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
-        # Calculate histograms
-        hist_size = [50, 60]
-        ranges = [0, 180, 0, 256]
-        hist_prev = cv2.calcHist([prev_hsv], [0, 1], None, hist_size, ranges)
-        hist_curr = cv2.calcHist([curr_hsv], [0, 1], None, hist_size, ranges)
+        # Calculate histograms over H, S **and V**. Hue and saturation alone make pure
+        # black and pure white identical (both H=0, S=0), so a cut between two totally
+        # different shots scored 0.0 while the docstring promises 1.0 for "completely
+        # different".
+        hist_size = [50, 60, 32]
+        ranges = [0, 180, 0, 256, 0, 256]
+        hist_prev = cv2.calcHist([prev_hsv], [0, 1, 2], None, hist_size, ranges)
+        hist_curr = cv2.calcHist([curr_hsv], [0, 1, 2], None, hist_size, ranges)
         
         # Normalize
         hist_prev = cv2.normalize(hist_prev, hist_prev).flatten()
         hist_curr = cv2.normalize(hist_curr, hist_curr).flatten()
         
         # Compare using Bhattacharyya coefficient
-        return cv2.compareHist(hist_prev, hist_curr, cv2.HISTCMP_BHATTACHARYYA)
+        return float(cv2.compareHist(hist_prev, hist_curr, cv2.HISTCMP_BHATTACHARYYA))
     
-    def _mse_diff(self, frame: np.ndarray) -> float:
+    def _mse_diff(self, prev: np.ndarray, frame: np.ndarray) -> float:
         """Calculate mean squared error (moderate speed)"""
         # Resize for faster computation if frames are large
-        h, w = min(self.prev_frame.shape[0], 360), min(self.prev_frame.shape[1], 640)
-        prev_resized = cv2.resize(self.prev_frame, (w, h))
+        h, w = min(prev.shape[0], 360), min(prev.shape[1], 640)
+        prev_resized = cv2.resize(prev, (w, h))
         curr_resized = cv2.resize(frame, (w, h))
         
         mse = np.mean((prev_resized.astype(float) - curr_resized.astype(float)) ** 2)
         # Normalize to 0-1 range
-        return min(mse / (255.0 ** 2), 1.0)
+        return float(min(mse / (255.0 ** 2), 1.0))
     
-    def _structural_diff(self, frame: np.ndarray) -> float:
+    def _structural_diff(self, prev: np.ndarray, frame: np.ndarray) -> float:
         """Calculate structural similarity (more accurate, slower)"""
         # Convert to grayscale
-        prev_gray = cv2.cvtColor(self.prev_frame, cv2.COLOR_BGR2GRAY)
+        prev_gray = cv2.cvtColor(prev, cv2.COLOR_BGR2GRAY)
         curr_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         # Calculate SSIM using template matching
@@ -200,6 +207,13 @@ class FaceTracker:
             List of (track_id, contestant_id, name, confidence)
         """
         if not detections:
+            # Expire stale tracks even when nothing was detected this frame. The sweep in
+            # the unmatched branch below only runs when there are detections to match, so
+            # without this a track survived forever and a later, unrelated face could be
+            # matched to a contestant who had long left the frame.
+            for track_id, track in list(self.active_tracks.items()):
+                if frame_number - track.last_seen > self.max_frames_skip:
+                    del self.active_tracks[track_id]
             return []
         
         results = []

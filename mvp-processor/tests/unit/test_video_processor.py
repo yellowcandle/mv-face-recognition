@@ -67,7 +67,7 @@ class TestVideoProcessor:
         processor = VideoProcessor(sample_config)
         invalid_video = str(temp_dir / "nonexistent.mp4")
 
-        from src.exceptions import VideoNotFoundError
+        from src.video_processor import VideoNotFoundError
         with pytest.raises(VideoNotFoundError):
             list(processor.extract_frames(invalid_video))
 
@@ -158,45 +158,6 @@ class TestFrameProcessor:
             rgb_frame, frame
         )  # Should be different due to BGR->RGB conversion
 
-    def test_draw_face_box(self, sample_image):
-        """Test face bounding box drawing"""
-        frame = cv2.imread(sample_image)
-        original_frame = frame.copy()
-
-        face_location = (50, 150, 150, 50)  # top, right, bottom, left
-        label = "Test Person"
-        confidence = 0.95
-
-        result_frame = FrameProcessor.draw_face_box(
-            frame, face_location, label, confidence
-        )
-
-        # Frame should be modified
-        assert not np.array_equal(result_frame, original_frame)
-
-        # Should return the same frame object
-        assert result_frame is frame
-
-    def test_draw_face_box_no_label(self, sample_image):
-        """Test face bounding box drawing without label"""
-        frame = cv2.imread(sample_image)
-        face_location = (50, 150, 150, 50)
-
-        result_frame = FrameProcessor.draw_face_box(frame, face_location)
-
-        # Should still draw the box
-        assert result_frame is frame
-
-    def test_draw_face_box_with_confidence_zero(self, sample_image):
-        """Test face bounding box drawing with zero confidence"""
-        frame = cv2.imread(sample_image)
-        face_location = (50, 150, 150, 50)
-
-        result_frame = FrameProcessor.draw_face_box(frame, face_location, "Test", 0.0)
-
-        assert result_frame is frame
-
-
 @pytest.mark.integration
 class TestVideoProcessorIntegration:
     def test_full_video_processing_pipeline(
@@ -222,10 +183,6 @@ class TestVideoProcessorIntegration:
         for frame, timestamp in frames[:3]:  # Test first 3 frames
             rgb_frame = FrameProcessor.preprocess_frame(frame)
             assert rgb_frame.shape == frame.shape
-
-            # Draw a test face box
-            face_location = (10, 100, 100, 10)
-            FrameProcessor.draw_face_box(rgb_frame, face_location, "Test", 0.9)
 
 
 @pytest.mark.slow

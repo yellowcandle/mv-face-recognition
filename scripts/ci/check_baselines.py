@@ -93,7 +93,9 @@ def main() -> int:
 
     # Reported, never gated: see the module docstring.
     repo_wide = count_mypy((".",))
-    print(f"mypy repo-wide: {repo_wide} (informational; needs project deps to be exact)")
+    print(
+        f"mypy repo-wide: {repo_wide} (informational; needs project deps to be exact)"
+    )
 
     if failed:
         print(
