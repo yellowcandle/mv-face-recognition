@@ -95,3 +95,16 @@ jobs:
       # against scripts/ci/baseline.json. No project install is needed: the
       # heavy imports sit in mypy's ignore_missing_imports overrides.
       - run: uv run --no-project python scripts/ci/check_baselines.py
+
+      # The root suite fails by construction today (140 failed / 17 errors, all
+      # pre-existing), so the gate is a recorded count that may not get worse.
+      # `|| true` keeps the job alive; the script decides, and a crashed run with
+      # no summary line fails rather than reading as zero failures.
+      - name: Root pytest (recorded-failure baseline)
+        run: |
+          uv run --no-project --with pytest --with numpy \
+            --with opencv-python-headless --with pandas \
+            python -m pytest tests/ -q --tb=no -p no:cacheprovider \
+            > pytest-root.log 2>&1 || true
+          uv run --no-project python scripts/ci/check_baselines.py \
+            --pytest-log pytest-root.log

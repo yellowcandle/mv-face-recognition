@@ -24,10 +24,37 @@ Run from the repo root. Exit 1 on any regression.
 
 from __future__ import annotations
 
+import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+PYTEST_TERMS = ("failed", "passed", "skipped", "error")
+
+
+def count_pytest_log(path: Path) -> dict[str, int] | None:
+    """Read pytest -q's summary line. None when the run produced no summary.
+
+    A crashed or killed run prints no "in <time>" line; treating that as "0 failed"
+    would turn a broken gate into a green one, so the caller must fail on None.
+    """
+    try:
+        lines = [ln for ln in path.read_text(encoding="utf-8", errors="replace").splitlines() if ln.strip()]
+    except OSError:
+        return None
+    for line in reversed(lines[-5:]):  # the summary is within the last few lines
+        if " in " not in line or "=" in line:
+            continue
+        counts = {term: 0 for term in PYTEST_TERMS}
+        for number, term in re.findall(r"(\d+) (" + "|".join(PYTEST_TERMS) + r")s?", line):
+            counts[term] = int(number)
+        if any(counts.values()) or "passed" in line:
+            return counts
+    return None
+
 
 REPO = Path(__file__).resolve().parents[2]
 BASELINE = REPO / "scripts/ci/baseline.json"
@@ -61,7 +88,49 @@ def count_ruff() -> int:
         return -1
 
 
+def baseline_int(baseline: dict[str, object], key: str) -> int:
+    """Read an integer baseline, refusing a malformed config instead of guessing."""
+    value = baseline.get(key)
+    if not isinstance(value, int):
+        sys.exit(f"baseline {key!r} must be an integer, got {value!r}")
+    return value
+
+
+def check_pytest_log(baseline: dict[str, object], log_path: Path) -> bool:
+    counts = count_pytest_log(log_path)
+    if counts is None:
+        print(f"pytest log {log_path}: no summary line — the run crashed or was killed")
+        return False
+    failed_limit = baseline_int(baseline, "pytest_root_failed")
+    errors_limit = baseline_int(baseline, "pytest_root_errors")
+    passed_min = baseline_int(baseline, "pytest_root_passed_min")
+    ok = True
+    print(
+        f"pytest root: {counts['failed']} failed (baseline {failed_limit}), "
+        f"{counts['error']} errors (baseline {errors_limit}), "
+        f"{counts['passed']} passed (minimum {passed_min})"
+    )
+    if counts["failed"] > failed_limit:
+        print("  more failures than the recorded baseline — this change makes it worse")
+        ok = False
+    if counts["error"] > errors_limit:
+        print("  more errors than the recorded baseline — this change makes it worse")
+        ok = False
+    if counts["passed"] < passed_min:
+        print("  fewer tests passed than the minimum — tests may have vanished")
+        ok = False
+    return ok
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__ or "")
+    ap.add_argument(
+        "--pytest-log",
+        type=Path,
+        help="path to a `pytest -q` log to gate against the recorded counts",
+    )
+    args = ap.parse_args()
+
     try:
         baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -90,6 +159,9 @@ def main() -> int:
         failed = True
     else:
         print(f"ruff: {ruff} (baseline {limit})")
+
+    if args.pytest_log is not None and not check_pytest_log(baseline, args.pytest_log):
+        failed = True
 
     # Reported, never gated: see the module docstring.
     repo_wide = count_mypy((".",))

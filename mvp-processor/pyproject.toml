@@ -33,6 +33,18 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+# Declared here, in the config pytest actually reads. These used to live in
+# pytest.ini under a [tool:pytest] section, which pytest only honours inside
+# setup.cfg — so the file was dead and its --cov-fail-under floor, --strict-markers
+# and these marker names never applied.
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Tests that take a long time to run",
+    "performance: Benchmarks",
+    "gpu: Tests that require GPU",
+    "network: Tests that require network access",
+]
 
 [dependency-groups]
 dev = [
