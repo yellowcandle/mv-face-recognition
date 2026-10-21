@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import {
-  BAND_STAMP,
-  bandFor,
-  formatMmSs,
-  useContestants,
-  useVideos,
-  useViewerMetadata,
-  VideoCanvas,
-  type VideoCanvasHandle,
-  getVideoRenderRect,
-} from '@mv/shared';
+import { BAND_STAMP, Masthead, VideoCanvas, bandFor, formatMmSs, getVideoRenderRect, type VideoCanvasHandle, useContestants, useVideos, useViewerMetadata } from '@mv/shared';
 import type { Band, FaceDetection } from '@mv/shared';
 
 function nameOf(face: FaceDetection): string {
@@ -134,34 +124,20 @@ export function PlayerPage() {
     <div className="flex min-h-0 flex-1 flex-row">
       <div className="flex min-w-0 flex-1 flex-col px-10 pb-6 pt-7">
         {/* Masthead */}
-        <div className="flex flex-row items-end justify-between gap-6">
-          <div className="flex flex-col gap-1.5">
-            <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-              MV FACE RECOGNITION · 全民造星 IV
-            </div>
-            <div className="flex flex-row items-baseline gap-3.5">
-              <h1 className="font-serif text-[46px] font-black leading-none tracking-[0.06em] text-carbon">
-                點唱單
-              </h1>
-              <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">REQUEST SLIP</span>
-            </div>
-          </div>
-
-          <div className="flex flex-row items-center gap-4">
-            <div className="flex flex-col items-end gap-0.5 pb-0.5">
-              <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">FILED</span>
-              <span className="font-mono text-[12px] tracking-[0.08em] text-carbon">
-                REEL {video?.id ?? '—'} · {formatMmSs(duration)}
-              </span>
-            </div>
-            <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
-              <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">已核對</div>
-              <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">
-                VERIFIED · OPERATOR
-              </div>
-            </div>
-          </div>
+      <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="點唱單" latin="REQUEST SLIP">
+        <div className="flex flex-col items-end gap-0.5 pb-0.5">
+        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">FILED</span>
+        <span className="font-mono text-[12px] tracking-[0.08em] text-carbon">
+        REEL {video?.id ?? '—'} · {formatMmSs(duration)}
+        </span>
         </div>
+        <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
+        <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">已核對</div>
+        <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">
+        VERIFIED · OPERATOR
+        </div>
+        </div>
+      </Masthead>
 
         <div className="mt-4 h-px bg-carbon/45" />
 

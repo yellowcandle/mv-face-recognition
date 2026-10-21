@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { formatMmSs, useContestants } from '@mv/shared';
+import { Masthead, formatMmSs, useContestants } from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 interface Appearance {
@@ -88,20 +88,12 @@ export function Contestants() {
   return (
     <div className="flex min-h-0 flex-1 flex-row px-9 pb-6 pt-7">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-row items-end justify-between gap-6">
-          <div className="flex flex-col gap-1.5">
-            <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-              BACK OFFICE · LOCAL ONLY · 127.0.0.1
-            </div>
-            <div className="flex flex-row items-baseline gap-3.5">
-              <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-                名冊
-              </h1>
-              <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">
-                CAST · 全民造星 IV
-              </span>
-            </div>
-          </div>
+        <Masthead
+          eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
+          title="名冊"
+          latin="CAST · 全民造星 IV"
+          size="md"
+        >
           <button
             type="button"
             onClick={() => void refetch()}
@@ -109,7 +101,7 @@ export function Contestants() {
           >
             重新調閱
           </button>
-        </div>
+        </Masthead>
 
         <div className="mt-4 h-px bg-carbon/45" />
 

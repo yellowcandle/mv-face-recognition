@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useVideos } from '@mv/shared';
+import { Masthead, useVideos } from '@mv/shared';
 import { BAND_STAMP, bandFor, formatMmSs } from '@mv/shared';
 import type { Band, VideoMetadata } from '@mv/shared';
 
@@ -70,35 +70,22 @@ export function Analytics() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
-      <div className="flex flex-row items-end justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-            MV FACE RECOGNITION · 全民造星 IV
-          </div>
-          <div className="flex flex-row items-baseline gap-3.5">
-            <h1 className="font-serif text-[46px] font-black leading-none tracking-[0.06em] text-carbon">
-              紀錄
-            </h1>
-            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">RECOGNITION LEDGER</span>
-          </div>
+      <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="紀錄" latin="RECOGNITION LEDGER">
+        <div className="flex flex-col items-end gap-1">
+        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
+        <select
+        className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
+        value={selectedVideoId}
+        onChange={(e) => setSelectedVideoId(e.target.value)}
+        >
+        {videos.map((v) => (
+        <option key={v.id} value={v.id}>
+        {v.name}
+        </option>
+        ))}
+        </select>
         </div>
-        <div className="flex flex-row items-center gap-4 pb-1">
-          <div className="flex flex-col items-end gap-1">
-            <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
-            <select
-              className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
-              value={selectedVideoId}
-              onChange={(e) => setSelectedVideoId(e.target.value)}
-            >
-              {videos.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
 

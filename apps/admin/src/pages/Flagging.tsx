@@ -1,13 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  BAND_STAMP,
-  bandFor,
-  formatMmSs,
-  useFlaggedFaces,
-  useContestants,
-  useVideos,
-} from '@mv/shared';
+import { BAND_STAMP, Masthead, bandFor, formatMmSs, useContestants, useFlaggedFaces, useVideos } from '@mv/shared';
 import type { Band, FlaggedFace, Contestant, FrameData, VideoMetadata } from '@mv/shared';
 
 /**
@@ -222,39 +215,28 @@ export function Flagging() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
-      {/* Masthead */}
-      <div className="flex flex-row items-end justify-between gap-6">
-        <div className="flex flex-col gap-1.5">
-          <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">
-            BACK OFFICE · LOCAL ONLY · 127.0.0.1
+      <Masthead
+        eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
+        title="存根"
+        latin="OFFICE COPY · WRITABLE"
+        size="md"
+      >
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
+          className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
+        >
+          重新調閱
+        </button>
+        <div className="-rotate-[6deg] border-2 border-stamp px-3 py-1.5">
+          <div className="text-center font-serif text-[14px] font-bold tracking-[0.14em] text-stamp">
+            待核 {pendingCount}
           </div>
-          <div className="flex flex-row items-baseline gap-3.5">
-            <h1 className="font-serif text-[44px] font-black leading-none tracking-[0.06em] text-carbon">
-              存根
-            </h1>
-            <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">
-              OFFICE COPY · WRITABLE
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-row items-center gap-3">
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
-            className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
-          >
-            重新調閱
-          </button>
-          <div className="-rotate-[6deg] border-2 border-stamp px-3 py-1.5">
-            <div className="text-center font-serif text-[14px] font-bold tracking-[0.14em] text-stamp">
-              待核 {pendingCount}
-            </div>
-            <div className="text-center font-mono text-[7px] tracking-[0.16em] text-stamp">
-              PENDING FLAGS
-            </div>
+          <div className="text-center font-mono text-[7px] tracking-[0.16em] text-stamp">
+            PENDING FLAGS
           </div>
         </div>
-      </div>
+      </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
 
