@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, useContestants, useVideos, bandFor } from '@mv/shared';
+import { BAND_STAMP, Badge, Button, Card, useContestants, useVideos, bandFor } from '@mv/shared';
 import type { Band, Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 
 // ---------------------------------------------------------------------------
@@ -87,14 +87,6 @@ const MIN_LABELS_FOR_GATE = 10;
 const MIN_TRUE_MATCHES_FOR_MEAN = 5;
 const MIN_IMPOSTORS_FOR_WORST = 3;
 
-const BAND_PILL: Record<Band, string> = {
-  high: 'bg-carbon/20 text-carbon border-carbon/50',
-  medium: 'bg-stamp/20 text-stamp border-stamp/50',
-  low: 'bg-stamp/20 text-stamp border-stamp/50',
-};
-
-const BAND_LABEL: Record<Band, string> = { high: 'high', medium: 'medium', low: 'low' };
-
 const VERDICT_PILL: Record<Verdict, string> = {
   contestant: 'bg-carbon/20 text-carbon border-carbon/50',
   not_a_contestant: 'bg-paper-deep/60 text-carbon border-carbon',
@@ -177,11 +169,13 @@ function metadataContractIssue(metadata: DenseMetadata | undefined): string | nu
 }
 
 function BandPill({ band, className = '' }: { band: Band; className?: string }) {
+  // One stamp map for the whole product: BAND_STAMP carries the word and its ink.
+  const stamp = BAND_STAMP[band];
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BAND_PILL[band]} ${className}`}
+      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${stamp.ink} ${className}`}
     >
-      {BAND_LABEL[band]}
+      {stamp.word}
     </span>
   );
 }

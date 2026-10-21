@@ -10,6 +10,7 @@ import { PlayerControls } from './PlayerControls';
 import { DetectionBar } from './DetectionBar';
 import { FlagDialog } from './FlagDialog';
 import { getVideoRenderRect } from './useAnnotations';
+import { formatMmSs } from '../../lib/format';
 import { useViewerMetadata } from '../../hooks/useViewerMetadata';
 import { ContestantTimeline } from './ContestantTimeline';
 import { pickInitialVideo } from './pickInitialVideo';
@@ -19,12 +20,6 @@ interface PlayerProps {
   apiBase: string;
   /** Video to open on mount. Falls back to the first video when absent or unmatched. */
   initialVideoId?: string | null;
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -354,7 +349,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
             timestamp: currentTime,
             bbox: selectedFace?.bbox,
             confidence: selectedFace?.match_score ?? null,
-            user_label: userLabel || `Flagged by user at ${formatTime(currentTime)}`,
+            user_label: userLabel || `Flagged by user at ${formatMmSs(currentTime)}`,
             thumbnail,
           }),
         });
@@ -397,7 +392,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                 timestamp: currentTime,
                 bbox: face.bbox,
                 confidence: face.match_score ?? null,
-                user_label: `Batch flagged (${facesArray.length} faces) at ${formatTime(currentTime)}`,
+                user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(currentTime)}`,
                 thumbnail,
               }),
             });
@@ -731,7 +726,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                         left: `${duration > 0 ? (a.timestamp / duration) * 100 : 0}%`,
                       }}
                       onClick={() => handleSeek(a.timestamp)}
-                      title={`Jump to ${formatTime(a.timestamp)}`}
+                      title={`Jump to ${formatMmSs(a.timestamp)}`}
                     />
                   ))}
                   <div
@@ -882,7 +877,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                         {getContestantName(flag.contestant_id)}
                       </div>
                       <div className="text-ledger">Video: {flag.video_id}</div>
-                      <div className="text-ledger">@ {formatTime(flag.timestamp)}</div>
+                      <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
                     </div>
                     <span
                       className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${

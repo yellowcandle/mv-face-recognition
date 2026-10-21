@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Card, Badge, Button } from '@mv/shared';
+import { Card, Badge, Button, formatMmSs } from '@mv/shared';
 import { useVideos } from '@mv/shared';
 
 interface ProcessingJob {
@@ -20,9 +20,7 @@ interface ProcessingJob {
 const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}$/;
 
 function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return formatMmSs(seconds);
 }
 
 function formatDate(dateStr: string): string {

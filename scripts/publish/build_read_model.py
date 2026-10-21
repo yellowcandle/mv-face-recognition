@@ -310,6 +310,99 @@ def pick_sources() -> dict[str, list[str]]:
     return candidates
 
 
+# The high band cutoff from apps/shared/lib/bands.ts (measured false-match boundary).
+# Duplicated as a constant until workstream B gives both sides one source.
+HIGH_BAND = 0.585
+
+
+def load_roster() -> list[dict[str, Any]]:
+    """The 96 contestants from the CSV, in the Contestant shape the apps read."""
+    try:
+        with open(CSV, encoding="utf-8-sig") as f:
+            rows = list(csv.DictReader(f))
+    except OSError as exc:
+        sys.exit(f"cannot read {CSV}: {exc}")
+    roster: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            cid = str(int(row["編號"].strip()))
+        except (KeyError, ValueError) as exc:
+            sys.exit(f"bad 編號 in {CSV}: {row!r} ({exc})")
+        age = row.get("年齡", "").strip()
+        roster.append(
+            {
+                "id": cid,
+                "number": int(cid),
+                "name": row["姓名"].strip(),
+                "nickname": row["暱稱"].strip(),
+                "age": int(age) if age else None,
+            }
+        )
+    return roster
+
+
+def load_reference_counts() -> dict[str, int]:
+    """References per contestant, keyed by 編號 (ADR 0001: the manifest is the record)."""
+    path = os.path.join(REPO, "source/photo/contestants/reference_manifest.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, ValueError) as exc:
+        logger.warning("no reference manifest (%s); reference counts will read 0", exc)
+        return {}
+    raw = manifest.get("references_per_contestant") or {}
+    return {str(k): int(v) for k, v in raw.items()}
+
+
+def build_roster(
+    payloads: dict[str, dict[str, Any]], refs: dict[str, int]
+) -> list[dict[str, Any]]:
+    """Join CSV + reference manifest + the published reels into Contestant rows.
+
+    The Worker served a raw CSV dump here, so every field the apps read (`id`,
+    `has_embedding`, `reference_count`, `quality`) was `undefined` in production, and
+    the hardcoded fallback claimed `has_embedding: true` for all 96.
+    """
+    stats: dict[str, dict[str, Any]] = {}
+    for payload in payloads.values():
+        for cid, entry in (payload.get("contestant_timeline") or {}).items():
+            scores = [a["match_score"] for a in entry.get("appearances") or []]
+            if not scores:
+                continue
+            s = stats.setdefault(cid, {"scores": [], "detections": 0, "videos": set()})
+            s["scores"].extend(scores)
+            s["detections"] += len(scores)
+            s["videos"].add(payload["video_info"].get("filename", ""))
+
+    roster = []
+    for person in load_roster():
+        cid = person["id"]
+        reference_count = int(refs.get(cid, 0))
+        s = stats.get(cid) or {"scores": [], "detections": 0, "videos": set()}
+        avg = round(sum(s["scores"]) / len(s["scores"]), 4) if s["scores"] else 0.0
+        peak = round(max(s["scores"]), 4) if s["scores"] else 0.0
+        if reference_count == 0:
+            quality = "missing"
+        elif avg >= HIGH_BAND or s["detections"] >= 20:
+            quality = "good"
+        else:
+            quality = "weak"
+        roster.append(
+            {
+                **person,
+                "has_embedding": reference_count > 0,
+                "reference_count": reference_count,
+                "portrait_url": f"/api/contestants/{cid}/thumb/face",
+                "avg_match_score": avg,
+                "max_match_score": peak,
+                "detection_count": s["detections"],
+                "videos_seen_in": len(s["videos"]),
+                "quality": quality,
+            }
+        )
+    return roster
+
+
 def wrangler(*args: str) -> bool:
     proc = subprocess.run(
         ["npx", "wrangler", *args], cwd=REPO, capture_output=True, text=True
@@ -342,6 +435,7 @@ def main() -> int:
         sys.exit(f"cannot create {STAGE}: {exc}")
 
     videos = []
+    payloads: dict[str, dict[str, Any]] = {}
     chosen: dict[str, str] = {}
     for vid, candidates in sorted(sources.items(), key=lambda kv: int(kv[0])):
         # Pick the candidate that actually recognises the most faces: the generations
@@ -368,6 +462,7 @@ def main() -> int:
             continue
         payload = best
         chosen[vid] = best_path
+        payloads[vid] = payload
         frames = payload["frame_data"]
         empty = sum(1 for f in frames if f["detections_count"] == 0)
         src = payload["read_model"]["source"]
@@ -409,6 +504,25 @@ def main() -> int:
         sys.exit(f"cannot write {list_path}: {exc}")
 
     print(f"\nstaged {len(videos)} reels + processed_videos_list in {STAGE}")
+
+    # The roster joins the CSV, the reference manifest and the reels published above, so
+    # `has_embedding` / `reference_count` / `quality` describe what actually shipped.
+    roster = build_roster(payloads, load_reference_counts())
+    roster_path = os.path.join(STAGE, "contestants_structured.json")
+    try:
+        with open(roster_path, "w", encoding="utf-8") as f:
+            json.dump(roster, f, ensure_ascii=False, separators=(",", ":"))
+    except OSError as exc:
+        sys.exit(f"cannot write {roster_path}: {exc}")
+    by_quality: dict[str, int] = {}
+    for person in roster:
+        by_quality[person["quality"]] = by_quality.get(person["quality"], 0) + 1
+    no_refs = [p["id"] for p in roster if not p["has_embedding"]]
+    print(
+        f"  roster: {len(roster)} contestants "
+        f"(good {by_quality.get('good', 0)}, weak {by_quality.get('weak', 0)}, "
+        f"missing {by_quality.get('missing', 0)}); no references: {no_refs}"
+    )
     if not args.publish:
         print("dry run: nothing written to KV")
         return 0
@@ -428,6 +542,20 @@ def main() -> int:
         ):
             return 1
         print(f"  put metadata_dense_{vid}")
+    if not wrangler(
+        "kv",
+        "key",
+        "put",
+        "contestants_structured",
+        "--path",
+        roster_path,
+        "--binding",
+        "METADATA_KV",
+        "--remote",
+    ):
+        return 1
+    print("  put contestants_structured")
+
     if not wrangler(
         "kv",
         "key",

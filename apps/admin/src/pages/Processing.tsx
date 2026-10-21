@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Card, Badge, Button } from '@mv/shared';
+import { Card, Badge, Button, formatMmSs } from '@mv/shared';
 
 interface ProcessingJob {
   id: string;
@@ -37,10 +37,7 @@ function getStatusColor(status: string): string {
 function formatDuration(start?: number, end?: number): string {
   if (!start) return '--';
   const endTime = end || Date.now();
-  const diff = Math.floor((endTime - start) / 1000);
-  const mins = Math.floor(diff / 60);
-  const secs = diff % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return formatMmSs(Math.floor((endTime - start) / 1000));
 }
 
 function formatTimestamp(iso?: string): string {

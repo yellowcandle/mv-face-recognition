@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { useVideos, useFlaggedFaces } from '@mv/shared';
+import { formatMmSs, useVideos, useFlaggedFaces } from '@mv/shared';
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
@@ -70,8 +70,7 @@ export function Dashboard() {
                   className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2.5"
                 >
                   <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
-                    {String(Math.floor(f.timestamp / 60)).padStart(2, '0')}:
-                    {String(Math.floor(f.timestamp % 60)).padStart(2, '0')}
+                    {formatMmSs(f.timestamp)}
                   </span>
                   <span className="flex-1 truncate font-kai text-[14px] font-bold text-carbon-deep">
                     #{f.contestant_id}
