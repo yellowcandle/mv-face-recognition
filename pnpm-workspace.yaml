@@ -1,2 +1,18 @@
 packages:
-  - 'apps/*'
+  - "apps/*"
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vite-plus: 1.3.0
+overrides:
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
+# Native binaries the toolchain needs: esbuild (worker tests/wrangler), sharp
+# (image helpers), workerd (wrangler's runtime). pnpm 12 fails on unreviewed builds.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
