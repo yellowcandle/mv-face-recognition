@@ -62,7 +62,7 @@ See [CONTEXT.md](CONTEXT.md) and [DESIGN.md](DESIGN.md). In short:
   writes happen only through the local admin API.
 - **Embeddings are keyed by 編號** ([ADR 0001](docs/adr/0001-reference-embeddings-are-a-derived-cache.md)).
   The record is `source/photo/contestants/reference_manifest.json`; the `.npy` files are
-  a legacy artifact read through `src/database/roster.py`.
+  a legacy artifact and nothing in the live pipeline reads them.
 - **Bands are provisional**: high ≥ 0.585, medium ≥ 0.451, acceptance ≥ 0.45, measured
   from the 663-reference cache.
 
@@ -76,13 +76,12 @@ mvp-processor/               the live pipeline, local API and its pytest suite
 scripts/publish/             read-model normaliser, validation, KV publish
 scripts/hf/                  Hugging Face dataset/embedding upload helpers
 scripts/ci/check_baselines.py  the quality ratchet (ruff, mypy, pytest counts)
-src/                         utility glue only: DB init, HF integration, hardware checks
 docs/                        refactor plan, ADRs, pipeline and deployment notes
 ```
 
-`src/` is not part of the live pipeline: what remains (7 modules, ~2.9k lines) is imported
-only by the HF-upload scripts, `fix_embeddings.py` / `init_database.py` and
-`setup_hardware_acceleration.py`. The retired Modal and desktop surfaces are recorded in
+There is no `src/` package: the legacy CLI, Streamlit UI, Chroma helpers and the scripts that
+used them are deleted. Retained utility scripts live under `scripts/` (portraits, Hugging Face
+staging, embedding checks). The retired surfaces are recorded in
 [docs/refactor-plan.md](docs/refactor-plan.md).
 
 ## Tests and gates

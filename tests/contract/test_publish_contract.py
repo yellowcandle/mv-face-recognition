@@ -57,7 +57,6 @@ def test_normalise_backfills_the_fields_consumers_read(tmp_path: Path) -> None:
                         "match_score": 0.5,
                         "det_score": 0.93,
                         "bbox": [0.1, 0.1, 0.2, 0.2],
-                        "tracker_id": None,
                     }
                 ],
             }
@@ -97,3 +96,35 @@ def test_validation_rejects_a_payload_missing_the_backfilled_fields() -> None:
     assert any("duration" in p for p in problems), problems
     assert any("recognition_rate" in p for p in problems), problems
     assert any("contestant_info.id" in p for p in problems), problems
+
+
+def test_validation_rejects_tracker_id() -> None:
+    payload: dict[str, Any] = {
+        "video_info": {"duration": 1.0},
+        "processing_summary": {"recognition_rate": 1.0},
+        "contestant_timeline": {
+            "33": {"contestant_info": {"id": "33", "name": "x", "nickname": "y"}}
+        },
+        "frame_data": [
+            {
+                "frame_number": 0,
+                "timestamp": 0.0,
+                "detections_count": 1,
+                "detections": [
+                    {
+                        "contestant_id": "33",
+                        "contestant_name": "x",
+                        "contestant_nickname": "y",
+                        "match_score": 0.5,
+                        "det_score": 0.9,
+                        "bbox": [0.1, 0.1, 0.2, 0.2],
+                        "tracker_id": 7,
+                    }
+                ],
+            }
+        ],
+    }
+
+    problems = model.validate_payload("33", payload)
+
+    assert any("tracker_id" in p for p in problems), problems

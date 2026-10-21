@@ -29,14 +29,12 @@ node scripts/upload-to-r2.js --dry-run
 
 ## Embeddings and contestant data
 
-- `fix_embeddings.py` — rebuild/repair the reference cache (`--all --force`)
 - `check_stored_embeddings.py` — integrity and normalisation checks
-- `init_database.py` — populate the legacy Chroma collection, keyed by 編號 through
-  `src/database/roster.py`
+- `validate_embeddings.py` — compare stored embeddings against the reference manifest
+- `upload_embeddings_to_hf.py` — upload the embedding cache to Hugging Face
 
-## Hardware and configuration
-
-- `setup_hardware_acceleration.py` — detect CUDA / Apple Silicon and configure the runtime
+The Chroma collection, its roster resolver and the scripts that populated it are deleted.
+`source/photo/contestants/reference_manifest.json` is the record (ADR 0001).
 
 ## Archive
 

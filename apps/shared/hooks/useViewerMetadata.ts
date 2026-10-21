@@ -74,7 +74,6 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
         contestant_id: d.contestant_id,
         contestant_name: d.contestant_name,
         contestant_nickname: d.contestant_nickname,
-        tracker_id: d.tracker_id,
         matched: d.contestant_id != null,
       }));
     },

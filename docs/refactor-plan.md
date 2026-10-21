@@ -120,6 +120,14 @@ restored embedding round-trips through `DetectedFace.to_dict/from_dict`; mvp 100
 worker 6/6, both web checks, root 3 passed, gate exit 0. The 31 remaining mypy errors under
 `src/` are the tracked debt of `face_detector/face_matcher/detection/hardware_acceleration`.
 
+**A(3) completed 2026-10-22 — full drop.** The 7-module closure went with its consumers:
+`src/` is deleted, along with the HF-upload scripts, `fix_embeddings`/`init_database`,
+`setup_hardware_acceleration`, the Chroma benchmarks and debug probes, `compare_recognition.py`
+and `inspect_npy.py`. The root project is now `package = false` with only the dependencies the
+retained `scripts/hf` and embedding checks use. `tracker_id` is also gone from the contract:
+the pipeline still tracks faces for the annotated video, but the field is not stored, served or
+published, and `validate_payload` rejects it.
+
 ---
 
 ## Workstream B — one metadata contract

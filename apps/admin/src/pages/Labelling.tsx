@@ -62,7 +62,6 @@ interface Detection {
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
-  tracker_id: number | null;
 }
 
 /** The metadata route also stamps the run's `processing_date`, which `VideoInfo` does not declare. */
@@ -378,7 +377,6 @@ export function Labelling() {
           contestant_id: d.contestant_id,
           contestant_name: d.contestant_name,
           contestant_nickname: d.contestant_nickname,
-          tracker_id: d.tracker_id,
         });
       });
     }
@@ -390,23 +388,6 @@ export function Labelling() {
     for (const d of detections) byKey[d.key] = d;
     return byKey;
   }, [detections]);
-
-  // ---- tracks ------------------------------------------------------------
-
-  const tracksById = useMemo(() => {
-    const map = new Map<number, Detection[]>();
-    for (const d of detections) {
-      if (d.tracker_id === null) continue;
-      const list = map.get(d.tracker_id);
-      if (list) list.push(d);
-      else map.set(d.tracker_id, [d]);
-    }
-    return map;
-  }, [detections]);
-
-  function trackOf(detection: Detection): Detection[] {
-    return detection.tracker_id === null ? [] : (tracksById.get(detection.tracker_id) ?? []);
-  }
 
   const processingDate = metadataQuery.data?.video_info?.processing_date ?? null;
   // The server identifies a run by `{processing_date, detections}` where detections is the
@@ -557,14 +538,10 @@ export function Labelling() {
   // ---- the sheet ---------------------------------------------------------
 
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [applyToTrack, setApplyToTrack] = useState(false);
-  const [pendingApply, setPendingApply] = useState<Label | null>(null);
   const openDetection = openKey ? (detectionByKey[openKey] ?? null) : null;
 
   const closeSheet = useCallback(() => {
     setOpenKey(null);
-    setApplyToTrack(false);
-    setPendingApply(null);
   }, []);
 
   useEffect(() => {
@@ -611,7 +588,6 @@ export function Labelling() {
         else delete next[key];
       }
       setLabels(next);
-      setPendingApply(null);
       advanceFrom(next, fromKey);
     },
     [labels, advanceFrom],
@@ -625,15 +601,9 @@ export function Labelling() {
         verdict,
         ...(verdict === 'contestant' && contestantId ? { contestant_id: contestantId } : {}),
       };
-      const track =
-        detection.tracker_id === null ? [] : (tracksById.get(detection.tracker_id) ?? []);
-      if (applyToTrack && track.length > 1) {
-        setPendingApply(label);
-        return;
-      }
       commit([[detection.key, label]], detection.key);
     },
-    [applyToTrack, commit, tracksById],
+    [commit],
   );
 
   const clearLabel = useCallback(
@@ -982,7 +952,6 @@ export function Labelling() {
                         type="button"
                         disabled={blocked}
                         onClick={() => {
-                          setPendingApply(null);
                           setOpenKey(d.key);
                         }}
                         onKeyDown={(e) => {
@@ -1232,7 +1201,6 @@ export function Labelling() {
                       openDetection.match_score.toFixed(3)
                     )}
                   </div>
-                  <div className="font-mono">track {openDetection.tracker_id ?? '—'}</div>
                   <div className="pt-1">
                     Matcher says:{' '}
                     {openDetection.contestant_id ? (
@@ -1269,169 +1237,39 @@ export function Labelling() {
                 </div>
               </div>
 
-              {pendingApply ? (
-                <div className="border border-stamp/60 bg-stamp/10/20 rounded-none p-3 space-y-3">
-                  <p className="text-sm text-carbon-deep">
-                    Apply{' '}
-                    <span className="font-semibold">
-                      {pendingApply.verdict === 'contestant'
-                        ? pendingApply.contestant_id
-                          ? `“${contestantsById[pendingApply.contestant_id]?.nickname ?? `#${pendingApply.contestant_id}`}”`
-                          : 'contestant'
-                        : VERDICT_LABEL[pendingApply.verdict].toLowerCase()}
-                    </span>{' '}
-                    to the{' '}
-                    {trackFramesLabel(openDetection)
-                      ? `${trackFramesLabel(openDetection)} of this track?`
-                      : 'frames of this track?'}
-                  </p>
-                  <TrackFrameList
-                    videoId={videoId ?? ''}
-                    detections={trackOf(openDetection)}
-                    note={mixedTrackNote(trackOf(openDetection))}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => setPendingApply(null)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() =>
-                        commit(
-                          trackOf(openDetection).map((d) => [
-                            d.key,
-                            {
-                              frame_number: d.frame_number,
-                              detection_index: d.detection_index,
-                              verdict: pendingApply.verdict,
-                              ...(pendingApply.verdict === 'contestant' &&
-                              pendingApply.contestant_id
-                                ? { contestant_id: pendingApply.contestant_id }
-                                : {}),
-                            },
-                          ]),
-                          openDetection.key,
-                        )
-                      }
+              <>
+                <ContestantPicker
+                  key={openKey}
+                  contestants={contestants}
+                  onPick={(contestantId) => commitOne(openDetection, 'contestant', contestantId)}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {(['not_a_contestant', 'unsure', 'box_wrong'] as Verdict[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => commitOne(openDetection, v)}
+                      title={VERDICT_BLURB[v]}
+                      className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
                     >
-                      Apply to {trackFramesLabel(openDetection) ?? 'this track'}
-                    </Button>
-                  </div>
+                      <span className="block font-semibold">{VERDICT_LABEL[v]}</span>
+                      <span className="block text-[10.5px] text-carbon-soft">
+                        {VERDICT_BLURB[v]}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <>
-                  <ContestantPicker
-                    key={openKey}
-                    contestants={contestants}
-                    onPick={(contestantId) => commitOne(openDetection, 'contestant', contestantId)}
-                  />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {(['not_a_contestant', 'unsure', 'box_wrong'] as Verdict[]).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => commitOne(openDetection, v)}
-                        title={VERDICT_BLURB[v]}
-                        className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
-                      >
-                        <span className="block font-semibold">{VERDICT_LABEL[v]}</span>
-                        <span className="block text-[10.5px] text-carbon-soft">
-                          {VERDICT_BLURB[v]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <p className="text-[11px] text-ledger">
-                    Picking a verdict records the label and moves to the next unlabelled tile.
-                    Escape closes this sheet; Backspace or Delete on a tile clears its label.
-                  </p>
-
-                  {openDetection.tracker_id !== null && trackOf(openDetection).length > 1 && (
-                    <div className="border-t border-paper-dark pt-3 space-y-2">
-                      <label className="flex items-start gap-2 text-xs text-carbon cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={applyToTrack}
-                          onChange={(e) => setApplyToTrack(e.target.checked)}
-                          className="w-4 h-4 mt-0.5 cursor-pointer accent-stamp"
-                        />
-                        <span>
-                          Apply to the {trackFramesLabel(openDetection)} of this track
-                          {mixedTrackNote(trackOf(openDetection))
-                            ? ' — it claims two different contestants, so the frames are shown before applying'
-                            : ''}
-                        </span>
-                      </label>
-                      <p className="text-[11px] text-ledger">
-                        The stored label stays per detection; this only writes the same verdict into
-                        each of the track's frames.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
+                <p className="text-[11px] text-ledger">
+                  Picking a verdict records the label and moves to the next unlabelled tile. Escape
+                  closes this sheet; Backspace or Delete on a tile clears its label.
+                </p>
+              </>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-
-  /** "N frames" (or "N detections across M frames" when a track repeats one) for the confirm step. */
-  function trackFramesLabel(detection: Detection): string | null {
-    const track = trackOf(detection);
-    if (track.length === 0) return null;
-    const frames = new Set(track.map((d) => d.frame_number)).size;
-    if (frames === track.length) return `${frames} ${frames === 1 ? 'frame' : 'frames'}`;
-    return `${frames} frames (${track.length} detections)`;
-  }
-
-  /** Tracks whose frames claim more than one named contestant get reviewed before applying. */
-  function mixedTrackNote(track: Detection[]): string | null {
-    const claimed = new Set(
-      track.filter((d) => d.contestant_id !== null).map((d) => d.contestant_id as string),
-    );
-    return claimed.size > 1 ? `${claimed.size} different claimed contestants` : null;
-  }
-}
-
-/** The frames a track covers — crops included, so a mixed-claim track can be eyeballed. */
-function TrackFrameList({
-  videoId,
-  detections,
-  note,
-}: {
-  videoId: string;
-  detections: Detection[];
-  note: string | null;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {note && <p className="text-xs text-stamp">This track holds {note} across its frames.</p>}
-      <div className="max-h-56 overflow-y-auto border border-paper-dark rounded">
-        {detections.map((d) => (
-          <div
-            key={d.key}
-            className="flex items-center gap-2 px-2 py-1 border-b border-paper-dark last:border-b-0"
-          >
-            <img
-              src={cropSrc(videoId, d.frame_number, d.detection_index)}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="w-8 h-8 object-cover rounded bg-black shrink-0"
-            />
-            <span className="text-[11px] font-mono text-carbon-soft">f{d.frame_number}</span>
-            <span className={`text-[11px] ${d.contestant_id ? 'text-carbon' : 'text-ledger'}`}>
-              {d.contestant_nickname ?? (d.contestant_id ? `#${d.contestant_id}` : 'unmatched')}
-            </span>
-            <BandPill band={bandFor(d.match_score)} className="ml-auto" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

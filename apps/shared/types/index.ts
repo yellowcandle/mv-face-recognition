@@ -52,7 +52,6 @@ export interface FaceDetection {
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
-  tracker_id: number | null;
   matched: boolean; // === (contestant_id !== null)
 }
 
@@ -66,7 +65,6 @@ export interface FrameDetection {
   match_score: number | null; // raw cosine; null when unmatched
   det_score: number;
   bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
-  tracker_id: number | null;
 }
 
 export interface FrameData {

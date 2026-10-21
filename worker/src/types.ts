@@ -56,7 +56,6 @@ export interface FaceDetection {
   /** Nickname (暱稱), null when unmatched */
   contestant_nickname: string | null;
   /** Track id within the video, null when the detector assigned none */
-  tracker_id: number | null;
   /** Whether this detection was identified (`contestant_id !== null`) */
   matched: boolean;
 }

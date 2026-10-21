@@ -387,7 +387,6 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
             "contestant_name": detection.get("contestant_name"),
             "contestant_id": contestant_id,
             "contestant_nickname": detection.get("contestant_nickname"),
-            "tracker_id": detection.get("tracker_id"),
             "matched": contestant_id is not None,
         })
     return {"faces": faces}

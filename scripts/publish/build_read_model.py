@@ -47,7 +47,6 @@ class Detection(TypedDict):
     match_score: float | None
     det_score: float
     bbox: list[float]
-    tracker_id: int | None
 
 
 class Frame(TypedDict):
@@ -148,7 +147,6 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
     frames: list[Frame] = []
     for raw in doc.get("frame_data") or []:
         dets: list[Detection] = []
-        trackers = raw.get("tracker_ids") or []
         for i, rec in enumerate(raw.get("recognitions") or []):
             loc = rec.get("face_location") or []
             if len(loc) != 4:
@@ -172,7 +170,6 @@ def convert_recognitions(doc: dict[str, Any]) -> dict[str, Any]:
                             left / width, top / height, right / width, bottom / height
                         )
                     ],
-                    tracker_id=(trackers[i] if i < len(trackers) else None),
                 )
             )
         frames.append(
@@ -225,8 +222,11 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
     # bboxes are frame fractions in canonical [x1,y1,x2,y2] order (CONTEXT.md).
     bad_boxes = 0
     bad_scores = 0
+    tracker_fields = 0
     for frame in frames:
         for det in frame.get("detections") or []:
+            if "tracker_id" in det:
+                tracker_fields += 1
             box = det.get("bbox")
             if (
                 not isinstance(box, list)
@@ -245,6 +245,11 @@ def validate_payload(vid: str, payload: dict[str, Any]) -> list[str]:
         )
     if bad_scores:
         problems.append(f"{bad_scores} match scores outside the cosine range [-1,1]")
+    if tracker_fields:
+        problems.append(
+            f"{tracker_fields} detections still carry tracker_id; it is not part of "
+            "the contract"
+        )
 
     config = payload.get("recognition_config")
     if config is None:
@@ -337,6 +342,11 @@ def normalise(path: str) -> dict[str, Any]:
         source = "recognitions-converted"
     else:
         sys.exit(f"{path}: frame_data in an unknown shape")
+
+    # `tracker_id` was carried and never rendered; it is not part of the contract.
+    for frame in frames:
+        for det in frame.get("detections") or []:
+            det.pop("tracker_id", None)
 
     timeline = build_timeline(frames)
 

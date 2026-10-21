@@ -218,7 +218,6 @@ async function handleWebSocketRequest(pathname: string, request: Request): Promi
                           match_score: 0.45 + Math.random() * 0.2,
                           det_score: 0.93,
                           bbox: [0.41, 0.08, 0.62, 0.75],
-                          tracker_id: 3,
                           matched: true,
                         },
                       ],
@@ -1609,7 +1608,6 @@ async function handleFaceDetection(
           det_score?: number;
           /** Frame fractions, canonical [x1, y1, x2, y2] */
           bbox?: number[];
-          tracker_id?: number | null;
         }>;
       }>;
     };
@@ -1648,7 +1646,6 @@ async function handleFaceDetection(
         contestant_id: d.contestant_id ?? null,
         contestant_name: d.contestant_name ?? null,
         contestant_nickname: d.contestant_nickname ?? null,
-        tracker_id: d.tracker_id ?? null,
         matched: d.contestant_id != null,
       }));
 
