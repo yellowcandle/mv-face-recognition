@@ -9,6 +9,7 @@ import {
   Masthead,
   bandFor,
   formatMmSs,
+  LOCAL_API_OFFLINE_NOTICE,
   useCoverage,
   useSimilarity,
   useVideos,
@@ -182,10 +183,7 @@ export function EmbeddingWorkbench() {
         });
       } catch (e) {
         if (e instanceof LocalApiUnavailableError) {
-          setNotice({
-            tone: 'error',
-            text: '本機 API 未連線（127.0.0.1:8000）：重新計算只會在執行 local_api.py 的機器上發生。',
-          });
+          setNotice({ tone: 'error', text: LOCAL_API_OFFLINE_NOTICE });
         } else {
           setNotice({ tone: 'error', text: e instanceof Error ? e.message : '操作失敗' });
         }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, Badge, Button, Masthead, formatMmSs } from '@mv/shared';
+import { Card, Badge, Button, Masthead, formatMmSs, LOCAL_API_OFFLINE_NOTICE } from '@mv/shared';
 
 interface ProcessingJob {
   id: string;
@@ -219,7 +219,7 @@ export function Processing() {
       <div className="flex min-h-0 flex-1 flex-col gap-6 pt-5">
         {!localApiAvailable && (
           <div className="border border-stamp/50 bg-stamp/5 px-4 py-3 font-kai text-[13px] text-stamp">
-            此頁面需連接本機 API (127.0.0.1:8000) 才能執行 Python 影片處理與向量計算
+            {LOCAL_API_OFFLINE_NOTICE}
           </div>
         )}
 
