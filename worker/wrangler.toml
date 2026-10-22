@@ -12,7 +12,7 @@ id = "890d77e11bfc4623ac4ef56db6b9a4ab"
 preview_id = "ba09879957074c0892d9a208f2fb1e5c"
 
 [[kv_namespaces]]
-binding = "MODAL_JOBS"
+binding = "JOB_STORE"
 id = "9096b9cd7c204ad2b511c173057e85ab"
 preview_id = "9096b9cd7c204ad2b511c173057e85ab"
 
@@ -25,6 +25,11 @@ preview_bucket_name = "mv-face-recognition-videos-preview"
 ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,https://d7308ddf.mv-face-recognition.pages.dev,https://371f3248.mv-face-recognition.pages.dev,http://localhost:5173"
 ENVIRONMENT = "production"
 LOG_LEVEL = "info"  # Options: debug, info, warn, error, none
+# HF Jobs dispatch targets (ADR 0006). The token is a secret: `wrangler secret put HF_TOKEN`.
+HF_JOBS_NAMESPACE = "yellowcandle"
+HF_JOBS_BUCKET = "yellowcandle/mv-face-recognition"
+HF_JOBS_REF = "main"
+HF_JOBS_FLAVOR = "cpu-upgrade"
 # Cloudflare Access application that fronts the admin writes (flags + labels). Unset means the
 # write routes fail closed with 503; invalid tokens are rejected with 401.
 CF_ACCESS_TEAM_DOMAIN = "herballemon.cloudflareaccess.com"

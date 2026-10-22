@@ -5,6 +5,28 @@
 import { EMBEDDED_ASSETS, BINARY_ASSETS } from '../embedded-assets.js';
 import { logger } from './lib/logger';
 import { AppError, InternalError, CorsHeaders } from './lib/errors';
+import {
+  clearCompleted,
+  countActiveJobs,
+  cancelJob,
+  isJobMode,
+  isTerminal,
+  listJobs,
+  newJobId,
+  putJob,
+  readJob,
+  toWire,
+  type ProcessingJob,
+} from './lib/jobs';
+import {
+  HF_JOBS_DEFAULTS,
+  buildJobSpec,
+  cancelHfJob,
+  fetchHfStage,
+  mapStage,
+  submitHfJob,
+  videoIdFromFilename,
+} from './lib/hfJobs';
 
 /**
  * Environment bindings for the Cloudflare Worker
@@ -22,6 +44,14 @@ interface Env {
   CF_ACCESS_TEAM_DOMAIN?: string;
   /** Cloudflare Access application audience (AUD) tag. */
   CF_ACCESS_AUD?: string;
+  /** One document per processing job (ADR 0006). */
+  JOB_STORE: KVNamespace;
+  /** HF Jobs bearer token, `job.write` scope. Unset means dispatch fails closed. */
+  HF_TOKEN?: string;
+  HF_JOBS_NAMESPACE?: string;
+  HF_JOBS_BUCKET?: string;
+  HF_JOBS_REF?: string;
+  HF_JOBS_FLAVOR?: string;
 }
 
 /**
@@ -278,7 +308,9 @@ export default {
     // caches `GET /admin/api/faces/flagged` (no validator, no Cache-Control), so accepting a flag
     // writes to KV but the review queue keeps showing it and never asks again.
     const routeHeaders: CorsHeaders =
-      pathname.startsWith('/api/faces/flag') || pathname.startsWith('/api/labels')
+      pathname.startsWith('/api/faces/flag') ||
+      pathname.startsWith('/api/labels') ||
+      pathname.startsWith('/api/processing')
         ? { ...corsHeaders, 'Cache-Control': 'no-store' }
         : corsHeaders;
 
@@ -1545,7 +1577,27 @@ async function handleApiRequest(
     return await handleVideoLabels(request, videoLabels[1], env, corsHeaders);
   }
 
+  // Processing jobs carry an id in the path, so they match here for the same reason.
+  const jobStatus = path.match(/^\/processing\/jobs\/([^/]+)$/);
+  if (jobStatus) {
+    return await handleJobStatus(request, jobStatus[1], env, corsHeaders);
+  }
+
+  const jobCancel = path.match(/^\/processing\/cancel\/([^/]+)$/);
+  if (jobCancel) {
+    return await handleJobCancel(request, jobCancel[1], env, corsHeaders);
+  }
+
   switch (path) {
+    case '/processing/trigger':
+    case '/processing/trigger/':
+      return await handleJobTrigger(request, env, corsHeaders);
+    case '/processing/jobs':
+    case '/processing/jobs/':
+      return await handleJobList(request, env, corsHeaders);
+    case '/processing/clear-completed':
+    case '/processing/clear-completed/':
+      return await handleJobsClear(request, env, corsHeaders);
     case '/system/status/':
     case '/system/status':
       return new Response(
@@ -1557,7 +1609,7 @@ async function handleApiRequest(
           services_running: true,
           contestant_count: 96,
           video_count: 5,
-          processing_jobs: 0,
+          processing_jobs: await countActiveJobs(env.JOB_STORE),
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -2150,6 +2202,209 @@ function validateLabels(
   }
 
   return { labels };
+}
+
+/**
+ * Pull a non-terminal job's upstream stage into its record. Only `GET .../jobs/{id}` and the list
+ * call this: each one costs a Hub round-trip, and the list is polled while the console is open.
+ */
+async function refreshJob(env: Env, job: ProcessingJob): Promise<ProcessingJob> {
+  if (isTerminal(job.status) || !job.hf_job_id) return job;
+  const upstream = await fetchHfStage(env, job.hf_job_id);
+  if (!upstream.ok) {
+    logger.warn('HF job stage unreadable', { job: job.id, detail: upstream.detail });
+    return job;
+  }
+  const mapped = mapStage(upstream.value.stage, upstream.value.message);
+  const next: ProcessingJob = {
+    ...job,
+    status: mapped.status,
+    progress: mapped.progress,
+    started_at: job.started_at ?? (mapped.status === 'running' ? Date.now() : job.started_at),
+    completed_at: isTerminal(mapped.status) ? (job.completed_at ?? Date.now()) : job.completed_at,
+    ...(mapped.detail !== undefined ? { error: mapped.detail } : {}),
+  };
+  if (next.status !== job.status || next.progress !== job.progress || next.error !== job.error) {
+    await putJob(env.JOB_STORE, next);
+  }
+  return next;
+}
+
+/**
+ * `POST /api/processing/trigger`: create the record, then dispatch to HF Jobs.
+ *
+ * The edge has no `source/videos` directory, so an `initial` run must name its reel. Accepting a
+ * bare `{mode:'initial'}` would mean guessing at five paid pipeline runs.
+ */
+async function handleJobTrigger(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const raw = await readJsonBody(request);
+  const body: Record<string, unknown> =
+    typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const requestedMode = body.mode === undefined ? 'initial' : body.mode;
+  if (!isJobMode(requestedMode)) {
+    return jsonResponse({ detail: `Invalid mode: ${String(body.mode)}` }, 400, corsHeaders);
+  }
+  const mode = requestedMode;
+
+  const video =
+    typeof body.video === 'string' && body.video.trim() !== '' ? body.video.trim() : null;
+  if (video && (video.includes('/') || video.includes('\\') || video.includes('..'))) {
+    return jsonResponse({ detail: 'Invalid name' }, 400, corsHeaders);
+  }
+  if (mode === 'initial' && !video) {
+    return jsonResponse(
+      { detail: 'video is required: the edge has no source directory to enumerate' },
+      400,
+      corsHeaders,
+    );
+  }
+  const videoId = mode === 'initial' && video ? videoIdFromFilename(video) : null;
+  if (mode === 'initial' && !videoId) {
+    return jsonResponse({ detail: `Unsupported video format: ${video ?? ''}` }, 400, corsHeaders);
+  }
+
+  const job: ProcessingJob = {
+    id: newJobId(),
+    status: 'queued',
+    progress: 0,
+    mode,
+    total_videos: 1,
+    videos_processed: 0,
+    current_video: video,
+    created_at: new Date().toISOString(),
+    started_at: null,
+    completed_at: null,
+    video_files: video ? [video] : [],
+    hf_job_id: null,
+    error: null,
+  };
+
+  const spec = buildJobSpec({
+    mode,
+    videoId,
+    ref: env.HF_JOBS_REF ?? HF_JOBS_DEFAULTS.ref,
+    bucket: env.HF_JOBS_BUCKET ?? HF_JOBS_DEFAULTS.bucket,
+    flavor: env.HF_JOBS_FLAVOR ?? HF_JOBS_DEFAULTS.flavor,
+  });
+  const dispatch = await submitHfJob(env, spec);
+
+  if (!dispatch.ok) {
+    // A failed dispatch is a record, not a silent queued job: the console must show why nothing
+    // will ever run, and a queued row would read as "still starting".
+    await putJob(env.JOB_STORE, {
+      ...job,
+      status: 'failed',
+      progress: 100,
+      completed_at: Date.now(),
+      error: dispatch.detail,
+    });
+    return jsonResponse({ detail: dispatch.detail }, 502, corsHeaders);
+  }
+
+  const mapped = mapStage(dispatch.value.stage);
+  const stored: ProcessingJob = {
+    ...job,
+    hf_job_id: dispatch.value.id,
+    status: mapped.status,
+    progress: mapped.progress,
+    started_at: mapped.status === 'running' ? Date.now() : null,
+  };
+  if (mapped.detail !== undefined) stored.error = mapped.detail;
+  await putJob(env.JOB_STORE, stored);
+
+  return jsonResponse(
+    mode === 'initial'
+      ? { job_id: stored.id, status: stored.status, total_videos: stored.total_videos }
+      : { job_id: stored.id, status: stored.status, total_videos: stored.total_videos, mode },
+    200,
+    corsHeaders,
+  );
+}
+
+/** `GET /api/processing/jobs`: every record, newest first, with live stages refreshed. */
+async function handleJobList(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+  const jobs = await listJobs(env.JOB_STORE);
+  const refreshed = await Promise.all(jobs.map((job) => refreshJob(env, job)));
+  return jsonResponse({ jobs: refreshed.map(toWire) }, 200, corsHeaders);
+}
+
+/** `GET /api/processing/jobs/{id}`: one record, flat, as the local API served it. */
+async function handleJobStatus(
+  request: Request,
+  rawId: string,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+  const job = await readJob(env.JOB_STORE, rawId);
+  if (!job) return jsonResponse({ detail: 'Job not found' }, 404, corsHeaders);
+  return jsonResponse(toWire(await refreshJob(env, job)), 200, corsHeaders);
+}
+
+/** `POST /api/processing/cancel/{id}`: ask the Hub to stop, then mark the record cancelled. */
+async function handleJobCancel(
+  request: Request,
+  rawId: string,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+  const existing = await readJob(env.JOB_STORE, rawId);
+  if (!existing) return jsonResponse({ detail: 'Job not found' }, 404, corsHeaders);
+
+  if (existing.hf_job_id && !isTerminal(existing.status)) {
+    const cancelled = await cancelHfJob(env, existing.hf_job_id);
+    if (!cancelled.ok) {
+      // The record still flips: the reviewer asked for it to stop, and a Hub that disagrees must
+      // not leave the console showing a run that will keep billing.
+      logger.warn('HF job cancel rejected', { job: rawId, detail: cancelled.detail });
+    }
+  }
+  await cancelJob(env.JOB_STORE, rawId);
+  return jsonResponse({ status: 'cancelled' }, 200, corsHeaders);
+}
+
+/** `POST /api/processing/clear-completed`: delete terminal records. The Hub keeps its own history. */
+async function handleJobsClear(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+  return jsonResponse({ cleared: await clearCompleted(env.JOB_STORE) }, 200, corsHeaders);
 }
 
 /** `GET`/`PUT /api/labels/{video_id}`: read or replace one video's track labels. */

@@ -189,7 +189,7 @@ function recordingEnv(effects) {
   });
   return {
     METADATA_KV: kv('METADATA_KV'),
-    MODAL_JOBS: kv('MODAL_JOBS'),
+    JOB_STORE: kv('JOB_STORE'),
     VIDEOS_BUCKET: {
       get: async () => null,
       head: async () => null,
@@ -323,6 +323,12 @@ test('deleted routes are gone; Access-gated writes fail closed', async () => {
     ['GET', '/api/labels'],
     ['GET', '/api/labels/4-x'],
     ['PUT', '/api/labels/4-x'],
+    // Processing jobs are writes on the same terms (ADR 0006).
+    ['POST', '/api/processing/trigger'],
+    ['GET', '/api/processing/jobs'],
+    ['GET', '/api/processing/jobs/abc123'],
+    ['POST', '/api/processing/cancel/abc123'],
+    ['POST', '/api/processing/clear-completed'],
     // The admin's Access-protected prefix must fail closed the same way.
     ['POST', '/admin/api/faces/flag'],
     ['GET', '/admin/api/faces/flagged'],
@@ -686,6 +692,7 @@ test('embedding documents, portraits, crops and recognition boxes are served', a
       'portraits/33.webp': 'WEBPBYTES',
       'crops/vid1/32_2.jpg': 'JPEGBYTES',
     }),
+    JOB_STORE: memoryKv(),
   };
 
   for (const [path, expected] of [
@@ -779,4 +786,131 @@ test('embedding documents, portraits, crops and recognition boxes are served', a
   assert.equal(recognition.results[0].detection_index, 1);
   // A box with no matching detection stays unindexed, so the client crops the reel instead.
   assert.equal('detection_index' in recognition.results[1], false);
+});
+
+test('processing jobs dispatch to HF Jobs and read back through the gated prefix', async () => {
+  const module = await import(pathToFileURL(buildWorker()).href);
+  const worker = module.default;
+  module.resetJwksCache();
+
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const env = {
+    METADATA_KV: memoryKv(),
+    VIDEOS_BUCKET: memoryR2(),
+    JOB_STORE: memoryKv(),
+    CF_ACCESS_TEAM_DOMAIN: TEAM_DOMAIN,
+    CF_ACCESS_AUD: AUD,
+    HF_TOKEN: 'hf_test_token',
+    LOG_LEVEL: 'none',
+  };
+
+  const jwksUrl = `https://${TEAM_DOMAIN}/cdn-cgi/access/certs`;
+  const hub = 'https://huggingface.co/api/jobs/yellowcandle';
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  let stage = 'SCHEDULING';
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input.url;
+    calls.push(`${init?.method ?? 'GET'} ${url}`);
+    if (url === jwksUrl) return Response.json({ keys: [publicJwk] });
+    if (init?.method === 'POST' && url === hub) {
+      return Response.json({ id: 'hub-job-1', status: { stage } });
+    }
+    if (init?.method === 'POST' && url === `${hub}/hub-job-1/cancel`) {
+      stage = 'CANCELED';
+      return new Response(null, { status: 200 });
+    }
+    if (url === `${hub}/hub-job-1`) {
+      return Response.json({ id: 'hub-job-1', status: { stage } });
+    }
+    return new Response('not found', { status: 404 });
+  };
+
+  try {
+    const token = await signAccessToken();
+
+    // The edge cannot enumerate a source directory, so an initial run must name its reel.
+    const nameless = await callWorker(worker, env, ctx, 'POST', '/admin/api/processing/trigger', {
+      token,
+      body: { mode: 'initial' },
+    });
+    assert.equal(nameless.status, 400);
+    assert.match((await nameless.json()).detail, /video is required/);
+
+    const badMode = await callWorker(worker, env, ctx, 'POST', '/admin/api/processing/trigger', {
+      token,
+      body: { mode: 'sideways' },
+    });
+    assert.equal(badMode.status, 400);
+
+    const triggered = await callWorker(worker, env, ctx, 'POST', '/admin/api/processing/trigger', {
+      token,
+      body: { mode: 'initial', video: '4-《全民造星IV》極限拍MV.mp4' },
+    });
+    assert.equal(triggered.status, 200);
+    assert.equal(triggered.headers.get('cache-control'), 'no-store');
+    const start = await triggered.json();
+    assert.match(start.job_id, /^[0-9a-f]{8}$/);
+    assert.equal(start.status, 'queued');
+    assert.equal(start.total_videos, 1);
+    // Parity with local_api: the video branch carries no `mode`.
+    assert.equal('mode' in start, false);
+
+    assert.ok(
+      calls.some((call) => call === `POST ${hub}`),
+      'trigger must dispatch to HF Jobs',
+    );
+
+    // The list serves the wire shape, refreshed from the Hub, with internals stripped.
+    stage = 'RUNNING';
+    const listed = await callWorker(worker, env, ctx, 'GET', '/admin/api/processing/jobs', {
+      token,
+    });
+    assert.equal(listed.status, 200);
+    const { jobs } = await listed.json();
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].id, start.job_id);
+    assert.equal(jobs[0].status, 'running');
+    assert.equal('video_files' in jobs[0], false);
+    assert.equal('hf_job_id' in jobs[0], false);
+    assert.equal(jobs[0].error, null);
+
+    stage = 'COMPLETED';
+    const one = await callWorker(
+      worker,
+      env,
+      ctx,
+      'GET',
+      `/admin/api/processing/jobs/${start.job_id}`,
+      { token },
+    );
+    assert.equal(one.status, 200);
+    const job = await one.json();
+    assert.equal(job.status, 'completed');
+    assert.equal(job.progress, 100);
+    assert.equal(typeof job.completed_at, 'number');
+
+    const missing = await callWorker(
+      worker,
+      env,
+      ctx,
+      'GET',
+      '/admin/api/processing/jobs/nope',
+      { token },
+    );
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { detail: 'Job not found' });
+
+    const cleared = await callWorker(
+      worker,
+      env,
+      ctx,
+      'POST',
+      '/admin/api/processing/clear-completed',
+      { token },
+    );
+    assert.deepEqual(await cleared.json(), { cleared: 1 });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
