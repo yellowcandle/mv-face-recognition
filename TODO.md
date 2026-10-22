@@ -20,12 +20,13 @@ Remaining before the branch lands:
 - [ ] Extract a shared `projectBbox` helper — `FaceOverlay.getBboxStyle` and `useAnnotations.drawAnnotations` duplicate the projection math with different dimension sources (overlay buttons can drift from drawn boxes)
 - [ ] Anchor Python data paths on `Path(__file__)` via one shared paths/config module — scripts currently use cwd-relative `Path("../…")` and silently break when run from the repo root; same module should own the `{nickname}_embedding.npy` convention (duplicated 5+ places)
 - [ ] Move hardcoded thresholds into `processing_config.yaml`: `min_confidence=0.15` (process_video), coverage quality cutoffs 0.4/0.25, clustering `distance_threshold=0.8`; also de-hardcode InsightFace providers/det_size (CoreML is baked in — Modal GPU runs fall back to CPU)
-- [ ] Serve coverage/similarity data from `local_api` instead of committed snapshots in `apps/admin/public/data/` (11k+ lines of generated JSON that goes stale after every reprocessing run)
+- [x] Serve coverage/similarity data from `local_api` instead of committed snapshots in `apps/admin/public/data/` (11k+ lines of generated JSON that goes stale after every reprocessing run) — **done 2026-10-22**: published to KV as `embedding_coverage` / `embedding_similarity_matrix` / `embedding_top_pairs`, served at `/api/embedding/*` by both origins; the three static copies are deleted (~190 KiB off the Worker bundle)
 - [ ] Player component: replace scattered `mode === 'admin' | 'viewer'` branches with capability props (annotation source, canFlag, timeline visibility)
 - [ ] One `flagFace()` helper + `Promise.allSettled` for batch flagging (two ~50-line copy-pasted callbacks, sequential awaits)
 - [ ] Shared `useInterval` hook to replace the two hand-rolled setInterval/ref patterns (Player, Processing)
 - [ ] `Contestants.tsx`: derive `stats` from `appearances` with `useMemo` instead of parallel state reset in three places
-- [ ] `Processing.tsx`: drop or implement the request fields `ProcessRequest` silently discards (`mode`, `similarity_threshold`, …) — "Embedding Update" currently queues the same job as "Initial Processing"
+- [x] `Processing.tsx`: drop or implement the request fields `ProcessRequest` silently discards (`mode`, `similarity_threshold`, …) — **done 2026-10-22**: `mode` is honoured (`initial` / `embedding-update` / `coverage-refresh`, 400 otherwise) and the dead `similarity_threshold` / `sync_from_hf` / `upload_results` fields are gone
+- [ ] Replace the single `flagged_faces` KV array with one key per flag — get/PATCH/delete are all read-modify-write on the whole array, so two admins reviewing at the same moment silently lose one flag (last write wins). Single reviewer is fine today; per-flag keys (or a Durable Object) if a second reviewer appears
 - [ ] `ContestantTimeline`: isolate the playhead into its own component so `currentTime` updates stop re-rendering every contestant row
 - [ ] `supervision_annotator.annotate_frame`: single BGR→PIL→BGR round trip per frame (currently two, doubling annotation cost)
 

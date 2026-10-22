@@ -342,7 +342,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       setIsFlagging(true);
       try {
         const thumbnail = selectedFace ? extractFaceThumbnail(selectedFace) : null;
-        const res = await fetch(`${apiBase}/api/faces/flag`, {
+        const res = await fetch(`${apiBase}/admin/api/faces/flag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -385,7 +385,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         for (const face of facesArray) {
           try {
             const thumbnail = extractFaceThumbnail(face);
-            const res = await fetch(`${apiBase}/api/faces/flag`, {
+            const res = await fetch(`${apiBase}/admin/api/faces/flag`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

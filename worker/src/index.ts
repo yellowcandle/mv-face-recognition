@@ -241,9 +241,18 @@ export default {
       logger.error('Malformed request URL', { message: (error as Error).message });
       return new Response('Bad request', { status: 400 });
     }
-    const { pathname } = url;
+    const { pathname: rawPathname } = url;
 
-    logger.info(`${request.method} ${pathname}`, {
+    // Admin writes are also served under the Access-protected prefix. The existing Access
+    // application covers `/admin`, so a same-origin call to `/admin/api/...` reaches Access,
+    // carries the `CF_Authorization` cookie whatever its path scope is, and comes back with
+    // `Cf-Access-Jwt-Assertion` stamped on it. The API path underneath is unchanged, and the
+    // handlers read query parameters from the original URL, so only the routing path moves.
+    const pathname = rawPathname.startsWith('/admin/api/')
+      ? rawPathname.slice('/admin'.length)
+      : rawPathname;
+
+    logger.info(`${request.method} ${rawPathname}`, {
       userAgent: request.headers.get('User-Agent')?.substring(0, 50),
       timestamp: new Date().toISOString(),
     });

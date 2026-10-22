@@ -224,31 +224,35 @@ test('no route has an effect: the Worker is read-only', async () => {
 
   try {
     for (const route of routes) {
-      for (const method of METHODS) {
-        for (const body of [undefined, PLAUSIBLE_BODY]) {
-          const effects = [];
-          globalThis.fetch = async (input) => {
-            effects.push(`outbound fetch ${typeof input === 'string' ? input : input?.url}`);
-            return new Response('{}', {
-              status: 200,
+      // The admin calls the gated routes through the Access-protected prefix; it must map to
+      // the same handlers and inherit the same no-write-before-auth guarantee.
+      for (const prefix of ['/api', '/admin/api']) {
+        for (const method of METHODS) {
+          for (const body of [undefined, PLAUSIBLE_BODY]) {
+            const effects = [];
+            globalThis.fetch = async (input) => {
+              effects.push(`outbound fetch ${typeof input === 'string' ? input : input?.url}`);
+              return new Response('{}', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            };
+            const request = new Request(`https://worker.test${prefix}${route}`, {
+              method,
               headers: { 'Content-Type': 'application/json' },
+              body: method === 'GET' || method === 'DELETE' ? undefined : body,
             });
-          };
-          const request = new Request(`https://worker.test/api${route}`, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: method === 'GET' || method === 'DELETE' ? undefined : body,
-          });
-          try {
-            await worker.fetch(request, recordingEnv(effects), {
-              waitUntil() {},
-              passThroughOnException() {},
-            });
-          } catch {
-            // Throwing on a stub env is fine — the assertion is about what it did before that.
+            try {
+              await worker.fetch(request, recordingEnv(effects), {
+                waitUntil() {},
+                passThroughOnException() {},
+              });
+            } catch {
+              // Throwing on a stub env is fine — the assertion is about what it did before that.
+            }
+            globalThis.fetch = realFetch;
+            if (effects.length > 0) offenders.push(`${method} ${prefix}${route} -> ${effects.join(', ')}`);
           }
-          globalThis.fetch = realFetch;
-          if (effects.length > 0) offenders.push(`${method} ${route} -> ${effects.join(', ')}`);
         }
       }
     }
@@ -314,6 +318,10 @@ test('deleted routes are gone; Access-gated writes fail closed', async () => {
     ['GET', '/api/labels'],
     ['GET', '/api/labels/4-x'],
     ['PUT', '/api/labels/4-x'],
+    // The admin's Access-protected prefix must fail closed the same way.
+    ['POST', '/admin/api/faces/flag'],
+    ['GET', '/admin/api/faces/flagged'],
+    ['PUT', '/admin/api/labels/4-x'],
   ];
 
   for (const [method, path] of gated) {
@@ -585,6 +593,27 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
     response = await callWorker(worker, env, ctx, 'DELETE', `/api/faces/flagged/${flag.id}`, { token });
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { error: 'Flagged face not found' });
+
+    // ── the Access-protected prefix reaches the same handlers, query and body intact ──
+    response = await callWorker(worker, env, ctx, 'POST', '/admin/api/faces/flag', {
+      cookie: token,
+      body: { contestant_id: 44, video_id: 'vid1', timestamp: 2.5, thumbnail: 'ALIAS' },
+    });
+    assert.equal(response.status, 200);
+    const aliased = await response.json();
+    assert.equal(aliased.contestant_id, 44);
+    assert.equal(aliased.flagged_by, EMAIL);
+
+    response = await callWorker(worker, env, ctx, 'GET', '/admin/api/faces/flagged?details=true', {
+      token,
+    });
+    assert.equal(response.status, 200);
+    body = await response.json();
+    assert.equal(body.flagged_faces.find((entry) => entry.id === aliased.id)?.thumbnail, 'ALIAS');
+
+    // The same record is visible through the unprefixed read, so both prefixes share storage.
+    response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged', { token });
+    assert.ok((await response.json()).flagged_faces.some((entry) => entry.id === aliased.id));
 
     assert.equal(
       fetches.filter((url) => url === jwksUrl).length,

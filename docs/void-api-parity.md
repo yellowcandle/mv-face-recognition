@@ -76,6 +76,12 @@ These are the traps; the port must pick one behaviour per row.
 
 ## 5. Calls that are not HTTP
 
+- The admin calls its gated routes through `/admin/api/...`, which the Worker serves as a prefix
+  alias of `/api/...`. The existing Access application covers `/admin`, so those calls pass
+  through Access, carry the `CF_Authorization` cookie whatever its path scope is, and arrive
+  with `Cf-Access-Jwt-Assertion` stamped on them. Public reads stay unprefixed. Vite proxies
+  `/admin/api` to `local_api.py`'s `/api` in development, so the same code runs both ways.
+
 - `Player.tsx` also opens a **WebSocket** to `/ws/…` for realtime processing
   (`worker/src/index.ts:98`, `case '/realtime-processing'`). The viewer never uses it; the admin
   uses polling instead. **Port nothing here**; if realtime is wanted later it is a Void

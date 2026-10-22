@@ -21,6 +21,13 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      // The admin's gated calls use the Access-protected prefix the Worker serves in production;
+      // locally they must reach the same routes on `local_api.py`.
+      '/admin/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/admin\/api/, '/api'),
+      },
     },
     fs: {
       allow: ['..'],
