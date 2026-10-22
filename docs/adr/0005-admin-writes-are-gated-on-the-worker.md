@@ -13,6 +13,10 @@ every write route answers `401` to it.
 This supersedes [ADR 0003](0003-the-deployed-worker-is-read-only.md) in two places: the Worker
 is no longer read-only, and the admin is no longer local-only.
 
+> Amended by [ADR 0006](0006-admin-jobs-run-on-the-worker.md): the processing job routes are
+> gated writes on the Worker too, dispatched to HF Jobs. The gate, the `no-store` rule and the
+> read-only test described below govern them unchanged.
+
 ## Context
 
 ADR 0003 deleted the flag routes because they were protected by a function that returned

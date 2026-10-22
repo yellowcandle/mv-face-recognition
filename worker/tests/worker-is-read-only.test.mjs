@@ -213,7 +213,12 @@ test('no route has an effect: the Worker is read-only', async () => {
   const routes = routesFromSource();
   // Parameterised routes are not `case` labels, so sample each shape explicitly: the sweep must
   // cover them or the next write-with-an-id route could slip past the no-effect check.
-  routes.push('/faces/flagged/sample-face', '/labels/sample-video');
+  routes.push(
+    '/faces/flagged/sample-face',
+    '/labels/sample-video',
+    '/processing/jobs/sample-job',
+    '/processing/cancel/sample-job',
+  );
   routes.sort((a, b) => a.localeCompare(b));
   // The floor only guards against the regex silently matching nothing and the test passing
   // vacuously.
