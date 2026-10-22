@@ -274,6 +274,14 @@ export default {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cf-Access-Jwt-Assertion',
     };
 
+    // Identity-dependent responses must never be reused. Without this, the browser heuristically
+    // caches `GET /admin/api/faces/flagged` (no validator, no Cache-Control), so accepting a flag
+    // writes to KV but the review queue keeps showing it and never asks again.
+    const routeHeaders: CorsHeaders =
+      pathname.startsWith('/api/faces/flag') || pathname.startsWith('/api/labels')
+        ? { ...corsHeaders, 'Cache-Control': 'no-store' }
+        : corsHeaders;
+
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       logger.debug(`CORS preflight for ${pathname}`);
@@ -290,7 +298,7 @@ export default {
       // API routes
       if (pathname.startsWith('/api/')) {
         logger.debug(`Routing to API handler: ${pathname}`);
-        return await handleApiRequest(pathname, request, env, corsHeaders);
+        return await handleApiRequest(pathname, request, env, routeHeaders);
       }
 
       // Video files from R2

@@ -336,6 +336,11 @@ test('deleted routes are gone; Access-gated writes fail closed', async () => {
     );
     assert.equal(response.status, 401, `${method} ${path} should refuse anonymously`);
     assert.deepEqual(await response.json(), { error: 'Unauthorized' }, `${method} ${path}`);
+    assert.equal(
+      response.headers.get('cache-control'),
+      'no-store',
+      `${method} ${path} must not be cached — a cached queue hides accepted flags`,
+    );
   }
 
   // Fail closed, not open: without the Access audience every gated route is 503.
