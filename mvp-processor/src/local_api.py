@@ -79,8 +79,7 @@ class FlagRequest(BaseModel):
 
 
 class LabelRecord(BaseModel):
-    frame_number: int
-    detection_index: int  # index into frame_data[].detections[]
+    tracker_id: int  # ByteTrack id within a shot; one label covers the whole track
     verdict: str  # contestant | not_a_contestant | unsure | box_wrong
     contestant_id: Optional[str] = None
     note: Optional[str] = None
@@ -427,13 +426,17 @@ async def recognition_results(contestant_id: str, video_id: Optional[str] = None
 
 # ─── Ground-truth labels (local_output/labels/<video_id>_labels.json) ───
 #
-# A label is a verdict on one *detection* — a box in a frame — keyed by frame_number plus the
-# index into frame_data[].detections[]. See CONTEXT.md and the resolution of "Choose the
-# ground-truth labelling means". Flags are a separate thing entirely (a human-proposed
+# A label is a verdict on one *track* — a face linked across frames by `tracker_id` — so one
+# human answer covers every frame the track appears in. Detections with `tracker_id < 0` were
+# never tracked and cannot be labelled. Flags are a separate thing entirely (a human-proposed
 # correction with a review lifecycle); labels are the answer, and they live in their own file.
+#
+# `labels/v2` replaced the per-detection `labels/v1` format. v1 keys (frame_number +
+# detection_index) cannot be mapped to a track reliably, so a v1 file is reported and left
+# untouched rather than guessed at.
 
 VERDICTS = ("contestant", "not_a_contestant", "unsure", "box_wrong")
-LABELS_SCHEMA = "labels/v1"
+LABELS_SCHEMA = "labels/v2"
 
 _labels_lock = asyncio.Lock()
 
@@ -445,8 +448,8 @@ def _labels_path(video_id: str) -> Path:
 def _metadata_source(data: dict) -> dict:
     """The identity of a metadata run: what a label set was made against.
 
-    A reprocess renumbers detections and re-scores them, so labels from a previous run must be
-    refused rather than silently attached to whatever box now sits at that index.
+    A reprocess can renumber tracks and re-score their detections, so labels from a previous run
+    must be refused rather than silently attached to whatever track now carries that id.
     """
     return {
         "processing_date": data.get("video_info", {}).get("processing_date"),
@@ -469,38 +472,46 @@ def _contestant_ids() -> set[str]:
         return {row["編號"].strip() for row in csv.DictReader(f)}
 
 
+def _known_tracker_ids(data: dict) -> set[int]:
+    """Every tracked id the current metadata can attach a label to."""
+    trackers: set[int] = set()
+    for frame in data.get("frame_data", []):
+        for detection in frame.get("detections", []):
+            tracker_id = detection.get("tracker_id")
+            if isinstance(tracker_id, int) and not isinstance(tracker_id, bool) and tracker_id >= 0:
+                trackers.add(tracker_id)
+    return trackers
+
+
 def _validate_labels(data: dict, labels: list[LabelRecord]) -> None:
-    """Reject anything that does not point at a real detection. Loud on purpose."""
-    frames = {f["frame_number"]: f for f in data.get("frame_data", [])}
+    """Reject anything that does not point at a real track. Loud on purpose."""
+    known_trackers = _known_tracker_ids(data)
     known_contestants = _contestant_ids()
     seen = set()
 
     for label in labels:
-        key = (label.frame_number, label.detection_index)
-        if key in seen:
-            raise HTTPException(400, f"Duplicate label for frame {label.frame_number} detection {label.detection_index}")
-        seen.add(key)
+        if label.tracker_id in seen:
+            raise HTTPException(400, f"Duplicate label for track {label.tracker_id}")
+        seen.add(label.tracker_id)
 
-        frame = frames.get(label.frame_number)
-        if frame is None:
-            raise HTTPException(400, f"No frame {label.frame_number} in this video's metadata")
-        if not 0 <= label.detection_index < len(frame.get("detections", [])):
+        if label.tracker_id < 0:
             raise HTTPException(
                 400,
-                f"Frame {label.frame_number} has {len(frame.get('detections', []))} detections; "
-                f"index {label.detection_index} does not exist",
+                f"Track {label.tracker_id} is untracked; only tracker_id >= 0 can be labelled",
             )
+        if label.tracker_id not in known_trackers:
+            raise HTTPException(400, f"No track {label.tracker_id} in this video's metadata")
         if label.verdict not in VERDICTS:
             raise HTTPException(400, f"Unknown verdict {label.verdict!r}; expected one of {VERDICTS}")
         if label.verdict == "contestant":
             if not label.contestant_id:
-                raise HTTPException(400, f"Frame {label.frame_number}: verdict 'contestant' needs a contestant_id")
+                raise HTTPException(400, f"Track {label.tracker_id}: verdict 'contestant' needs a contestant_id")
             if known_contestants and label.contestant_id not in known_contestants:
                 raise HTTPException(400, f"Unknown contestant {label.contestant_id!r}")
         elif label.contestant_id:
             raise HTTPException(
                 400,
-                f"Frame {label.frame_number}: verdict {label.verdict!r} must not carry a contestant_id",
+                f"Track {label.tracker_id}: verdict {label.verdict!r} must not carry a contestant_id",
             )
 
 
@@ -508,26 +519,42 @@ def _validate_labels(data: dict, labels: list[LabelRecord]) -> None:
 async def get_labels(video_id: str):
     """Labels for a video, or an empty set ready to label when none exist yet.
 
-    409 when a file exists but describes a different metadata run — the caller has to decide
-    what to do about that, not the server.
+    A `labels/v1` file is reported as `legacy_ignored` with an empty v2 label set and is left
+    untouched on disk: its frame/detection keys have no safe mapping onto tracker ids. A v2 file
+    from a different metadata run is a 409 — the caller has to decide what to do about that, not
+    the server.
     """
     _, data = _current_metadata(video_id)
     current = _metadata_source(data)
     path = _labels_path(video_id)
+    empty = {
+        "schema": LABELS_SCHEMA,
+        "video_id": video_id,
+        "labelled_at": None,
+        "source": current,
+        "labels": [],
+        "legacy_ignored": False,
+    }
 
     if not path.exists():
-        return {
-            "schema": LABELS_SCHEMA,
-            "video_id": video_id,
-            "labelled_at": None,
-            "source": current,
-            "labels": [],
-        }
+        return empty
 
     try:
         stored = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         raise HTTPException(500, f"Could not read {path.name}: {e}")
+
+    stored_schema = stored.get("schema")
+    if stored_schema != LABELS_SCHEMA:
+        return {
+            **empty,
+            "legacy_ignored": True,
+            "legacy_detail": (
+                f"{path.name} uses schema {stored_schema or 'unknown'} (per-detection "
+                "frame_number/detection_index labels). It was ignored and left untouched: those "
+                "keys cannot be mapped onto tracker ids. Re-label the tracks to write labels/v2."
+            ),
+        }
 
     stored_source = stored.get("source", {})
     if stored_source != current:
@@ -535,15 +562,15 @@ async def get_labels(video_id: str):
             409,
             f"Labels at {path.name} were made against a different metadata run "
             f"(labels: {stored_source}, current: {current}). They were not loaded: a reprocess "
-            f"renumbers and re-scores detections, so the indices no longer mean the same boxes.",
+            f"renumbers and re-scores detections, so the keys no longer mean the same tracks.",
         )
 
-    return stored
+    return {**stored, "legacy_ignored": False}
 
 
 @app.put("/api/labels/{video_id}")
 async def put_labels(video_id: str, payload: LabelsPayload):
-    """Replace a video's labels. Validated against the metadata, then written atomically."""
+    """Replace a video's labels (one per track). Validated against the metadata, then written atomically."""
     _, data = _current_metadata(video_id)
     current = _metadata_source(data)
 
@@ -579,7 +606,11 @@ async def put_labels(video_id: str, payload: LabelsPayload):
 
 @app.get("/api/labels")
 async def list_labels():
-    """Which videos have labels, and how many."""
+    """Which videos have v2 labels, and how many tracks each file labels.
+
+    A v1 file is listed with `count: 0` and `legacy_ignored: true` so callers do not mistake its
+    per-detection count for progress on the track contract.
+    """
     out = []
     if LABELS_DIR.exists():
         for path in sorted(LABELS_DIR.glob("*_labels.json")):
@@ -587,10 +618,14 @@ async def list_labels():
                 stored = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 continue
+            schema = stored.get("schema")
+            legacy = schema != LABELS_SCHEMA
             out.append({
                 "video_id": stored.get("video_id", path.stem[: -len("_labels")]),
-                "count": len(stored.get("labels", [])),
+                "schema": schema,
+                "count": 0 if legacy else len(stored.get("labels", [])),
                 "labelled_at": stored.get("labelled_at"),
+                "legacy_ignored": legacy,
             })
     return {"labels": out}
 
