@@ -20,6 +20,33 @@ const cropCache = new Map<string, string>();
 const CROP_CACHE_MAX = 200;
 
 /**
+ * The crop route is all-or-nothing: a deployment either has pre-extracted crops in R2 or it
+ * has none. Asking per tile cost one 404 for every face on the page before the canvas path it
+ * was going to use anyway. One tile discovers the answer, once per page load, and everyone
+ * else waits for it.
+ */
+type CropRouteState = 'unknown' | 'present' | 'missing';
+let cropRouteState: CropRouteState = 'unknown';
+let cropRouteClaimed = false;
+const cropRouteListeners = new Set<(state: CropRouteState) => void>();
+
+function setCropRouteState(state: CropRouteState): void {
+  if (cropRouteState === state) return;
+  cropRouteState = state;
+  for (const notify of cropRouteListeners) notify(state);
+}
+
+/** An `<img>` error cannot say why; this asks once, then retires the primary path if it is gone. */
+async function classifyCropRoute(src: string): Promise<void> {
+  try {
+    const response = await fetch(src, { cache: 'no-store' });
+    setCropRouteState(response.status === 404 || response.status === 410 ? 'missing' : 'present');
+  } catch {
+    setCropRouteState('missing');
+  }
+}
+
+/**
  * One seek queue per stream. A `Promise` chain is the lock: every job appends with
  * `previous.then(job, job)`, so a job only starts once the preceding one has settled,
  * and a failed seek neither stalls nor skips the queue. The shared video element is
@@ -188,16 +215,45 @@ export function FaceCrop({
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [fallbackFailed, setFallbackFailed] = useState(false);
-
   const primarySrc =
     frameNumber != null && detectionIndex != null
       ? `/api/faces/crop?video_id=${encodeURIComponent(videoId)}&frame_number=${frameNumber}&detection_index=${detectionIndex}&width=${width}`
       : null;
 
+  const [routeState, setRouteState] = useState<CropRouteState>(cropRouteState);
+  // A node with no crop URL cannot probe: if it claimed, everyone else would wait on a request
+  // that never happens.
+  const [claimant] = useState(() => {
+    if (primarySrc === null) return false;
+    if (cropRouteState !== 'unknown' || cropRouteClaimed) return false;
+    cropRouteClaimed = true;
+    return true;
+  });
+
+  useEffect(() => {
+    const notify = (state: CropRouteState) => setRouteState(state);
+    cropRouteListeners.add(notify);
+    return () => {
+      cropRouteListeners.delete(notify);
+    };
+  }, []);
+
+  // A claimant that unmounts before the answer must not leave the route unclassified forever.
+  useEffect(() => {
+    if (!claimant) return;
+    return () => {
+      if (cropRouteState === 'unknown') cropRouteClaimed = false;
+    };
+  }, [claimant]);
+
   const bboxKey = bbox && bbox.length === 4 ? bbox.join(',') : '';
   const canFallback = Boolean(streamUrl && timestamp != null && bboxKey);
   const cropKey = canFallback ? `${streamUrl}|${timestamp}|${bboxKey}|${width}` : '';
   const cached = cropKey ? cropCache.get(cropKey) : undefined;
+
+  const awaitingRoute = routeState === 'unknown' && !claimant && primarySrc !== null;
+  const primaryImgSrc =
+    primarySrc && !awaitingRoute && routeState !== 'missing' ? primarySrc : null;
 
   // A different crop is a different image: forget the previous outcome.
   useEffect(() => {
@@ -205,7 +261,7 @@ export function FaceCrop({
     setFallbackFailed(false);
   }, [cropKey]);
 
-  const showFallback = primarySrc === null || failedSrc === primarySrc;
+  const showFallback = !awaitingRoute && (primaryImgSrc === null || failedSrc === primaryImgSrc);
 
   useEffect(() => {
     if (!showFallback || !canFallback || !streamUrl || timestamp == null || !bboxKey) {
@@ -237,13 +293,19 @@ export function FaceCrop({
 
   return (
     <div className={className} style={{ width }}>
-      {primarySrc && failedSrc !== primarySrc ? (
+      {primaryImgSrc && failedSrc !== primaryImgSrc ? (
         <img
-          src={primarySrc}
+          src={primaryImgSrc}
           alt={alt ?? 'Face crop'}
           width={width}
           className="block h-auto w-full"
-          onError={() => setFailedSrc(primarySrc)}
+          onLoad={() => {
+            if (claimant) setCropRouteState('present');
+          }}
+          onError={() => {
+            if (claimant) void classifyCropRoute(primaryImgSrc);
+            setFailedSrc(primaryImgSrc);
+          }}
         />
       ) : image ? (
         <img src={image} alt={alt ?? 'Face crop'} width={width} className="block h-auto w-full" />
