@@ -452,7 +452,11 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
       body: { video_id: '', timestamp: 'soon' },
     });
     assert.equal(invalidFlag.status, 400);
-    assert.equal(JSON.parse(await env.METADATA_KV.get('flagged_faces')).length, 1);
+    assert.equal(
+      [...env.METADATA_KV.store.keys()].filter((key) => key.startsWith('flag_')).length,
+      1,
+      'a rejected body stores nothing',
+    );
 
     let response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged', { token });
     assert.equal(response.status, 200);
@@ -614,6 +618,40 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
     // The same record is visible through the unprefixed read, so both prefixes share storage.
     response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged', { token });
     assert.ok((await response.json()).flagged_faces.some((entry) => entry.id === aliased.id));
+
+    // ── a legacy single array is readable, then claimed by the first write ──
+    await env.METADATA_KV.put(
+      'flagged_faces',
+      JSON.stringify([
+        {
+          id: 'legacy000001',
+          contestant_id: 7,
+          video_id: 'vid1',
+          timestamp: 1,
+          confidence: 0,
+          bbox: null,
+          status: 'pending',
+          user_label: null,
+          thumbnail: null,
+          created_at: '2026-01-01T00:00:00.000Z',
+          flagged_by: 'old@example.com',
+        },
+      ]),
+    );
+    response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged', { token });
+    assert.ok((await response.json()).flagged_faces.some((entry) => entry.id === 'legacy000001'));
+
+    response = await callWorker(worker, env, ctx, 'PATCH', '/admin/api/faces/flagged/legacy000001', {
+      cookie: token,
+      body: { status: 'accepted' },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(await env.METADATA_KV.get('flagged_faces'), null, 'the legacy key is claimed');
+    assert.equal(
+      JSON.parse(await env.METADATA_KV.get('flag_legacy000001')).status,
+      'accepted',
+      'the migrated record is updated in place',
+    );
 
     assert.equal(
       fetches.filter((url) => url === jwksUrl).length,

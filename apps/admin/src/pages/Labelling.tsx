@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   FaceCrop,
+  adminFetch,
   useContestants,
   useVideos,
   bandFor,
@@ -352,7 +353,7 @@ export function Labelling() {
     queryKey: ['labels', videoId],
     enabled: !!videoId,
     queryFn: async () => {
-      const res = await fetch(`/admin/api/labels/${encodeURIComponent(videoId ?? '')}`);
+      const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(videoId ?? '')}`);
       if (res.status === 409) {
         const detail = readErrorDetail(await res.json().catch(() => null));
         return {
@@ -557,7 +558,7 @@ export function Labelling() {
         // Round-trip of this page's own serialization, not external input: the debounce effect
         // hands over the exact JSON it built from the labels map.
         const labelList = JSON.parse(bodyLabelsJson) as Label[];
-        const res = await fetch(`/admin/api/labels/${encodeURIComponent(videoId)}`, {
+        const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(videoId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source, labels: labelList }),

@@ -1652,7 +1652,8 @@ async function handleApiRequest(
 // `labels/<video_id>_labels.json`. Every route below calls `requireAccess` FIRST, so the
 // unauthenticated surface stays read-only and never fetches a JWKS.
 
-const FLAGS_KEY = 'flagged_faces';
+const FLAGS_KEY = 'flagged_faces'; // legacy single array; migrated on the first write
+const FLAG_PREFIX = 'flag_';
 const LABEL_PREFIX = 'labels_';
 const LABELS_SCHEMA = 'labels/v2';
 const FLAG_STATUSES = ['pending', 'accepted', 'rejected'] as const;
@@ -1794,20 +1795,83 @@ function parseStoredLabels(stored: string): StoredLabels | null {
   }
 }
 
-async function readFlags(env: Env): Promise<FlagRecord[]> {
-  const stored = await env.METADATA_KV.get(FLAGS_KEY);
-  if (!stored) return [];
+function flagKey(id: string): string {
+  return `${FLAG_PREFIX}${id}`;
+}
+
+function isFlagRecord(value: unknown): value is FlagRecord {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as FlagRecord).id === 'string' &&
+    (value as FlagRecord).id.length > 0
+  );
+}
+
+function parseFlagRecord(stored: string | null): FlagRecord | null {
+  if (!stored) return null;
   try {
     const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed) ? (parsed as FlagRecord[]) : [];
+    return isFlagRecord(parsed) ? parsed : null;
   } catch {
-    logger.warn('Could not read flagged_faces — starting with an empty list');
-    return [];
+    return null;
   }
 }
 
-async function writeFlags(env: Env, flags: FlagRecord[]): Promise<void> {
-  await env.METADATA_KV.put(FLAGS_KEY, JSON.stringify(flags));
+async function putFlag(env: Env, record: FlagRecord): Promise<void> {
+  await env.METADATA_KV.put(flagKey(record.id), JSON.stringify(record));
+}
+
+/**
+ * One key per flag, so two reviewers acting on different flags never overwrite each other —
+ * the single array was read-modify-write, and the later write silently dropped the other flag.
+ *
+ * The legacy array is still read for this release. Every mutation claims it first, so a flag
+ * cannot be resurrected from it after a delete.
+ */
+async function readFlags(env: Env): Promise<FlagRecord[]> {
+  const byId = new Map<string, FlagRecord>();
+
+  const legacy = await env.METADATA_KV.get(FLAGS_KEY);
+  if (legacy) {
+    try {
+      const parsed: unknown = JSON.parse(legacy);
+      if (Array.isArray(parsed)) {
+        for (const record of parsed) if (isFlagRecord(record)) byId.set(record.id, record);
+      }
+    } catch {
+      logger.warn('Could not read the legacy flagged_faces array');
+    }
+  }
+
+  let cursor: string | undefined;
+  do {
+    const page = await env.METADATA_KV.list({ prefix: FLAG_PREFIX, cursor });
+    for (const key of page.keys) {
+      const record = parseFlagRecord(await env.METADATA_KV.get(key.name));
+      if (record) byId.set(record.id, record);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  // Oldest first: the order the single array appended in.
+  return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+/** Move the legacy array into per-flag keys, then drop it. Safe to call on every mutation. */
+async function claimLegacyFlags(env: Env): Promise<void> {
+  const legacy = await env.METADATA_KV.get(FLAGS_KEY);
+  if (!legacy) return;
+  try {
+    const parsed: unknown = JSON.parse(legacy);
+    if (Array.isArray(parsed)) {
+      for (const record of parsed) if (isFlagRecord(record)) await putFlag(env, record);
+    }
+  } catch {
+    logger.warn('Could not migrate the legacy flagged_faces array');
+    return;
+  }
+  await env.METADATA_KV.delete(FLAGS_KEY);
 }
 
 /** `PATCH`/`DELETE /api/faces/flagged/{face_id}`. */
@@ -1831,15 +1895,14 @@ async function handleFlaggedFaceMutation(
     return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
   }
 
-  const flags = await readFlags(env);
-  const index = flags.findIndex((flag) => flag.id === faceId);
-  if (index === -1) {
+  await claimLegacyFlags(env);
+  const existing = parseFlagRecord(await env.METADATA_KV.get(flagKey(faceId)));
+  if (!existing) {
     return jsonResponse({ error: 'Flagged face not found' }, 404, corsHeaders);
   }
 
   if (request.method === 'DELETE') {
-    flags.splice(index, 1);
-    await writeFlags(env, flags);
+    await env.METADATA_KV.delete(flagKey(faceId));
     return jsonResponse({ deleted: faceId }, 200, corsHeaders);
   }
 
@@ -1848,9 +1911,9 @@ async function handleFlaggedFaceMutation(
     return jsonResponse({ detail: status.detail }, 400, corsHeaders);
   }
 
-  flags[index].status = status;
-  await writeFlags(env, flags);
-  return jsonResponse(flags[index], 200, corsHeaders);
+  existing.status = status;
+  await putFlag(env, existing);
+  return jsonResponse(existing, 200, corsHeaders);
 }
 
 /** `GET /api/faces/flagged`: thumbnails are large base64 JPEGs, so they are opt-in. */
@@ -1911,9 +1974,8 @@ async function handleFlagCreate(
     flagged_by: auth.email,
   };
 
-  const flags = await readFlags(env);
-  flags.push(record);
-  await writeFlags(env, flags);
+  await claimLegacyFlags(env);
+  await putFlag(env, record);
   return jsonResponse(record, 200, corsHeaders);
 }
 
@@ -1935,15 +1997,15 @@ async function handleFlagReassign(
     return jsonResponse({ error: input.error }, 400, corsHeaders);
   }
 
-  const flags = await readFlags(env);
-  const existing = flags.find((flag) => flag.id === input.face_id);
+  await claimLegacyFlags(env);
+  const existing = parseFlagRecord(await env.METADATA_KV.get(flagKey(input.face_id)));
   if (!existing) {
     return jsonResponse({ error: 'Flagged face not found' }, 404, corsHeaders);
   }
 
   existing.contestant_id = input.contestant_id;
   existing.status = 'pending';
-  await writeFlags(env, flags);
+  await putFlag(env, existing);
   return jsonResponse(existing, 200, corsHeaders);
 }
 

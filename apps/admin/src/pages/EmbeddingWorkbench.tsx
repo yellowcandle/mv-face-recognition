@@ -140,9 +140,12 @@ export function EmbeddingWorkbench() {
   });
 
   // Only detections whose reel is known can be cropped; an unresolved reel is not a card.
+  // Eight, not twenty-four: with no pre-extracted crops in R2, each card seeks the reel and
+  // cuts the box on a canvas, and the seeks are serialised per stream. The wait is linear in
+  // card count, so the grid shows the first eight and stops.
   const detections = (recognition?.results ?? [])
     .filter((r) => videoById.has(r.video_id))
-    .slice(0, 24);
+    .slice(0, 8);
 
   const runRefresh = useCallback(
     async (mode: RefreshMode) => {
@@ -573,7 +576,7 @@ export function EmbeddingWorkbench() {
                             Detected Faces from Videos
                           </h3>
                           <span className="font-mono text-[9px] tracking-[0.14em] text-ledger">
-                            {detectionsLoading ? '調閱中…' : `${detections.length} / 24`}
+                            {detectionsLoading ? '調閱中…' : `${detections.length} / 8`}
                           </span>
                         </div>
                         {detectionsLoading ? (

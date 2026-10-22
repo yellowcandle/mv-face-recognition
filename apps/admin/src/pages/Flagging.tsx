@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BAND_STAMP,
   Masthead,
+  adminFetch,
   bandFor,
   formatMmSs,
   useContestants,
@@ -179,7 +180,7 @@ export function Flagging() {
 
   async function updateFaceStatus(faceId: string, status: 'accepted' | 'rejected') {
     try {
-      const res = await fetch(`/admin/api/faces/flagged/${faceId}`, {
+      const res = await adminFetch(`/admin/api/faces/flagged/${faceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -200,7 +201,7 @@ export function Flagging() {
   async function reassignFace() {
     if (!focused || !reassignTo) return;
     try {
-      const res = await fetch('/admin/api/faces/flag/update', {
+      const res = await adminFetch('/admin/api/faces/flag/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),

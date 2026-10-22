@@ -83,9 +83,11 @@ displays **recognitions** and never writes. Anything it can do, an anonymous str
 _Avoid_: frontend, the app, the dashboard
 
 **Admin**:
-The local-only app (`apps/admin`), served by Vite against `local_api.py` on localhost. Every
-operation that writes — **flagging**, reprocessing, the embedding workbench — lives here and
-is never deployed.
+The back-office app (`apps/admin`), served two ways: by Vite against `local_api.py` on
+localhost, and at `/admin` on the Worker behind Cloudflare Access. Reads are shared with the
+**Viewer**; writes split — **flags** and **label sets** go to Worker KV when deployed, while
+pipeline runs and embedding rebuilds only happen against `local_api.py`. It is never public:
+anonymous requests to the gated routes get 401.
 _Avoid_: dashboard, backend, the tool
 
 ### Geometry

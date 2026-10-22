@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Card,
   Masthead,
+  adminFetch,
   formatMmSs,
   useContestants,
   useFlaggedFaces,
@@ -70,7 +71,7 @@ export function SystemAdmin() {
   const labelsQuery = useQuery<LabelsPayload>({
     queryKey: LABELS_QUERY_KEY,
     queryFn: async () => {
-      const res = await fetch('/admin/api/labels');
+      const res = await adminFetch('/admin/api/labels');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return (await res.json()) as LabelsPayload;
     },
