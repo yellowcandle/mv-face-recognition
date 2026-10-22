@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Masthead } from './Masthead';
 import { useVideos } from '../hooks/useVideos';
-import { BAND_STAMP, bandFor, type Band } from '../lib/bands';
+import { BAND_CUTOFFS, BAND_STAMP, bandFor, type Band } from '../lib/bands';
 import { formatMmSs } from '../lib/format';
 import type { VideoMetadata } from '../types';
 
@@ -98,16 +98,18 @@ export function AnalyticsLedger({
       <div className="mt-4 h-px bg-carbon/45" />
 
       {summary && (
-        <div className="flex flex-row items-end gap-10 py-3.5">
+        <div className="flex flex-row items-start gap-16 py-4">
           {[
-            { label: 'FRAMES', value: summary.frames_processed.toLocaleString() },
-            { label: 'FACES DETECTED', value: summary.total_faces_detected.toLocaleString() },
-            { label: 'RECOGNISED', value: summary.total_recognitions.toLocaleString() },
-            { label: 'CONTESTANTS', value: String(summary.unique_contestants) },
+            { label: 'FRAMES 影格', value: summary.frames_processed.toLocaleString() },
+            { label: 'DETECTED 偵測', value: summary.total_faces_detected.toLocaleString() },
+            { label: 'RECOGNISED 辨識', value: summary.total_recognitions.toLocaleString() },
+            { label: 'CONTESTANTS 出場', value: String(summary.unique_contestants) },
           ].map((s) => (
             <div key={s.label} className="flex flex-col gap-1">
+              <span className="font-serif text-[28px] font-bold leading-none text-carbon-deep">
+                {s.value}
+              </span>
               <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">{s.label}</span>
-              <span className="font-mono text-[22px] leading-none text-carbon">{s.value}</span>
             </div>
           ))}
         </div>
@@ -144,8 +146,8 @@ export function AnalyticsLedger({
           這卷影片沒有可核對的紀錄。
         </div>
       ) : (
-        <div className="overflow-hidden border border-carbon/35">
-          <div className="flex flex-row items-center border-b border-carbon/40 bg-paper-dark px-4 py-2.5">
+        <div className="flex flex-col">
+          <div className="flex flex-row items-center border-b border-carbon/40 py-2.5">
             <span className="w-[52px] font-mono text-[8px] tracking-[0.18em] text-ledger">NO.</span>
             <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">
               CONTESTANT
@@ -170,7 +172,7 @@ export function AnalyticsLedger({
             return (
               <div
                 key={s.id}
-                className="flex flex-row items-center border-b border-carbon/15 px-4 py-2.5 last:border-b-0 hover:bg-paper-light"
+                className="flex flex-row items-center border-b border-carbon/15 py-3 last:border-b-0 hover:bg-paper-light"
               >
                 <span className="w-[52px] font-mono text-[11px] text-carbon-soft">
                   {String(s.id).padStart(2, '0')}
@@ -201,6 +203,27 @@ export function AnalyticsLedger({
           })}
         </div>
       )}
+
+      <div className="flex flex-row items-center gap-8 pt-4">
+        <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">BANDS 分級</span>
+        {(
+          [
+            ['high', `≥ ${BAND_CUTOFFS.high}`],
+            ['medium', `${BAND_CUTOFFS.medium} — ${BAND_CUTOFFS.high}`],
+            ['low', `< ${BAND_CUTOFFS.medium}`],
+          ] as const
+        ).map(([band, range]) => (
+          <span key={band} className="flex flex-row items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                band === 'high' ? 'bg-carbon' : band === 'medium' ? 'bg-stamp' : 'bg-ledger'
+              }`}
+            />
+            <span className="font-kai text-[10px] text-carbon-deep">{BAND_STAMP[band].word}</span>
+            <span className="font-mono text-[9px] text-ledger">{range}</span>
+          </span>
+        ))}
+      </div>
 
       <div className="flex-1" />
       <div className="flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
