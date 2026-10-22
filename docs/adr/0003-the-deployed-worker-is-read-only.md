@@ -1,8 +1,13 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0005-admin-writes-are-gated-on-the-worker.md
 ---
 
 # The deployed worker is read-only
+
+> Superseded by [ADR 0005](0005-admin-writes-are-gated-on-the-worker.md). The reasoning below
+> still explains why the routes were deleted at the time; the two premises that changed are
+> recorded there.
 
 The Cloudflare Worker serves the **viewer** and nothing else. It reads metadata from KV and
 video from R2. It accepts **no** writes. Everything that writes — flagging, reprocessing, the

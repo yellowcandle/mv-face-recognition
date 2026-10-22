@@ -26,7 +26,7 @@ Remaining before the branch lands:
 - [ ] Shared `useInterval` hook to replace the two hand-rolled setInterval/ref patterns (Player, Processing)
 - [ ] `Contestants.tsx`: derive `stats` from `appearances` with `useMemo` instead of parallel state reset in three places
 - [x] `Processing.tsx`: drop or implement the request fields `ProcessRequest` silently discards (`mode`, `similarity_threshold`, …) — **done 2026-10-22**: `mode` is honoured (`initial` / `embedding-update` / `coverage-refresh`, 400 otherwise) and the dead `similarity_threshold` / `sync_from_hf` / `upload_results` fields are gone
-- [ ] Replace the single `flagged_faces` KV array with one key per flag — get/PATCH/delete are all read-modify-write on the whole array, so two admins reviewing at the same moment silently lose one flag (last write wins). Single reviewer is fine today; per-flag keys (or a Durable Object) if a second reviewer appears
+- [x] Replace the single `flagged_faces` KV array with one key per flag — **done 2026-10-22**: `flag_<id>` per record, legacy array read and claimed on first write; the queue's `no-store` header came out of the same bug hunt (a cached list hid accepted flags)
 - [ ] `ContestantTimeline`: isolate the playhead into its own component so `currentTime` updates stop re-rendering every contestant row
 - [ ] `supervision_annotator.annotate_frame`: single BGR→PIL→BGR round trip per frame (currently two, doubling annotation cost)
 
