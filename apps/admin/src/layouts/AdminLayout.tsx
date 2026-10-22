@@ -36,15 +36,27 @@ const sections = [
 ] as const;
 
 type Status = 'online' | 'offline' | 'checking';
+type ApiMode = 'local' | 'edge';
 
 export function AdminLayout() {
   const [status, setStatus] = useState<Status>('checking');
+  const [mode, setMode] = useState<ApiMode>('local');
 
   useEffect(() => {
     const check = async () => {
       try {
         const res = await fetch('/api/system/status');
-        setStatus(res.ok ? 'online' : 'offline');
+        if (!res.ok) {
+          setStatus('offline');
+          return;
+        }
+        const data = (await res.json()) as { mode?: string; chromadb_connected?: unknown };
+        setMode(
+          data.mode === 'edge' || (!data.mode && data.chromadb_connected !== undefined)
+            ? 'edge'
+            : 'local',
+        );
+        setStatus('online');
       } catch {
         setStatus('offline');
       }
@@ -72,7 +84,9 @@ export function AdminLayout() {
           <span className="h-11 w-px bg-carbon/30" />
           <span className="font-kai text-[12px] text-carbon-soft">存根</span>
         </div>
-        <div className="font-mono text-[9px] tracking-[0.18em] text-carbon-soft">LOCAL</div>
+        <div className="font-mono text-[9px] tracking-[0.18em] text-carbon-soft">
+          {mode === 'edge' ? 'EDGE' : 'LOCAL'}
+        </div>
       </div>
 
       {/* Filing cabinet */}
@@ -129,13 +143,15 @@ export function AdminLayout() {
           <div className="flex flex-col">
             <span className="font-mono text-[8px] tracking-[0.14em] text-carbon">
               {status === 'online'
-                ? 'LOCAL API ONLINE'
+                ? mode === 'edge'
+                  ? 'EDGE API ONLINE'
+                  : 'LOCAL API ONLINE'
                 : status === 'offline'
                   ? 'API OFFLINE'
                   : 'CHECKING'}
             </span>
             <span className="font-mono text-[7px] tracking-[0.1em] text-ledger">
-              127.0.0.1:8000
+              {mode === 'edge' ? window.location.host : '127.0.0.1:8000'}
             </span>
           </div>
         </div>

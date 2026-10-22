@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Paths relative to mvp-processor/
 DEFAULT_CSV = Path("../metadata/contestant_info.csv")
 DEFAULT_EMBEDDINGS_DIR = Path("../source/photo/contestants")
-DEFAULT_METADATA_DIR = Path("../metadata")
+DEFAULT_METADATA_DIR = Path("../local_output/metadata")
 DEFAULT_OUTPUT = Path("../data/coverage.json")
 
 # Anchored on this file, not the cwd: the cutoffs are the pipeline's, and there is one place

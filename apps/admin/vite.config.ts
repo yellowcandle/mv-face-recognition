@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
+  // Served by the Worker from /admin — absolute asset URLs must carry the prefix.
+  base: '/admin/',
   plugins: lazyPlugins(() => [react(), tailwindcss()]),
   resolve: {
     alias: {

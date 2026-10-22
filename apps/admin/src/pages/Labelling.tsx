@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BAND_STAMP, Badge, Button, Card, useContestants, useVideos, bandFor } from '@mv/shared';
+import {
+  BAND_STAMP,
+  Badge,
+  Button,
+  Card,
+  FaceCrop,
+  useContestants,
+  useVideos,
+  bandFor,
+} from '@mv/shared';
 import type { Band, Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 
 // ---------------------------------------------------------------------------
@@ -57,10 +66,12 @@ type LabelsResult = { status: 'conflict'; detail: string } | { status: 'loaded';
 
 interface Detection {
   frame_number: number;
+  timestamp: number;
   detection_index: number;
   tracker_id: number | null;
   match_score: number | null;
   det_score: number;
+  bbox: [number, number, number, number];
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
@@ -114,20 +125,6 @@ const VERDICT_PILL: Record<Verdict, string> = {
 
 const FIELD =
   'bg-paper-dark border border-paper-deep text-carbon-deep text-xs rounded-none px-2 py-1.5 focus:ring-stamp focus:outline-none';
-
-/**
- * The crop endpoint does the pixel work from the stored frame fractions; never scaled here.
- * `width` is the server's own crop width (64–512): the grid takes the default 160, the sheet
- * asks for 320 because it shows one face at twice the size.
- */
-function cropSrc(
-  videoId: string,
-  frameNumber: number,
-  detectionIndex: number,
-  width = 160,
-): string {
-  return `/api/faces/crop?video_id=${encodeURIComponent(videoId)}&frame_number=${frameNumber}&detection_index=${detectionIndex}&width=${width}`;
-}
 
 /** Stable, track-ordered output so a save only rewrites what actually changed. */
 function serializeLabels(labels: Record<string, Label>): Label[] {
@@ -296,6 +293,7 @@ export function Labelling() {
   const contestants = Array.isArray(contestantsRaw) ? (contestantsRaw as Contestant[]) : [];
 
   const [videoId, setVideoId] = useState<string | null>(null);
+  const streamUrl = videos.find((v) => v.id === videoId)?.stream_url;
   // Videos the probe found to be unlabelable (pre-014 metadata), so the picker can say which
   // ones need a reprocess instead of letting the next visitor land in the same message.
   const [staleVideoIds, setStaleVideoIds] = useState<Set<string>>(new Set());
@@ -405,10 +403,12 @@ export function Labelling() {
       frameDetections.forEach((d, index) => {
         out.push({
           frame_number: frame.frame_number,
+          timestamp: frame.timestamp,
           detection_index: index,
           tracker_id: typeof d.tracker_id === 'number' ? d.tracker_id : null,
           match_score: d.match_score,
           det_score: d.det_score,
+          bbox: d.bbox,
           contestant_id: d.contestant_id,
           contestant_name: d.contestant_name,
           contestant_nickname: d.contestant_nickname,
@@ -1110,15 +1110,14 @@ export function Labelling() {
                           label ? 'border-carbon/50' : 'border-paper-dark'
                         } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
                       >
-                        <img
-                          src={cropSrc(
-                            videoId ?? '',
-                            track.representative.frame_number,
-                            track.representative.detection_index,
-                          )}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
+                        <FaceCrop
+                          videoId={videoId ?? ''}
+                          frameNumber={track.representative.frame_number}
+                          detectionIndex={track.representative.detection_index}
+                          timestamp={track.representative.timestamp}
+                          bbox={track.representative.bbox}
+                          streamUrl={streamUrl}
+                          width={160}
                           className="w-full aspect-square object-cover rounded bg-black"
                         />
                         <div className="mt-1.5 flex items-center justify-between gap-1">
@@ -1328,14 +1327,14 @@ export function Labelling() {
 
             <div className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
-                <img
-                  src={cropSrc(
-                    videoId ?? '',
-                    openTrack.representative.frame_number,
-                    openTrack.representative.detection_index,
-                    320,
-                  )}
-                  alt=""
+                <FaceCrop
+                  videoId={videoId ?? ''}
+                  frameNumber={openTrack.representative.frame_number}
+                  detectionIndex={openTrack.representative.detection_index}
+                  timestamp={openTrack.representative.timestamp}
+                  bbox={openTrack.representative.bbox}
+                  streamUrl={streamUrl}
+                  width={320}
                   className="w-full sm:w-[200px] shrink-0 aspect-square object-cover rounded bg-black"
                 />
                 <div className="space-y-1.5 text-xs text-carbon-soft">

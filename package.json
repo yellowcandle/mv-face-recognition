@@ -5,7 +5,7 @@
   "description": "MV Face Recognition on Cloudflare Workers",
   "scripts": {
     "build": "npm run build:frontend",
-    "build:frontend": "pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js",
+    "build:frontend": "pnpm --filter @mv/viewer build && pnpm --filter @mv/admin build && node scripts/update-worker-assets.js",
     "dev": "cd worker && wrangler dev",
     "deploy": "cd worker && wrangler deploy",
     "deploy:staging": "cd worker && wrangler deploy --env staging",

@@ -25,4 +25,8 @@ preview_bucket_name = "mv-face-recognition-videos-preview"
 ALLOWED_ORIGINS = "https://mv-face-recognition-api.herballemon.workers.dev,https://mv-face-recognition.pages.dev,https://a0a857b9.mv-face-recognition.pages.dev,https://d7308ddf.mv-face-recognition.pages.dev,https://371f3248.mv-face-recognition.pages.dev,http://localhost:5173"
 ENVIRONMENT = "production"
 LOG_LEVEL = "info"  # Options: debug, info, warn, error, none
+# Cloudflare Access application that fronts the admin writes (flags + labels). Unset means the
+# write routes fail closed with 503; invalid tokens are rejected with 401.
+CF_ACCESS_TEAM_DOMAIN = "herballemon.cloudflareaccess.com"
+CF_ACCESS_AUD = "2c58bccc6a792ab6857c8ad87f187879355655186a4ab7e0e517dec9a80e0dea"
 

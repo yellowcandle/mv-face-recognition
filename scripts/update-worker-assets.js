@@ -33,6 +33,12 @@ function readDirectoryRecursively(dir, baseDir = '') {
     const relativePath = baseDir ? `${baseDir}/${item}` : item;
 
     if (fs.statSync(itemPath).isDirectory()) {
+      // Read-model JSON is served from KV via /api/embedding/*, never from the
+      // bundle; a stale dist/data copy would cost ~190 KiB of the 1 MiB limit.
+      if (relativePath === 'data') {
+        logger.info('Skipping read-model data directory', { dir: itemPath });
+        continue;
+      }
       const sub = readDirectoryRecursively(itemPath, relativePath);
       Object.assign(assets, sub.assets);
       binaryAssets.push(...sub.binaryAssets);
@@ -54,25 +60,42 @@ function readDirectoryRecursively(dir, baseDir = '') {
 function main() {
   logger.info('Updating worker embedded assets');
 
-  const buildDir = path.join(__dirname, '../apps/viewer/dist');
+  const viewerDir = path.join(__dirname, '../apps/viewer/dist');
+  const adminDir = path.join(__dirname, '../apps/admin/dist');
   const workerDir = path.join(__dirname, '../worker');
   const embeddedAssetsFile = path.join(workerDir, 'embedded-assets.js');
 
-  if (!fs.existsSync(buildDir)) {
-    logger.error('Viewer build directory not found — run `pnpm --filter @mv/viewer build` first', { buildDir });
-    process.exit(1);
+  for (const [label, buildDir] of [
+    ['viewer', viewerDir],
+    ['admin', adminDir],
+  ]) {
+    if (!fs.existsSync(buildDir)) {
+      logger.error(
+        `${label} build directory not found — run \`pnpm --filter @mv/${label} build\` first`,
+        { buildDir },
+      );
+      process.exit(1);
+    }
+
+    if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
+      logger.error(`${label} build has no index.html — incomplete build?`, { buildDir });
+      process.exit(1);
+    }
   }
 
-  if (!fs.existsSync(path.join(buildDir, 'index.html'))) {
-    logger.error('Viewer build has no index.html — incomplete build?', { buildDir });
-    process.exit(1);
-  }
+  // The viewer owns the root; the admin SPA is mounted under /admin, so one Worker
+  // origin serves both and one Cloudflare Access app can cover the back office.
+  const viewer = readDirectoryRecursively(viewerDir, '');
+  const admin = readDirectoryRecursively(adminDir, 'admin');
 
-  const { assets, binaryAssets } = readDirectoryRecursively(buildDir, '');
+  const assets = { ...viewer.assets, ...admin.assets };
+  const binaryAssets = [...viewer.binaryAssets, ...admin.binaryAssets];
 
-  logger.info('Assets collected from viewer dist/', {
+  logger.info('Assets collected', {
     count: Object.keys(assets).length,
     binaryCount: binaryAssets.length,
+    viewerCount: Object.keys(viewer.assets).length,
+    adminCount: Object.keys(admin.assets).length,
     keys: Object.keys(assets).slice(0, 10),
   });
 

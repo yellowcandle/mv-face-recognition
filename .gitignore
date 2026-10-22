@@ -313,3 +313,6 @@ mvp-processor/*TEMP*.mp4
 # Rewritten with temp paths by tests/contract/test_cli_*.py on every run.
 /db/init_state.json
 .vitest/
+
+# Local wrangler dev state (KV/R2/Miniflare) created by `wrangler dev`.
+.wrangler/

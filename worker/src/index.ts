@@ -10,14 +10,18 @@ import { AppError, InternalError, CorsHeaders } from './lib/errors';
  * Environment bindings for the Cloudflare Worker
  */
 interface Env {
-  // The deployed Worker is read-only: it reads metadata from KV and streams video from R2, and
-  // writes nothing (ADR 0003, ticket 016). `MODAL_JOBS`, `HF_TOKEN`, `MODAL_TOKEN` and the
-  // Access pair are still bound in wrangler.toml but no code here reads them any more.
+  // The public surface reads metadata from KV and streams video from R2. The only writes are
+  // grounded-truth labels and face flags, and every one of those routes sits behind Cloudflare
+  // Access (`requireAccess`): no Access config means 503, an unverifiable token means 401.
   METADATA_KV: KVNamespace;
   VIDEOS_BUCKET: R2Bucket;
   ENVIRONMENT?: string;
   ALLOWED_ORIGINS?: string;
   LOG_LEVEL?: string;
+  /** Cloudflare Access team domain, e.g. `team.cloudflareaccess.com`. */
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  /** Cloudflare Access application audience (AUD) tag. */
+  CF_ACCESS_AUD?: string;
 }
 
 /**
@@ -70,7 +74,163 @@ interface WebSocketMessageData {
 /**
  * Verify Cloudflare Access JWT token
  * @see https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/
+ *
+ * Ported from labeller/src/index.ts, which is the reference implementation for Access
+ * verification in this repo. It FAILS CLOSED: unconfigured means 503, anything unverifiable
+ * means 401, and the reason is logged but never returned.
  */
+
+interface AccessJwk extends JsonWebKey {
+  kid?: string;
+}
+
+const JWKS_TTL_MS = 5 * 60 * 1000;
+const CLOCK_SKEW_S = 60;
+
+let jwksCache: { url: string; keys: AccessJwk[]; fetchedAt: number } | null = null;
+
+/** Test hook: forget cached keys so each test sees its own JWKS. */
+export function resetJwksCache(): void {
+  jwksCache = null;
+}
+
+async function getJwks(url: string): Promise<AccessJwk[]> {
+  if (jwksCache && jwksCache.url === url && Date.now() - jwksCache.fetchedAt < JWKS_TTL_MS) {
+    return jwksCache.keys;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status}`);
+  const body = (await res.json()) as { keys?: AccessJwk[] };
+  if (!Array.isArray(body.keys)) throw new Error('JWKS has no keys');
+  jwksCache = { url, keys: body.keys, fetchedAt: Date.now() };
+  return body.keys;
+}
+
+function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
+  if (!/^[A-Za-z0-9_-]*$/.test(s)) throw new Error('bad base64url');
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function decodePart(s: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('JWT part is not an object');
+  }
+  return value as Record<string, unknown>;
+}
+
+/** Returns the verified email, or throws with a reason (the reason is logged, never returned). */
+async function verifyAccessJwt(token: string, teamDomain: string, aud: string): Promise<string> {
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('malformed token');
+  const [h, p, s] = parts;
+  const header = decodePart(h);
+  const payload = decodePart(p);
+
+  // Checked before the JWKS fetch so a malformed or unauthenticated request never causes an
+  // outbound call. `verifyAccessJwt` repeats the checks for callers that skip the preflight.
+  if (header.alg !== 'RS256') throw new Error('unexpected alg');
+  if (typeof header.kid !== 'string') throw new Error('missing kid');
+
+  const keys = await getJwks(`https://${teamDomain}/cdn-cgi/access/certs`);
+  const jwk = keys.find((key) => key.kid === header.kid);
+  if (!jwk) throw new Error('unknown kid');
+
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  const ok = await crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    b64urlToBytes(s),
+    new TextEncoder().encode(`${h}.${p}`),
+  );
+  if (!ok) throw new Error('bad signature');
+
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.iss !== `https://${teamDomain}`) throw new Error('wrong iss');
+  const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (!audiences.includes(aud)) throw new Error('wrong aud');
+  if (typeof payload.exp !== 'number' || payload.exp + CLOCK_SKEW_S < now) throw new Error('expired');
+  if (payload.nbf !== undefined && (typeof payload.nbf !== 'number' || payload.nbf - CLOCK_SKEW_S > now)) {
+    throw new Error('not yet valid');
+  }
+  if (typeof payload.email !== 'string' || payload.email === '') throw new Error('no email claim');
+  return payload.email;
+}
+
+/** The Access assertion, from the header Access injects or from its cookie. */
+function extractAccessToken(request: Request): string | null {
+  const header = request.headers.get('Cf-Access-Jwt-Assertion');
+  if (header) return header;
+
+  const cookie = request.headers.get('Cookie');
+  if (!cookie) return null;
+  for (const part of cookie.split(';')) {
+    const [name, ...rest] = part.trim().split('=');
+    if (name === 'CF_Authorization') {
+      const value = rest.join('=');
+      return value ? value : null;
+    }
+  }
+  return null;
+}
+
+function jsonResponse(
+  body: unknown,
+  status: number,
+  corsHeaders: CorsHeaders,
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Gate a write route on a verified Cloudflare Access identity.
+ *
+ * Returns `{ email }` when the caller may proceed, or the 503/401 response to send. Every check
+ * that needs no network happens before `getJwks`, so unauthenticated traffic never fetches.
+ */
+async function requireAccess(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<{ email: string } | Response> {
+  const teamDomain = env.CF_ACCESS_TEAM_DOMAIN;
+  const aud = env.CF_ACCESS_AUD;
+  if (!teamDomain || !aud) {
+    return jsonResponse({ error: 'Service not configured' }, 503, corsHeaders);
+  }
+
+  const token = extractAccessToken(request);
+  if (!token) return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) throw new Error('malformed token');
+    const header = decodePart(parts[0]);
+    if (header.alg !== 'RS256') throw new Error('unexpected alg');
+    if (typeof header.kid !== 'string') throw new Error('missing kid');
+
+    const email = await verifyAccessJwt(token, teamDomain, aud);
+    return { email };
+  } catch (error) {
+    logger.warn('Access token rejected', {
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+    return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+  }
+}
 
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
@@ -89,9 +249,10 @@ export default {
     });
 
     // CORS headers for all responses.
-    // The Worker is read-only and serves public data (ADR 0003), so it carries no
-    // credentials and no per-user state; the origin is still restricted to the
-    // configured ALLOWED_ORIGINS so a browser on an unrelated site cannot read it.
+    // Reads are public data (ADR 0003); the label and flag writes are additionally gated by
+    // Cloudflare Access, so the write verbs and the Access assertion header must survive the
+    // preflight for same-origin admin fetches. Credentials are cookie-carried by the Access
+    // session itself, not by an `Access-Control-Allow-Credentials` grant.
     const origin = request.headers.get('Origin');
     const allowed = (env.ALLOWED_ORIGINS ?? '')
       .split(',')
@@ -100,10 +261,8 @@ export default {
     const corsHeaders: CorsHeaders = {
       'Access-Control-Allow-Origin':
         origin && allowed.includes(origin) ? origin : allowed.length ? '' : '*',
-      // ADR 0003: this Worker serves reads only. Advertising write methods here
-      // contradicted the handler surface and invited preflights that can never succeed.
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cf-Access-Jwt-Assertion',
     };
 
     // Handle CORS preflight
@@ -1333,11 +1492,10 @@ async function handleApiRequest(
 ): Promise<Response> {
   const path = pathname.replace('/api', '');
 
-  // Public face crop for the cast sheet: /api/contestants/{id}/thumb/face
-  // The object is immutable (content-addressed by the publish step), so it is
-  // safe to cache hard at the edge. Handled before the switch: it is a
-  // distinct resource, not another case of the same shape.
-  const portrait = path.match(/^\/contestants\/(\d+)\/thumb\/(face|320|640)$/);
+  // Public portrait for the cast sheet. `/thumb/face`, the sized variants and the legacy
+  // `/photo` all serve the same pre-cropped, immutable object published to R2, so they are one
+  // resource rather than four cases. Handled before the switch: it is a distinct resource.
+  const portrait = path.match(/^\/contestants\/(\d+)\/(?:thumb\/(?:face|320|640)|photo)$/);
   if (portrait) {
     const key = `portraits/${portrait[1]}.webp`;
     const object = await env.VIDEOS_BUCKET.get(key);
@@ -1357,11 +1515,26 @@ async function handleApiRequest(
     });
   }
 
+  // Access-gated writes with a path parameter. They are matched here rather than as switch
+  // cases; the collection routes below share the same handlers. Every one of them calls
+  // `requireAccess` before touching KV, so an unauthenticated request has no effect.
+  const flaggedFace = path.match(/^\/faces\/flagged\/([^/]+)$/);
+  if (flaggedFace) {
+    return await handleFlaggedFaceMutation(request, flaggedFace[1], env, corsHeaders);
+  }
+
+  const videoLabels = path.match(/^\/labels\/([^/]+)$/);
+  if (videoLabels) {
+    return await handleVideoLabels(request, videoLabels[1], env, corsHeaders);
+  }
+
   switch (path) {
     case '/system/status/':
     case '/system/status':
       return new Response(
         JSON.stringify({
+          status: 'online',
+          mode: 'edge',
           chromadb_connected: true,
           model_loaded: true,
           services_running: true,
@@ -1388,6 +1561,38 @@ async function handleApiRequest(
     case '/videos/':
       return await handleVideosEndpoint(env, corsHeaders);
 
+    case '/embedding/coverage':
+    case '/embedding/coverage/':
+      return await handleEmbeddingRead(request, env, corsHeaders, 'embedding_coverage');
+
+    case '/embedding/similarity':
+    case '/embedding/similarity/':
+      return await handleEmbeddingRead(request, env, corsHeaders, 'embedding_similarity_matrix');
+
+    case '/embedding/top-pairs':
+    case '/embedding/top-pairs/':
+      return await handleEmbeddingRead(request, env, corsHeaders, 'embedding_top_pairs');
+
+    case '/faces/flagged':
+    case '/faces/flagged/':
+      return await handleFlagList(request, env, corsHeaders);
+
+    case '/faces/flag':
+    case '/faces/flag/':
+      return await handleFlagCreate(request, env, corsHeaders);
+
+    case '/faces/flag/update':
+    case '/faces/flag/update/':
+      return await handleFlagReassign(request, env, corsHeaders);
+
+    case '/faces/crop':
+    case '/faces/crop/':
+      return await handleFaceCrop(request, env, corsHeaders);
+
+    case '/labels':
+    case '/labels/':
+      return await handleLabelsList(request, env, corsHeaders);
+
     case '/videos/processed/list':
     case '/videos/processed/list/':
       return await handleProcessedVideosEndpoint(env, corsHeaders);
@@ -1404,12 +1609,9 @@ async function handleApiRequest(
       return await handleRecognitionResults(request, env, corsHeaders);
 
     default:
-      // Handle dynamic routes
-      if (path.startsWith('/videos/metadata/dense/')) {
-        return await handleDenseMetadata(path, env, corsHeaders);
-      }
-
-      if (path.startsWith('/videos/metadata/') && !path.includes('/dense/')) {
+      // Handle dynamic routes. Both metadata routes share `handleVideoMetadata`: it
+      // strips either prefix and reads the same `metadata_{id}` key.
+      if (path.startsWith('/videos/metadata/')) {
         return await handleVideoMetadata(path, env, corsHeaders);
       }
 
@@ -1422,8 +1624,8 @@ async function handleApiRequest(
       }
   }
 
-  // Deliberately 404, not 405: ADR 0003 removed the write routes, and a 405 would tell a
-  // caller that a route exists but is gated. Gone must look gone.
+  // Unmatched routes are 404, not 405: a 405 would tell a caller that a route exists but is
+  // gated. Gone must look gone.
 
   return new Response(JSON.stringify({ error: 'API endpoint not found' }), {
     status: 404,
@@ -1434,6 +1636,637 @@ async function handleApiRequest(
 // ============================================
 // API Handler Functions
 // ============================================
+
+// ─── Admin writes: face flags and ground-truth labels ───
+//
+// Both stores are KV documents, mirroring the local API's `flagged_faces.json` and
+// `labels/<video_id>_labels.json`. Every route below calls `requireAccess` FIRST, so the
+// unauthenticated surface stays read-only and never fetches a JWKS.
+
+const FLAGS_KEY = 'flagged_faces';
+const LABEL_PREFIX = 'labels_';
+const LABELS_SCHEMA = 'labels/v2';
+const FLAG_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+const VERDICTS = ['contestant', 'not_a_contestant', 'unsure', 'box_wrong'] as const;
+
+interface FlagRecord {
+  id: string;
+  contestant_id: number;
+  video_id: string;
+  timestamp: number;
+  confidence: number;
+  bbox: unknown[] | null;
+  status: string;
+  user_label: string | null;
+  thumbnail: string | null;
+  created_at: string;
+  flagged_by: string;
+}
+
+interface VideoMetadataShape {
+  video_info?: { processing_date?: string | null };
+  frame_data?: Array<{ detections?: Array<{ tracker_id?: number }> }>;
+}
+
+interface LabelSource {
+  processing_date: string | null;
+  detections: number;
+}
+
+interface CleanLabel {
+  tracker_id: number;
+  verdict: string;
+  contestant_id?: string;
+  note?: string;
+}
+
+/** Fields a flag create accepts; `null`/omitted optional values are normalised here. */
+interface FlagCreateInput {
+  contestant_id: number;
+  video_id: string;
+  timestamp: number;
+  confidence: number;
+  bbox: unknown[] | null;
+  user_label: string | null;
+  thumbnail: string | null;
+}
+
+interface StoredLabels {
+  schema?: unknown;
+  video_id?: unknown;
+  labelled_at?: unknown;
+  source?: unknown;
+  labels?: unknown;
+}
+
+async function readJsonBody(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+function parseFlagCreate(raw: unknown): FlagCreateInput | { error: string } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { error: 'Invalid JSON body' };
+  }
+  const body = raw as Record<string, unknown>;
+  if (typeof body.contestant_id !== 'number' || !Number.isInteger(body.contestant_id)) {
+    return { error: 'contestant_id must be an integer' };
+  }
+  if (typeof body.video_id !== 'string' || body.video_id === '') {
+    return { error: 'video_id must be a non-empty string' };
+  }
+  if (typeof body.timestamp !== 'number' || !Number.isFinite(body.timestamp)) {
+    return { error: 'timestamp must be a number' };
+  }
+  return {
+    contestant_id: body.contestant_id,
+    video_id: body.video_id,
+    timestamp: body.timestamp,
+    confidence: typeof body.confidence === 'number' ? body.confidence : 0,
+    bbox: Array.isArray(body.bbox) ? body.bbox : null,
+    user_label: typeof body.user_label === 'string' ? body.user_label : null,
+    thumbnail: typeof body.thumbnail === 'string' ? body.thumbnail : null,
+  };
+}
+
+function parseFlagStatus(raw: unknown): string | { detail: string } {
+  const status =
+    typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>).status
+      : undefined;
+  if (typeof status !== 'string' || !(FLAG_STATUSES as readonly string[]).includes(status)) {
+    return { detail: `Invalid status: ${typeof status === 'string' ? status : 'missing'}` };
+  }
+  return status;
+}
+
+function parseFlagReassign(raw: unknown): { face_id: string; contestant_id: number } | { error: string } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { error: 'Invalid JSON body' };
+  }
+  const body = raw as Record<string, unknown>;
+  if (typeof body.face_id !== 'string' || body.face_id === '') {
+    return { error: 'face_id must be a non-empty string' };
+  }
+  if (typeof body.contestant_id !== 'number' || !Number.isInteger(body.contestant_id)) {
+    return { error: 'contestant_id must be an integer' };
+  }
+  return { face_id: body.face_id, contestant_id: body.contestant_id };
+}
+
+function parseLabelsPayload(
+  raw: unknown,
+): { source: Record<string, unknown>; labels: unknown[] } | { detail: string } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { detail: 'Invalid JSON body' };
+  }
+  const body = raw as Record<string, unknown>;
+  if (typeof body.source !== 'object' || body.source === null || Array.isArray(body.source)) {
+    return { detail: 'source is required' };
+  }
+  if (!Array.isArray(body.labels)) {
+    return { detail: 'labels must be an array' };
+  }
+  return { source: body.source as Record<string, unknown>, labels: body.labels };
+}
+
+/** Parsed labels document, or null when the stored value is not a JSON object. */
+function parseStoredLabels(stored: string): StoredLabels | null {
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as StoredLabels)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readFlags(env: Env): Promise<FlagRecord[]> {
+  const stored = await env.METADATA_KV.get(FLAGS_KEY);
+  if (!stored) return [];
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as FlagRecord[]) : [];
+  } catch {
+    logger.warn('Could not read flagged_faces — starting with an empty list');
+    return [];
+  }
+}
+
+async function writeFlags(env: Env, flags: FlagRecord[]): Promise<void> {
+  await env.METADATA_KV.put(FLAGS_KEY, JSON.stringify(flags));
+}
+
+/** `PATCH`/`DELETE /api/faces/flagged/{face_id}`. */
+async function handleFlaggedFaceMutation(
+  request: Request,
+  rawFaceId: string,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  let faceId: string;
+  try {
+    faceId = decodeURIComponent(rawFaceId);
+  } catch {
+    return jsonResponse({ error: 'Bad path encoding' }, 400, corsHeaders);
+  }
+
+  if (request.method !== 'PATCH' && request.method !== 'DELETE') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const flags = await readFlags(env);
+  const index = flags.findIndex((flag) => flag.id === faceId);
+  if (index === -1) {
+    return jsonResponse({ error: 'Flagged face not found' }, 404, corsHeaders);
+  }
+
+  if (request.method === 'DELETE') {
+    flags.splice(index, 1);
+    await writeFlags(env, flags);
+    return jsonResponse({ deleted: faceId }, 200, corsHeaders);
+  }
+
+  const status = parseFlagStatus(await readJsonBody(request));
+  if (typeof status !== 'string') {
+    return jsonResponse({ detail: status.detail }, 400, corsHeaders);
+  }
+
+  flags[index].status = status;
+  await writeFlags(env, flags);
+  return jsonResponse(flags[index], 200, corsHeaders);
+}
+
+/** `GET /api/faces/flagged`: thumbnails are large base64 JPEGs, so they are opt-in. */
+async function handleFlagList(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const details = new URL(request.url).searchParams.get('details') === 'true';
+  const flags = await readFlags(env);
+  const flaggedFaces = details
+    ? flags
+    : flags.map((flag) => {
+        const copy: Record<string, unknown> = { ...flag };
+        delete copy.thumbnail;
+        return copy;
+      });
+
+  return jsonResponse({ flagged_faces: flaggedFaces }, 200, corsHeaders);
+}
+
+/** `POST /api/faces/flag`: a human-proposed correction, pending review. */
+async function handleFlagCreate(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const input = parseFlagCreate(await readJsonBody(request));
+  if ('error' in input) {
+    return jsonResponse({ error: input.error }, 400, corsHeaders);
+  }
+
+  const record: FlagRecord = {
+    id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+    contestant_id: input.contestant_id,
+    video_id: input.video_id,
+    timestamp: input.timestamp,
+    confidence: input.confidence,
+    bbox: input.bbox,
+    status: 'pending',
+    user_label: input.user_label,
+    thumbnail: input.thumbnail,
+    created_at: new Date().toISOString(),
+    flagged_by: auth.email,
+  };
+
+  const flags = await readFlags(env);
+  flags.push(record);
+  await writeFlags(env, flags);
+  return jsonResponse(record, 200, corsHeaders);
+}
+
+/** `POST /api/faces/flag/update`: reassign a pending flag to another contestant. */
+async function handleFlagReassign(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const input = parseFlagReassign(await readJsonBody(request));
+  if ('error' in input) {
+    return jsonResponse({ error: input.error }, 400, corsHeaders);
+  }
+
+  const flags = await readFlags(env);
+  const existing = flags.find((flag) => flag.id === input.face_id);
+  if (!existing) {
+    return jsonResponse({ error: 'Flagged face not found' }, 404, corsHeaders);
+  }
+
+  existing.contestant_id = input.contestant_id;
+  existing.status = 'pending';
+  await writeFlags(env, flags);
+  return jsonResponse(existing, 200, corsHeaders);
+}
+
+/** `GET /api/labels`: which videos carry a label set, and how many tracks each labels. */
+async function handleLabelsList(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const entries: Array<{
+    video_id: string;
+    schema: string | null;
+    count: number;
+    labelled_at: string | null;
+    legacy_ignored: boolean;
+  }> = [];
+
+  let cursor: string | undefined;
+  do {
+    const page = await env.METADATA_KV.list({ prefix: LABEL_PREFIX, cursor });
+    for (const key of page.keys) {
+      const stored = await env.METADATA_KV.get(key.name);
+      if (!stored) continue;
+      const parsed = parseStoredLabels(stored);
+      if (!parsed) continue;
+
+      const schema = typeof parsed.schema === 'string' ? parsed.schema : null;
+      const legacy = schema !== LABELS_SCHEMA;
+      entries.push({
+        video_id:
+          typeof parsed.video_id === 'string'
+            ? parsed.video_id
+            : key.name.slice(LABEL_PREFIX.length),
+        schema,
+        count: legacy ? 0 : Array.isArray(parsed.labels) ? parsed.labels.length : 0,
+        labelled_at: typeof parsed.labelled_at === 'string' ? parsed.labelled_at : null,
+        legacy_ignored: legacy,
+      });
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  return jsonResponse({ labels: entries }, 200, corsHeaders);
+}
+
+function metadataSource(data: VideoMetadataShape): LabelSource {
+  const frames = data.frame_data ?? [];
+  return {
+    processing_date: data.video_info?.processing_date ?? null,
+    detections: frames.reduce((total, frame) => total + (frame.detections?.length ?? 0), 0),
+  };
+}
+
+function knownTrackerIds(data: VideoMetadataShape): Set<number> {
+  const ids = new Set<number>();
+  for (const frame of data.frame_data ?? []) {
+    for (const detection of frame.detections ?? []) {
+      const trackerId = detection.tracker_id;
+      if (typeof trackerId === 'number' && Number.isInteger(trackerId) && trackerId >= 0) {
+        ids.add(trackerId);
+      }
+    }
+  }
+  return ids;
+}
+
+function normalizeContestantId(value: unknown): number | null | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
+  return null;
+}
+
+/** Reject anything that does not point at a real track. Loud on purpose, like the local API. */
+function validateLabels(
+  data: VideoMetadataShape,
+  rawLabels: unknown[],
+): { labels: CleanLabel[] } | { detail: string } {
+  const known = knownTrackerIds(data);
+  const seen = new Set<number>();
+  const labels: CleanLabel[] = [];
+
+  for (const raw of rawLabels) {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      return { detail: 'Each label must be an object' };
+    }
+    const labelRecord = raw as Record<string, unknown>;
+
+    const trackerId = labelRecord.tracker_id;
+    if (typeof trackerId !== 'number' || !Number.isInteger(trackerId)) {
+      return { detail: `tracker_id must be an integer, got ${JSON.stringify(trackerId)}` };
+    }
+    if (seen.has(trackerId)) return { detail: `Duplicate label for track ${trackerId}` };
+    seen.add(trackerId);
+
+    if (trackerId < 0) {
+      return { detail: `Track ${trackerId} is untracked; only tracker_id >= 0 can be labelled` };
+    }
+    if (!known.has(trackerId)) {
+      return { detail: `No track ${trackerId} in this video's metadata` };
+    }
+
+    const verdict = labelRecord.verdict;
+    if (typeof verdict !== 'string' || !(VERDICTS as readonly string[]).includes(verdict)) {
+      return {
+        detail: `Unknown verdict ${JSON.stringify(verdict)}; expected one of ${VERDICTS.join(', ')}`,
+      };
+    }
+
+    const contestant = normalizeContestantId(labelRecord.contestant_id);
+    const label: CleanLabel = { tracker_id: trackerId, verdict };
+
+    if (verdict === 'contestant') {
+      if (contestant === undefined) {
+        return { detail: `Track ${trackerId}: verdict 'contestant' needs a contestant_id` };
+      }
+      if (contestant === null || contestant < 1 || contestant > 96) {
+        return { detail: `Unknown contestant ${JSON.stringify(labelRecord.contestant_id)}` };
+      }
+      label.contestant_id = String(contestant);
+    } else if (contestant !== undefined) {
+      return { detail: `Track ${trackerId}: verdict '${verdict}' must not carry a contestant_id` };
+    }
+
+    if (typeof labelRecord.note === 'string') label.note = labelRecord.note;
+    labels.push(label);
+  }
+
+  return { labels };
+}
+
+/** `GET`/`PUT /api/labels/{video_id}`: read or replace one video's track labels. */
+async function handleVideoLabels(
+  request: Request,
+  rawVideoId: string,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  const auth = await requireAccess(request, env, corsHeaders);
+  if (auth instanceof Response) return auth;
+
+  if (request.method !== 'GET' && request.method !== 'PUT') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  let videoId: string;
+  try {
+    videoId = decodeURIComponent(rawVideoId);
+  } catch {
+    return jsonResponse({ detail: 'Bad path encoding' }, 400, corsHeaders);
+  }
+  if (!videoId || videoId.includes('/') || videoId.includes('..')) {
+    return jsonResponse({ detail: 'Invalid video_id' }, 400, corsHeaders);
+  }
+
+  const storedMetadata = await env.METADATA_KV.get(`metadata_${videoId}`);
+  if (!storedMetadata) {
+    return jsonResponse({ detail: `Metadata not found for ${videoId}` }, 404, corsHeaders);
+  }
+
+  let data: VideoMetadataShape;
+  try {
+    const parsed: unknown = JSON.parse(storedMetadata);
+    data = typeof parsed === 'object' && parsed !== null ? (parsed as VideoMetadataShape) : {};
+  } catch {
+    return jsonResponse({ detail: `Metadata for ${videoId} could not be read` }, 500, corsHeaders);
+  }
+
+  const current = metadataSource(data);
+  const labelKey = `${LABEL_PREFIX}${videoId}`;
+
+  if (request.method === 'GET') {
+    const empty = {
+      schema: LABELS_SCHEMA,
+      video_id: videoId,
+      labelled_at: null as string | null,
+      source: current,
+      labels: [] as CleanLabel[],
+      legacy_ignored: false,
+    };
+
+    const storedLabels = await env.METADATA_KV.get(labelKey);
+    if (!storedLabels) return jsonResponse(empty, 200, corsHeaders);
+
+    const parsed = parseStoredLabels(storedLabels);
+    if (!parsed) {
+      return jsonResponse(
+        { detail: `Could not read ${labelKey}: not a JSON object` },
+        500,
+        corsHeaders,
+      );
+    }
+
+    if (parsed.schema !== LABELS_SCHEMA) {
+      const schemaLabel = typeof parsed.schema === 'string' ? parsed.schema : 'unknown';
+      return jsonResponse(
+        {
+          ...empty,
+          legacy_ignored: true,
+          legacy_detail:
+            `${labelKey} uses schema ${schemaLabel} (per-detection frame_number/detection_index ` +
+            'labels). It was ignored and left untouched: those keys cannot be mapped onto tracker ' +
+            'ids. Re-label the tracks to write labels/v2.',
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const storedSource: Partial<LabelSource> =
+      typeof parsed.source === 'object' && parsed.source !== null && !Array.isArray(parsed.source)
+        ? (parsed.source as Partial<LabelSource>)
+        : {};
+    if (
+      storedSource.processing_date !== current.processing_date ||
+      storedSource.detections !== current.detections
+    ) {
+      return jsonResponse(
+        {
+          detail:
+            `Labels were made against a different metadata run (labels: ${JSON.stringify(
+              storedSource,
+            )}, current: ${JSON.stringify(current)}). They were not loaded: a reprocess renumbers ` +
+            'and re-scores detections, so the keys no longer mean the same tracks.',
+        },
+        409,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse({ ...parsed, legacy_ignored: false }, 200, corsHeaders);
+  }
+
+  const payload = parseLabelsPayload(await readJsonBody(request));
+  if ('detail' in payload) {
+    return jsonResponse({ detail: payload.detail }, 400, corsHeaders);
+  }
+
+  if (
+    payload.source.processing_date !== current.processing_date ||
+    payload.source.detections !== current.detections
+  ) {
+    return jsonResponse({ detail: 'Refusing labels for stale metadata run' }, 409, corsHeaders);
+  }
+
+  const validation = validateLabels(data, payload.labels);
+  if ('detail' in validation) {
+    return jsonResponse({ detail: validation.detail }, 400, corsHeaders);
+  }
+
+  const record = {
+    schema: LABELS_SCHEMA,
+    video_id: videoId,
+    labelled_at: new Date().toISOString(),
+    labelled_by: auth.email,
+    source: current,
+    labels: validation.labels,
+  };
+  await env.METADATA_KV.put(labelKey, JSON.stringify(record));
+
+  return jsonResponse(
+    { saved: true, count: validation.labels.length, path: `kv:${labelKey}` },
+    200,
+    corsHeaders,
+  );
+}
+
+/** `GET /api/faces/crop`: pre-extracted crop from R2, or 404 so the UI falls back to canvas. */
+async function handleFaceCrop(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const url = new URL(request.url);
+  const videoId = url.searchParams.get('video_id');
+  const frameNumber = url.searchParams.get('frame_number');
+  const detectionIndex = url.searchParams.get('detection_index') ?? '0';
+
+  if (!videoId || !frameNumber) {
+    return jsonResponse({ error: 'video_id and frame_number are required' }, 400, corsHeaders);
+  }
+  if (!/^\d+$/.test(frameNumber) || !/^\d+$/.test(detectionIndex)) {
+    return jsonResponse({ error: 'frame_number and detection_index must be integers' }, 400, corsHeaders);
+  }
+
+  const key = `crops/${videoId}/${frameNumber}_${detectionIndex}.jpg`;
+  const object = await env.VIDEOS_BUCKET.get(key);
+  if (!object) {
+    return jsonResponse({ error: 'crop not found' }, 404, corsHeaders);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'image/jpeg',
+      'Content-Length': String(object.size),
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
+}
+
+/** `/api/embedding/*`: the published coverage/similarity documents, straight from KV. */
+async function handleEmbeddingRead(
+  request: Request,
+  env: Env,
+  corsHeaders: CorsHeaders,
+  key: string,
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
+
+  const data = await env.METADATA_KV.get(key);
+  if (!data) {
+    return jsonResponse({ error: `${key} not found` }, 404, corsHeaders);
+  }
+
+  return new Response(data, {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 async function handleVideosEndpoint(env: Env, corsHeaders: CorsHeaders): Promise<Response> {
   // Try to get optimized video list from KV storage first
@@ -1680,6 +2513,32 @@ async function handleFaceDetection(
   );
 }
 
+type FrameDetections = {
+  frame_number?: number;
+  detections?: Array<{ bbox?: number[] }>;
+};
+
+/** Boxes are copied verbatim from the detection, so float equality with slack is enough. */
+function sameBbox(left: number[] | undefined, right: number[] | undefined): boolean {
+  if (!left || !right || left.length !== 4 || right.length !== 4) return false;
+  return left.every((value, index) => Math.abs(value - right[index]) < 1e-6);
+}
+
+/**
+ * `contestant_timeline` keeps a face's box but not its position in the frame's detection list —
+ * which is exactly what `/api/faces/crop` keys on. Matching the box back recovers the index;
+ * duplicate boxes resolve to the first, and an unmatched box yields `undefined` so the client
+ * falls back to cropping the reel itself.
+ */
+function findDetectionIndex(
+  detections: Array<{ bbox?: number[] }> | undefined,
+  bbox: number[] | undefined,
+): number | undefined {
+  if (!detections) return undefined;
+  const index = detections.findIndex((detection) => sameBbox(detection.bbox, bbox));
+  return index === -1 ? undefined : index;
+}
+
 async function handleRecognitionResults(
   request: Request,
   env: Env,
@@ -1714,12 +2573,20 @@ async function handleRecognitionResults(
     metadataKeys = listing.keys.map((k) => k.name);
   }
 
-  type Appearance = { timestamp?: number; match_score?: number; frame_number?: number };
+  type Appearance = {
+    timestamp?: number;
+    match_score?: number;
+    frame_number?: number;
+    bbox?: number[];
+    detection_index?: number;
+  };
   const results: Array<{
     video_id: string;
     timestamp: number;
     match_score: number;
     frame_number?: number;
+    bbox?: number[];
+    detection_index?: number;
   }> = [];
 
   for (const key of metadataKeys) {
@@ -1728,16 +2595,40 @@ async function handleRecognitionResults(
     try {
       const parsed = JSON.parse(stored) as {
         contestant_timeline?: Record<string, { appearances?: Appearance[] }>;
+        frame_data?: FrameDetections[];
       };
       const entry = parsed.contestant_timeline?.[contestantIdFilter];
       if (!entry?.appearances) continue;
       const videoId = videoIdFilter || key.replace('metadata_', '');
+
+      // Built on first use: `frame_data` is the bulk of a 1–3 MB document, and a contestant with
+      // no appearances should not pay to index it.
+      let framesByNumber: Map<number, FrameDetections['detections']> | null = null;
+      const detectionsOf = (frameNumber: number | undefined) => {
+        if (frameNumber === undefined) return undefined;
+        if (!framesByNumber) {
+          framesByNumber = new Map();
+          for (const frame of parsed.frame_data ?? []) {
+            if (typeof frame.frame_number === 'number') {
+              framesByNumber.set(frame.frame_number, frame.detections ?? []);
+            }
+          }
+        }
+        return framesByNumber.get(frameNumber);
+      };
+
       for (const appearance of entry.appearances) {
+        const detectionIndex =
+          typeof appearance.detection_index === 'number'
+            ? appearance.detection_index
+            : findDetectionIndex(detectionsOf(appearance.frame_number), appearance.bbox);
         results.push({
           video_id: videoId,
           timestamp: appearance.timestamp ?? 0,
           match_score: appearance.match_score ?? 0,
           frame_number: appearance.frame_number,
+          bbox: appearance.bbox,
+          detection_index: detectionIndex,
         });
       }
     } catch {
@@ -1761,12 +2652,17 @@ async function handleRecognitionResults(
 
 // Admin Endpoints
 
-async function handleDenseMetadata(
+/**
+ * `/videos/metadata/{id}` and `/videos/metadata/dense/{id}` are one read: both return
+ * the `metadata_{id}` blob verbatim. A single handler strips either prefix, so the two
+ * routes cannot drift apart.
+ */
+async function handleVideoMetadata(
   path: string,
   env: Env,
   corsHeaders: CorsHeaders,
 ): Promise<Response> {
-  let videoId = path.replace('/videos/metadata/dense/', '');
+  let videoId = path.replace(/^\/videos\/metadata\/(?:dense\/)?/, '');
 
   try {
     videoId = decodeURIComponent(videoId);
@@ -1777,43 +2673,15 @@ async function handleDenseMetadata(
   // Ticket 007 Q1: the key is the full video id from processed_videos_list, so a
   // numeric prefix can never serve another reel's metadata.
   const key = `metadata_${videoId}`;
-  const storedDenseMetadata = await env.METADATA_KV?.get(key);
+  const storedMetadata = await env.METADATA_KV?.get(key);
 
-  if (storedDenseMetadata) {
-    return new Response(storedDenseMetadata, {
+  if (storedMetadata) {
+    return new Response(storedMetadata, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
   // No mock, no dead key fallback (ticket 007 Q2): a missing reel fails loudly.
-  return new Response(JSON.stringify({ error: 'metadata not found', key }), {
-    status: 404,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-async function handleVideoMetadata(
-  path: string,
-  env: Env,
-  corsHeaders: CorsHeaders,
-): Promise<Response> {
-  let videoId = path.replace('/videos/metadata/', '');
-
-  try {
-    videoId = decodeURIComponent(videoId);
-  } catch {
-    // If decoding fails, use as-is
-  }
-
-  const key = `metadata_${videoId}`;
-  const storedVideoMetadata = await env.METADATA_KV?.get(key);
-
-  if (storedVideoMetadata) {
-    return new Response(storedVideoMetadata, {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   return new Response(JSON.stringify({ error: 'metadata not found', key }), {
     status: 404,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1957,8 +2825,13 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
       });
     }
 
-    logger.debug(`SPA route detected, serving index.html for: ${finalPath}`);
-    return new Response(embeddedAssets['index.html'], {
+    // Two SPAs share this origin: the viewer at the root, the admin under /admin.
+    // Anything under /admin that is not a file resolves to the admin shell.
+    const spaFallback =
+      assetKey === 'admin' || assetKey.startsWith('admin/') ? 'admin/index.html' : 'index.html';
+
+    logger.debug(`SPA route detected, serving ${spaFallback} for: ${finalPath}`);
+    return new Response(embeddedAssets[spaFallback], {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/html; charset=utf-8',

@@ -10,6 +10,8 @@ import { Contestants } from '@/pages/Contestants';
 import { Flagging } from '@/pages/Flagging';
 import { Labelling } from '@/pages/Labelling';
 import { Processing } from '@/pages/Processing';
+import { Analytics } from '@/pages/Analytics';
+import { SystemAdmin } from '@/pages/SystemAdmin';
 import './app.css';
 
 const queryClient = new QueryClient({
@@ -24,24 +26,18 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename="/admin">
         <Routes>
           <Route element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="player" element={<Player />} />
             <Route path="contestants" element={<Contestants />} />
-            <Route
-              path="analytics"
-              element={<div className="text-carbon-soft">Analytics — coming soon</div>}
-            />
+            <Route path="analytics" element={<Analytics />} />
             <Route path="flagging" element={<Flagging />} />
             <Route path="labelling" element={<Labelling />} />
             <Route path="processing" element={<Processing />} />
             <Route path="embedding-workbench" element={<EmbeddingWorkbench />} />
-            <Route
-              path="admin"
-              element={<div className="text-carbon-soft">Admin — coming soon</div>}
-            />
+            <Route path="admin" element={<SystemAdmin />} />
           </Route>
         </Routes>
       </BrowserRouter>

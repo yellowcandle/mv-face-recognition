@@ -152,7 +152,7 @@ export function Contestants() {
               </span>
               <span className="h-[42px] w-[38px] shrink-0 overflow-hidden border border-carbon/35 bg-paper-dark">
                 <img
-                  src={`/api/contestants/${c.id}/photo`}
+                  src={c.portrait_url ?? `/api/contestants/${c.id}/thumb/face`}
                   alt=""
                   className="h-full w-full object-cover"
                   onError={(e) => {
@@ -209,7 +209,10 @@ export function Contestants() {
             <div className="mt-3 flex flex-row gap-4">
               <div className="h-[132px] w-[112px] shrink-0 overflow-hidden border border-carbon bg-paper-dark">
                 <img
-                  src={`/api/contestants/${selectedContestant.id}/photo`}
+                  src={
+                    selectedContestant.portrait_url ??
+                    `/api/contestants/${selectedContestant.id}/thumb/face`
+                  }
                   alt={selectedContestant.name}
                   className="h-full w-full object-cover"
                   onError={(e) => {

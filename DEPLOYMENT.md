@@ -2,8 +2,9 @@
 
 > **Retired surface (2026-10-22).** The FastAPI `backend/` tree, its `Dockerfile`, the Heroku
 > `Procfile` and the four ad-hoc upload scripts are gone. The deployable product is the
-> Cloudflare Worker in `worker/` (API + embedded viewer build), the KV read model it serves,
-> and the encodes in R2. The admin app is a local back office and is not deployed.
+> Cloudflare Worker in `worker/` (API + both embedded SPAs), the KV read model it serves,
+> and the encodes in R2. The admin app is embedded at `/admin` on the same Worker origin and
+> sits behind a Cloudflare Access application.
 
 ## What gets written
 
@@ -29,8 +30,8 @@ more; the Worker's remaining reads of them are fallbacks, not the contract.
 ## Steps
 
 ```bash
-# 1. Build the viewer and embed it into the Worker
-npm run build            # pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js
+# 1. Build the viewer and the admin, and embed both into the Worker
+npm run build            # pnpm --filter @mv/viewer build && pnpm --filter @mv/admin build && node scripts/update-worker-assets.js
 
 # 2. Stage and validate the read model (no writes), then publish to KV
 npm run publish:metadata
@@ -66,6 +67,8 @@ curl -sI -H 'Range: bytes=0-1023' "https://<worker-host>/videos/processed_videos
 ```
 
 Then open the Worker host in a browser: 圖庫 lists the reels, 點唱單 plays one and draws boxes.
+`/admin` serves the back office from the same origin; it answers 302 to Cloudflare Access
+until the session exists, so a `curl` on that path is expected to redirect rather than 200.
 
 ## Inspecting KV and R2
 
