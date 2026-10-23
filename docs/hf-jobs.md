@@ -52,6 +52,10 @@ Measured on `test-video-mv2`: detection 3m45s → 18s, but encoding 1080p/720p s
 CPU (~4 min), so the whole job is ~6 min at $1/h. For the five reels that projects to
 ~$0.60 each; `cpu-upgrade` is ~$0.05 each. Use GPU when wall-clock matters.
 
+GPU runs assert the provider: `install()` builds a one-node model and exits non-zero when the
+session did not get `CUDAExecutionProvider` (ONNX Runtime otherwise falls back to CPU silently,
+billing GPU hours at CPU speed — #86).
+
 Manual single stage:
 
 ```bash

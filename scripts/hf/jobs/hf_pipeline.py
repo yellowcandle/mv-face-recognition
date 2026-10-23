@@ -65,6 +65,9 @@ graph = helper.make_graph(
     [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])],
 )
 model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+# `onnx` writes the newest IR it knows; onnxruntime-gpu 1.22 refuses anything above 10.
+model.ir_version = 10
+print("onnxruntime providers available:", ort.get_available_providers(), flush=True)
 session = ort.InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
 active = session.get_providers()
 print("onnxruntime providers:", active, flush=True)
