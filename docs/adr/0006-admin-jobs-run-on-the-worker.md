@@ -45,8 +45,9 @@ read-only test apply to these routes unchanged.
   `initial` (reels) and `embedding-update` get a GPU, because both run detection; a
   `coverage-refresh` stays on `cpu-upgrade`. `GPU_MODES` holds that decision in code and
   `HF_JOBS_GPU_FLAVOR` / `HF_JOBS_CPU_FLAVOR` tune it. A GPU hour costs about 20x a CPU hour,
-  and a full reel still spends most of its wall clock in the CPU-side rendition encode, so a GPU
-  buys detection time only (#86). A stuck queued record is a bill, so the UI must show a
+  and detection is what pays for it: on `cpu-upgrade` a reel spends 83 of its 98 minutes in
+  `detect_recognize` and 15 in the rendition encode, while a GPU does the same detection in
+  minutes (#86). A stuck queued record is a bill, so the UI must show a
   terminal state, and a dispatch failure must land as `failed` with the upstream message — never
   a silent `queued`.
 - **No delete on the Hub.** HF Jobs exposes create, read and cancel, but no delete for regular
