@@ -23,6 +23,7 @@ import {
   buildJobSpec,
   cancelHfJob,
   fetchHfStage,
+  flavorFor,
   mapStage,
   submitHfJob,
   videoIdFromFilename,
@@ -51,10 +52,10 @@ interface Env {
   HF_JOBS_NAMESPACE?: string;
   HF_JOBS_BUCKET?: string;
   HF_JOBS_REF?: string;
-  /** Cache rebuild flavor (`cpu-upgrade` by default). */
-  HF_JOBS_FLAVOR?: string;
-  /** Reel run flavor (`a10g-small` by default): detection over every frame needs the GPU. */
-  HF_JOBS_VIDEO_FLAVOR?: string;
+  /** Flavor for jobs that do not need a GPU (`cpu-upgrade` by default). */
+  HF_JOBS_CPU_FLAVOR?: string;
+  /** Flavor for GPU jobs — reels and embedding rebuilds (`a10g-small` by default). */
+  HF_JOBS_GPU_FLAVOR?: string;
 }
 
 /**
@@ -2301,8 +2302,7 @@ async function handleJobTrigger(
     videoId,
     ref: env.HF_JOBS_REF ?? HF_JOBS_DEFAULTS.ref,
     bucket: env.HF_JOBS_BUCKET ?? HF_JOBS_DEFAULTS.bucket,
-    cacheFlavor: env.HF_JOBS_FLAVOR ?? HF_JOBS_DEFAULTS.cacheFlavor,
-    videoFlavor: env.HF_JOBS_VIDEO_FLAVOR ?? HF_JOBS_DEFAULTS.videoFlavor,
+    flavor: flavorFor(mode, env),
   });
   const dispatch = await submitHfJob(env, spec);
 
