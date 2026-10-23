@@ -304,9 +304,9 @@ export function Processing() {
   async function clearCompleted() {
     try {
       const res = await adminFetch('/admin/api/processing/clear-completed', { method: 'POST' });
-      if (res.ok) {
-        setJobs((prev) => prev.filter((j) => j.status !== 'completed'));
-      }
+      // The server drops every terminal record (completed, failed, cancelled); a local filter
+      // would keep the rows it disagrees about until the next poll.
+      if (res.ok) await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to clear completed jobs');
     }
