@@ -83,10 +83,23 @@ displays **recognitions** and never writes. Anything it can do, an anonymous str
 _Avoid_: frontend, the app, the dashboard
 
 **Admin**:
-The local-only app (`apps/admin`), served by Vite against `local_api.py` on localhost. Every
-operation that writes — **flagging**, reprocessing, the embedding workbench — lives here and
-is never deployed.
+The back-office app (`apps/admin`), served two ways: by Vite against `local_api.py` on
+localhost, and at `/admin` on the Worker behind Cloudflare Access. Reads are shared with the
+**Viewer**; writes split — **flags**, **label sets** and **processing jobs** go to Worker KV
+when deployed, and a deployed **processing job** dispatches the pipeline to HF Jobs. Embedding
+rebuilds that read local files still only happen against `local_api.py`. It is never public:
+anonymous requests to the gated routes get 401.
 _Avoid_: dashboard, backend, the tool
+
+### Operations
+
+**Processing job**:
+One dispatch of the pipeline — a whole reel, an embedding rebuild, or a coverage refresh —
+identified by an 8-hex id and a lifecycle of queued → running → completed | failed | cancelled.
+The job record is what the **Admin** reads and what survives the request that started it; the
+HF Jobs run behind it is an implementation detail.
+_Avoid_: task, batch, queue item — a job is one record with one status; "queue" names the
+ordering of pending jobs, not the record itself.
 
 ### Geometry
 

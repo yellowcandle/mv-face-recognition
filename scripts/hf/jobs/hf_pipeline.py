@@ -51,6 +51,30 @@ ENV = {
     "UV_CACHE_DIR": "/tmp/uv-cache",
 }
 
+# A CUDA provider that cannot load degrades to CPU silently. Build a one-node model and ask the
+# session which provider it actually got, so a misconfigured GPU run dies instead of billing.
+GPU_CHECK = """
+import onnx
+import onnxruntime as ort
+from onnx import TensorProto, helper
+
+graph = helper.make_graph(
+    [helper.make_node("Identity", ["x"], ["y"])],
+    "gpu-check",
+    [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
+    [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])],
+)
+model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+# `onnx` writes the newest IR it knows; onnxruntime-gpu 1.22 refuses anything above 10.
+model.ir_version = 10
+print("onnxruntime providers available:", ort.get_available_providers(), flush=True)
+session = ort.InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
+active = session.get_providers()
+print("onnxruntime providers:", active, flush=True)
+if "CUDAExecutionProvider" not in active:
+    raise SystemExit(f"CUDAExecutionProvider unavailable; ONNX Runtime chose {active}")
+"""
+
 
 def prepare_home() -> None:
     home = Path(ENV["HOME"])
@@ -100,6 +124,9 @@ def install(repo: Path) -> Path:
         if lib_dirs:
             existing = ENV.get("LD_LIBRARY_PATH", "")
             ENV["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else []))
+        # ONNX Runtime falls back to CPU without failing when CUDA cannot initialise, which
+        # bills GPU hours at CPU speed (#86). Create one real session and stop if it did.
+        run([str(python), "-c", GPU_CHECK], cwd=mvp)
     return python
 
 

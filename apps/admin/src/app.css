@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Tailwind 4 discovers sources from the Vite root, which is this app — the shared package sits
+   outside it, so utilities used only there (the Masthead's gap, the Button's disabled opacity)
+   were never emitted. Scan it explicitly. */
+@source '../../shared';
+
 /* 存根 — the office copy of the request slip. Same paper, one step dirtier. */
 @theme {
   --font-sans: 'Noto Sans TC', system-ui, sans-serif;

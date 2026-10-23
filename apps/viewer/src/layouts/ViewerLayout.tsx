@@ -1,68 +1,58 @@
-import { Outlet, NavLink } from 'react-router';
+import { NavLink, Outlet } from 'react-router';
 
-/**
- * The spine is the route rail: the slip's folios. 01 圖庫 · 02 播放 · 03 名冊 · 04 紀錄.
- * One punched strip, no top navigation bar — the form owns the frame.
- */
-const folios = [
-  { to: '/', no: '01', label: '圖庫', latin: 'LIBRARY' },
-  { to: '/player', no: '02', label: '播放', latin: 'PLAYER' },
-  { to: '/cast', no: '03', label: '名冊', latin: 'CAST' },
-  { to: '/analytics', no: '04', label: '紀錄', latin: 'LEDGER' },
+const NAV = [
+  { to: '/', label: '首頁', hint: '選片入口 · 點唱單', latin: 'HOME' },
+  { to: '/player', label: '播放', hint: '看片、人臉框與時間軸', latin: 'PLAYER' },
+  { to: '/analytics', label: '紀錄', hint: '唯讀的辨識結果帳冊', latin: 'LEDGER' },
+  { to: '/cast', label: '名冊', hint: '參賽者、參考照與出場次數', latin: 'CAST' },
 ];
 
+/**
+ * One printed slip, read page by page: a hairline index across the top, the folio below.
+ * The old punched spine took 76px of every page for four links.
+ */
 export function ViewerLayout() {
   return (
-    <div className="flex h-full flex-row bg-paper">
-      <nav className="flex w-[76px] shrink-0 flex-col items-center justify-between border-r border-carbon/30 bg-paper-dark py-8">
-        <div className="flex flex-col items-center gap-6">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="h-[22px] w-[22px] rounded-full border border-carbon/35 bg-paper-deep shadow-[inset_0_1px_2px_rgba(43,47,107,0.25)]"
-            />
-          ))}
-        </div>
-
-        <div className="flex flex-col items-center gap-7">
-          {folios.map((f) => (
+    <div className="flex h-full flex-col bg-paper">
+      <header className="flex shrink-0 flex-row items-center justify-between border-b border-carbon/30 px-14 py-3">
+        <span className="font-mono text-[9px] tracking-[0.3em] text-carbon-soft">MVFR</span>
+        <nav className="flex flex-row items-center gap-8">
+          {NAV.map((item) => (
             <NavLink
-              key={f.to}
-              to={f.to}
-              end={f.to === '/'}
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
               className={({ isActive }) =>
-                `group flex w-full flex-col items-center gap-1 ${isActive ? '' : 'opacity-70 hover:opacity-100'}`
+                `flex flex-col gap-0.5 ${isActive ? '' : 'opacity-60 hover:opacity-100'}`
               }
             >
               {({ isActive }) => (
                 <>
-                  <span
-                    className={`font-mono text-[19px] leading-none tracking-tight ${
-                      isActive ? 'text-stamp' : 'text-carbon'
-                    }`}
-                  >
-                    {f.no}
+                  <span className="flex flex-row items-baseline gap-2">
+                    <span
+                      className={`font-serif text-[13px] font-bold ${
+                        isActive ? 'text-carbon-deep' : 'text-ledger'
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                    <span
+                      className={`font-mono text-[8px] tracking-[0.22em] ${
+                        isActive ? 'text-stamp' : 'text-ledger'
+                      }`}
+                    >
+                      {item.latin}
+                    </span>
                   </span>
-                  <span
-                    className={`font-kai text-[12px] leading-none ${
-                      isActive ? 'text-carbon-deep' : 'text-carbon-soft'
-                    }`}
-                  >
-                    {f.label}
-                  </span>
-                  <span
-                    className={`mt-1 h-[3px] w-4 ${isActive ? 'bg-stamp' : 'bg-transparent'}`}
-                  />
+                  <span className="font-kai text-[9px] leading-none text-ledger">{item.hint}</span>
                 </>
               )}
             </NavLink>
           ))}
-        </div>
+        </nav>
+      </header>
 
-        <div className="font-mono text-[9px] tracking-[0.22em] text-carbon-soft">MVFR</div>
-      </nav>
-
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <Outlet />
       </main>
     </div>

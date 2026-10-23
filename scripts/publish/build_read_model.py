@@ -491,6 +491,42 @@ def build_roster(
     return roster
 
 
+def build_coverage(
+    roster: list[dict[str, Any]], payloads: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """The coverage report the Embedding Workbench reads.
+
+    Same shape `generate_coverage()` returns (contestants + summary), built from the
+    roster and payloads already normalised above so the numbers match what shipped in
+    `contestants_structured` instead of a second scan of the metadata directory.
+    """
+    good = sum(1 for r in roster if r["quality"] == "good")
+    weak = sum(1 for r in roster if r["quality"] == "weak")
+    missing = sum(1 for r in roster if r["quality"] == "missing")
+    scored = [r["avg_match_score"] for r in roster if r["avg_match_score"] > 0]
+    avg_score = round(sum(scored) / len(scored), 4) if scored else 0.0
+    total_det = sum(
+        p["processing_summary"]["total_faces_detected"] for p in payloads.values()
+    )
+    total_rec = sum(
+        p["processing_summary"]["total_recognitions"] for p in payloads.values()
+    )
+    rate = round(total_rec / total_det, 6) if total_det > 0 else 0.0
+    return {
+        "contestants": roster,
+        "summary": {
+            "total": len(roster),
+            "good": good,
+            "weak": weak,
+            "missing": missing,
+            "avg_match_score": avg_score,
+            "recognition_rate": rate,
+            "total_faces_detected": total_det,
+            "total_faces_recognized": total_rec,
+        },
+    }
+
+
 def wrangler(*args: str) -> bool:
     # The namespace has a preview id too; `--preview false` is required to write the
     # production namespace from a non-interactive shell.
@@ -643,6 +679,48 @@ def main() -> int:
         f"(good {by_quality.get('good', 0)}, weak {by_quality.get('weak', 0)}, "
         f"missing {by_quality.get('missing', 0)}); no references: {no_refs}"
     )
+
+    # Coverage is derived from the same roster, so it cannot disagree with the KV roster.
+    coverage = build_coverage(roster, payloads)
+    coverage_path = os.path.join(STAGE, "embedding_coverage.json")
+    data_coverage_path = os.path.join(REPO, "data/coverage.json")
+    for path in (coverage_path, data_coverage_path):
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(coverage, f, ensure_ascii=False, separators=(",", ":"))
+        except OSError as exc:
+            sys.exit(f"cannot write {path}: {exc}")
+    summary = coverage["summary"]
+    print(
+        f"  coverage: {summary['good']} good, {summary['weak']} weak, "
+        f"{summary['missing']} missing of {summary['total']}; "
+        f"recognition rate {summary['recognition_rate']}"
+    )
+
+    # Similarity inputs are produced by the embedding scripts, not by this publisher; stage
+    # them verbatim when present so the Workbench reads them from the same origin.
+    similarity_sources = (
+        ("embedding_similarity_matrix.json", "data/similarity_matrix.json"),
+        ("embedding_top_pairs.json", "data/top_pairs.json"),
+    )
+    for stage_name, data_name in similarity_sources:
+        source = os.path.join(REPO, data_name)
+        if not os.path.exists(source):
+            print(f"  skip {stage_name}: {data_name} not present")
+            continue
+        try:
+            with open(source, encoding="utf-8") as f:
+                document = json.load(f)
+        except (OSError, ValueError) as exc:
+            sys.exit(f"cannot read {source}: {exc}")
+        staged = os.path.join(STAGE, stage_name)
+        try:
+            with open(staged, "w", encoding="utf-8") as f:
+                json.dump(document, f, ensure_ascii=False, separators=(",", ":"))
+        except OSError as exc:
+            sys.exit(f"cannot write {staged}: {exc}")
+        print(f"  staged {stage_name}")
+
     if not args.publish:
         print("dry run: nothing written to KV")
         return 0
@@ -690,6 +768,31 @@ def main() -> int:
     ):
         return 1
     print("  put processed_videos_list")
+
+    # The Workbench reads these three through `/api/embedding/*`; stage names match the
+    # KV keys so the loop stays mechanical.
+    for key in (
+        "embedding_coverage",
+        "embedding_similarity_matrix",
+        "embedding_top_pairs",
+    ):
+        staged_path = os.path.join(STAGE, f"{key}.json")
+        if not os.path.exists(staged_path):
+            print(f"  skip {key}: not staged")
+            continue
+        if not wrangler(
+            "kv",
+            "key",
+            "put",
+            key,
+            "--path",
+            staged_path,
+            "--binding",
+            "METADATA_KV",
+            "--remote",
+        ):
+            return 1
+        print(f"  put {key}")
     return 0
 
 

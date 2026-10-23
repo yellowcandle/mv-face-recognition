@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BAND_STAMP,
   Masthead,
+  adminFetch,
   bandFor,
   formatMmSs,
   useContestants,
@@ -179,7 +180,7 @@ export function Flagging() {
 
   async function updateFaceStatus(faceId: string, status: 'accepted' | 'rejected') {
     try {
-      const res = await fetch(`/api/faces/flagged/${faceId}`, {
+      const res = await adminFetch(`/admin/api/faces/flagged/${faceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -200,7 +201,7 @@ export function Flagging() {
   async function reassignFace() {
     if (!focused || !reassignTo) return;
     try {
-      const res = await fetch('/api/faces/flag/update', {
+      const res = await adminFetch('/admin/api/faces/flag/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),
@@ -231,7 +232,7 @@ export function Flagging() {
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
       <Masthead
         eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
-        title="存根"
+        title="待核"
         latin="OFFICE COPY · WRITABLE"
         size="md"
       >
@@ -531,18 +532,22 @@ export function Flagging() {
                   <div className="mt-1 h-px bg-carbon/20" />
 
                   {/* Three reference slots. The only reference-image route is
-                      GET /api/contestants/{id}/photo, which serves the contestant's FIRST photo by
-                      filename — not ranked by cosine: no endpoint returns per-reference embeddings
-                      or scores for a flag, so "nearest" cannot be computed here. Slot 1 is that real
-                      photo; slots 2–3 are marked unavailable rather than filled.
-                      `reference_count` (GET /api/contestants) is how many exist on file. */}
+                      GET /api/contestants/{id}/thumb/face (or the published `portrait_url`), which
+                      serves the contestant's FIRST photo by filename — not ranked by cosine: no
+                      endpoint returns per-reference embeddings or scores for a flag, so "nearest"
+                      cannot be computed here. Slot 1 is that real photo; slots 2–3 are marked
+                      unavailable rather than filled. `reference_count` (GET /api/contestants) is
+                      how many exist on file. */}
                   <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
                     REFERENCES · {focusedContestant?.reference_count ?? 0} ON FILE
                   </span>
                   <div className="flex flex-row gap-1.5">
                     <div className="h-[54px] w-[46px] overflow-hidden border border-carbon/45 bg-paper-dark">
                       <img
-                        src={`/api/contestants/${focused.contestant_id}/photo`}
+                        src={
+                          focusedContestant?.portrait_url ??
+                          `/api/contestants/${focused.contestant_id}/thumb/face`
+                        }
                         alt={focusedContestant?.name ?? ''}
                         className="h-full w-full object-cover"
                         onError={(e) => {

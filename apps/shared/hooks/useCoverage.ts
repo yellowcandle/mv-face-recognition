@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CoverageData } from '../types';
 
-export function useCoverage() {
+export function useCoverage(apiBase = '') {
   return useQuery<CoverageData>({
     queryKey: ['coverage'],
     queryFn: async () => {
-      const res = await fetch('/data/coverage.json');
+      const res = await fetch(`${apiBase}/api/embedding/coverage`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },

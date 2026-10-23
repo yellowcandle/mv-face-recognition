@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
   BAND_STAMP,
-  Masthead,
   VideoCanvas,
   bandFor,
   formatMmSs,
@@ -122,78 +121,35 @@ export function PlayerPage() {
   }, []);
 
   const total = Math.max(96, contestants.length);
-  const headline = matched[0] ? nameOf(matched[0]) : '—';
-  const programme = video ? (video.name.split(/[《》]/)[1] ?? video.name) : '—';
+  const summary = meta.metadata?.processing_summary;
   const reel = video ? (video.name.split('：').pop() ?? video.name) : '—';
-  const headlineScore = matched[0]?.match_score ?? null;
-  const headlineBand = headlineScore == null ? null : bandFor(headlineScore);
 
   return (
     <div className="flex min-h-0 flex-1 flex-row">
-      <div className="flex min-w-0 flex-1 flex-col px-10 pb-6 pt-7">
-        {/* Masthead */}
-        <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="點唱單" latin="REQUEST SLIP">
-          <div className="flex flex-col items-end gap-0.5 pb-0.5">
-            <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">FILED</span>
-            <span className="font-mono text-[12px] tracking-[0.08em] text-carbon">
-              REEL {video?.id ?? '—'} · {formatMmSs(duration)}
+      <div className="flex min-w-0 flex-1 flex-col px-14 pb-6 pt-7">
+        <div className="flex flex-row items-center justify-between pb-4">
+          <div className="flex flex-row items-baseline gap-4">
+            <Link to="/" className="font-mono text-[14px] text-ledger hover:text-stamp">
+              ←
+            </Link>
+            <h1 className="font-serif text-[26px] font-black leading-none text-carbon-deep">
+              播放
+            </h1>
+            <span className="font-mono text-[10px] tracking-[0.2em] text-ledger">
+              REEL {video?.id.split('-')[0] ?? '—'} · {reel}
             </span>
           </div>
-          <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
-            <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">
-              已核對
-            </div>
-            <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">
-              VERIFIED · OPERATOR
-            </div>
+          <div className="flex flex-row items-baseline gap-2">
+            <span className="font-mono text-[13px] text-carbon-deep">{formatMmSs(time)}</span>
+            <span className="font-mono text-[11px] text-ledger">/ {formatMmSs(duration)}</span>
           </div>
-        </Masthead>
-
-        <div className="mt-4 h-px bg-carbon/45" />
-
-        {/* Filled fields */}
-        <div className="flex flex-row items-end gap-0 py-3.5">
-          <Field label="節目 PROGRAMME" width="w-[300px]">
-            <span className="font-kai text-[17px] font-bold text-carbon-deep">{programme}</span>
-          </Field>
-          <Divider />
-          <Field label="影片 REEL" width="w-[210px]">
-            <span className="truncate font-kai text-[17px] font-bold text-carbon-deep">{reel}</span>
-          </Field>
-          <Divider />
-          <Field label="時段 TIME" width="w-[190px]">
-            <span className="font-mono text-[17px] tracking-[0.02em] text-carbon">
-              {formatMmSs(time)} — {formatMmSs(duration)}
-            </span>
-          </Field>
-          <div className="flex-1" />
-          <Field label="在場 ON SCREEN" width="" align="right">
-            <span className="font-kai text-[17px] font-bold text-carbon-deep">
-              {matched.length} 人
-            </span>
-          </Field>
         </div>
 
-        {/* Reel */}
-        <div className="flex flex-row items-center justify-between pb-2.5">
-          <div className="flex flex-row items-center gap-2.5">
-            <span
-              className={`h-[7px] w-[7px] rounded-full ${playing ? 'bg-stamp' : 'bg-ledger'}`}
-            />
-            <span className="font-mono text-[10px] tracking-[0.22em] text-carbon-soft">
-              {playing ? 'PLAYING' : 'PAUSED'} · {headline}
-              {headlineBand ? ` · ${BAND_STAMP[headlineBand].word}` : ''}
-            </span>
-          </div>
-          <span className="font-mono text-[10px] tracking-[0.16em] text-ledger">
-            {meta.metadata?.video_info?.width ?? 1920}P · FRAME{' '}
-            {Math.floor(time * (meta.metadata?.video_info?.fps ?? 25))}
-          </span>
-        </div>
+        <div className="h-px bg-carbon/45" />
 
         <div
           ref={containerRef}
-          className="relative aspect-video w-full max-h-[calc(100vh-330px)] overflow-hidden border border-carbon bg-[#111116]"
+          className="relative mt-5 aspect-video w-full max-h-[calc(100vh-330px)] overflow-hidden border border-carbon bg-[#111116]"
         >
           {video && (
             <VideoCanvas
@@ -266,7 +222,10 @@ export function PlayerPage() {
               </div>
             </div>
           </div>
+        </div>
 
+        <div className="flex flex-row items-center gap-3 pt-3">
+          <span className="font-mono text-[10px] text-carbon-soft">{formatMmSs(time)}</span>
           <input
             type="range"
             min={0}
@@ -274,75 +233,67 @@ export function PlayerPage() {
             step={0.1}
             value={time}
             onChange={(e) => seek(parseFloat(e.target.value))}
-            className="absolute inset-x-0 bottom-0 h-1 w-full cursor-pointer appearance-none bg-paper/25 accent-stamp [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-paper [&::-moz-range-thumb]:h-2 [&::-moz-range-thumb]:w-2 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-paper [&::-moz-range-track]:bg-transparent"
+            className="h-1 flex-1 cursor-pointer appearance-none bg-carbon/20 accent-stamp [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-stamp [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-stamp"
             aria-label="播放位置"
           />
+          <span className="font-mono text-[10px] text-ledger">{formatMmSs(duration)}</span>
         </div>
 
-        {/* Tray */}
-        <div className="flex flex-row items-baseline justify-between pt-3">
-          <div className="flex flex-row items-baseline gap-2.5">
-            <span className="font-kai text-[15px] font-bold text-carbon">現在</span>
-            <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">
-              FILED AT {formatMmSs(time)} · {matched.length} SLIPS
-            </span>
-          </div>
-          <span className="font-mono text-[9px] tracking-[0.14em] text-stamp">SHOW ALL</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5 pt-2.5">
-          {matched.slice(0, 3).map((face, i) => {
-            const band = face.match_score == null ? 'low' : bandFor(face.match_score);
+        <div className="flex flex-row flex-wrap items-center gap-2 pt-4">
+          {matched.map((face, i) => {
+            const band = bandFor(face.match_score);
             return (
-              <div
+              <span
                 key={i}
-                className="flex flex-col gap-2 border border-carbon/40 bg-paper-light px-3 py-2.5"
+                className="flex flex-row items-center gap-2 border border-carbon/35 px-2.5 py-1"
               >
-                <div className="flex flex-row items-center justify-between">
-                  <span className="font-mono text-[11px] tracking-[0.06em] text-carbon-soft">
-                    {formatMmSs(time)}
-                  </span>
-                  <span
-                    className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
-                  >
-                    {BAND_STAMP[band].word}
-                  </span>
-                </div>
-                <div className="flex flex-row items-baseline gap-1.5">
-                  <span className="font-kai text-[18px] font-bold leading-none text-carbon-deep">
-                    {nameOf(face)}
-                  </span>
-                  <span className="font-mono text-[9px] tracking-[0.08em] text-ledger">
-                    #{face.contestant_id}
-                  </span>
-                </div>
+                <span className="font-kai text-[11px] text-carbon-deep">{nameOf(face)}</span>
                 <span className="font-mono text-[9px] text-ledger">
-                  {face.match_score == null ? '未配對' : `${face.match_score.toFixed(2)} cosine`}
+                  {face.match_score == null ? '—' : face.match_score.toFixed(2)}
                 </span>
-              </div>
+                <span
+                  className={`border px-1 font-kai text-[9px] tracking-[0.1em] ${BAND_STAMP[band].ink}`}
+                >
+                  {BAND_STAMP[band].word}
+                </span>
+              </span>
             );
           })}
           {matched.length === 0 && (
-            <div className="col-span-3 border border-dashed border-carbon/30 px-3 py-6 text-center font-kai text-[13px] text-carbon-soft">
-              這一格沒有已核對的人臉
-            </div>
+            <span className="font-kai text-[12px] text-carbon-soft">這一格沒有已核對的人臉</span>
           )}
+        </div>
+
+        <div className="mt-auto flex flex-row items-center justify-between border-t border-carbon/30 pt-3">
+          <span className="font-mono text-[9px] tracking-[0.16em] text-ledger">
+            FRAMES {summary?.frames_processed.toLocaleString() ?? '—'} · DETECTIONS{' '}
+            {summary?.total_faces_detected.toLocaleString() ?? '—'} · RECOGNISED{' '}
+            {summary?.total_recognitions.toLocaleString() ?? '—'}
+          </span>
+          <span className="font-mono text-[9px] tracking-[0.16em] text-carbon-soft">
+            {video?.id.split('-')[0] ?? '—'} · R2 · 1080P
+          </span>
         </div>
       </div>
 
       {/* 第二聯 — the carbon copy carries the queue, never a write. */}
       <aside className="flex w-[330px] shrink-0 flex-col border-l border-carbon bg-copy px-6 pb-5 pt-6">
         <div className="font-mono text-[8px] tracking-[0.26em] text-carbon-soft">
-          第二聯 · COPY 2
+          本卷出場 · IN THIS REEL
         </div>
 
-        <div className="flex flex-row items-baseline justify-between pt-3">
-          <h2 className="font-serif text-[28px] font-black tracking-[0.1em] text-carbon-deep">
-            待播
-          </h2>
+        <div className="flex flex-row items-baseline gap-2.5 pt-2">
+          <span className="font-serif text-[36px] font-black leading-none text-carbon-deep">
+            {coverage}
+          </span>
+          <span className="font-kai text-[12px] text-carbon-soft">位參賽者被辨識</span>
+        </div>
+
+        <div className="flex flex-row items-baseline justify-between pt-4">
+          <h2 className="font-kai text-[13px] font-bold text-carbon-deep">待播</h2>
           <span className="font-mono text-[9px] tracking-[0.22em] text-carbon-soft">QUEUE</span>
         </div>
-        <div className="mt-3 h-px bg-carbon/40" />
+        <div className="mt-2 h-px bg-carbon/40" />
 
         <div className="flex flex-col pt-1">
           {queue.map((entry) => (
@@ -406,29 +357,4 @@ export function PlayerPage() {
       </aside>
     </div>
   );
-}
-
-function Field({
-  label,
-  width,
-  align = 'left',
-  children,
-}: {
-  label: string;
-  width: string;
-  align?: 'left' | 'right';
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`flex flex-col gap-1.5 ${width} ${align === 'right' ? 'items-end' : ''}`}>
-      <span className="whitespace-nowrap font-mono text-[9px] tracking-[0.2em] text-ledger">
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function Divider() {
-  return <div className="mx-6 h-[34px] w-px bg-carbon/25" />;
 }

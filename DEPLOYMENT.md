@@ -2,8 +2,9 @@
 
 > **Retired surface (2026-10-22).** The FastAPI `backend/` tree, its `Dockerfile`, the Heroku
 > `Procfile` and the four ad-hoc upload scripts are gone. The deployable product is the
-> Cloudflare Worker in `worker/` (API + embedded viewer build), the KV read model it serves,
-> and the encodes in R2. The admin app is a local back office and is not deployed.
+> Cloudflare Worker in `worker/` (API + both embedded SPAs), the KV read model it serves,
+> and the encodes in R2. The admin app is embedded at `/admin` on the same Worker origin and
+> sits behind a Cloudflare Access application.
 
 ## What gets written
 
@@ -23,14 +24,17 @@ more; the Worker's remaining reads of them are fallbacks, not the contract.
 
 - `wrangler login` with the account that owns the KV namespace and R2 bucket in
   [worker/wrangler.toml](worker/wrangler.toml).
+- `HF_TOKEN` as a Worker secret, with `job.write` (and bucket read): the admin's processing jobs
+  dispatch to HF Jobs (`worker/src/lib/hfJobs.ts`). Without it the job routes fail closed with
+  `503`/`502` naming the token; nothing silently queues.
 - `pnpm install` (viewer build) and `uv` (publisher).
 - Reels processed into `local_output/metadata/` and `local_output/processed_videos/`.
 
 ## Steps
 
 ```bash
-# 1. Build the viewer and embed it into the Worker
-npm run build            # pnpm --filter @mv/viewer build && node scripts/update-worker-assets.js
+# 1. Build the viewer and the admin, and embed both into the Worker
+npm run build            # pnpm --filter @mv/viewer build && pnpm --filter @mv/admin build && node scripts/update-worker-assets.js
 
 # 2. Stage and validate the read model (no writes), then publish to KV
 npm run publish:metadata
@@ -41,7 +45,8 @@ npm run upload:videos -- --dry-run
 npm run upload:videos
 
 # 4. Deploy the Worker
-npm run deploy           # cd worker && wrangler deploy
+cd worker && npx wrangler secret put HF_TOKEN   # once per environment, or after a rotation
+cd .. && npm run deploy                          # cd worker && wrangler deploy
 ```
 
 `npm run setup` runs 1 → 2(remote) → 3. Steps 2 and 3 are independent of step 4 and can be
@@ -66,6 +71,26 @@ curl -sI -H 'Range: bytes=0-1023' "https://<worker-host>/videos/processed_videos
 ```
 
 Then open the Worker host in a browser: 圖庫 lists the reels, 點唱單 plays one and draws boxes.
+`/admin` serves the back office from the same origin; it answers 302 to Cloudflare Access
+until the session exists, so a `curl` on that path is expected to redirect rather than 200.
+
+Processing jobs have their own check, because they spend money:
+
+```bash
+# unauthenticated: the gate must refuse before any KV write or HF call
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<worker-host>/admin/api/processing/trigger
+# → 401 (503 if CF_ACCESS_AUD / CF_ACCESS_TEAM_DOMAIN are unset)
+
+# authenticated, from the deployed /admin console: trigger one reel, watch it reach
+# completed or failed, then cancel one. Both must show a terminal state.
+```
+
+A reel run defaults to `cpu-upgrade`: ~1.5 h and ~$0.05, because the rendition encode is
+CPU-bound on every flavor. Setting `HF_JOBS_VIDEO_FLAVOR` to a GPU flavor (e.g. `a10g-small`)
+also switches the image, setup and ONNX provider env, and buys detection — 2m43s vs 1h31m for
+the same reel — but it is opt-in until #86 (Worker-dispatched GPU jobs currently run at CPU
+speed). A job left in `queued` means the dispatch failed and the record should say why in
+`error` — check `npx wrangler tail` for `HF job stage unreadable` / `HF job cancel rejected`.
 
 ## Inspecting KV and R2
 
@@ -73,6 +98,7 @@ Then open the Worker host in a browser: 圖庫 lists the reels, 點唱單 plays 
 cd worker
 npx wrangler kv key list --binding METADATA_KV --remote
 npx wrangler kv key get "processed_videos_list" --binding METADATA_KV --remote
+npx wrangler kv key list --binding JOB_STORE --remote   # job:<8 hex> records, 7-day TTL
 npx wrangler r2 object list mv-face-recognition-videos --prefix processed_videos/
 npx wrangler tail     # live Worker logs
 ```

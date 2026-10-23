@@ -14,7 +14,7 @@ import logging
 import uuid
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -52,12 +52,35 @@ PROCESSED_DIR = OUTPUT_DIR / "processed_videos"
 FLAGS_PATH = OUTPUT_DIR / "flagged_faces.json"
 LABELS_DIR = OUTPUT_DIR / "labels"
 PHOTOS_DIR = Path("../source/photo/contestants/ig_photos")
+HISTORICAL_PHOTOS_DIR = Path("../source/photo/historical/contestants")
 EMBEDDINGS_DIR = Path("../source/photo/contestants")
+DATA_DIR = Path("../data")
 REFERENCE_MANIFEST = EMBEDDINGS_DIR / "reference_manifest.json"
 CONTESTANT_CSV = Path("../metadata/contestant_info.csv")
 CONFIG_PATH = "config/processing_config.yaml"
 
 VIDEO_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv")
+
+PROCESSING_MODES = ("initial", "embedding-update", "coverage-refresh")
+EMBEDDING_MODES = ("embedding-update", "coverage-refresh")
+
+
+def _script_import(module: str):
+    """Import `scripts/<module>` whether the app was started from mvp-processor/ or the repo root.
+
+    The path constants above are cwd-relative (mvp-processor/), so `scripts` is normally
+    importable already; the fallback anchors on this file for `python -m src.local_api`.
+    """
+    import importlib
+    import sys
+
+    try:
+        return importlib.import_module(f"scripts.{module}")
+    except ImportError:
+        root = str(Path(__file__).resolve().parent.parent)
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        return importlib.import_module(f"scripts.{module}")
 
 # ─── In-memory job store ───
 
@@ -66,6 +89,7 @@ jobs: dict[str, dict] = {}
 
 class ProcessRequest(BaseModel):
     video: Optional[str] = None  # specific video filename, or None for all
+    mode: str = "initial"  # initial | embedding-update | coverage-refresh
 
 
 class FlagRequest(BaseModel):
@@ -245,28 +269,158 @@ async def list_contestants():
                 "has_embedding": reference_count > 0,
                 "reference_count": reference_count,
                 "quality": "good" if reference_count else "missing",
+                "portrait_url": f"/api/contestants/{contestant_id}/thumb/face",
             })
     return contestants
+
+
+# ─── Embedding read models (coverage + similarity, derived from the current run) ───
+
+def _recompute_coverage() -> dict:
+    """Aggregate coverage from the current metadata run and write data/coverage.json."""
+    generate_coverage = _script_import("generate_coverage").generate_coverage
+    coverage = generate_coverage(CONTESTANT_CSV, EMBEDDINGS_DIR, METADATA_DIR)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "coverage.json").write_text(
+        json.dumps(coverage, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    return coverage
+
+
+def _recompute_similarity() -> None:
+    """Recompute the contestant similarity matrix and confusion pairs into data/."""
+    import numpy as np
+
+    similarity = _script_import("compute_similarity")
+    contestants = similarity.load_contestants(CONTESTANT_CSV)
+    valid, reference_sets = similarity.load_reference_sets(contestants, EMBEDDINGS_DIR)
+    if len(valid) < 2:
+        raise ValueError("Need at least 2 contestants with references to compute similarity")
+
+    matrix = similarity.cosine_similarity_matrix(reference_sets)
+    off_diagonal = matrix[np.triu_indices_from(matrix, k=1)]
+    payload = {
+        "labels": [
+            {"id": c["id"], "name": c["name"], "nickname": c["nickname"]} for c in valid
+        ],
+        "matrix": [[round(float(v), 6) for v in row] for row in matrix],
+        "stats": {
+            "min_off_diagonal": round(float(np.min(off_diagonal)), 6),
+            "max_off_diagonal": round(float(np.max(off_diagonal)), 6),
+            "mean_off_diagonal": round(float(np.mean(off_diagonal)), 6),
+            "contestant_count": len(valid),
+        },
+    }
+    pairs_payload = {
+        "pairs": similarity.extract_top_pairs(matrix, valid),
+        "total_pairs": len(valid) * (len(valid) - 1) // 2,
+    }
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "similarity_matrix.json").write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (DATA_DIR / "top_pairs.json").write_text(
+        json.dumps(pairs_payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+@app.get("/api/embedding/coverage")
+async def embedding_coverage():
+    """Coverage report from data/coverage.json, generated on first read if absent."""
+    path = DATA_DIR / "coverage.json"
+    if path.exists():
+        return _load_json_cached(path)
+    try:
+        return await asyncio.to_thread(_recompute_coverage)
+    except (Exception, SystemExit) as e:
+        logger.error(f"Coverage generation failed: {e}")
+        raise HTTPException(500, f"Could not generate coverage: {e}")
+
+
+@app.get("/api/embedding/similarity")
+async def embedding_similarity():
+    """Pairwise contestant similarity matrix from data/similarity_matrix.json."""
+    path = DATA_DIR / "similarity_matrix.json"
+    if not path.exists():
+        raise HTTPException(404, "similarity_matrix.json not found")
+    return _load_json_cached(path)
+
+
+@app.get("/api/embedding/top-pairs")
+async def embedding_top_pairs():
+    """Most similar contestant pairs from data/top_pairs.json."""
+    path = DATA_DIR / "top_pairs.json"
+    if not path.exists():
+        raise HTTPException(404, "top_pairs.json not found")
+    return _load_json_cached(path)
+
+
+# ─── Contestant portraits ───
+
+_PHOTO_SUFFIXES = (".webp", ".jpg", ".jpeg", ".png")
+
+
+def _contestant_photo_path(contestant_id: int) -> Path:
+    """Best available portrait: the curated historical photo, then the IG reference set."""
+    for directory in (
+        HISTORICAL_PHOTOS_DIR / str(contestant_id),
+        PHOTOS_DIR / f"contestant_{contestant_id}",
+    ):
+        if not directory.is_dir():
+            continue
+        for photo in sorted(directory.iterdir()):
+            if photo.suffix.lower() in _PHOTO_SUFFIXES:
+                return photo
+    raise HTTPException(404, f"No photo for contestant {contestant_id}")
+
+
+def _photo_media_type(path: Path) -> str:
+    return {".webp": "image/webp", ".png": "image/png"}.get(path.suffix.lower(), "image/jpeg")
 
 
 @app.get("/api/contestants/{contestant_id}/photo")
 async def contestant_photo(contestant_id: int):
     """Serve a reference photo for a contestant."""
-    photo_dir = PHOTOS_DIR / f"contestant_{contestant_id}"
-    if photo_dir.is_dir():
-        for photo in sorted(photo_dir.iterdir()):
-            if photo.suffix.lower() in (".jpg", ".jpeg", ".png"):
-                media_type = "image/png" if photo.suffix.lower() == ".png" else "image/jpeg"
-                return FileResponse(photo, media_type=media_type)
-    raise HTTPException(404, f"No photo for contestant {contestant_id}")
+    photo = _contestant_photo_path(contestant_id)
+    return FileResponse(photo, media_type=_photo_media_type(photo))
+
+
+@app.get("/api/contestants/{contestant_id}/thumb/{size}")
+async def contestant_thumbnail(contestant_id: int, size: str):
+    """Serve the portrait (`face`, `320`, `640` — the stored file is already web-sized)."""
+    photo = _contestant_photo_path(contestant_id)
+    return FileResponse(photo, media_type=_photo_media_type(photo))
 
 
 # ─── Processing ───
 
 @app.post("/api/processing/trigger")
 async def trigger_processing(req: ProcessRequest):
-    """Start a local video processing job."""
+    """Start a local video processing job, or one of the derived-cache refresh jobs."""
+    if req.mode not in PROCESSING_MODES:
+        raise HTTPException(400, f"Invalid mode: {req.mode}")
     job_id = str(uuid.uuid4())[:8]
+
+    if req.mode in EMBEDDING_MODES:
+        jobs[job_id] = {
+            "id": job_id,
+            "status": "queued",
+            "progress": 0,
+            "mode": req.mode,
+            "total_videos": 1,
+            "videos_processed": 0,
+            "current_video": (
+                "reference_embeddings.npz" if req.mode == "embedding-update" else "coverage.json"
+            ),
+            "created_at": _now(),
+            "started_at": None,
+            "completed_at": None,
+            "error": None,
+            "video_files": [],
+        }
+        asyncio.create_task(_run_embedding_job(job_id, req.mode))
+        return {"job_id": job_id, "status": "queued", "total_videos": 1, "mode": req.mode}
 
     if req.video:
         video_path = _safe_child(SOURCE_DIR, req.video)
@@ -287,7 +441,7 @@ async def trigger_processing(req: ProcessRequest):
         "id": job_id,
         "status": "queued",
         "progress": 0,
-        "mode": "local",
+        "mode": req.mode,
         "total_videos": len(video_files),
         "videos_processed": 0,
         "current_video": None,
@@ -393,9 +547,24 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
     return {"faces": faces}
 
 
+def _same_bbox(left: Any, right: Any) -> bool:
+    """Boxes are copied verbatim from the detection, so float equality with slack is enough."""
+    if not isinstance(left, list) or not isinstance(right, list):
+        return False
+    if len(left) != 4 or len(right) != 4:
+        return False
+    return all(abs(a - b) < 1e-6 for a, b in zip(left, right))
+
+
 @app.get("/api/recognition/results")
 async def recognition_results(contestant_id: str, video_id: Optional[str] = None):
-    """Appearances of a contestant, across all videos or within one."""
+    """Appearances of a contestant, across all videos or within one.
+
+    `contestant_timeline` keeps a face's box but not its position in the frame's detection list —
+    which is what `/api/faces/crop` keys on. Matching the box back recovers `detection_index`;
+    duplicate boxes resolve to the first, and an unmatched box stays `None` so the client falls
+    back to cropping the reel itself.
+    """
     if video_id is not None:
         targets = [(video_id, _metadata_path(video_id))]
     else:
@@ -412,12 +581,42 @@ async def recognition_results(contestant_id: str, video_id: Optional[str] = None
         entry = data.get("contestant_timeline", {}).get(str(contestant_id))
         if not entry:
             continue
+
+        frames_by_number: dict[int, list[dict]] = {}
+        frames_indexed = False
+
+        def detections_of(frame_number: Any) -> list[dict]:
+            nonlocal frames_indexed
+            if not isinstance(frame_number, int):
+                return []
+            if not frames_indexed:
+                for frame in data.get("frame_data") or []:
+                    number = frame.get("frame_number")
+                    if isinstance(number, int):
+                        frames_by_number[number] = frame.get("detections") or []
+                frames_indexed = True
+            return frames_by_number.get(frame_number, [])
+
         for appearance in entry.get("appearances", []):
+            index = appearance.get("detection_index")
+            if not isinstance(index, int):
+                index = next(
+                    (
+                        position
+                        for position, detection in enumerate(
+                            detections_of(appearance.get("frame_number"))
+                        )
+                        if _same_bbox(detection.get("bbox"), appearance.get("bbox"))
+                    ),
+                    None,
+                )
             results.append({
                 "video_id": vid,
                 "timestamp": appearance.get("timestamp", 0),
                 "match_score": appearance.get("match_score"),
                 "frame_number": appearance.get("frame_number"),
+                "bbox": appearance.get("bbox"),
+                "detection_index": index,
             })
 
     results.sort(key=lambda r: (r["video_id"], r["timestamp"]))
@@ -824,10 +1023,51 @@ async def reassign_flagged_face(req: FlagReassign):
 @app.get("/api/system/status")
 async def system_status():
     """Health check."""
-    return {"status": "online", "mode": "local"}
+    return {
+        "status": "online",
+        "mode": "local",
+        "chromadb_connected": (EMBEDDINGS_DIR / "reference_embeddings.npz").exists(),
+        "model_loaded": True,
+        "services_running": True,
+        "contestant_count": len(_contestant_ids()),
+        "video_count": sum(1 for _ in _iter_metadata_files()),
+        "processing_jobs": sum(1 for j in jobs.values() if j["status"] in ("queued", "running")),
+    }
 
 
 # ─── Background processing ───
+
+async def _run_embedding_job(job_id: str, mode: str):
+    """Rebuild a derived cache in a background task (reference embeddings, coverage, similarity)."""
+    job = jobs[job_id]
+    job["status"] = "running"
+    job["started_at"] = _now_ts()
+    job["progress"] = 5
+
+    try:
+        if mode == "embedding-update":
+            build = _script_import("build_reference_cache").build
+            await asyncio.to_thread(build, PHOTOS_DIR, EMBEDDINGS_DIR)
+            _references_per_contestant.cache_clear()
+            job["current_video"] = "coverage.json"
+            job["progress"] = 60
+
+        await asyncio.to_thread(_recompute_coverage)
+        job["current_video"] = "similarity_matrix.json"
+        job["progress"] = 80
+
+        await asyncio.to_thread(_recompute_similarity)
+        job["videos_processed"] = 1
+        job["status"] = "completed"
+        job["progress"] = 100
+    except (Exception, SystemExit) as e:
+        logger.error(f"[{job_id}] {mode} failed: {e}")
+        job["status"] = "failed"
+        job["error"] = str(e)
+    finally:
+        job["completed_at"] = _now_ts()
+        job["current_video"] = None
+
 
 async def _run_processing(job_id: str):
     """Run the video processing pipeline in a background task."""
@@ -870,6 +1110,12 @@ async def _run_processing(job_id: str):
         if job["status"] != "cancelled":
             job["status"] = "completed"
             job["progress"] = 100
+            # Coverage is derived from the metadata just written. A failure here must not
+            # mark the video job failed — the videos themselves processed.
+            try:
+                await asyncio.to_thread(_recompute_coverage)
+            except (Exception, SystemExit) as e:
+                logger.warning(f"[{job_id}] Coverage refresh failed: {e}")
 
     except Exception as e:
         logger.error(f"[{job_id}] Processing failed: {e}")

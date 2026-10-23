@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
+  // Served by the Worker from /admin — absolute asset URLs must carry the prefix.
+  base: '/admin/',
   plugins: lazyPlugins(() => [react(), tailwindcss()]),
   resolve: {
     alias: {
@@ -18,6 +20,13 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+      },
+      // The admin's gated calls use the Access-protected prefix the Worker serves in production;
+      // locally they must reach the same routes on `local_api.py`.
+      '/admin/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/admin\/api/, '/api'),
       },
     },
     fs: {
