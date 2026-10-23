@@ -170,25 +170,39 @@ test('the job spec matches submit.py: command, timeout, label and volume', () =>
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
     cacheFlavor: 'cpu-upgrade',
-    videoFlavor: 'a10g-small',
+    videoFlavor: 'cpu-upgrade',
   });
   assert.deepEqual(video.command.slice(0, 2), ['bash', '-lc']);
-  assert.match(video.command[2], /build-essential/);
-  assert.match(video.command[2], /pip install -q uv/);
+  assert.doesNotMatch(video.command[2], /build-essential|pip install/);
   assert.match(video.command[2], /hf_pipeline\.py/);
   assert.match(video.command[2], /python \/tmp\/j\.py video --video-id 4$/);
-  assert.equal(video.flavor, 'a10g-small');
-  assert.equal(video.dockerImage, hf.HF_JOBS_DEFAULTS.gpuImage);
-  assert.deepEqual(video.environment, {
-    REPO_REF: 'main',
-    ONNXRUNTIME_GPU: '1',
-    INSIGHTFACE_PROVIDERS: 'CUDAExecutionProvider',
-  });
+  assert.equal(video.flavor, 'cpu-upgrade');
+  assert.equal(video.dockerImage, hf.HF_JOBS_DEFAULTS.image);
+  assert.deepEqual(video.environment, { REPO_REF: 'main' });
   assert.equal(video.timeoutSeconds, 10800);
   assert.deepEqual(video.labels, { name: 'mv-video-4' });
   assert.deepEqual(video.volumes, [
     { type: 'bucket', source: 'yellowcandle/mv-face-recognition', mountPath: '/mnt/data' },
   ]);
+
+  // A GPU flavor is the whole switch: image, provider env and setup follow the name.
+  const gpu = hf.buildJobSpec({
+    mode: 'initial',
+    videoId: '4',
+    ref: 'main',
+    bucket: 'yellowcandle/mv-face-recognition',
+    cacheFlavor: 'cpu-upgrade',
+    videoFlavor: 'a10g-small',
+  });
+  assert.match(gpu.command[2], /build-essential/);
+  assert.match(gpu.command[2], /pip install -q uv/);
+  assert.equal(gpu.flavor, 'a10g-small');
+  assert.equal(gpu.dockerImage, hf.HF_JOBS_DEFAULTS.gpuImage);
+  assert.deepEqual(gpu.environment, {
+    REPO_REF: 'main',
+    ONNXRUNTIME_GPU: '1',
+    INSIGHTFACE_PROVIDERS: 'CUDAExecutionProvider',
+  });
 
   const cache = hf.buildJobSpec({
     mode: 'embedding-update',

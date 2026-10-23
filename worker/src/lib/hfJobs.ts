@@ -21,9 +21,11 @@ export const HF_JOBS_DEFAULTS = {
   bucket: 'yellowcandle/mv-face-recognition',
   ref: 'main',
   // A cache rebuild is CPU work over reference portraits; a reel run is detection over every
-  // frame, which at ~5s/frame on `cpu-upgrade` outlives the 3h budget. Hence GPU for video.
+  // frame. GPU would be ~33x faster, but the CUDA path silently falls back to CPU inside the job
+  // (#86), so both default to `cpu-upgrade` until that is fixed. Setting a GPU flavor here is all
+  // it takes to switch: `buildJobSpec` derives the image and provider env from the name.
   cacheFlavor: 'cpu-upgrade',
-  videoFlavor: 'a10g-small',
+  videoFlavor: 'cpu-upgrade',
   // The CUDA image ships the driver stack but no uv; the uv image cannot see a GPU.
   image: 'ghcr.io/astral-sh/uv:python3.12-bookworm',
   gpuImage: 'pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime',
@@ -69,14 +71,49 @@ export function videoIdFromFilename(filename: string): string | null {
 }
 
 /**
+ * The flavor decides the image, not the mode: a GPU flavor needs the CUDA stack and the GPU
+ * provider, a CPU flavor must not pay for either. Names are the Hub's own (`hf jobs run --flavor`).
+ */
+const GPU_FLAVORS: Record<string, true> = {
+  't4-small': true,
+  't4-medium': true,
+  l4x1: true,
+  l4x4: true,
+  l40sx1: true,
+  l40sx4: true,
+  l40sx8: true,
+  'a10g-small': true,
+  'a10g-large': true,
+  'a10g-largex2': true,
+  'a10g-largex4': true,
+  'a100-large': true,
+  a100x4: true,
+  a100x8: true,
+  'rtx-pro-6000': true,
+  'rtx-pro-6000x2': true,
+  'rtx-pro-6000x4': true,
+  'rtx-pro-6000x8': true,
+  h200: true,
+  h200x2: true,
+  h200x4: true,
+  h200x8: true,
+};
+
+export function isGpuFlavor(flavor: string): boolean {
+  return GPU_FLAVORS[flavor] === true;
+}
+
+/**
  * The payload `run_job` would POST. `command` downloads the pipeline script from GitHub at
  * runtime, which is what lets a token with `job.write` but no bucket write submit a run.
  */
 export function buildJobSpec(input: JobSpecInput): JobSpec {
   const script = `https://raw.githubusercontent.com/${REPO_SLUG}/${input.ref}/scripts/hf/jobs/hf_pipeline.py`;
   const download = `python -c "import urllib.request; urllib.request.urlretrieve('${script}','/tmp/j.py')"`;
-  const gpu = input.mode === 'initial';
-  const stage = gpu ? `video --video-id ${input.videoId ?? ''}` : 'cache';
+  const video = input.mode === 'initial';
+  const flavor = video ? input.videoFlavor : input.cacheFlavor;
+  const gpu = isGpuFlavor(flavor);
+  const stage = video ? `video --video-id ${input.videoId ?? ''}` : 'cache';
   const setup = gpu ? `${APT} build-essential && pip install -q uv` : APT;
   return {
     command: ['bash', '-lc', `${setup} && ${download} && python /tmp/j.py ${stage}`],
@@ -88,11 +125,11 @@ export function buildJobSpec(input: JobSpecInput): JobSpec {
           INSIGHTFACE_PROVIDERS: 'CUDAExecutionProvider',
         }
       : { REPO_REF: input.ref },
-    flavor: gpu ? input.videoFlavor : input.cacheFlavor,
+    flavor,
     // A cache rebuild reads every reference photo; a reel run also encodes. Neither finishes in
     // the Hub's default window.
-    timeoutSeconds: gpu ? 10800 : 2700,
-    labels: { name: gpu ? `mv-video-${input.videoId ?? ''}` : 'mv-cache' },
+    timeoutSeconds: video ? 10800 : 2700,
+    labels: { name: video ? `mv-video-${input.videoId ?? ''}` : 'mv-cache' },
     volumes: [{ type: 'bucket', source: input.bucket, mountPath: '/mnt/data' }],
     dockerImage: gpu ? HF_JOBS_DEFAULTS.gpuImage : HF_JOBS_DEFAULTS.image,
   };
