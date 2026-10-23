@@ -124,6 +124,8 @@ export function Processing() {
   const [selectedVideo, setSelectedVideo] = useState('');
   // Fail-open until the first probe answers, so a healthy API never flashes the notice.
   const [jobsAvailable, setJobsAvailable] = useState(true);
+  // Coverage refresh needs the local API; the Worker has no path into the KV read model.
+  const [isEdge, setIsEdge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const pollingRef = useRef<number | undefined>(undefined);
@@ -193,10 +195,11 @@ export function Processing() {
       try {
         const statusRes = await adminFetch('/admin/api/system/status');
         const status: unknown = statusRes.ok ? await statusRes.json() : null;
-        const isEdge =
+        const edge =
           !!status && typeof status === 'object' && 'mode' in status && status.mode === 'edge';
+        setIsEdge(edge);
         const res = await adminFetch(
-          isEdge ? '/admin/api/videos/processed/list' : '/admin/api/videos/local',
+          edge ? '/admin/api/videos/processed/list' : '/admin/api/videos/local',
         );
         if (!res.ok) return;
         const data: unknown = await res.json();
@@ -442,11 +445,17 @@ export function Processing() {
             <Button
               variant="secondary"
               onClick={startCoverageRefresh}
-              disabled={!jobsAvailable || isProcessing}
+              disabled={!jobsAvailable || isProcessing || isEdge}
               className="mb-4 w-full"
             >
               {isProcessing ? 'Starting...' : '重新計算覆蓋率與相似度'}
             </Button>
+            {isEdge && (
+              <p className="mb-4 text-xs leading-relaxed text-ledger">
+                Not available on the edge: coverage and similarity are published from the bucket
+                with <code>npm run publish:metadata</code>, not written by a job.
+              </p>
+            )}
             <ul className="space-y-1.5 text-xs text-ledger">
               <li className="flex items-center gap-2">
                 <span className="text-carbon">&#x2713;</span> Rebuild data/coverage.json

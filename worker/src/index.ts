@@ -2276,6 +2276,20 @@ async function handleJobTrigger(
       corsHeaders,
     );
   }
+  if (mode === 'coverage-refresh') {
+    // No path exists from a job to the read model: coverage and similarity are published to KV
+    // from the bucket by `npm run publish:metadata`. Running the cache stage instead would do
+    // different work under this name, which is what #91 was.
+    return jsonResponse(
+      {
+        detail:
+          'coverage refresh is not available on the edge: coverage and similarity are published from the bucket, not written by a job',
+      },
+      501,
+      corsHeaders,
+    );
+  }
+
   const videoId = mode === 'initial' && video ? videoIdFromFilename(video) : null;
   if (mode === 'initial' && !videoId) {
     return jsonResponse({ detail: `Unsupported video format: ${video ?? ''}` }, 400, corsHeaders);
