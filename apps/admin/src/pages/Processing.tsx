@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, Badge, Button, Masthead, formatMmSs, LOCAL_API_OFFLINE_NOTICE } from '@mv/shared';
+import {
+  Card,
+  Badge,
+  Button,
+  Masthead,
+  adminFetch,
+  formatMmSs,
+  LOCAL_API_OFFLINE_NOTICE,
+} from '@mv/shared';
 
 interface ProcessingJob {
   id: string;
@@ -11,14 +19,58 @@ interface ProcessingJob {
   videos_processed?: number;
   total_videos?: number;
   created_at?: string;
-  started_at?: number;
-  completed_at?: number;
-  error?: string;
+  // The Worker and the local API both answer with `null` for "not yet".
+  started_at?: number | null;
+  completed_at?: number | null;
+  error?: string | null;
 }
 
-interface LocalVideo {
+interface VideoOption {
   filename: string;
   size_mb: number;
+}
+
+/**
+ * Both video lists use `filename` and byte sizes: the local API reports `size_mb` directly,
+ * the Worker publishes `size` in bytes. Unknown entries are dropped rather than guessed.
+ */
+function toVideoOptions(list: unknown[]): VideoOption[] {
+  const options: VideoOption[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    if (!('filename' in item) || typeof item.filename !== 'string') continue;
+    const sizeMb =
+      'size_mb' in item && typeof item.size_mb === 'number'
+        ? item.size_mb
+        : 'size' in item && typeof item.size === 'number'
+          ? item.size / 1024 / 1024
+          : 0;
+    options.push({ filename: item.filename, size_mb: sizeMb });
+  }
+  return options;
+}
+
+/** FastAPI answers with `detail`; Worker handlers use `error` (string or `{message}`). */
+async function failureMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body: unknown = await res.json();
+    if (body && typeof body === 'object') {
+      const values = [
+        'detail' in body ? body.detail : undefined,
+        'error' in body ? body.error : undefined,
+      ];
+      for (const value of values) {
+        if (typeof value === 'string' && value) return value;
+        if (value && typeof value === 'object' && 'message' in value) {
+          const message = value.message;
+          if (typeof message === 'string' && message) return message;
+        }
+      }
+    }
+  } catch {
+    /* non-JSON body: fall through to the generic message */
+  }
+  return `${fallback} (HTTP ${res.status})`;
 }
 
 function getStatusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
@@ -49,7 +101,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-function formatDuration(start?: number, end?: number): string {
+function formatDuration(start?: number | null, end?: number | null): string {
   if (!start) return '--';
   const endTime = end || Date.now();
   return formatMmSs(Math.floor((endTime - start) / 1000));
@@ -68,36 +120,50 @@ function formatTimestamp(iso?: string): string {
 export function Processing() {
   const queryClient = useQueryClient();
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
-  const [localVideos, setLocalVideos] = useState<LocalVideo[]>([]);
+  const [videoOptions, setVideoOptions] = useState<VideoOption[]>([]);
   const [selectedVideo, setSelectedVideo] = useState('');
-  // Fail-open until the first probe answers, so a healthy local API never flashes the notice.
-  const [localApiAvailable, setLocalApiAvailable] = useState(true);
+  // Fail-open until the first probe answers, so a healthy API never flashes the notice.
+  const [jobsAvailable, setJobsAvailable] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const pollingRef = useRef<number | undefined>(undefined);
   // Last status per job, so a coverage/embedding job that just finished refreshes the read model.
   const seenStatusRef = useRef<Map<string, ProcessingJob['status']>>(new Map());
+  // KV listing is eventually consistent, so a job created a second ago can be missing from it.
+  // Hold the row the trigger returned until a poll reports that id.
+  const [pendingJobs, setPendingJobs] = useState<ProcessingJob[]>([]);
+  const visibleJobs = useMemo(() => {
+    const listed = new Set(jobs.map((job) => job.id));
+    return [...pendingJobs.filter((job) => !listed.has(job.id)), ...jobs];
+  }, [jobs, pendingJobs]);
 
   const activeCount = useMemo(
-    () => jobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
-    [jobs],
+    () => visibleJobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
+    [visibleJobs],
   );
-  const completedCount = useMemo(() => jobs.filter((j) => j.status === 'completed').length, [jobs]);
+  const completedCount = useMemo(
+    () => visibleJobs.filter((j) => j.status === 'completed').length,
+    [visibleJobs],
+  );
 
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await fetch('/api/processing/jobs');
+      const res = await adminFetch('/admin/api/processing/jobs');
       if (res.status === 404) {
-        // The edge Worker does not run Python jobs; the page is local-only.
-        setLocalApiAvailable(false);
+        // A Worker without the job routes cannot run the pipeline at all.
+        setJobsAvailable(false);
         return;
       }
       if (!res.ok) return;
-      setLocalApiAvailable(true);
+      setJobsAvailable(true);
       const data = await res.json();
       const jobList = data.jobs || data || [];
       const next: ProcessingJob[] = Array.isArray(jobList) ? jobList : [];
       setJobs(next);
+      const listed = new Set(next.map((job) => job.id));
+      setPendingJobs((prev) =>
+        prev.length === 0 ? prev : prev.filter((job) => !listed.has(job.id)),
+      );
 
       for (const job of next) {
         const prev = seenStatusRef.current.get(job.id);
@@ -113,30 +179,37 @@ export function Processing() {
         seenStatusRef.current.set(job.id, job.status);
       }
     } catch (e) {
-      setLocalApiAvailable(false);
+      setJobsAvailable(false);
       console.error('Failed to fetch jobs:', e);
     }
   }, [queryClient]);
 
-  // Source reels, only served by the local API. A failure leaves the "all videos" default.
+  // Source reels for the picker. The Worker has no local filesystem, so it publishes the
+  // processed list instead; the local API knows what is on disk. A failure leaves the
+  // "all videos" default.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch('/api/videos/local');
+        const statusRes = await adminFetch('/admin/api/system/status');
+        const status: unknown = statusRes.ok ? await statusRes.json() : null;
+        const isEdge =
+          !!status &&
+          typeof status === 'object' &&
+          'mode' in status &&
+          status.mode === 'edge';
+        const res = await adminFetch(
+          isEdge ? '/admin/api/videos/processed/list' : '/admin/api/videos/local',
+        );
         if (!res.ok) return;
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data?.videos;
-        if (cancelled || !Array.isArray(list)) return;
-        const videos: LocalVideo[] = [];
-        for (const item of list as Array<Record<string, unknown>>) {
-          if (typeof item?.filename !== 'string') continue;
-          videos.push({
-            filename: item.filename,
-            size_mb: typeof item.size_mb === 'number' ? item.size_mb : 0,
-          });
+        const data: unknown = await res.json();
+        let list: unknown[] | null = null;
+        if (Array.isArray(data)) list = data;
+        else if (data && typeof data === 'object' && 'videos' in data && Array.isArray(data.videos)) {
+          list = data.videos;
         }
-        setLocalVideos(videos);
+        if (cancelled || !list) return;
+        setVideoOptions(toVideoOptions(list));
       } catch {
         /* the reel list is optional; the trigger surfaces the real failure */
       }
@@ -163,12 +236,33 @@ export function Processing() {
         mode === 'initial'
           ? { mode: 'initial', ...(selectedVideo ? { video: selectedVideo } : {}) }
           : { mode };
-      const res = await fetch('/api/processing/trigger', {
+      const res = await adminFetch('/admin/api/processing/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Failed to start processing');
+      if (!res.ok) throw new Error(await failureMessage(res, 'Failed to start processing'));
+      const started = (await res.json()) as {
+        job_id?: string;
+        status?: ProcessingJob['status'];
+        total_videos?: number;
+      };
+      if (typeof started.job_id === 'string' && started.job_id !== '') {
+        const row: ProcessingJob = {
+          id: started.job_id,
+          mode,
+          status: started.status ?? 'queued',
+          progress: started.status === 'running' ? 10 : 0,
+          current_video: mode === 'initial' ? selectedVideo : undefined,
+          videos_processed: 0,
+          total_videos: started.total_videos,
+          created_at: new Date().toISOString(),
+          started_at: started.status === 'running' ? Date.now() : null,
+          completed_at: null,
+          error: undefined,
+        };
+        setPendingJobs((prev) => [row, ...prev.filter((job) => job.id !== row.id)]);
+      }
       await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start processing');
@@ -191,8 +285,16 @@ export function Processing() {
 
   async function cancelJob(jobId: string) {
     try {
-      const res = await fetch(`/api/processing/cancel/${jobId}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to cancel job');
+      const res = await adminFetch(`/admin/api/processing/cancel/${jobId}`, { method: 'POST' });
+      if (!res.ok) throw new Error(await failureMessage(res, 'Failed to cancel job'));
+      // The list lags the write, so a row still pending locally must not keep saying `queued`.
+      setPendingJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? { ...job, status: 'cancelled', progress: 100, completed_at: Date.now() }
+            : job,
+        ),
+      );
       await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to cancel job');
@@ -201,10 +303,10 @@ export function Processing() {
 
   async function clearCompleted() {
     try {
-      const res = await fetch('/api/processing/clear-completed', { method: 'POST' });
-      if (res.ok) {
-        setJobs((prev) => prev.filter((j) => j.status !== 'completed'));
-      }
+      const res = await adminFetch('/admin/api/processing/clear-completed', { method: 'POST' });
+      // The server drops every terminal record (completed, failed, cancelled); a local filter
+      // would keep the rows it disagrees about until the next poll.
+      if (res.ok) await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to clear completed jobs');
     }
@@ -217,7 +319,7 @@ export function Processing() {
       <div className="mt-4 h-px bg-carbon/45" />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 pt-5">
-        {!localApiAvailable && (
+        {!jobsAvailable && (
           <div className="border border-stamp/50 bg-stamp/5 px-4 py-3 font-kai text-[13px] text-stamp">
             {LOCAL_API_OFFLINE_NOTICE}
           </div>
@@ -254,11 +356,11 @@ export function Processing() {
             <select
               value={selectedVideo}
               onChange={(e) => setSelectedVideo(e.target.value)}
-              disabled={!localApiAvailable}
+              disabled={!jobsAvailable}
               className="mb-4 w-full border border-carbon/45 bg-paper-light px-2.5 py-2 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none disabled:opacity-50"
             >
               <option value="">全部來源影片 (All Videos)</option>
-              {localVideos.map((v) => (
+              {videoOptions.map((v) => (
                 <option key={v.filename} value={v.filename}>
                   {v.filename} ({v.size_mb.toFixed(1)} MB)
                 </option>
@@ -267,7 +369,7 @@ export function Processing() {
             <Button
               variant="primary"
               onClick={startInitialProcessing}
-              disabled={!localApiAvailable || isProcessing}
+              disabled={!jobsAvailable || isProcessing}
               className="mb-4 w-full"
             >
               {isProcessing ? 'Starting...' : 'Start Processing'}
@@ -299,7 +401,7 @@ export function Processing() {
             <Button
               variant="secondary"
               onClick={startEmbeddingUpdate}
-              disabled={!localApiAvailable || isProcessing}
+              disabled={!jobsAvailable || isProcessing}
               className="mb-4 w-full"
             >
               {isProcessing ? 'Starting...' : 'Update Embeddings'}
@@ -331,7 +433,7 @@ export function Processing() {
             <Button
               variant="secondary"
               onClick={startCoverageRefresh}
-              disabled={!localApiAvailable || isProcessing}
+              disabled={!jobsAvailable || isProcessing}
               className="mb-4 w-full"
             >
               {isProcessing ? 'Starting...' : '重新計算覆蓋率與相似度'}
@@ -372,14 +474,14 @@ export function Processing() {
             </div>
           </div>
 
-          {jobs.length === 0 ? (
+          {visibleJobs.length === 0 ? (
             <div className="py-10 text-center text-ledger">
               <p className="text-sm">No processing jobs yet</p>
               <p className="mt-1 text-xs">Start a processing job to see it here</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {jobs.map((job) => (
+              {visibleJobs.map((job) => (
                 <div
                   key={job.id}
                   className="flex gap-4 border border-paper-dark bg-paper p-4 transition-colors hover:border-paper-deep"
