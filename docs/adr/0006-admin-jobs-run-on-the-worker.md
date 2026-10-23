@@ -41,11 +41,13 @@ read-only test apply to these routes unchanged.
 
 ## Consequences
 
-- **One secret, real money.** `HF_TOKEN` needs `job.write`; a reel run defaults to GPU
-  (`a10g-small`, ~$0.60, ~3 min) because CPU detection measures ~5s/frame and outlives the 3h
-  budget, while a cache rebuild stays on `cpu-upgrade` (~$0.05). A stuck queued record is a bill,
-  so the UI must show a terminal state, and a dispatch failure must land as `failed` with the
-  upstream message — never a silent `queued`.
+- **One secret, real money.** `HF_TOKEN` needs `job.write`. A reel run defaults to
+  `cpu-upgrade` (~1.5 h, ~$0.05); the rendition encode is CPU-bound on every flavor, so a GPU
+  only buys detection (2m43s vs 1h31m measured for the same reel). A GPU flavor is therefore
+  opt-in through `HF_JOBS_VIDEO_FLAVOR`, which also selects the CUDA image, `build-essential`
+  and the ONNX provider env — and it stays opt-in until the Worker-dispatched run stops landing
+  on CPU (#86). A stuck queued record is a bill, so the UI must show a terminal state, and a
+  dispatch failure must land as `failed` with the upstream message — never a silent `queued`.
 - **No delete on the Hub.** HF Jobs exposes create, read and cancel, but no delete for regular
   jobs. `clear-completed` therefore removes local records only; Hub history persists and is not
   a source of truth for the console.
