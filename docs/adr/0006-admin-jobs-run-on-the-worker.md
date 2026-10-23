@@ -41,9 +41,10 @@ read-only test apply to these routes unchanged.
 
 ## Consequences
 
-- **One secret, real money.** `HF_TOKEN` needs `job.write`; `cpu-upgrade` costs roughly
-  $0.05/reel and GPU around $0.60/reel (`docs/hf-jobs.md`). A stuck queued record is a bill, so
-  the UI must show a terminal state, and a dispatch failure must land as `failed` with the
+- **One secret, real money.** `HF_TOKEN` needs `job.write`; a reel run defaults to GPU
+  (`a10g-small`, ~$0.60, ~3 min) because CPU detection measures ~5s/frame and outlives the 3h
+  budget, while a cache rebuild stays on `cpu-upgrade` (~$0.05). A stuck queued record is a bill,
+  so the UI must show a terminal state, and a dispatch failure must land as `failed` with the
   upstream message — never a silent `queued`.
 - **No delete on the Hub.** HF Jobs exposes create, read and cancel, but no delete for regular
   jobs. `clear-completed` therefore removes local records only; Hub history persists and is not
