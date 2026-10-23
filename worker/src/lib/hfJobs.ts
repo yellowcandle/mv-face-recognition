@@ -20,8 +20,13 @@ export const HF_JOBS_DEFAULTS = {
   namespace: 'yellowcandle',
   bucket: 'yellowcandle/mv-face-recognition',
   ref: 'main',
-  flavor: 'cpu-upgrade',
+  // A cache rebuild is CPU work over reference portraits; a reel run is detection over every
+  // frame, which at ~5s/frame on `cpu-upgrade` outlives the 3h budget. Hence GPU for video.
+  cacheFlavor: 'cpu-upgrade',
+  videoFlavor: 'a10g-small',
+  // The CUDA image ships the driver stack but no uv; the uv image cannot see a GPU.
   image: 'ghcr.io/astral-sh/uv:python3.12-bookworm',
+  gpuImage: 'pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime',
 } as const;
 
 export interface HfJobsEnv {
@@ -30,6 +35,7 @@ export interface HfJobsEnv {
   HF_JOBS_BUCKET?: string;
   HF_JOBS_REF?: string;
   HF_JOBS_FLAVOR?: string;
+  HF_JOBS_VIDEO_FLAVOR?: string;
 }
 
 export interface JobSpecInput {
@@ -38,7 +44,8 @@ export interface JobSpecInput {
   videoId?: string | null;
   ref: string;
   bucket: string;
-  flavor: string;
+  cacheFlavor: string;
+  videoFlavor: string;
 }
 
 export interface JobSpec {
@@ -68,18 +75,26 @@ export function videoIdFromFilename(filename: string): string | null {
 export function buildJobSpec(input: JobSpecInput): JobSpec {
   const script = `https://raw.githubusercontent.com/${REPO_SLUG}/${input.ref}/scripts/hf/jobs/hf_pipeline.py`;
   const download = `python -c "import urllib.request; urllib.request.urlretrieve('${script}','/tmp/j.py')"`;
-  const stage = input.mode === 'initial' ? `video --video-id ${input.videoId ?? ''}` : 'cache';
+  const gpu = input.mode === 'initial';
+  const stage = gpu ? `video --video-id ${input.videoId ?? ''}` : 'cache';
+  const setup = gpu ? `${APT} build-essential && pip install -q uv` : APT;
   return {
-    command: ['bash', '-lc', `${APT} && ${download} && python /tmp/j.py ${stage}`],
+    command: ['bash', '-lc', `${setup} && ${download} && python /tmp/j.py ${stage}`],
     arguments: [],
-    environment: { REPO_REF: input.ref },
-    flavor: input.flavor,
+    environment: gpu
+      ? {
+          REPO_REF: input.ref,
+          ONNXRUNTIME_GPU: '1',
+          INSIGHTFACE_PROVIDERS: 'CUDAExecutionProvider',
+        }
+      : { REPO_REF: input.ref },
+    flavor: gpu ? input.videoFlavor : input.cacheFlavor,
     // A cache rebuild reads every reference photo; a reel run also encodes. Neither finishes in
     // the Hub's default window.
-    timeoutSeconds: input.mode === 'initial' ? 10800 : 2700,
-    labels: { name: input.mode === 'initial' ? `mv-video-${input.videoId ?? ''}` : 'mv-cache' },
+    timeoutSeconds: gpu ? 10800 : 2700,
+    labels: { name: gpu ? `mv-video-${input.videoId ?? ''}` : 'mv-cache' },
     volumes: [{ type: 'bucket', source: input.bucket, mountPath: '/mnt/data' }],
-    dockerImage: HF_JOBS_DEFAULTS.image,
+    dockerImage: gpu ? HF_JOBS_DEFAULTS.gpuImage : HF_JOBS_DEFAULTS.image,
   };
 }
 

@@ -169,27 +169,40 @@ test('the job spec matches submit.py: command, timeout, label and volume', () =>
     videoId: '4',
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
-    flavor: 'cpu-upgrade',
+    cacheFlavor: 'cpu-upgrade',
+    videoFlavor: 'a10g-small',
   });
   assert.deepEqual(video.command.slice(0, 2), ['bash', '-lc']);
+  assert.match(video.command[2], /build-essential/);
+  assert.match(video.command[2], /pip install -q uv/);
   assert.match(video.command[2], /hf_pipeline\.py/);
   assert.match(video.command[2], /python \/tmp\/j\.py video --video-id 4$/);
+  assert.equal(video.flavor, 'a10g-small');
+  assert.equal(video.dockerImage, hf.HF_JOBS_DEFAULTS.gpuImage);
+  assert.deepEqual(video.environment, {
+    REPO_REF: 'main',
+    ONNXRUNTIME_GPU: '1',
+    INSIGHTFACE_PROVIDERS: 'CUDAExecutionProvider',
+  });
   assert.equal(video.timeoutSeconds, 10800);
   assert.deepEqual(video.labels, { name: 'mv-video-4' });
   assert.deepEqual(video.volumes, [
     { type: 'bucket', source: 'yellowcandle/mv-face-recognition', mountPath: '/mnt/data' },
   ]);
-  assert.deepEqual(video.environment, { REPO_REF: 'main' });
-  assert.equal(video.dockerImage, hf.HF_JOBS_DEFAULTS.image);
 
   const cache = hf.buildJobSpec({
     mode: 'embedding-update',
     videoId: null,
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
-    flavor: 'cpu-upgrade',
+    cacheFlavor: 'cpu-upgrade',
+    videoFlavor: 'a10g-small',
   });
   assert.match(cache.command[2], /python \/tmp\/j\.py cache$/);
+  assert.doesNotMatch(cache.command[2], /build-essential|pip install/);
+  assert.equal(cache.flavor, 'cpu-upgrade');
+  assert.equal(cache.dockerImage, hf.HF_JOBS_DEFAULTS.image);
+  assert.deepEqual(cache.environment, { REPO_REF: 'main' });
   assert.equal(cache.timeoutSeconds, 2700);
   assert.deepEqual(cache.labels, { name: 'mv-cache' });
 });

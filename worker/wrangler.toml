@@ -29,7 +29,8 @@ LOG_LEVEL = "info"  # Options: debug, info, warn, error, none
 HF_JOBS_NAMESPACE = "yellowcandle"
 HF_JOBS_BUCKET = "yellowcandle/mv-face-recognition"
 HF_JOBS_REF = "main"
-HF_JOBS_FLAVOR = "cpu-upgrade"
+HF_JOBS_FLAVOR = "cpu-upgrade"        # cache rebuilds
+HF_JOBS_VIDEO_FLAVOR = "a10g-small"   # reel runs: CPU detection outlives the 3h budget
 # Cloudflare Access application that fronts the admin writes (flags + labels). Unset means the
 # write routes fail closed with 503; invalid tokens are rejected with 401.
 CF_ACCESS_TEAM_DOMAIN = "herballemon.cloudflareaccess.com"

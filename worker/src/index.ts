@@ -51,7 +51,10 @@ interface Env {
   HF_JOBS_NAMESPACE?: string;
   HF_JOBS_BUCKET?: string;
   HF_JOBS_REF?: string;
+  /** Cache rebuild flavor (`cpu-upgrade` by default). */
   HF_JOBS_FLAVOR?: string;
+  /** Reel run flavor (`a10g-small` by default): detection over every frame needs the GPU. */
+  HF_JOBS_VIDEO_FLAVOR?: string;
 }
 
 /**
@@ -2296,7 +2299,8 @@ async function handleJobTrigger(
     videoId,
     ref: env.HF_JOBS_REF ?? HF_JOBS_DEFAULTS.ref,
     bucket: env.HF_JOBS_BUCKET ?? HF_JOBS_DEFAULTS.bucket,
-    flavor: env.HF_JOBS_FLAVOR ?? HF_JOBS_DEFAULTS.flavor,
+    cacheFlavor: env.HF_JOBS_FLAVOR ?? HF_JOBS_DEFAULTS.cacheFlavor,
+    videoFlavor: env.HF_JOBS_VIDEO_FLAVOR ?? HF_JOBS_DEFAULTS.videoFlavor,
   });
   const dispatch = await submitHfJob(env, spec);
 
