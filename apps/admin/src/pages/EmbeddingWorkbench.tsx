@@ -122,7 +122,11 @@ export function EmbeddingWorkbench() {
 
   const videoById = new Map(videos.map((v) => [v.id, v]));
 
-  const { data: recognition, isLoading: detectionsLoading, error: detectionsError } = useQuery<{
+  const {
+    data: recognition,
+    isLoading: detectionsLoading,
+    error: detectionsError,
+  } = useQuery<{
     results: RecognitionResult[];
   }>({
     queryKey: ['recognition-results', selectedContestant?.id],
@@ -654,9 +658,7 @@ export function EmbeddingWorkbench() {
           {activeTab === 'confusion' && (
             <>
               {confusionLoading ? (
-                <div className="py-12 text-center text-carbon-soft">
-                  Loading similarity data...
-                </div>
+                <div className="py-12 text-center text-carbon-soft">Loading similarity data...</div>
               ) : similarityData ? (
                 <div className="flex gap-6">
                   {/* Heatmap */}

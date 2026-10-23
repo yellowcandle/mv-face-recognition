@@ -30,7 +30,9 @@ export function Home() {
               REEL 01 — {String(videos.length).padStart(2, '0')}
             </span>
             <span className="font-mono text-[10px] tracking-[0.14em] text-ledger">
-              {summary ? `${summary.total} 位 · ${summary.total_faces_recognized.toLocaleString('en-US')} 辨識` : '—'}
+              {summary
+                ? `${summary.total} 位 · ${summary.total_faces_recognized.toLocaleString('en-US')} 辨識`
+                : '—'}
             </span>
           </div>
 
@@ -38,7 +40,9 @@ export function Home() {
             <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
           ) : videos.length === 0 ? (
             <div className="border border-dashed border-carbon/35 px-4 py-14 text-center">
-              <div className="font-kai text-[15px] font-bold text-carbon-deep">尚未有已處理影片</div>
+              <div className="font-kai text-[15px] font-bold text-carbon-deep">
+                尚未有已處理影片
+              </div>
               <div className="mt-1 font-kai text-[12px] text-carbon-soft">
                 處理完成的影片會存進這裡。
               </div>
@@ -55,8 +59,10 @@ export function Home() {
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <span className="truncate font-serif text-[22px] font-bold leading-tight text-carbon-deep">
-                    {video.name.replace(/^\d+-/, '').replace(/^《全民造星IV》/, '').trim() ||
-                      video.name}
+                    {video.name
+                      .replace(/^\d+-/, '')
+                      .replace(/^《全民造星IV》/, '')
+                      .trim() || video.name}
                   </span>
                 </div>
                 <div className="flex shrink-0 flex-row items-center gap-4">
@@ -93,8 +99,12 @@ export function Home() {
             to="/player"
             className="flex flex-row items-center justify-center gap-2.5 border border-stamp bg-stamp px-4 py-4 transition-colors hover:bg-carbon"
           >
-            <span className="font-kai text-[14px] tracking-[0.12em] text-paper-light">進入播放</span>
-            <span className="font-mono text-[10px] tracking-[0.24em] text-paper-light/70">PLAY</span>
+            <span className="font-kai text-[14px] tracking-[0.12em] text-paper-light">
+              進入播放
+            </span>
+            <span className="font-mono text-[10px] tracking-[0.24em] text-paper-light/70">
+              PLAY
+            </span>
           </Link>
         </aside>
       </div>

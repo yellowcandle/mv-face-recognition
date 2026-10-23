@@ -240,10 +240,7 @@ export function SystemAdmin() {
             })}
             {!videosQuery.isLoading && reels.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="py-8 text-center font-kai text-[12px] text-carbon-soft"
-                >
+                <td colSpan={6} className="py-8 text-center font-kai text-[12px] text-carbon-soft">
                   還沒有可讀取的影片清單。
                 </td>
               </tr>

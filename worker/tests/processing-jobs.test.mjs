@@ -20,7 +20,13 @@ function bundle(relPath) {
   const out = join(mkdtempSync(join(tmpdir(), 'worker-lib-')), 'mod.mjs');
   execFileSync(
     join(WORKER_DIR, 'node_modules/.bin/esbuild'),
-    [join(WORKER_DIR, relPath), '--bundle', '--format=esm', '--platform=neutral', '--outfile=' + out],
+    [
+      join(WORKER_DIR, relPath),
+      '--bundle',
+      '--format=esm',
+      '--platform=neutral',
+      '--outfile=' + out,
+    ],
     { cwd: WORKER_DIR, stdio: 'pipe' },
   );
   return out;
@@ -50,7 +56,10 @@ function memoryStore() {
       const start = cursor ? Number(cursor) : 0;
       const slice = names.slice(start, start + 2);
       const nextCursor = start + 2 < names.length ? String(start + 2) : undefined;
-      const page = { keys: slice.map((name) => ({ name })), list_complete: nextCursor === undefined };
+      const page = {
+        keys: slice.map((name) => ({ name })),
+        list_complete: nextCursor === undefined,
+      };
       if (nextCursor !== undefined) page.cursor = nextCursor;
       return page;
     },

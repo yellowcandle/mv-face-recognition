@@ -32,7 +32,12 @@ const sections = [
     latin: 'PIPELINE',
     items: [
       { to: '/processing', label: '處理', hint: '觸發影片處理、查看進度', latin: 'PROCESS' },
-      { to: '/embedding-workbench', label: '向量', hint: '檢查覆蓋率、重建參考向量', latin: 'EMBED' },
+      {
+        to: '/embedding-workbench',
+        label: '向量',
+        hint: '檢查覆蓋率、重建參考向量',
+        latin: 'EMBED',
+      },
       { to: '/admin', label: '管理', hint: '服務狀態與資料檢查', latin: 'ADMIN' },
     ],
   },

@@ -123,7 +123,7 @@ def install(repo: Path) -> Path:
         lib_dirs = [str(path) for path in sorted(nvidia.glob("*/lib"))]
         if lib_dirs:
             existing = ENV.get("LD_LIBRARY_PATH", "")
-            ENV["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else ""))
+            ENV["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else []))
         # ONNX Runtime falls back to CPU without failing when CUDA cannot initialise, which
         # bills GPU hours at CPU speed (#86). Create one real session and stop if it did.
         run([str(python), "-c", GPU_CHECK], cwd=mvp)

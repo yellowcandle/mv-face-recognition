@@ -256,7 +256,8 @@ test('no route has an effect: the Worker is read-only', async () => {
               // Throwing on a stub env is fine — the assertion is about what it did before that.
             }
             globalThis.fetch = realFetch;
-            if (effects.length > 0) offenders.push(`${method} ${prefix}${route} -> ${effects.join(', ')}`);
+            if (effects.length > 0)
+              offenders.push(`${method} ${prefix}${route} -> ${effects.join(', ')}`);
           }
         }
       }
@@ -368,7 +369,11 @@ test('deleted routes are gone; Access-gated writes fail closed', async () => {
       ctx,
     );
     assert.equal(response.status, 503, `${method} ${path} without CF_ACCESS_AUD should be 503`);
-    assert.deepEqual(await response.json(), { error: 'Service not configured' }, `${method} ${path}`);
+    assert.deepEqual(
+      await response.json(),
+      { error: 'Service not configured' },
+      `${method} ${path}`,
+    );
   }
 });
 
@@ -401,7 +406,10 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
   const metadata = {
     video_info: { processing_date: '2026-01-02T03:04:05' },
     frame_data: [
-      { frame_number: 1, detections: [{ tracker_id: 0, bbox: [0.1, 0.2, 0.3, 0.4] }, { tracker_id: 1 }] },
+      {
+        frame_number: 1,
+        detections: [{ tracker_id: 0, bbox: [0.1, 0.2, 0.3, 0.4] }, { tracker_id: 1 }],
+      },
       { frame_number: 2, detections: [{ tracker_id: 1 }] },
     ],
   };
@@ -480,7 +488,9 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
     assert.equal(body.flagged_faces.length, 1);
     assert.equal('thumbnail' in body.flagged_faces[0], false);
 
-    response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged?details=true', { token });
+    response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged?details=true', {
+      token,
+    });
     body = await response.json();
     assert.equal(body.flagged_faces[0].thumbnail, 'BASE64JPEG');
 
@@ -573,7 +583,10 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
 
     // Anything that does not point at a real track is refused, not written.
     const invalidLabelSets = [
-      [{ tracker_id: 0, verdict: 'unsure' }, { tracker_id: 0, verdict: 'unsure' }],
+      [
+        { tracker_id: 0, verdict: 'unsure' },
+        { tracker_id: 0, verdict: 'unsure' },
+      ],
       [{ tracker_id: 9, verdict: 'unsure' }],
       [{ tracker_id: 0, verdict: 'maybe' }],
       [{ tracker_id: 0, verdict: 'contestant' }],
@@ -606,11 +619,15 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
     assert.match((await response.json()).detail, /different metadata run/);
 
     // ── delete ──
-    response = await callWorker(worker, env, ctx, 'DELETE', `/api/faces/flagged/${flag.id}`, { token });
+    response = await callWorker(worker, env, ctx, 'DELETE', `/api/faces/flagged/${flag.id}`, {
+      token,
+    });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { deleted: flag.id });
 
-    response = await callWorker(worker, env, ctx, 'DELETE', `/api/faces/flagged/${flag.id}`, { token });
+    response = await callWorker(worker, env, ctx, 'DELETE', `/api/faces/flagged/${flag.id}`, {
+      token,
+    });
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { error: 'Flagged face not found' });
 
@@ -657,10 +674,17 @@ test('authenticated flagging and labelling routes round-trip in KV', async () =>
     response = await callWorker(worker, env, ctx, 'GET', '/api/faces/flagged', { token });
     assert.ok((await response.json()).flagged_faces.some((entry) => entry.id === 'legacy000001'));
 
-    response = await callWorker(worker, env, ctx, 'PATCH', '/admin/api/faces/flagged/legacy000001', {
-      cookie: token,
-      body: { status: 'accepted' },
-    });
+    response = await callWorker(
+      worker,
+      env,
+      ctx,
+      'PATCH',
+      '/admin/api/faces/flagged/legacy000001',
+      {
+        cookie: token,
+        body: { status: 'accepted' },
+      },
+    );
     assert.equal(response.status, 200);
     assert.equal(await env.METADATA_KV.get('flagged_faces'), null, 'the legacy key is claimed');
     assert.equal(
@@ -766,7 +790,7 @@ test('embedding documents, portraits, crops and recognition boxes are served', a
         },
       ],
       contestant_timeline: {
-        '17': {
+        17: {
           appearances: [
             { timestamp: 3.5, match_score: 0.9, frame_number: 105, bbox: [0.1, 0.2, 0.3, 0.4] },
             { timestamp: 9.5, match_score: 0.4, frame_number: 999, bbox: [0.7, 0.7, 0.8, 0.8] },
@@ -890,14 +914,9 @@ test('processing jobs dispatch to HF Jobs and read back through the gated prefix
     assert.equal(job.progress, 100);
     assert.equal(typeof job.completed_at, 'number');
 
-    const missing = await callWorker(
-      worker,
-      env,
-      ctx,
-      'GET',
-      '/admin/api/processing/jobs/nope',
-      { token },
-    );
+    const missing = await callWorker(worker, env, ctx, 'GET', '/admin/api/processing/jobs/nope', {
+      token,
+    });
     assert.equal(missing.status, 404);
     assert.deepEqual(await missing.json(), { detail: 'Job not found' });
 

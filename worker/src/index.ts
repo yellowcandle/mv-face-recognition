@@ -192,8 +192,12 @@ async function verifyAccessJwt(token: string, teamDomain: string, aud: string): 
   if (payload.iss !== `https://${teamDomain}`) throw new Error('wrong iss');
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   if (!audiences.includes(aud)) throw new Error('wrong aud');
-  if (typeof payload.exp !== 'number' || payload.exp + CLOCK_SKEW_S < now) throw new Error('expired');
-  if (payload.nbf !== undefined && (typeof payload.nbf !== 'number' || payload.nbf - CLOCK_SKEW_S > now)) {
+  if (typeof payload.exp !== 'number' || payload.exp + CLOCK_SKEW_S < now)
+    throw new Error('expired');
+  if (
+    payload.nbf !== undefined &&
+    (typeof payload.nbf !== 'number' || payload.nbf - CLOCK_SKEW_S > now)
+  ) {
     throw new Error('not yet valid');
   }
   if (typeof payload.email !== 'string' || payload.email === '') throw new Error('no email claim');
@@ -217,11 +221,7 @@ function extractAccessToken(request: Request): string | null {
   return null;
 }
 
-function jsonResponse(
-  body: unknown,
-  status: number,
-  corsHeaders: CorsHeaders,
-): Response {
+function jsonResponse(body: unknown, status: number, corsHeaders: CorsHeaders): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1816,7 +1816,9 @@ function parseFlagStatus(raw: unknown): string | { detail: string } {
   return status;
 }
 
-function parseFlagReassign(raw: unknown): { face_id: string; contestant_id: number } | { error: string } {
+function parseFlagReassign(
+  raw: unknown,
+): { face_id: string; contestant_id: number } | { error: string } {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return { error: 'Invalid JSON body' };
   }
@@ -2566,7 +2568,11 @@ async function handleFaceCrop(
     return jsonResponse({ error: 'video_id and frame_number are required' }, 400, corsHeaders);
   }
   if (!/^\d+$/.test(frameNumber) || !/^\d+$/.test(detectionIndex)) {
-    return jsonResponse({ error: 'frame_number and detection_index must be integers' }, 400, corsHeaders);
+    return jsonResponse(
+      { error: 'frame_number and detection_index must be integers' },
+      400,
+      corsHeaders,
+    );
   }
 
   const key = `crops/${videoId}/${frameNumber}_${detectionIndex}.jpg`;

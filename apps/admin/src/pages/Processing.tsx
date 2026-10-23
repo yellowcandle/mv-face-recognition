@@ -194,10 +194,7 @@ export function Processing() {
         const statusRes = await adminFetch('/admin/api/system/status');
         const status: unknown = statusRes.ok ? await statusRes.json() : null;
         const isEdge =
-          !!status &&
-          typeof status === 'object' &&
-          'mode' in status &&
-          status.mode === 'edge';
+          !!status && typeof status === 'object' && 'mode' in status && status.mode === 'edge';
         const res = await adminFetch(
           isEdge ? '/admin/api/videos/processed/list' : '/admin/api/videos/local',
         );
@@ -205,7 +202,12 @@ export function Processing() {
         const data: unknown = await res.json();
         let list: unknown[] | null = null;
         if (Array.isArray(data)) list = data;
-        else if (data && typeof data === 'object' && 'videos' in data && Array.isArray(data.videos)) {
+        else if (
+          data &&
+          typeof data === 'object' &&
+          'videos' in data &&
+          Array.isArray(data.videos)
+        ) {
           list = data.videos;
         }
         if (cancelled || !list) return;
@@ -314,7 +316,12 @@ export function Processing() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
-      <Masthead eyebrow="BACK OFFICE · PIPELINE" title="處理" latin="VIDEO PROCESSING & CACHE" size="md" />
+      <Masthead
+        eyebrow="BACK OFFICE · PIPELINE"
+        title="處理"
+        latin="VIDEO PROCESSING & CACHE"
+        size="md"
+      />
 
       <div className="mt-4 h-px bg-carbon/45" />
 
@@ -424,7 +431,9 @@ export function Processing() {
 
           <Card padding="lg">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-carbon-deep">Coverage &amp; Similarity</h2>
+              <h2 className="text-base font-semibold text-carbon-deep">
+                Coverage &amp; Similarity
+              </h2>
               <span className="h-2 w-2 rounded-full bg-carbon" />
             </div>
             <p className="mb-4 text-sm leading-relaxed text-carbon-soft">
