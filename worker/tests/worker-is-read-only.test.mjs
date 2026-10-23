@@ -867,6 +867,16 @@ test('processing jobs dispatch to HF Jobs and read back through the gated prefix
     });
     assert.equal(badMode.status, 400);
 
+    // A coverage refresh has no pipeline stage and no path into the KV read model; the edge
+    // must refuse it instead of quietly running the embedding cache under that name.
+    const coverage = await callWorker(worker, env, ctx, 'POST', '/admin/api/processing/trigger', {
+      token,
+      body: { mode: 'coverage-refresh' },
+    });
+    assert.equal(coverage.status, 501);
+    assert.match((await coverage.json()).detail, /not available on the edge/);
+    assert.equal(calls.filter((call) => call.startsWith('POST ')).length, 0);
+
     const triggered = await callWorker(worker, env, ctx, 'POST', '/admin/api/processing/trigger', {
       token,
       body: { mode: 'initial', video: '4-《全民造星IV》極限拍MV.mp4' },
