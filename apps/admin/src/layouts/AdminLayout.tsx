@@ -8,29 +8,32 @@ import { useState, useEffect } from 'react';
 const sections = [
   {
     group: '核對',
+    blurb: '審核與標註',
     latin: 'TRIAGE',
     items: [
-      { to: '/', label: '儀表', latin: 'DESK' },
-      { to: '/flagging', label: '待核', latin: 'FLAGS' },
-      { to: '/labelling', label: '標註', latin: 'LABEL' },
+      { to: '/', label: '儀表', hint: '待辦、數量與捷徑總覽', latin: 'DESK' },
+      { to: '/flagging', label: '待核', hint: '核對系統標記的人臉', latin: 'FLAGS' },
+      { to: '/labelling', label: '標註', hint: '替未認出的臉指定參賽者', latin: 'LABEL' },
     ],
   },
   {
     group: '資料',
+    blurb: '查找與回看',
     latin: 'RECORDS',
     items: [
-      { to: '/contestants', label: '參賽者', latin: 'CAST' },
-      { to: '/player', label: '播放', latin: 'PLAYER' },
-      { to: '/analytics', label: '紀錄', latin: 'LEDGER' },
+      { to: '/contestants', label: '參賽者', hint: '名冊、參考照與出場次數', latin: 'CAST' },
+      { to: '/player', label: '播放', hint: '播放影片並標記人臉', latin: 'PLAYER' },
+      { to: '/analytics', label: '紀錄', hint: '唯讀的辨識結果帳冊', latin: 'LEDGER' },
     ],
   },
   {
     group: '生產',
+    blurb: '處理與維護',
     latin: 'PIPELINE',
     items: [
-      { to: '/processing', label: '處理', latin: 'PROCESS' },
-      { to: '/embedding-workbench', label: '向量', latin: 'EMBED' },
-      { to: '/admin', label: '管理', latin: 'ADMIN' },
+      { to: '/processing', label: '處理', hint: '觸發影片處理、查看進度', latin: 'PROCESS' },
+      { to: '/embedding-workbench', label: '向量', hint: '檢查覆蓋率、重建參考向量', latin: 'EMBED' },
+      { to: '/admin', label: '管理', hint: '服務狀態與資料檢查', latin: 'ADMIN' },
     ],
   },
 ] as const;
@@ -113,15 +116,22 @@ export function AdminLayout() {
                   to={item.to}
                   end={item.to === '/'}
                   className={({ isActive }) =>
-                    `flex flex-row items-center justify-between border-l-[3px] px-2 py-1.5 ${
+                    `flex flex-row items-start justify-between gap-2 border-l-[3px] px-2 py-1.5 ${
                       isActive
                         ? 'border-l-stamp bg-paper-light text-carbon-deep'
                         : 'border-l-transparent text-carbon-soft hover:bg-paper-light/60 hover:text-carbon'
                     }`
                   }
                 >
-                  <span className="font-kai text-[14px] font-bold">{item.label}</span>
-                  <span className="font-mono text-[7px] tracking-[0.14em] opacity-70">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-kai text-[14px] font-bold leading-tight">
+                      {item.label}
+                    </span>
+                    <span className="font-kai text-[10px] leading-snug opacity-80">
+                      {item.hint}
+                    </span>
+                  </span>
+                  <span className="mt-[3px] shrink-0 font-mono text-[7px] tracking-[0.14em] opacity-60">
                     {item.latin}
                   </span>
                 </NavLink>
