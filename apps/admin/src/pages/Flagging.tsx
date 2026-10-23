@@ -232,7 +232,7 @@ export function Flagging() {
     <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
       <Masthead
         eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
-        title="存根"
+        title="待核"
         latin="OFFICE COPY · WRITABLE"
         size="md"
       >

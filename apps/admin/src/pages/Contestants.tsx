@@ -90,7 +90,7 @@ export function Contestants() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Masthead
           eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
-          title="名冊"
+          title="參賽者"
           latin="CAST · 全民造星 IV"
           size="md"
         >

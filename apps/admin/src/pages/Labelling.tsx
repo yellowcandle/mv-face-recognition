@@ -823,7 +823,7 @@ export function Labelling() {
       {/* Header */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-carbon-deep">Labelling</h1>
+          <h1 className="text-2xl font-bold text-carbon-deep">標註</h1>
           <p className="text-carbon-soft text-sm mt-1">
             One verdict per track — `tracker_id` links a face across frames, so the ground truth the
             separation gate is computed from is one label per track. Crops come from the processed
