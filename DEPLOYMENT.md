@@ -85,12 +85,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<worker-host>/admin/api
 # completed or failed, then cancel one. Both must show a terminal state.
 ```
 
-A reel run defaults to `cpu-upgrade`: ~1.5 h and ~$0.05, because the rendition encode is
-CPU-bound on every flavor. Setting `HF_JOBS_VIDEO_FLAVOR` to a GPU flavor (e.g. `a10g-small`)
-also switches the image, setup and ONNX provider env, and buys detection — 2m43s vs 1h31m for
-the same reel — but it is opt-in until #86 (Worker-dispatched GPU jobs currently run at CPU
-speed). A job left in `queued` means the dispatch failed and the record should say why in
-`error` — check `npx wrangler tail` for `HF job stage unreadable` / `HF job cancel rejected`.
+Flavor follows the job kind (`GPU_MODES` in `worker/src/lib/hfJobs.ts`): reels and embedding
+rebuilds run on `a10g-small` (about $1 per reel, mostly the CPU encode), a coverage refresh on
+`cpu-upgrade` (about $0.05). `HF_JOBS_GPU_FLAVOR` and `HF_JOBS_CPU_FLAVOR` tune each side. A job
+left in `queued` means the dispatch failed and the record should say why in `error` — check
+`npx wrangler tail` for `HF job stage unreadable` / `HF job cancel rejected`.
 
 ## Inspecting KV and R2
 

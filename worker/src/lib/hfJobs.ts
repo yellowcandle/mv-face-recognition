@@ -20,24 +20,36 @@ export const HF_JOBS_DEFAULTS = {
   namespace: 'yellowcandle',
   bucket: 'yellowcandle/mv-face-recognition',
   ref: 'main',
-  // A cache rebuild is CPU work over reference portraits; a reel run is detection over every
-  // frame. GPU would be ~33x faster, but the CUDA path silently falls back to CPU inside the job
-  // (#86), so both default to `cpu-upgrade` until that is fixed. Setting a GPU flavor here is all
-  // it takes to switch: `buildJobSpec` derives the image and provider env from the name.
-  cacheFlavor: 'cpu-upgrade',
-  videoFlavor: 'cpu-upgrade',
+  // Detection and reference-embedding work use the GPU; work that only reads and rewrites JSON
+  // does not. A GPU flavor costs ~20x more per hour, so the split is explicit, not heuristic.
+  cpuFlavor: 'cpu-upgrade',
+  gpuFlavor: 'a10g-small',
   // The CUDA image ships the driver stack but no uv; the uv image cannot see a GPU.
   image: 'ghcr.io/astral-sh/uv:python3.12-bookworm',
   gpuImage: 'pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime',
 } as const;
+
+/** Job kinds that need a GPU. `Record<JobMode, …>` so a new mode cannot skip the decision. */
+export const GPU_MODES: Record<JobMode, boolean> = {
+  initial: true,
+  'embedding-update': true,
+  'coverage-refresh': false,
+};
+
+export function flavorFor(mode: JobMode, env: HfJobsEnv): string {
+  if (GPU_MODES[mode]) return env.HF_JOBS_GPU_FLAVOR ?? HF_JOBS_DEFAULTS.gpuFlavor;
+  return env.HF_JOBS_CPU_FLAVOR ?? HF_JOBS_DEFAULTS.cpuFlavor;
+}
 
 export interface HfJobsEnv {
   HF_TOKEN?: string;
   HF_JOBS_NAMESPACE?: string;
   HF_JOBS_BUCKET?: string;
   HF_JOBS_REF?: string;
-  HF_JOBS_FLAVOR?: string;
-  HF_JOBS_VIDEO_FLAVOR?: string;
+  /** Flavor for jobs that do not need a GPU (`cpu-upgrade` by default). */
+  HF_JOBS_CPU_FLAVOR?: string;
+  /** Flavor for `GPU_MODES` jobs (`a10g-small` by default). */
+  HF_JOBS_GPU_FLAVOR?: string;
 }
 
 export interface JobSpecInput {
@@ -46,8 +58,8 @@ export interface JobSpecInput {
   videoId?: string | null;
   ref: string;
   bucket: string;
-  cacheFlavor: string;
-  videoFlavor: string;
+  /** Resolved by `flavorFor`: the flavor name also selects the image and provider env. */
+  flavor: string;
 }
 
 export interface JobSpec {
@@ -111,7 +123,7 @@ export function buildJobSpec(input: JobSpecInput): JobSpec {
   const script = `https://raw.githubusercontent.com/${REPO_SLUG}/${input.ref}/scripts/hf/jobs/hf_pipeline.py`;
   const download = `python -c "import urllib.request; urllib.request.urlretrieve('${script}','/tmp/j.py')"`;
   const video = input.mode === 'initial';
-  const flavor = video ? input.videoFlavor : input.cacheFlavor;
+  const flavor = input.flavor;
   const gpu = isGpuFlavor(flavor);
   const stage = video ? `video --video-id ${input.videoId ?? ''}` : 'cache';
   const setup = gpu ? `${APT} build-essential && pip install -q uv` : APT;

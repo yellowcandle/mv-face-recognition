@@ -172,14 +172,30 @@ test('a reel filename yields the manifest id, and nothing else does', () => {
   assert.equal(hf.videoIdFromFilename(' 3.mp4 '), '3');
 });
 
+test('each job kind gets the flavor its work needs', () => {
+  assert.equal(hf.flavorFor('initial', {}), 'a10g-small');
+  assert.equal(hf.flavorFor('embedding-update', {}), 'a10g-small');
+  assert.equal(hf.flavorFor('coverage-refresh', {}), 'cpu-upgrade');
+
+  // Ops can move either side without a code change.
+  assert.equal(hf.flavorFor('initial', { HF_JOBS_GPU_FLAVOR: 'a10g-large' }), 'a10g-large');
+  assert.equal(hf.flavorFor('coverage-refresh', { HF_JOBS_CPU_FLAVOR: 'cpu-xl' }), 'cpu-xl');
+
+  // Every mode has a decision; a new one cannot silently default to GPU.
+  assert.deepEqual(Object.keys(hf.GPU_MODES).sort(), [
+    'coverage-refresh',
+    'embedding-update',
+    'initial',
+  ]);
+});
+
 test('the job spec matches submit.py: command, timeout, label and volume', () => {
   const video = hf.buildJobSpec({
     mode: 'initial',
     videoId: '4',
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
-    cacheFlavor: 'cpu-upgrade',
-    videoFlavor: 'cpu-upgrade',
+    flavor: 'cpu-upgrade',
   });
   assert.deepEqual(video.command.slice(0, 2), ['bash', '-lc']);
   assert.doesNotMatch(video.command[2], /build-essential|pip install/);
@@ -200,8 +216,7 @@ test('the job spec matches submit.py: command, timeout, label and volume', () =>
     videoId: '4',
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
-    cacheFlavor: 'cpu-upgrade',
-    videoFlavor: 'a10g-small',
+    flavor: 'a10g-small',
   });
   assert.match(gpu.command[2], /build-essential/);
   assert.match(gpu.command[2], /pip install -q uv/);
@@ -218,8 +233,7 @@ test('the job spec matches submit.py: command, timeout, label and volume', () =>
     videoId: null,
     ref: 'main',
     bucket: 'yellowcandle/mv-face-recognition',
-    cacheFlavor: 'cpu-upgrade',
-    videoFlavor: 'a10g-small',
+    flavor: 'cpu-upgrade',
   });
   assert.match(cache.command[2], /python \/tmp\/j\.py cache$/);
   assert.doesNotMatch(cache.command[2], /build-essential|pip install/);
