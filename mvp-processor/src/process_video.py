@@ -7,6 +7,8 @@ import click
 import yaml
 import json
 import logging
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 from tqdm import tqdm
@@ -30,6 +32,43 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+class StageClock:
+    """Writes the elapsed time of each pipeline stage to `<output>_progress.json`.
+
+    A job's log helps only after it ends, and HF Jobs returns nothing while a run is live, so
+    the timings go to the bucket next to the metadata instead (#86). Each `mark()` closes the
+    previous stage, which keeps the call sites to one line.
+    """
+
+    def __init__(self, path: Path, video: str):
+        self.path = path
+        self.video = video
+        self.started = time.monotonic()
+        self.stages: Dict[str, float] = {}
+        self._stage_started = self.started
+
+    def mark(self, stage: str) -> None:
+        now = time.monotonic()
+        self.stages[stage] = round(now - self._stage_started, 2)
+        self._stage_started = now
+        self._write()
+
+    def _write(self) -> None:
+        payload = {
+            "video": self.video,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "stages_seconds": self.stages,
+            "total_seconds": round(time.monotonic() - self.started, 2),
+        }
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+
+    def summary(self) -> str:
+        parts = [f"{name}={seconds:.0f}s" for name, seconds in self.stages.items()]
+        return ", ".join(parts)
 
 
 def _json_default(obj):
@@ -174,8 +213,14 @@ class VideoProcessingPipeline:
 
         logger.info(f"Processing video: {video_path}")
 
+        clock = StageClock(
+            Path(self.config["output"]["metadata_dir"]) / f"{output_name}_progress.json",
+            output_name,
+        )
+
         # Get video info
         video_info = self.video_processor.get_video_info(str(video_path))
+        clock.mark("probe_video")
         logger.info(
             f"Video info: {video_info['duration']:.1f}s, "
             f"{video_info['width']}x{video_info['height']}, "
@@ -187,6 +232,7 @@ class VideoProcessingPipeline:
         thumbnail_paths = self.video_processor.generate_thumbnails(
             str(video_path), thumbnails_dir, output_name
         )
+        clock.mark("thumbnails")
 
         # Process frames
         all_recognitions = []
@@ -194,6 +240,7 @@ class VideoProcessingPipeline:
 
         frames_generator = self.video_processor.extract_frames(str(video_path))
         frames_list = list(frames_generator)  # Convert to list for progress bar
+        clock.mark("extract_frames")
 
         logger.info(f"Processing {len(frames_list)} frames...")
 
@@ -286,6 +333,8 @@ class VideoProcessingPipeline:
                     if i is not None:
                         entries[i]["tracker_id"] = int(track_id)
 
+        clock.mark("detect_recognize")
+
         smoothing = smooth_track_identities(frame_data)
         logger.info(
             "Track smoothing filled %d detections across %d of %d tracks",
@@ -294,9 +343,12 @@ class VideoProcessingPipeline:
             smoothing["tracks_considered"],
         )
 
+        clock.mark("track_smoothing")
+
         # Save unmatched face embeddings for clustering
         if unmatched_faces:
             self._save_unmatched_embeddings(unmatched_faces, output_name)
+        clock.mark("unmatched_embeddings")
 
         # `acceptance_threshold` in processing_config.yaml is the single acceptance gate, and it is
         # a cosine, in the same direction as the match score. There is deliberately no second
@@ -327,6 +379,7 @@ class VideoProcessingPipeline:
         )
         with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False, default=_json_default)
+        clock.mark("metadata")
 
         # Generate galleries
         gallery_data = self.metadata_generator.generate_face_galleries(
@@ -335,12 +388,16 @@ class VideoProcessingPipeline:
 
         # Save gallery data locally
         self.save_gallery_data(gallery_data, output_name)
+        clock.mark("galleries")
 
         # Convert video formats. Skipped when a GPU/CPU split hands the transcode to another
         # runner: the renditions are plain transcodes of the source; overlays are client-side.
         processed_videos = (
             [] if metadata_only else self.convert_video_formats(video_path, output_name)
         )
+        clock.mark("encode")
+        logger.info("Stage timings: %s", clock.summary())
+        clock.mark("done")
 
         # No annotated rendition: overlays are drawn by the JS layer, which can toggle them.
         # `_annotated.mp4` burned boxes into pixels and was never published.
