@@ -85,9 +85,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<worker-host>/admin/api
 # completed or failed, then cancel one. Both must show a terminal state.
 ```
 
-A `cpu-upgrade` reel costs roughly $0.05; a GPU run roughly $0.60 (`docs/hf-jobs.md`). A job
-left in `queued` means the dispatch failed and the record should say why in `error` — check
-`npx wrangler tail` for `HF job stage unreadable` / `HF job cancel rejected`.
+A reel run defaults to GPU (`a10g-small`, ~$0.60, ~3 min); a cache rebuild stays on
+`cpu-upgrade` (~$0.05). A job left in `queued` means the dispatch failed and the record should
+say why in `error` — check `npx wrangler tail` for `HF job stage unreadable` /
+`HF job cancel rejected`.
 
 ## Inspecting KV and R2
 
