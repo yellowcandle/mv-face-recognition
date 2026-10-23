@@ -19,9 +19,10 @@ interface ProcessingJob {
   videos_processed?: number;
   total_videos?: number;
   created_at?: string;
-  started_at?: number;
-  completed_at?: number;
-  error?: string;
+  // The Worker and the local API both answer with `null` for "not yet".
+  started_at?: number | null;
+  completed_at?: number | null;
+  error?: string | null;
 }
 
 interface VideoOption {
@@ -100,7 +101,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-function formatDuration(start?: number, end?: number): string {
+function formatDuration(start?: number | null, end?: number | null): string {
   if (!start) return '--';
   const endTime = end || Date.now();
   return formatMmSs(Math.floor((endTime - start) / 1000));
@@ -128,12 +129,22 @@ export function Processing() {
   const pollingRef = useRef<number | undefined>(undefined);
   // Last status per job, so a coverage/embedding job that just finished refreshes the read model.
   const seenStatusRef = useRef<Map<string, ProcessingJob['status']>>(new Map());
+  // KV listing is eventually consistent, so a job created a second ago can be missing from it.
+  // Hold the row the trigger returned until a poll reports that id.
+  const [pendingJobs, setPendingJobs] = useState<ProcessingJob[]>([]);
+  const visibleJobs = useMemo(() => {
+    const listed = new Set(jobs.map((job) => job.id));
+    return [...pendingJobs.filter((job) => !listed.has(job.id)), ...jobs];
+  }, [jobs, pendingJobs]);
 
   const activeCount = useMemo(
-    () => jobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
-    [jobs],
+    () => visibleJobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
+    [visibleJobs],
   );
-  const completedCount = useMemo(() => jobs.filter((j) => j.status === 'completed').length, [jobs]);
+  const completedCount = useMemo(
+    () => visibleJobs.filter((j) => j.status === 'completed').length,
+    [visibleJobs],
+  );
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -149,6 +160,10 @@ export function Processing() {
       const jobList = data.jobs || data || [];
       const next: ProcessingJob[] = Array.isArray(jobList) ? jobList : [];
       setJobs(next);
+      const listed = new Set(next.map((job) => job.id));
+      setPendingJobs((prev) =>
+        prev.length === 0 ? prev : prev.filter((job) => !listed.has(job.id)),
+      );
 
       for (const job of next) {
         const prev = seenStatusRef.current.get(job.id);
@@ -227,6 +242,27 @@ export function Processing() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await failureMessage(res, 'Failed to start processing'));
+      const started = (await res.json()) as {
+        job_id?: string;
+        status?: ProcessingJob['status'];
+        total_videos?: number;
+      };
+      if (typeof started.job_id === 'string' && started.job_id !== '') {
+        const row: ProcessingJob = {
+          id: started.job_id,
+          mode,
+          status: started.status ?? 'queued',
+          progress: started.status === 'running' ? 10 : 0,
+          current_video: mode === 'initial' ? selectedVideo : undefined,
+          videos_processed: 0,
+          total_videos: started.total_videos,
+          created_at: new Date().toISOString(),
+          started_at: started.status === 'running' ? Date.now() : null,
+          completed_at: null,
+          error: undefined,
+        };
+        setPendingJobs((prev) => [row, ...prev.filter((job) => job.id !== row.id)]);
+      }
       await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start processing');
@@ -251,6 +287,14 @@ export function Processing() {
     try {
       const res = await adminFetch(`/admin/api/processing/cancel/${jobId}`, { method: 'POST' });
       if (!res.ok) throw new Error(await failureMessage(res, 'Failed to cancel job'));
+      // The list lags the write, so a row still pending locally must not keep saying `queued`.
+      setPendingJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? { ...job, status: 'cancelled', progress: 100, completed_at: Date.now() }
+            : job,
+        ),
+      );
       await fetchJobs();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to cancel job');
@@ -430,14 +474,14 @@ export function Processing() {
             </div>
           </div>
 
-          {jobs.length === 0 ? (
+          {visibleJobs.length === 0 ? (
             <div className="py-10 text-center text-ledger">
               <p className="text-sm">No processing jobs yet</p>
               <p className="mt-1 text-xs">Start a processing job to see it here</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {jobs.map((job) => (
+              {visibleJobs.map((job) => (
                 <div
                   key={job.id}
                   className="flex gap-4 border border-paper-dark bg-paper p-4 transition-colors hover:border-paper-deep"
