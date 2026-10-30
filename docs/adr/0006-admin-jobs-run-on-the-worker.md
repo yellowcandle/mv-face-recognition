@@ -41,14 +41,14 @@ read-only test apply to these routes unchanged.
 
 ## Consequences
 
-- **One secret, real money.** `HF_TOKEN` needs `job.write`. The flavor follows the work:
-  `initial` (reels) and `embedding-update` get a GPU, because both run detection; a
-  `coverage-refresh` stays on `cpu-upgrade`. `GPU_MODES` holds that decision in code and
-  `HF_JOBS_GPU_FLAVOR` / `HF_JOBS_CPU_FLAVOR` tune it. A GPU hour costs about 20x a CPU hour,
-  and a full reel still spends most of its wall clock in the CPU-side rendition encode, so a GPU
-  buys detection time only (#86). A stuck queued record is a bill, so the UI must show a
-  terminal state, and a dispatch failure must land as `failed` with the upstream message — never
-  a silent `queued`.
+- **One secret, real money.** `HF_TOKEN` needs `job.write`. `GPU_MODES` decides the flavor per
+  job kind and `HF_JOBS_GPU_FLAVOR` / `HF_JOBS_CPU_FLAVOR` tune it. Reels stay on CPU: a measured
+  A/B gave ~2x wall clock for ~20x the hourly cost (1h39m for $0.05 against 50+ min for ~$0.70),
+  because the detector's pre/post-processing stays on the CPU — 83 of the reel's 98 detection
+  minutes are that work, not the encode (15 minutes). An embedding rebuild, which is unmeasured
+  and reads only 831 photos, gets the GPU. A stuck queued record is a bill, so the UI must show
+  a terminal state, and a dispatch failure must land as `failed` with the upstream message —
+  never a silent `queued`.
 - **No delete on the Hub.** HF Jobs exposes create, read and cancel, but no delete for regular
   jobs. `clear-completed` therefore removes local records only; Hub history persists and is not
   a source of truth for the console.

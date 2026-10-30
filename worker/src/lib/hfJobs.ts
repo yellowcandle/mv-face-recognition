@@ -29,9 +29,15 @@ export const HF_JOBS_DEFAULTS = {
   gpuImage: 'pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime',
 } as const;
 
-/** Job kinds that need a GPU. `Record<JobMode, …>` so a new mode cannot skip the decision. */
+/**
+ * Job kinds that need a GPU. `Record<JobMode, …>` so a new mode cannot skip the decision.
+ *
+ * Reels stay on CPU: a measured A/B (job `6adb12c6` vs `6ae4c8e6`, #86) gave ~2x wall clock for
+ * ~20x the hourly cost — 1h39m for $0.05 against 50+ min for ~$0.70 — because InsightFace's
+ * pre/post-processing stays on the CPU. Embedding rebuilds read 831 photos and are unmeasured.
+ */
 export const GPU_MODES: Record<JobMode, boolean> = {
-  initial: true,
+  initial: false,
   'embedding-update': true,
   'coverage-refresh': false,
 };

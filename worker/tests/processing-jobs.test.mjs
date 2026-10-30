@@ -173,12 +173,16 @@ test('a reel filename yields the manifest id, and nothing else does', () => {
 });
 
 test('each job kind gets the flavor its work needs', () => {
-  assert.equal(hf.flavorFor('initial', {}), 'a10g-small');
+  // Measured in #86: a GPU reel bought ~2x for ~20x the cost, so reels stay on CPU.
+  assert.equal(hf.flavorFor('initial', {}), 'cpu-upgrade');
   assert.equal(hf.flavorFor('embedding-update', {}), 'a10g-small');
   assert.equal(hf.flavorFor('coverage-refresh', {}), 'cpu-upgrade');
 
   // Ops can move either side without a code change.
-  assert.equal(hf.flavorFor('initial', { HF_JOBS_GPU_FLAVOR: 'a10g-large' }), 'a10g-large');
+  assert.equal(
+    hf.flavorFor('embedding-update', { HF_JOBS_GPU_FLAVOR: 'a10g-large' }),
+    'a10g-large',
+  );
   assert.equal(hf.flavorFor('coverage-refresh', { HF_JOBS_CPU_FLAVOR: 'cpu-xl' }), 'cpu-xl');
 
   // Every mode has a decision; a new one cannot silently default to GPU.
