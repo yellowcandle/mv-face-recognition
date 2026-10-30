@@ -85,9 +85,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<worker-host>/admin/api
 # completed or failed, then cancel one. Both must show a terminal state.
 ```
 
-Flavor follows the job kind (`GPU_MODES` in `worker/src/lib/hfJobs.ts`): reels and embedding
-rebuilds run on `a10g-small` (about $0.30 per reel: ~15 min of CPU encode plus a few minutes of
-GPU detection), a coverage refresh on `cpu-upgrade` (about $0.05). `HF_JOBS_GPU_FLAVOR` and
+Flavor follows the job kind (`GPU_MODES` in `worker/src/lib/hfJobs.ts`): a reel runs on
+`cpu-upgrade` (1h39m, $0.05 — a GPU measured only ~2x faster for ~20x the cost), an embedding
+rebuild on `a10g-small`, and a coverage refresh is refused on the edge. `HF_JOBS_GPU_FLAVOR` and
 `HF_JOBS_CPU_FLAVOR` tune each side. A job
 left in `queued` means the dispatch failed and the record should say why in `error` — check
 `npx wrangler tail` for `HF job stage unreadable` / `HF job cancel rejected`.
