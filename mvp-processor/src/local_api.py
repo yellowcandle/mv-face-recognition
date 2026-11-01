@@ -187,6 +187,20 @@ async def list_local_videos():
     return {"videos": videos}
 
 
+def _stream_version(stem: str) -> str | None:
+    """A cache-busting token for the rendition the stream route will serve."""
+    for suffix in ("_1080p.mp4", "_720p.mp4"):
+        path = _safe_child(PROCESSED_DIR, f"{stem}{suffix}")
+        if not path.exists():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            return None
+        return f"{stat.st_size:x}-{int(stat.st_mtime):x}"
+    return None
+
+
 @app.get("/api/videos/processed/list")
 async def list_processed_videos():
     """List processed videos from local_output/metadata/."""
@@ -198,10 +212,11 @@ async def list_processed_videos():
             continue
         vi = data.get("video_info", {})
         source_file = SOURCE_DIR / f"{name}.mp4"
+        version = _stream_version(name)
         videos.append({
             "id": name,
             "name": name,
-            "stream_url": f"/api/videos/stream/{name}",
+            "stream_url": f"/api/videos/stream/{name}" + (f"?v={version}" if version else ""),
             "filename": source_file.name if source_file.exists() else None,
             "duration": vi.get("duration", 0),
             "width": vi.get("width", 0),

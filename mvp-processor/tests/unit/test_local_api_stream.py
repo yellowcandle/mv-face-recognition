@@ -69,3 +69,21 @@ def test_stream_skips_aborted_1080p_for_the_720p(tmp_path, monkeypatch):
     response = asyncio.run(local_api.stream_video("reel"))
 
     assert Path(response.path) == good
+
+
+def test_stream_version_tracks_the_rendition(tmp_path, monkeypatch):
+    processed = tmp_path / "processed"
+    processed.mkdir()
+    target = _write(processed, "reel_1080p.mp4", _finalized(faststart=True))
+    monkeypatch.setattr(local_api, "PROCESSED_DIR", processed)
+
+    stat = target.stat()
+    assert local_api._stream_version("reel") == f"{stat.st_size:x}-{int(stat.st_mtime):x}"
+
+
+def test_stream_version_is_absent_without_a_rendition(tmp_path, monkeypatch):
+    processed = tmp_path / "processed"
+    processed.mkdir()
+    monkeypatch.setattr(local_api, "PROCESSED_DIR", processed)
+
+    assert local_api._stream_version("reel") is None
