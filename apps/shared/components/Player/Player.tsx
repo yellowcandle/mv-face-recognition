@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { FaceDetection, Video, VideoMetadata } from '../../types';
+import type { FaceDetection, FlaggedFace, Video, VideoMetadata } from '../../types';
 import { BAND_STAMP, bandFor } from '../../lib/bands';
 import { adminFetch, assertOk, isSessionExpired } from '../../lib/adminApi';
 import { AdminErrorNotice } from '../AdminErrorNotice';
@@ -45,6 +45,16 @@ function detectionTier(face: FaceDetection): { label: string; className: string;
   };
 }
 
+/**
+ * A flag's status reads like a slip in the tray: 待核 still in stamp red, 已核對 stamped in
+ * carbon, 作廢 filed away in ledger grey — the same ink the tray uses.
+ */
+const FLAG_STATUS: Record<FlaggedFace['status'], { word: string; ink: string }> = {
+  pending: { word: '待核', ink: 'bg-stamp/20 text-stamp' },
+  accepted: { word: '已核對', ink: 'bg-carbon/20 text-carbon' },
+  rejected: { word: '作廢', ink: 'bg-ledger/20 text-ledger' },
+};
+
 export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   // Flagging is an admin act. The deployed Worker is read-only and no longer serves the flag
   // routes at all (ADR 0003), so this single derivation decides what the player offers — and
@@ -60,6 +70,8 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const videoCanvasRef = useRef<VideoCanvasHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // A flag can point at another video: the seek waits for that video's metadata to load.
+  const pendingSeekRef = useRef<{ videoId: string; time: number } | null>(null);
 
   // Video state
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
@@ -238,6 +250,38 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       }
     },
     [getVideoEl, fetchFacesAtTime, clearSelection],
+  );
+
+  /** Metadata of a freshly loaded video is where a queued cross-video seek lands. */
+  const handleLoadedMetadata = useCallback(
+    (loadedDuration: number) => {
+      setDuration(loadedDuration);
+      const pending = pendingSeekRef.current;
+      if (!pending) return;
+      pendingSeekRef.current = null;
+      // A quick switch can surface another video's metadata first; the queued seek names one.
+      if (pending.videoId !== selectedVideo?.id) return;
+      handleSeek(pending.time);
+    },
+    [handleSeek, selectedVideo],
+  );
+
+  /** Jump to the frame a flag was taken from, switching videos first when it belongs elsewhere. */
+  const handleJumpToFlag = useCallback(
+    (flag: FlaggedFace) => {
+      if (selectedVideo && flag.video_id === selectedVideo.id) {
+        handleSeek(flag.timestamp);
+        return;
+      }
+      const target = videos.find((v) => v.id === flag.video_id);
+      if (!target) {
+        setFlagNotice(`找不到影片 ${flag.video_id}，無法跳到標記位置。`);
+        return;
+      }
+      pendingSeekRef.current = { videoId: target.id, time: flag.timestamp };
+      void handleSelectVideo(target);
+    },
+    [selectedVideo, videos, handleSeek, handleSelectVideo],
   );
 
   const handleSpeedChange = useCallback(
@@ -666,7 +710,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                   showAnnotations={showAnnotations}
                   containerRef={containerRef}
                   onTimeUpdate={setCurrentTime}
-                  onLoadedMetadata={setDuration}
+                  onLoadedMetadata={handleLoadedMetadata}
                   onPlay={handlePlay}
                   onPause={handlePause}
                   onEnded={handleEnded}
@@ -968,24 +1012,51 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
               <div className="space-y-2">
                 {flaggedFaces.map((flag) => (
                   <div key={flag.id} className="bg-paper-dark rounded-none p-3 text-xs">
-                    <div className="space-y-0.5">
-                      <div className="text-carbon-deep font-medium">
-                        {getContestantName(flag.contestant_id)}
+                    <div className="flex gap-3">
+                      {flag.thumbnail ? (
+                        <img
+                          src={flag.thumbnail}
+                          alt={`被標記的人臉 @ ${formatMmSs(flag.timestamp)}`}
+                          className="h-14 w-14 shrink-0 border border-carbon/25 bg-paper object-cover"
+                        />
+                      ) : (
+                        <div
+                          aria-hidden="true"
+                          className="flex h-14 w-14 shrink-0 items-center justify-center border border-carbon/20 bg-paper text-[10px] text-ledger"
+                        >
+                          無縮圖
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="truncate text-carbon-deep font-medium">
+                          {getContestantName(flag.contestant_id)}
+                        </div>
+                        <div className="truncate text-ledger">Video: {flag.video_id}</div>
+                        <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
+                        <span
+                          title={flag.status}
+                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${FLAG_STATUS[flag.status].ink}`}
+                        >
+                          {FLAG_STATUS[flag.status].word}
+                        </span>
                       </div>
-                      <div className="text-ledger">Video: {flag.video_id}</div>
-                      <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
                     </div>
-                    <span
-                      className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                        flag.status === 'pending'
-                          ? 'bg-stamp/20 text-stamp'
-                          : flag.status === 'accepted'
-                            ? 'bg-carbon/20 text-carbon'
-                            : 'bg-stamp/20 text-stamp'
-                      }`}
-                    >
-                      {flag.status}
-                    </span>
+                    <div className="mt-2 flex items-center gap-3 border-t border-carbon/15 pt-2">
+                      <button
+                        type="button"
+                        className="text-[11px] text-carbon underline-offset-2 hover:text-carbon-deep hover:underline"
+                        onClick={() => handleJumpToFlag(flag)}
+                      >
+                        跳到該幀
+                      </button>
+                      {/* The admin SPA is mounted at /admin; a plain anchor survives the trip. */}
+                      <a
+                        href="/admin/flagging"
+                        className="text-[11px] text-carbon underline-offset-2 hover:text-carbon-deep hover:underline"
+                      >
+                        前往待核
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
