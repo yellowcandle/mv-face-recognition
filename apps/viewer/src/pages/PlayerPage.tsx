@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   BAND_STAMP,
+  FaceCrop,
   VideoCanvas,
   bandFor,
   formatMmSs,
@@ -22,6 +23,10 @@ interface QueueEntry {
   contestantId: number;
   name: string;
   band: Band;
+  /** Enough of the source detection to crop the face from the reel. */
+  frameNumber: number;
+  detectionIndex: number;
+  bbox: [number, number, number, number];
 }
 
 export function PlayerPage() {
@@ -57,8 +62,8 @@ export function PlayerPage() {
     let previous = new Set<number>();
     for (const frame of sorted) {
       const now = new Set<number>();
-      for (const d of frame.detections ?? []) {
-        if (d.contestant_id == null) continue;
+      (frame.detections ?? []).forEach((d, detectionIndex) => {
+        if (d.contestant_id == null) return;
         const id = Number(d.contestant_id);
         now.add(id);
         if (!previous.has(id) && d.match_score != null) {
@@ -67,9 +72,12 @@ export function PlayerPage() {
             contestantId: id,
             name: d.contestant_nickname || d.contestant_name || `#${id}`,
             band: bandFor(d.match_score),
+            frameNumber: frame.frame_number,
+            detectionIndex,
+            bbox: d.bbox,
           });
         }
-      }
+      });
       previous = now;
       if (out.length > 600) break;
     }
@@ -301,20 +309,33 @@ export function PlayerPage() {
               type="button"
               key={`${entry.contestantId}-${entry.at}`}
               onClick={() => seek(entry.at)}
-              className="flex flex-row items-center gap-3 border-b border-carbon/20 py-2.5 text-left"
+              className="group flex flex-row items-center gap-3 border-b border-carbon/20 py-2 text-left transition-colors hover:bg-paper-light/40"
             >
-              <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
-                {formatMmSs(entry.at)}
-              </span>
+              <FaceCrop
+                videoId={video?.id ?? ''}
+                frameNumber={entry.frameNumber}
+                detectionIndex={entry.detectionIndex}
+                timestamp={entry.at}
+                bbox={entry.bbox}
+                streamUrl={video?.stream_url}
+                width={64}
+                alt={entry.name}
+                className="h-16 w-16 shrink-0 overflow-hidden border border-carbon/45 bg-carbon-deep/10 [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
+              />
               <span className="flex flex-1 flex-col gap-0.5">
-                <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
-                  {entry.name}
+                <span className="flex flex-row items-baseline justify-between gap-2">
+                  <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
+                    {entry.name}
+                  </span>
+                  <span className="font-mono text-[11px] text-carbon-soft">
+                    {formatMmSs(entry.at)}
+                  </span>
                 </span>
                 <span className="font-mono text-[8px] tracking-[0.14em] text-carbon-soft">
                   #{entry.contestantId} · {BAND_STAMP[entry.band].word}
                 </span>
               </span>
-              <span className="h-[7px] w-[7px] bg-carbon-deep" />
+              <span className="h-[7px] w-[7px] shrink-0 bg-carbon-deep group-hover:bg-stamp" />
             </button>
           ))}
           {queue.length === 0 && (
