@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import {
   AdminErrorNotice,
   BAND_STAMP,
@@ -310,6 +311,11 @@ export function Labelling() {
   // non-array reply contributes no contestants rather than throwing through the picker.
   const contestants = Array.isArray(contestantsRaw) ? (contestantsRaw as Contestant[]) : [];
 
+  // `?video=<id>` names the reel a link came for; the probe below tries it before falling back
+  // to its usual first-labelable walk.
+  const [searchParams] = useSearchParams();
+  const requestedVideoId = searchParams.get('video');
+
   const [videoId, setVideoId] = useState<string | null>(null);
   const streamUrl = videos.find((v) => v.id === videoId)?.stream_url;
   // Videos the probe found to be unlabelable (pre-014 metadata), so the picker can say which
@@ -321,13 +327,20 @@ export function Labelling() {
   // carries no contract marker, so the probe walks it in order and stops at the first video
   // whose metadata parses with `frame_data[].detections`; the rest are marked stale. If no video
   // qualifies, the first one is selected and explains itself — never a blank screen. The probe
-  // shares the metadata query's cache, so the chosen video is not fetched twice.
+  // shares the metadata query's cache, so the chosen video is not fetched twice. A `?video=`
+  // request is simply walked first, so an unlabelable one still falls back to the usual order.
   useEffect(() => {
     if (videos.length === 0 || userPickedRef.current) return;
     let cancelled = false;
     void (async () => {
       const stale: string[] = [];
-      for (const video of videos) {
+      const probeOrder = requestedVideoId
+        ? [
+            ...videos.filter((video) => video.id === requestedVideoId),
+            ...videos.filter((video) => video.id !== requestedVideoId),
+          ]
+        : videos;
+      for (const video of probeOrder) {
         let labelable = false;
         try {
           const metadata = await queryClient.fetchQuery({
@@ -355,7 +368,7 @@ export function Labelling() {
     return () => {
       cancelled = true;
     };
-  }, [videos, queryClient]);
+  }, [videos, queryClient, requestedVideoId]);
 
   // ---- queries -----------------------------------------------------------
 

@@ -1,5 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Masthead, formatMmSs, useContestants } from '@mv/shared';
+import {
+  AdminErrorNotice,
+  Masthead,
+  formatMmSs,
+  useContestants,
+  useCoverage,
+} from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 interface Appearance {
@@ -26,14 +32,31 @@ const QUALITY_INK: Record<Contestant['quality'], string> = {
   missing: 'text-ledger border-ledger',
 };
 
-/** 名冊 — the cast, read as a filing index. 96 people, one row each. */
+/** A count the read model may not have: absent reads as an em dash, never as zero. */
+function countText(value: number | undefined): string {
+  return typeof value === 'number' ? String(value) : '—';
+}
+
+/** 名冊 — the cast, read as a filing index. One row per contestant. */
 export function Contestants() {
-  const { data: contestants = [], refetch } = useContestants();
+  const {
+    data: contestants = [],
+    refetch,
+    isLoading: rosterLoading,
+    error: rosterError,
+  } = useContestants();
+  const { data: coverage } = useCoverage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContestant, setSelectedContestant] = useState<Contestant | null>(null);
   const [appearances, setAppearances] = useState<Appearance[]>([]);
   const [stats, setStats] = useState<ContestantStats | null>(null);
   const [isLoadingAppearances, setIsLoadingAppearances] = useState(false);
+
+  // The roster route carries identity and reference counts; coverage carries the tallies.
+  const countsById = useMemo(
+    () => new Map((coverage?.contestants ?? []).map((c) => [String(c.id), c] as const)),
+    [coverage],
+  );
 
   const filtered = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -105,6 +128,14 @@ export function Contestants() {
 
         <div className="mt-4 h-px bg-carbon/45" />
 
+        {rosterError ? (
+          <AdminErrorNotice
+            error={rosterError}
+            onRetry={() => void refetch()}
+            className="mt-3"
+          />
+        ) : null}
+
         <div className="flex flex-row items-end justify-between py-3">
           <div className="flex flex-1 flex-col gap-1">
             <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
@@ -118,7 +149,11 @@ export function Contestants() {
             />
           </div>
           <span className="font-mono text-[10px] text-carbon-soft">
-            {filtered.length} / {96}
+            {rosterLoading
+              ? '調閱中…'
+              : rosterError
+                ? '—'
+                : `${filtered.length} / ${contestants.length}`}
           </span>
         </div>
 
@@ -170,7 +205,7 @@ export function Contestants() {
                 {c.reference_count}
               </span>
               <span className="w-[70px] text-right font-mono text-[11px] text-carbon-soft">
-                {c.detection_count}
+                {countText(countsById.get(String(c.id))?.detection_count)}
               </span>
               <span className="flex w-[70px] justify-center">
                 <span
@@ -181,7 +216,12 @@ export function Contestants() {
               </span>
             </button>
           ))}
-          {filtered.length === 0 && (
+          {rosterLoading && (
+            <div className="border-b border-carbon/15 py-12 text-center font-kai text-[13px] text-carbon-soft">
+              正在調閱名冊…
+            </div>
+          )}
+          {!rosterLoading && !rosterError && filtered.length === 0 && (
             <div className="border-b border-carbon/15 py-12 text-center font-kai text-[13px] text-carbon-soft">
               名冊裡沒有這個人。
             </div>
@@ -241,9 +281,15 @@ export function Contestants() {
 
             <div className="mt-4 flex flex-row gap-6 border-y border-carbon/25 py-2.5">
               {[
-                ['參考相', selectedContestant.reference_count],
-                ['偵測', selectedContestant.detection_count],
-                ['影片', selectedContestant.videos_seen_in],
+                ['參考相', countText(selectedContestant.reference_count)],
+                [
+                  '偵測',
+                  countText(countsById.get(String(selectedContestant.id))?.detection_count),
+                ],
+                [
+                  '影片',
+                  countText(countsById.get(String(selectedContestant.id))?.videos_seen_in),
+                ],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex flex-col gap-0.5">
                   <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">

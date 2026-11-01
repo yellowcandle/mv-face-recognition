@@ -1,17 +1,53 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { AdminErrorNotice, Masthead, formatMmSs, useFlaggedFaces, useVideos } from '@mv/shared';
+import {
+  AdminErrorNotice,
+  Masthead,
+  formatMmSs,
+  useContestants,
+  useFlaggedFaces,
+  useVideos,
+} from '@mv/shared';
+import type { FlaggedFace } from '@mv/shared';
+
+/** The flag API stamps each record with `created_at`; the shared type predates that field. */
+type DatedFlag = FlaggedFace & { created_at?: string };
+
+function createdMs(flag: FlaggedFace): number {
+  const iso = (flag as DatedFlag).created_at;
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
   const { data: videos = [] } = useVideos();
-  const { data: flagged = [], error: flagsError, refetch: refetchFlags } = useFlaggedFaces();
+  const { data: roster } = useContestants();
+  const {
+    data: flagged = [],
+    error: flagsError,
+    isLoading: flagsLoading,
+    refetch: refetchFlags,
+  } = useFlaggedFaces();
 
   const pending = flagged.filter((f) => f.status === 'pending').length;
   const accepted = flagged.filter((f) => f.status === 'accepted').length;
 
-  const counters = [
+  // The preview is a queue, not an archive: only pending slips, newest first.
+  const recentPending = useMemo(
+    () =>
+      flagged
+        .map((flag, index) => ({ flag, index }))
+        .filter(({ flag }) => flag.status === 'pending')
+        .sort((a, b) => createdMs(b.flag) - createdMs(a.flag) || a.index - b.index)
+        .slice(0, 6)
+        .map(({ flag }) => flag),
+    [flagged],
+  );
+
+  const counters: { cn: string; latin: string; value: string | number; ink: string }[] = [
     { cn: '已存影片', latin: 'REELS', value: videos.length, ink: 'text-carbon' },
-    { cn: '參賽者', latin: 'CAST', value: 96, ink: 'text-carbon' },
+    { cn: '參賽者', latin: 'CAST', value: roster ? roster.length : '—', ink: 'text-carbon' },
     { cn: '待核', latin: 'PENDING', value: pending, ink: 'text-carbon' },
     { cn: '已核對', latin: 'ACCEPTED', value: accepted, ink: 'text-carbon' },
   ];
@@ -53,13 +89,17 @@ export function Dashboard() {
               前往托盤 →
             </Link>
           </div>
-          {flagged.length === 0 ? (
+          {flagsLoading ? (
+            <div className="border border-dashed border-carbon/35 px-4 py-10 text-center font-kai text-[12px] text-carbon-soft">
+              正在調閱待核紀錄…
+            </div>
+          ) : recentPending.length === 0 ? (
             <div className="border border-dashed border-carbon/35 px-4 py-10 text-center font-kai text-[12px] text-carbon-soft">
               目前沒有待核的人臉標記。
             </div>
           ) : (
             <div className="flex flex-col">
-              {flagged.slice(0, 6).map((f) => (
+              {recentPending.map((f) => (
                 <div
                   key={f.id}
                   className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2"
@@ -86,16 +126,8 @@ export function Dashboard() {
                   <span className="font-mono text-[9px] tracking-[0.12em] text-ledger">
                     {f.video_id}
                   </span>
-                  <span
-                    className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] ${
-                      f.status === 'pending'
-                        ? 'border-stamp text-stamp'
-                        : f.status === 'accepted'
-                          ? 'border-carbon text-carbon'
-                          : 'border-ledger text-ledger'
-                    }`}
-                  >
-                    {f.status === 'pending' ? '待核' : f.status === 'accepted' ? '已核對' : '作廢'}
+                  <span className="-rotate-2 border border-stamp px-1.5 py-0.5 font-kai text-[10px] text-stamp">
+                    待核
                   </span>
                 </div>
               ))}
