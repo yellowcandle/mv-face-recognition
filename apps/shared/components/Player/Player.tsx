@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { FaceDetection, Video, VideoMetadata } from '../../types';
 import { BAND_STAMP, bandFor } from '../../lib/bands';
-import { adminFetch } from '../../lib/adminApi';
+import { adminFetch, assertOk, isSessionExpired } from '../../lib/adminApi';
+import { AdminErrorNotice } from '../AdminErrorNotice';
 import { useVideos } from '../../hooks/useVideos';
 import { useContestants } from '../../hooks/useContestants';
 import { useFlaggedFaces } from '../../hooks/useFlaggedFaces';
@@ -79,6 +80,16 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [showBatchFlagDialog, setShowBatchFlagDialog] = useState(false);
   const [isFlagging, setIsFlagging] = useState(false);
+  const [flagError, setFlagError] = useState<unknown>(null);
+  const [flagNotice, setFlagNotice] = useState<string | null>(null);
+
+  // Freezing the frame on first interaction keeps face-object identity stable across the
+  // 200 ms poll, and pins the timestamp the correction is written against.
+  const [selectionSnapshot, setSelectionSnapshot] = useState<{
+    faces: FaceDetection[];
+    timestamp: number;
+    videoId: string;
+  } | null>(null);
 
   // Panel state
   const [showFlaggedPanel, setShowFlaggedPanel] = useState(false);
@@ -121,6 +132,14 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     () => getVideoRenderRect(getVideoEl(), containerRef.current),
     [getVideoEl],
   );
+
+  const clearSelection = useCallback(() => {
+    setSelectedFace(null);
+    setShowFlagDialog(false);
+    setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
+    setFlagError(null);
+  }, []);
 
   // --- Data fetching ---
 
@@ -188,12 +207,14 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       setIsPlaying(false);
       setCurrentTime(0);
       setDetectedFaces([]);
-      setSelectedFace(null);
+      clearSelection();
+      setBatchMode(false);
+      setFlagNotice(null);
       setFilterContestantId(null);
       setContestantAppearances([]);
       await loadVideoMetadata(video.id);
     },
-    [loadVideoMetadata, stopPolling],
+    [loadVideoMetadata, stopPolling, clearSelection],
   );
 
   const handleTogglePlay = useCallback(() => {
@@ -208,13 +229,15 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const handleSeek = useCallback(
     (time: number) => {
+      // A seek lands on a different frame; anything selected against the old one is stale.
+      clearSelection();
       const video = getVideoEl();
       if (video) {
         video.currentTime = time;
         void fetchFacesAtTime(time);
       }
     },
-    [getVideoEl, fetchFacesAtTime],
+    [getVideoEl, fetchFacesAtTime, clearSelection],
   );
 
   const handleSpeedChange = useCallback(
@@ -239,23 +262,25 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     (frames: number) => {
       const video = getVideoEl();
       if (!video) return;
+      clearSelection();
       const fps = videoMetadata?.video_info?.fps || 25;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + frames / fps));
       video.currentTime = newTime;
       void fetchFacesAtTime(newTime);
     },
-    [getVideoEl, videoMetadata, duration, fetchFacesAtTime],
+    [getVideoEl, videoMetadata, duration, fetchFacesAtTime, clearSelection],
   );
 
   const handleSkipSeconds = useCallback(
     (seconds: number) => {
       const video = getVideoEl();
       if (!video) return;
+      clearSelection();
       const newTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
       video.currentTime = newTime;
       void fetchFacesAtTime(newTime);
     },
-    [getVideoEl, duration, fetchFacesAtTime],
+    [getVideoEl, duration, fetchFacesAtTime, clearSelection],
   );
 
   const handleToggleAnnotations = useCallback(() => {
@@ -307,6 +332,18 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const handleFaceClick = useCallback(
     (face: FaceDetection) => {
+      if (!canFlag) return;
+      // First interaction freezes the frame: pausing stops the poll from replacing the
+      // objects, and the snapshot pins the timestamp the correction is written against.
+      if (!selectionSnapshot) {
+        const video = getVideoEl();
+        if (video && !video.paused) video.pause();
+        setSelectionSnapshot({
+          faces: detectedFaces,
+          timestamp: video?.currentTime ?? currentTime,
+          videoId: selectedVideo?.id ?? '',
+        });
+      }
       if (batchMode) {
         setSelectedFaces((prev) => {
           const next = new Set(prev);
@@ -314,116 +351,152 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           else next.add(face);
           return next;
         });
-      } else if (canFlag) {
+      } else {
         setSelectedFace(face);
+        setFlagError(null);
         setShowFlagDialog(true);
       }
     },
-    [batchMode, canFlag],
+    [batchMode, canFlag, selectionSnapshot, detectedFaces, currentTime, selectedVideo, getVideoEl],
   );
 
   const handleToggleBatchMode = useCallback(() => {
-    setBatchMode((prev) => {
-      if (prev) setSelectedFaces(new Set());
-      return !prev;
-    });
+    setBatchMode((prev) => !prev);
+    setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
+    setFlagError(null);
   }, []);
 
   const handleSelectAllFaces = useCallback(() => {
-    setSelectedFaces(new Set(detectedFaces));
-  }, [detectedFaces]);
+    const faces = selectionSnapshot?.faces ?? detectedFaces;
+    if (faces.length === 0) return;
+    if (!selectionSnapshot) {
+      const video = getVideoEl();
+      if (video && !video.paused) video.pause();
+      setSelectionSnapshot({
+        faces,
+        timestamp: video?.currentTime ?? currentTime,
+        videoId: selectedVideo?.id ?? '',
+      });
+    }
+    setSelectedFaces(new Set(faces));
+  }, [selectionSnapshot, detectedFaces, getVideoEl, currentTime, selectedVideo]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
   }, []);
 
   const handleFlagSubmit = useCallback(
     async (contestantId: number, userLabel: string) => {
-      if (!selectedVideo) return;
+      if (!selectedVideo || !selectedFace) return;
       setIsFlagging(true);
+      setFlagError(null);
+      const snapshot = selectionSnapshot;
+      const timestamp = snapshot?.timestamp ?? currentTime;
+      const videoId = snapshot?.videoId ?? selectedVideo.id;
       try {
-        const thumbnail = selectedFace ? extractFaceThumbnail(selectedFace) : null;
+        const thumbnail = extractFaceThumbnail(selectedFace);
         const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contestant_id: contestantId,
-            video_id: selectedVideo.id,
-            timestamp: currentTime,
-            bbox: selectedFace?.bbox,
-            confidence: selectedFace?.match_score ?? null,
-            user_label: userLabel || `Flagged by user at ${formatMmSs(currentTime)}`,
+            video_id: videoId,
+            timestamp,
+            bbox: selectedFace.bbox,
+            confidence: selectedFace.match_score ?? null,
+            user_label: userLabel || `Flagged by user at ${formatMmSs(timestamp)}`,
             thumbnail,
           }),
         });
-        if (res.ok) {
-          setShowFlagDialog(false);
-          setSelectedFace(null);
-          void refetchFlagged();
-          alert('Face flagged successfully!');
-        } else {
-          alert('Failed to flag face');
-        }
+        await assertOk(res);
+        setShowFlagDialog(false);
+        setSelectedFace(null);
+        setSelectionSnapshot(null);
+        setFlagNotice(`已標記一張人臉於 ${formatMmSs(timestamp)}，已送入待核。`);
+        void refetchFlagged();
       } catch (e) {
-        console.error('Failed to flag face:', e);
-        alert('Error flagging face');
+        setFlagError(e);
       } finally {
         setIsFlagging(false);
       }
     },
-    [apiBase, selectedVideo, selectedFace, currentTime, extractFaceThumbnail, refetchFlagged],
+    [
+      apiBase,
+      selectedVideo,
+      selectedFace,
+      selectionSnapshot,
+      currentTime,
+      extractFaceThumbnail,
+      refetchFlagged,
+    ],
   );
 
   const handleBatchFlagSubmit = useCallback(
     async (contestantId: number, _userLabel: string) => {
       if (!selectedVideo || selectedFaces.size === 0) return;
       setIsFlagging(true);
-      let successCount = 0;
-      let failCount = 0;
+      setFlagError(null);
+      const snapshot = selectionSnapshot;
+      const timestamp = snapshot?.timestamp ?? currentTime;
+      const videoId = snapshot?.videoId ?? selectedVideo.id;
       const facesArray = Array.from(selectedFaces);
+      const failed: FaceDetection[] = [];
+      let successCount = 0;
 
-      try {
-        for (const face of facesArray) {
-          try {
-            const thumbnail = extractFaceThumbnail(face);
-            const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contestant_id: contestantId,
-                video_id: selectedVideo.id,
-                timestamp: currentTime,
-                bbox: face.bbox,
-                confidence: face.match_score ?? null,
-                user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(currentTime)}`,
-                thumbnail,
-              }),
-            });
-            if (res.ok) successCount++;
-            else failCount++;
-          } catch {
-            failCount++;
+      for (let i = 0; i < facesArray.length; i++) {
+        const face = facesArray[i];
+        try {
+          const thumbnail = extractFaceThumbnail(face);
+          const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contestant_id: contestantId,
+              video_id: videoId,
+              timestamp,
+              bbox: face.bbox,
+              confidence: face.match_score ?? null,
+              user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(timestamp)}`,
+              thumbnail,
+            }),
+          });
+          await assertOk(res);
+          successCount++;
+        } catch (e) {
+          // Keep the failed (and, on session expiry, all remaining) faces selected so the
+          // operator can retry instead of losing the batch.
+          if (isSessionExpired(e)) {
+            failed.push(...facesArray.slice(i));
+            setFlagError(e);
+            break;
           }
+          failed.push(face);
         }
-
-        setShowBatchFlagDialog(false);
-        setSelectedFaces(new Set());
-        setBatchMode(false);
-        void refetchFlagged();
-
-        if (failCount === 0) {
-          alert(`Successfully flagged ${successCount} faces!`);
-        } else {
-          alert(`Flagged ${successCount} faces. ${failCount} failed.`);
-        }
-      } catch (e) {
-        console.error('Batch flag error:', e);
-        alert('Error during batch flagging');
-      } finally {
-        setIsFlagging(false);
       }
+
+      setSelectedFaces(new Set(failed));
+      void refetchFlagged();
+      if (failed.length === 0) {
+        setShowBatchFlagDialog(false);
+        setBatchMode(false);
+        setSelectionSnapshot(null);
+        setFlagNotice(`已標記 ${successCount} 張人臉，已送入待核。`);
+      } else {
+        setFlagNotice(`已標記 ${successCount} 張，${failed.length} 張失敗；保留選取以便重試。`);
+      }
+      setIsFlagging(false);
     },
-    [apiBase, selectedVideo, selectedFaces, currentTime, extractFaceThumbnail, refetchFlagged],
+    [
+      apiBase,
+      selectedVideo,
+      selectedFaces,
+      selectionSnapshot,
+      currentTime,
+      extractFaceThumbnail,
+      refetchFlagged,
+    ],
   );
 
   // --- Timeline filter (admin mode) ---
@@ -500,6 +573,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const videoSrc = getVideoSource(selectedVideo);
   const fps = videoMetadata?.video_info?.fps || 25;
   const frameNumber = Math.floor(currentTime * fps);
+  const displayFaces = selectionSnapshot?.faces ?? detectedFaces;
 
   if (isLoading) {
     return (
@@ -561,6 +635,19 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         </div>
       </div>
 
+      {flagError ? (
+        <AdminErrorNotice error={flagError} label="標記失敗" className="mx-5 mt-3" />
+      ) : null}
+      {flagNotice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mx-5 mt-3 border border-carbon/30 bg-paper-dark px-4 py-2 font-kai text-[12px] text-carbon-deep"
+        >
+          {flagNotice}
+        </div>
+      ) : null}
+
       {/* Main content */}
       <div className="flex-1 flex gap-5 p-5 min-h-0">
         {/* Video area */}
@@ -575,7 +662,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                 <VideoCanvas
                   ref={videoCanvasRef}
                   videoSrc={videoSrc}
-                  faces={detectedFaces}
+                  faces={displayFaces}
                   showAnnotations={showAnnotations}
                   containerRef={containerRef}
                   onTimeUpdate={setCurrentTime}
@@ -585,7 +672,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                   onEnded={handleEnded}
                 />
                 <FaceOverlay
-                  faces={detectedFaces}
+                  faces={displayFaces}
                   onFaceClick={handleFaceClick}
                   selectedFace={selectedFace}
                   batchMode={batchMode}
@@ -620,8 +707,8 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
           {/* Detection bar */}
           <DetectionBar
-            faceCount={detectedFaces.length}
-            recognizedCount={detectedFaces.filter((f) => f.matched).length}
+            faceCount={displayFaces.length}
+            recognizedCount={displayFaces.filter((f) => f.matched).length}
             frameNumber={frameNumber}
             showAnnotations={showAnnotations}
             batchMode={batchMode}
@@ -665,7 +752,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                   <button
                     className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
                     onClick={handleSelectAllFaces}
-                    disabled={detectedFaces.length === 0}
+                    disabled={displayFaces.length === 0}
                   >
                     Select All
                   </button>
@@ -799,11 +886,11 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
           <div>
             <h4 className="text-xs font-medium text-carbon-soft mb-2">Current Frame Faces</h4>
-            {detectedFaces.length === 0 ? (
+            {displayFaces.length === 0 ? (
               <p className="text-xs text-carbon italic">No faces detected at this timestamp</p>
             ) : (
               <div className="space-y-1">
-                {detectedFaces.map((face, i) => {
+                {displayFaces.map((face, i) => {
                   const tier = detectionTier(face);
                   return (
                     <button
@@ -838,8 +925,11 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           onClose={() => {
             setShowFlagDialog(false);
             setSelectedFace(null);
+            setSelectionSnapshot(null);
+            setFlagError(null);
           }}
           isSubmitting={isFlagging}
+          error={flagError}
         />
       )}
 
@@ -850,8 +940,12 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           selectedFaces={Array.from(selectedFaces)}
           contestants={contestants as Array<{ number: number; name: string; nickname: string }>}
           onSubmit={handleBatchFlagSubmit}
-          onClose={() => setShowBatchFlagDialog(false)}
+          onClose={() => {
+            setShowBatchFlagDialog(false);
+            setFlagError(null);
+          }}
           isSubmitting={isFlagging}
+          error={flagError}
         />
       )}
 

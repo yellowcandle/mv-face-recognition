@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FaceDetection } from '../../types';
 import { bandFor } from '../../lib/bands';
+import { AdminErrorNotice } from '../AdminErrorNotice';
 
 interface FlagDialogProps {
   mode: 'single' | 'batch';
@@ -10,6 +11,8 @@ interface FlagDialogProps {
   onSubmit: (contestantId: number, userLabel: string) => void;
   onClose: () => void;
   isSubmitting: boolean;
+  /** Submit failure; the dialog stays open so the operator can retry. */
+  error?: unknown;
 }
 
 export function FlagDialog({
@@ -20,6 +23,7 @@ export function FlagDialog({
   onSubmit,
   onClose,
   isSubmitting,
+  error,
 }: FlagDialogProps) {
   const [contestantId, setContestantId] = useState<number | null>(null);
   const [userLabel, setUserLabel] = useState('');
@@ -42,15 +46,20 @@ export function FlagDialog({
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={() => {
+        if (!isSubmitting) onClose();
+      }}
     >
       <div
         className="bg-paper-light border border-paper-deep rounded-none p-6 max-w-md w-full mx-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="flag-dialog-title"
       >
-        <h3 className="text-lg font-semibold text-carbon-deep mb-2">{title}</h3>
+        <h3 id="flag-dialog-title" className="text-lg font-semibold text-carbon-deep mb-2">
+          {title}
+        </h3>
         <p className="text-carbon-soft text-sm mb-4">
           {mode === 'batch'
             ? 'Assign all selected faces to a single contestant.'
@@ -134,11 +143,14 @@ export function FlagDialog({
           )}
         </div>
 
+        {error ? <AdminErrorNotice error={error} label="送出失敗" className="mt-4" /> : null}
+
         {/* Actions */}
         <div className="flex justify-end gap-3 mt-6">
           <button
-            className="px-4 py-2 bg-paper-dark text-carbon border border-paper-deep rounded-none text-sm hover:bg-paper-deep"
+            className="px-4 py-2 bg-paper-dark text-carbon border border-paper-deep rounded-none text-sm hover:bg-paper-deep disabled:opacity-45 disabled:cursor-not-allowed"
             onClick={onClose}
+            disabled={isSubmitting}
           >
             Cancel
           </button>

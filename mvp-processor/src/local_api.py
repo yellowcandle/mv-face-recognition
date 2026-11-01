@@ -956,7 +956,7 @@ async def flag_face(req: FlagRequest):
         "contestant_id": req.contestant_id,
         "video_id": req.video_id,
         "timestamp": req.timestamp,
-        "confidence": req.confidence if req.confidence is not None else 0,
+        "confidence": req.confidence,
         "bbox": req.bbox,
         "status": "pending",
         "user_label": req.user_label,
