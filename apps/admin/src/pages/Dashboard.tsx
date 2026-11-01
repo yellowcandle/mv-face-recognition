@@ -1,10 +1,10 @@
 import { Link } from 'react-router';
-import { Masthead, formatMmSs, useFlaggedFaces, useVideos } from '@mv/shared';
+import { AdminErrorNotice, Masthead, formatMmSs, useFlaggedFaces, useVideos } from '@mv/shared';
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
   const { data: videos = [] } = useVideos();
-  const { data: flagged = [] } = useFlaggedFaces();
+  const { data: flagged = [], error: flagsError, refetch: refetchFlags } = useFlaggedFaces();
 
   const pending = flagged.filter((f) => f.status === 'pending').length;
   const accepted = flagged.filter((f) => f.status === 'accepted').length;
@@ -23,6 +23,14 @@ export function Dashboard() {
       </Masthead>
 
       <div className="mt-4 h-px bg-carbon/45" />
+
+      {flagsError ? (
+        <AdminErrorNotice
+          error={flagsError}
+          onRetry={() => void refetchFlags()}
+          className="mt-3"
+        />
+      ) : null}
 
       <div className="flex flex-row items-end gap-12 py-4">
         {counters.map((c) => (
@@ -54,8 +62,21 @@ export function Dashboard() {
               {flagged.slice(0, 6).map((f) => (
                 <div
                   key={f.id}
-                  className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2.5"
+                  className="flex flex-row items-center gap-3 border-b border-carbon/15 py-2"
                 >
+                  <div className="h-10 w-10 shrink-0 overflow-hidden border border-carbon/40 bg-paper-dark">
+                    {f.thumbnail ? (
+                      <img
+                        src={f.thumbnail}
+                        alt={`待核 #${f.contestant_id}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-mono text-[7px] tracking-[0.1em] text-ledger">
+                        NO FACE
+                      </div>
+                    )}
+                  </div>
                   <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
                     {formatMmSs(f.timestamp)}
                   </span>

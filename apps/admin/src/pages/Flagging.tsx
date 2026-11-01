@@ -1,11 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AdminErrorNotice,
   BAND_STAMP,
   Masthead,
   adminFetch,
+  assertOk,
   bandFor,
   formatMmSs,
+  isSessionExpired,
   useContestants,
   useFlaggedFaces,
   useVideos,
@@ -57,7 +60,7 @@ const STATUS_WORD: Record<FlaggedFace['status'], string> = {
  */
 export function Flagging() {
   const queryClient = useQueryClient();
-  const { data: flaggedFaces = [], isLoading, error } = useFlaggedFaces();
+  const { data: flaggedFaces = [], isLoading, error, refetch } = useFlaggedFaces();
   const { data: contestants = [] } = useContestants();
 
   const [statusFilter, setStatusFilter] = useState<'all' | FlaggedFace['status']>('pending');
@@ -67,6 +70,10 @@ export function Flagging() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  // The last failed write (ApiError with the server's detail, or an expired session) and the last
+  // successful stamp word. Both render above the tray so they survive the slip being filtered out.
+  const [writeError, setWriteError] = useState<unknown>(null);
+  const [notice, setNotice] = useState('');
 
   const uniqueVideos = useMemo(
     () => [...new Set(flaggedFaces.map((f) => f.video_id))],
@@ -130,7 +137,8 @@ export function Flagging() {
     if (!focused || focused.status !== 'pending') return;
     const i = filtered.findIndex((f) => f.id === focused.id);
     const next = filtered.slice(i + 1).find((f) => f.status === 'pending');
-    await updateFaceStatus(focused.id, status);
+    // A rejected write keeps the slip under the stamps, so 1/2 retries it instead of skipping it.
+    if (!(await applyStatus(focused.id, status))) return;
     if (next) setFocusedId(next.id);
   }
 
@@ -178,38 +186,91 @@ export function Flagging() {
     [contestants],
   );
 
-  async function updateFaceStatus(faceId: string, status: 'accepted' | 'rejected') {
-    try {
-      const res = await adminFetch(`/admin/api/faces/flagged/${faceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
-    } catch (e) {
-      console.error('Failed to update face status:', e);
-    }
+  /** One PATCH. A non-2xx throws — ApiError with the server's `.detail`, or SessionExpiredError. */
+  async function updateFaceStatus(faceId: string, status: 'accepted' | 'rejected'): Promise<void> {
+    const res = await adminFetch(`/admin/api/faces/flagged/${faceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    await assertOk(res);
   }
 
+  /**
+   * A single decision with its feedback: true only when the write landed, so the caller can hold
+   * the slip where it is on failure. The write itself never refreshes — this path refreshes once,
+   * and bulk drives the same primitive and refreshes once for the whole run.
+   */
+  async function applyStatus(faceId: string, status: 'accepted' | 'rejected'): Promise<boolean> {
+    setWriteError(null);
+    setNotice('');
+    try {
+      await updateFaceStatus(faceId, status);
+    } catch (e) {
+      setWriteError(e);
+      return false;
+    }
+    const word = status === 'accepted' ? '已核對' : '已作廢';
+    setNotice(`${word} · SLIP ${String(faceId).slice(-4).toUpperCase()}`);
+    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+    return true;
+  }
+
+  /**
+   * The same primitive once per selected slip, so a failure is counted, not swallowed: the failed
+   * ids stay selected, an expired session stops the run and keeps the untouched ids too, and the
+   * queue is invalidated once instead of once per row.
+   */
   async function bulkUpdateStatus(status: 'accepted' | 'rejected') {
+    if (selected.size === 0) return;
     setBusy(true);
-    for (const faceId of selected) await updateFaceStatus(faceId, status);
-    setSelected(new Set());
-    setBusy(false);
+    setWriteError(null);
+    setNotice('');
+    const ids = [...selected];
+    const failed = new Set<string>();
+    let done = 0;
+    let failure: unknown = null;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          await updateFaceStatus(ids[i], status);
+          done++;
+        } catch (e) {
+          failed.add(ids[i]);
+          failure = e;
+          if (isSessionExpired(e)) {
+            for (const rest of ids.slice(i + 1)) failed.add(rest);
+            break;
+          }
+        }
+      }
+    } finally {
+      setBusy(false);
+      void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+    }
+    setSelected(failed);
+    setWriteError(failure);
+    const word = status === 'accepted' ? '已核對' : '已作廢';
+    setNotice(failed.size > 0 ? `${word} ${done} 張 · ${failed.size} 失敗` : `${word} ${done} 張`);
   }
 
   async function reassignFace() {
     if (!focused || !reassignTo) return;
+    setWriteError(null);
+    setNotice('');
     try {
       const res = await adminFetch('/admin/api/faces/flag/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),
       });
-      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      await assertOk(res);
     } catch (e) {
-      console.error('Failed to reassign face:', e);
+      setWriteError(e);
+      return;
     }
+    setNotice(`已改派 · SLIP ${String(focused.id).slice(-4).toUpperCase()}`);
+    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
   }
 
   function toggleSelection(id: string) {
@@ -300,6 +361,18 @@ export function Flagging() {
 
       <div className="h-px bg-carbon/20" />
 
+      {/* Every write reports here: the server's reason on failure, the stamp word on success.
+          The line stays mounted so `aria-live` announces each change. */}
+      <div className="pt-2">
+        {writeError ? <AdminErrorNotice error={writeError} label="寫入失敗" /> : null}
+        <p
+          aria-live="polite"
+          className="min-h-[17px] font-kai text-[12px] tracking-[0.04em] text-carbon-soft"
+        >
+          {notice}
+        </p>
+      </div>
+
       <div className="flex min-h-0 flex-1 flex-row">
         {/* Tray */}
         <div className="flex min-w-0 flex-1 flex-col pt-3 pr-1">
@@ -342,9 +415,12 @@ export function Flagging() {
           {isLoading ? (
             <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
           ) : error ? (
-            <div className="mt-2 border border-stamp/40 bg-stamp/5 px-4 py-10 text-center font-kai text-[13px] text-stamp">
-              讀不到待核紀錄 — 後台 API 未啟動？
-            </div>
+            <AdminErrorNotice
+              error={error}
+              label="讀不到待核紀錄"
+              onRetry={() => void refetch()}
+              className="mt-2"
+            />
           ) : filtered.length === 0 ? (
             <div className="mt-2 border border-dashed border-carbon/35 px-4 py-14 text-center">
               <div className="font-kai text-[15px] font-bold text-carbon-deep">這一疊是空的</div>
@@ -418,7 +494,7 @@ export function Flagging() {
                           tone="carbon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void updateFaceStatus(face.id, 'accepted');
+                            void applyStatus(face.id, 'accepted');
                           }}
                         />
                         <MiniStamp
@@ -426,7 +502,7 @@ export function Flagging() {
                           tone="stamp"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void updateFaceStatus(face.id, 'rejected');
+                            void applyStatus(face.id, 'rejected');
                           }}
                         />
                       </div>
@@ -648,7 +724,7 @@ export function Flagging() {
                 <button
                   type="button"
                   disabled={focused.status !== 'pending'}
-                  onClick={() => void updateFaceStatus(focused.id, 'accepted')}
+                  onClick={() => void applyStatus(focused.id, 'accepted')}
                   className="flex min-w-0 flex-1 flex-row items-center justify-between gap-2 bg-stamp px-3 py-3 disabled:opacity-40"
                 >
                   <span className="whitespace-nowrap font-kai text-[15px] font-bold tracking-[0.12em] text-paper-light">
@@ -661,7 +737,7 @@ export function Flagging() {
                 <button
                   type="button"
                   disabled={focused.status !== 'pending'}
-                  onClick={() => void updateFaceStatus(focused.id, 'rejected')}
+                  onClick={() => void applyStatus(focused.id, 'rejected')}
                   className="shrink-0 border border-carbon/45 px-3 py-3 disabled:opacity-40"
                 >
                   <span className="whitespace-nowrap font-kai text-[13px] tracking-[0.1em] text-carbon-soft">

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AdminErrorNotice,
   BAND_STAMP,
   Badge,
   Button,
   Card,
   FaceCrop,
   adminFetch,
+  assertOk,
   useContestants,
   useVideos,
   bandFor,
+  isSessionExpired,
 } from '@mv/shared';
 import type { Band, Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 
@@ -109,6 +112,13 @@ type DenseMetadata = Omit<VideoMetadata, 'video_info'> & {
 /** Tracks rendered at once. 530 lazy images at once is a request storm, not a grid. */
 const PAGE_SIZE = 120;
 const AUTOSAVE_DEBOUNCE_MS = 400;
+/**
+ * How long the sheet's verdict controls stay inert after a commit. The commit advances to the
+ * next unlabelled track in the same geometry, so without a window a double-click would label
+ * two tracks: the second click lands on a sheet that has already moved on. The window covers
+ * the advance plus the autosave debounce it starts.
+ */
+const COMMIT_SETTLE_MS = AUTOSAVE_DEBOUNCE_MS + 100;
 
 /** The separation gate the labels exist to decide (ticket 005). */
 const GATE = { trueMatchMean: 0.45, worstImpostor: 0.2 } as const;
@@ -175,7 +185,9 @@ function readErrorDetail(value: unknown): string | null {
  */
 async function fetchDenseMetadata(videoId: string): Promise<DenseMetadata> {
   const res = await fetch(`/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
-  if (!res.ok) throw new Error(`Failed to load metadata: HTTP ${res.status}`);
+  // Public route, so no Access plumbing: `assertOk` still turns a non-2xx into an error that
+  // carries the server's detail instead of a bare status code.
+  await assertOk(res);
   return (await res.json()) as DenseMetadata;
 }
 
@@ -219,9 +231,12 @@ function BandPill({ band, className = '' }: { band: Band; className?: string }) 
 
 function ContestantPicker({
   contestants,
+  busy,
   onPick,
 }: {
   contestants: Contestant[];
+  /** True while the commit that just ran is still settling; every control is inert. */
+  busy: boolean;
   onPick: (contestantId: string) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -245,6 +260,7 @@ function ContestantPicker({
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
+            if (busy) return;
             const first = hits[0];
             if (first) onPick(String(first.id));
           }
@@ -260,8 +276,9 @@ function ContestantPicker({
             <button
               key={c.id}
               type="button"
+              disabled={busy}
               onClick={() => onPick(String(c.id))}
-              className={`block w-full text-left px-3 py-1.5 text-sm transition-colors ${
+              className={`block w-full text-left px-3 py-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 i === 0 ? 'bg-paper-dark text-carbon-deep' : 'text-carbon hover:bg-paper-dark'
               }`}
             >
@@ -363,7 +380,9 @@ export function Labelling() {
             'A labels file exists whose source does not match the current metadata — a reprocess invalidated it.',
         };
       }
-      if (!res.ok) throw new Error(`Failed to load labels: HTTP ${res.status}`);
+      // Anything else that is not 2xx throws an `ApiError` carrying the server's detail (or a
+      // `SessionExpiredError`), so the page can name the real failure instead of guessing.
+      await assertOk(res);
       // `labels/v2` on the wire: the server rejects anything else on PUT, so a file that reads
       // back through GET was well-formed when it was written. A v1 file is not an error: it
       // comes back as an empty v2 set with `legacy_ignored`, so the page can explain re-labelling.
@@ -376,12 +395,14 @@ export function Labelling() {
   const conflict = labelsQuery.data?.status === 'conflict' ? labelsQuery.data.detail : null;
   const legacyIgnored = file?.legacy_ignored === true;
   // A labels file that cannot be read must not be silently replaced by an empty set, so the
-  // failure is surfaced and labelling is blocked until it is readable.
-  const labelsLoadError = labelsQuery.isError
-    ? labelsQuery.error instanceof Error
-      ? labelsQuery.error.message
-      : 'Failed to load labels'
+  // failure is surfaced and labelling is blocked until it is readable. The error object is kept
+  // whole: an expired Access session is not a corrupt file, and `AdminErrorNotice` tells the two
+  // apart (one offers reload, the other a retry).
+  const labelsLoadFailure: unknown = labelsQuery.isError
+    ? (labelsQuery.error ?? new Error('Failed to load labels'))
     : null;
+  const labelsLoadError = labelsLoadFailure !== null;
+  const labelsLoadExpired = isSessionExpired(labelsLoadFailure);
 
   // ---- detections and tracks ---------------------------------------------
 
@@ -522,12 +543,32 @@ export function Labelling() {
   const [labels, setLabels] = useState<Record<string, Label>>({});
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<unknown>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
   const savedJsonRef = useRef<string | null>(null);
   const saveSeqRef = useRef(0);
+  /** Tail of the write queue, so a labels file is never replaced by two PUTs racing each other. */
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  /**
+   * The payload the debounce is holding. It lives here, not only in the timer closure, because
+   * every dependency change, a video switch and an unmount all clear that timer — and clearing
+   * it is exactly what used to drop the last verdict typed inside the 400 ms window.
+   */
+  const pendingSaveRef = useRef<{ videoId: string; json: string } | null>(null);
+  /** The video the badges describe; a write finishing after a switch must not move them. */
+  const liveVideoRef = useRef<string | null>(null);
+  /**
+   * A write the reviewer switched away from cannot move the badges — they describe the video on
+   * screen — but its failure must not vanish with it: the flush before a switch is exactly the
+   * write that must not fail silently. Held per video and shown when that video is reopened.
+   */
+  const failedSaveRef = useRef(new Map<string, unknown>());
+
+  useEffect(() => {
+    liveVideoRef.current = videoId;
+  }, [videoId]);
 
   // Resume: reopening a video shows the labels already on disk. The baseline for
   // "has anything changed?" is what the server last told us, so hydration never
@@ -540,68 +581,87 @@ export function Labelling() {
     }
     setLabels(next);
     savedJsonRef.current = JSON.stringify(serializeLabels(next));
+    // A payload queued for the video being left is never written into this one's file.
+    pendingSaveRef.current = null;
+    const failedSave = failedSaveRef.current.get(videoId);
     setHydratedFor(videoId);
-    setSaveState('idle');
-    setSaveError(null);
+    setSaveState(failedSave ? 'failed' : 'idle');
+    setSaveError(failedSave ?? null);
     setSavedAt(file.labelled_at ? new Date(file.labelled_at) : null);
   }, [videoId, file, hydratedFor]);
 
   const labelsJson = useMemo(() => JSON.stringify(serializeLabels(labels)), [labels]);
 
   const save = useCallback(
-    async (bodyLabelsJson: string) => {
-      if (!videoId || !source) return;
+    (bodyLabelsJson: string): Promise<void> => {
+      if (!videoId || !source) return Promise.resolve();
+      // Everything below is pinned to this video: the request, the cache entry it refreshes and
+      // the badges it may move. `live()` asks again at each step, because the reviewer can switch
+      // video while a write is in flight.
+      const forVideo = videoId;
       const seq = ++saveSeqRef.current;
-      setSaveState('saving');
-      setSaveError(null);
-      try {
-        // Round-trip of this page's own serialization, not external input: the debounce effect
-        // hands over the exact JSON it built from the labels map.
-        const labelList = JSON.parse(bodyLabelsJson) as Label[];
-        const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(videoId)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source, labels: labelList }),
-        });
-        if (!res.ok) {
-          const detail = readErrorDetail(await res.json().catch(() => null));
+      const live = () => forVideo === liveVideoRef.current;
+      if (live()) {
+        setSaveState('saving');
+        setSaveError(null);
+      }
+      // The endpoint replaces the whole file, so writes are serialized: two overlapping PUTs can
+      // otherwise finish out of order and leave the older label set on disk. `seq` was taken at
+      // enqueue time, so only the newest queued payload may move the badges.
+      const run = saveChainRef.current.then(async () => {
+        try {
+          // Round-trip of this page's own serialization, not external input: the debounce effect
+          // hands over the exact JSON it built from the labels map.
+          const labelList = JSON.parse(bodyLabelsJson) as Label[];
+          const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(forVideo)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source, labels: labelList }),
+          });
+          // A non-2xx throws here: an `ApiError` with the server's `detail`, or a
+          // `SessionExpiredError` the notice renders as "reload", never as a broken file.
+          await assertOk(res);
+          const savedBody: unknown = await res.json().catch(() => null);
+          // Keep the cache equal to disk so remounting the page mid-session shows
+          // the verdicts that were just written. This is keyed by `forVideo`, so it stays correct
+          // even when the reviewer has already moved to another video.
+          queryClient.setQueryData<LabelsResult>(['labels', forVideo], (): LabelsResult => ({
+            status: 'loaded',
+            file: {
+              schema: 'labels/v2',
+              video_id: forVideo,
+              labelled_at: new Date().toISOString(),
+              source,
+              labels: labelList,
+              legacy_ignored: false,
+            },
+          }));
+          failedSaveRef.current.delete(forVideo);
+          if (!live() || seq !== saveSeqRef.current) return;
+          savedJsonRef.current = bodyLabelsJson;
+          setSaveState('saved');
+          setSaveError(null);
+          setSavedAt(new Date());
+          setSavedPath(
+            typeof savedBody === 'object' &&
+              savedBody !== null &&
+              'path' in savedBody &&
+              typeof savedBody.path === 'string'
+              ? savedBody.path
+              : null,
+          );
+        } catch (e) {
+          if (!live()) {
+            failedSaveRef.current.set(forVideo, e);
+            return;
+          }
           if (seq !== saveSeqRef.current) return;
           setSaveState('failed');
-          setSaveError(detail ?? `HTTP ${res.status}`);
-          return;
+          setSaveError(e);
         }
-        const savedBody: unknown = await res.json().catch(() => null);
-        if (seq !== saveSeqRef.current) return;
-        savedJsonRef.current = bodyLabelsJson;
-        setSaveState('saved');
-        setSaveError(null);
-        setSavedAt(new Date());
-        setSavedPath(
-          typeof savedBody === 'object' &&
-            savedBody !== null &&
-            'path' in savedBody &&
-            typeof savedBody.path === 'string'
-            ? savedBody.path
-            : null,
-        );
-        // Keep the cache equal to disk so remounting the page mid-session shows
-        // the verdicts that were just written.
-        queryClient.setQueryData<LabelsResult>(['labels', videoId], (): LabelsResult => ({
-          status: 'loaded',
-          file: {
-            schema: 'labels/v2',
-            video_id: videoId,
-            labelled_at: new Date().toISOString(),
-            source,
-            labels: labelList,
-            legacy_ignored: false,
-          },
-        }));
-      } catch (e) {
-        if (seq !== saveSeqRef.current) return;
-        setSaveState('failed');
-        setSaveError(e instanceof Error ? e.message : String(e));
-      }
+      });
+      saveChainRef.current = run;
+      return run;
     },
     [videoId, source, queryClient],
   );
@@ -610,12 +670,63 @@ export function Labelling() {
   // when the payload is byte-identical to what was last saved.
   useEffect(() => {
     if (!videoId || hydratedFor !== videoId || conflict || labelsLoadError || metadataIssue) return;
-    if (savedJsonRef.current === labelsJson) return;
+    if (savedJsonRef.current === labelsJson) {
+      pendingSaveRef.current = null;
+      return;
+    }
+    pendingSaveRef.current = { videoId, json: labelsJson };
     const timer = setTimeout(() => {
+      pendingSaveRef.current = null;
       void save(labelsJson);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [labelsJson, videoId, hydratedFor, conflict, labelsLoadError, metadataIssue, save]);
+
+  /**
+   * Write what the debounce is holding — or the labels in memory when the effect has not queued
+   * them yet — instead of waiting out the timer. Called before a video switch and on unmount: the
+   * two paths where the cleanup above would otherwise cancel the only write the reviewer's last
+   * verdict had.
+   */
+  const flushPendingSave = useCallback(() => {
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    // The same gate as the debounce: a blocked page never writes, not even on the way out, and a
+    // payload queued for another video is never written into this one's file.
+    if (conflict || labelsLoadError || metadataIssue) return;
+    // Between a switch and that video's hydration the labels in memory still belong to the video
+    // being left, so nothing in this state is theirs to write.
+    if (!videoId || hydratedFor !== videoId) return;
+    const queued = pending !== null && pending.videoId === videoId ? pending.json : null;
+    const target = queued ?? (labelsJson !== savedJsonRef.current ? labelsJson : null);
+    if (target === null) return;
+    void save(target);
+  }, [conflict, labelsLoadError, metadataIssue, videoId, hydratedFor, labelsJson, save]);
+
+  // `save` (and `videoId`) change across renders; an unmount cleanup must reach the newest pair.
+  const flushRef = useRef(flushPendingSave);
+  useEffect(() => {
+    flushRef.current = flushPendingSave;
+  }, [flushPendingSave]);
+  useEffect(() => () => flushRef.current(), []);
+
+  /** Verdicts typed but not yet on disk: the debounce is still running, or a write is in flight. */
+  const unsaved =
+    videoId !== null &&
+    hydratedFor === videoId &&
+    (saveState === 'saving' || labelsJson !== savedJsonRef.current);
+
+  // Leaving the page inside that window must not silently discard it. The browser owns the
+  // prompt, so this only asks; the flush above is what actually keeps the edit.
+  useEffect(() => {
+    if (!unsaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsaved]);
 
   // ---- filters -----------------------------------------------------------
 
@@ -702,8 +813,49 @@ export function Labelling() {
     [labels, advanceFrom],
   );
 
+  // ---- commit arming -----------------------------------------------------
+  // A commit advances the sheet to the next unlabelled track *in the same geometry*, so the
+  // second click of a double-click would land on a different track and label it too. The gate is
+  // a ref: it flips synchronously inside the first handler, before React re-renders, so the
+  // second click cannot slip between the two. `committing` only disables the controls visually.
+  const [committing, setCommitting] = useState(false);
+  const commitLockRef = useRef(false);
+  const commitTimerRef = useRef<number | null>(null);
+
+  const armCommit = useCallback(() => {
+    commitLockRef.current = true;
+    setCommitting(true);
+    if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
+    // Released once the advance has rendered and the autosave it queued has fired.
+    commitTimerRef.current = window.setTimeout(() => {
+      commitTimerRef.current = null;
+      commitLockRef.current = false;
+      setCommitting(false);
+    }, COMMIT_SETTLE_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
+    },
+    [],
+  );
+
   const commitOne = useCallback(
     (track: Track, verdict: Verdict, contestantId?: string) => {
+      if (commitLockRef.current) return;
+      armCommit();
+      const existing = labels[track.key];
+      if (
+        existing &&
+        existing.verdict === verdict &&
+        (verdict !== 'contestant' || existing.contestant_id === contestantId)
+      ) {
+        // Re-stating the verdict already on the track writes nothing; it only moves on, which is
+        // what the reviewer asked for by clicking it again.
+        advanceFrom(labels, track.key);
+        return;
+      }
       const label: Label = {
         tracker_id: track.tracker_id,
         verdict,
@@ -711,7 +863,7 @@ export function Labelling() {
       };
       commit([[track.key, label]], track.key);
     },
-    [commit],
+    [labels, advanceFrom, commit, armCommit],
   );
 
   const clearLabel = useCallback(
@@ -814,7 +966,7 @@ export function Labelling() {
   const visible = filtered.slice(0, visibleCount);
   // Labelling is blocked whenever the labels on disk cannot be read (a stale file, or a load
   // failure) or the metadata is not under the current contract. A blocked page never writes.
-  const blocked = conflict !== null || labelsLoadError !== null || metadataIssue !== null;
+  const blocked = conflict !== null || labelsLoadError || metadataIssue !== null;
   const labelable = metadataIssue === null;
   const loading = !videoId || metadataQuery.isLoading || labelsQuery.isLoading;
 
@@ -859,10 +1011,12 @@ export function Labelling() {
         </div>
       </div>
 
-      {saveError && (
-        <div className="border border-stamp/50 bg-stamp/10/40 text-stamp text-sm rounded-none px-4 py-2">
-          Save failed: {saveError}
-        </div>
+      {saveError != null && (
+        <AdminErrorNotice
+          error={saveError}
+          onRetry={() => void save(labelsJson)}
+          label="標註儲存失敗"
+        />
       )}
 
       {legacyIgnored && (
@@ -918,16 +1072,28 @@ export function Labelling() {
         </div>
       )}
 
-      {labelsLoadError !== null && (
-        <div className="border border-stamp/50 bg-stamp/10/40 rounded-none px-4 py-3 space-y-2">
-          <p className="text-stamp text-sm font-semibold">
-            The labels file could not be read — labelling is blocked, so a save cannot replace
-            verdicts that are already on disk.
-          </p>
-          <p className="text-stamp/80 text-xs font-mono">{labelsLoadError}</p>
-          <Button variant="secondary" size="sm" onClick={() => void labelsQuery.refetch()}>
-            Retry
-          </Button>
+      {labelsLoadError && (
+        <div className="space-y-2">
+          <AdminErrorNotice
+            error={labelsLoadFailure}
+            onRetry={() => void labelsQuery.refetch()}
+            label="標註檔讀取失敗"
+          />
+          {/* An expired session is not a broken file: the notice above already offers the only
+              action that helps, and the file is untouched and unread, not corrupt. */}
+          {!labelsLoadExpired && (
+            <div className="border border-stamp/50 bg-stamp/10/40 rounded-none px-4 py-3 space-y-2">
+              <p className="text-stamp text-sm font-semibold">
+                Labelling is blocked until the labels file is readable, so a save cannot replace
+                verdicts that are already on disk.
+              </p>
+              <p className="text-stamp/70 text-xs">
+                Fix or move{' '}
+                <span className="font-mono">local_output/labels/{videoId}_labels.json</span>, then
+                retry. Nothing is written while this stands.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -938,6 +1104,9 @@ export function Labelling() {
           <select
             value={videoId ?? ''}
             onChange={(e) => {
+              // The debounce timer is about to be cleared by this switch, so the verdict typed a
+              // moment ago is written first — to the video it was typed for.
+              flushPendingSave();
               // An explicit choice wins over the auto-probe for the rest of the session.
               userPickedRef.current = true;
               setVideoId(e.target.value || null);
@@ -1061,14 +1230,18 @@ export function Labelling() {
                 <p>Loading tracks…</p>
               </div>
             ) : metadataQuery.error ? (
-              <Card padding="lg">
-                <div className="text-center py-8">
-                  <p className="text-stamp mb-4">Failed to load video metadata</p>
-                  <Button variant="secondary" size="sm" onClick={() => metadataQuery.refetch()}>
-                    Retry
-                  </Button>
-                </div>
-              </Card>
+              <div className="space-y-2">
+                <AdminErrorNotice
+                  error={metadataQuery.error}
+                  onRetry={() => void metadataQuery.refetch()}
+                  label="中繼資料讀取失敗"
+                />
+                <p className="text-carbon-soft text-xs">
+                  Nothing can be labelled until this video's metadata reads back: the tracks are
+                  built from it, and a labels file is never written against a run that could not be
+                  read.
+                </p>
+              </div>
             ) : filtered.length === 0 ? (
               <Card padding="lg">
                 <div className="text-center py-8 text-carbon-soft">
@@ -1407,6 +1580,7 @@ export function Labelling() {
                 <ContestantPicker
                   key={openKey}
                   contestants={contestants}
+                  busy={committing}
                   onPick={(contestantId) => commitOne(openTrack, 'contestant', contestantId)}
                 />
 
@@ -1415,9 +1589,10 @@ export function Labelling() {
                     <button
                       key={v}
                       type="button"
+                      disabled={committing}
                       onClick={() => commitOne(openTrack, v)}
                       title={VERDICT_BLURB[v]}
-                      className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer"
+                      className="border border-paper-deep bg-paper-dark hover:border-ledger hover:bg-paper-deep text-carbon-deep rounded-none px-3 py-2 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="block font-semibold">{VERDICT_LABEL[v]}</span>
                       <span className="block text-[10.5px] text-carbon-soft">
