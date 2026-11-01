@@ -281,9 +281,10 @@ def _recompute_coverage() -> dict:
     generate_coverage = _script_import("generate_coverage").generate_coverage
     coverage = generate_coverage(CONTESTANT_CSV, EMBEDDINGS_DIR, METADATA_DIR)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "coverage.json").write_text(
-        json.dumps(coverage, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    path = DATA_DIR / "coverage.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(coverage, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
     return coverage
 
 
@@ -317,12 +318,14 @@ def _recompute_similarity() -> None:
     }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "similarity_matrix.json").write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (DATA_DIR / "top_pairs.json").write_text(
-        json.dumps(pairs_payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    for name, body in (
+        ("similarity_matrix.json", payload),
+        ("top_pairs.json", pairs_payload),
+    ):
+        path = DATA_DIR / name
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
 
 
 @app.get("/api/embedding/coverage")
@@ -400,6 +403,11 @@ async def trigger_processing(req: ProcessRequest):
     """Start a local video processing job, or one of the derived-cache refresh jobs."""
     if req.mode not in PROCESSING_MODES:
         raise HTTPException(400, f"Invalid mode: {req.mode}")
+    if any(
+        j.get("mode") == req.mode and j["status"] in ("queued", "running", "cancelling")
+        for j in jobs.values()
+    ):
+        raise HTTPException(409, f"A {req.mode} job is already running")
     job_id = str(uuid.uuid4())[:8]
 
     if req.mode in EMBEDDING_MODES:
@@ -449,6 +457,7 @@ async def trigger_processing(req: ProcessRequest):
         "started_at": None,
         "completed_at": None,
         "error": None,
+        "failures": [],
         "video_files": [str(f) for f in video_files],
     }
 
@@ -488,8 +497,8 @@ async def cancel_job(job_id: str):
 
 @app.post("/api/processing/clear-completed")
 async def clear_completed():
-    """Remove completed jobs from the list."""
-    to_remove = [jid for jid, j in jobs.items() if j["status"] in ("completed", "failed", "cancelled")]
+    """Remove successfully completed jobs from the list (failures stay for inspection)."""
+    to_remove = [jid for jid, j in jobs.items() if j["status"] == "completed"]
     for jid in to_remove:
         del jobs[jid]
     return {"cleared": len(to_remove)}
@@ -1052,18 +1061,24 @@ async def _run_embedding_job(job_id: str, mode: str):
             job["current_video"] = "coverage.json"
             job["progress"] = 60
 
+        if job["status"] == "cancelled":
+            return
+
         await asyncio.to_thread(_recompute_coverage)
         job["current_video"] = "similarity_matrix.json"
         job["progress"] = 80
 
         await asyncio.to_thread(_recompute_similarity)
         job["videos_processed"] = 1
-        job["status"] = "completed"
-        job["progress"] = 100
+        # An operator cancel must survive: never overwrite it with success.
+        if job["status"] != "cancelled":
+            job["status"] = "completed"
+            job["progress"] = 100
     except (Exception, SystemExit) as e:
         logger.error(f"[{job_id}] {mode} failed: {e}")
-        job["status"] = "failed"
-        job["error"] = str(e)
+        if job["status"] != "cancelled":
+            job["status"] = "failed"
+            job["error"] = str(e)
     finally:
         job["completed_at"] = _now_ts()
         job["current_video"] = None
@@ -1077,6 +1092,8 @@ async def _run_processing(job_id: str):
     job = jobs[job_id]
     job["status"] = "running"
     job["started_at"] = _now_ts()
+    job["failures"] = []
+    processed = 0
 
     try:
         from process_video import VideoProcessingPipeline
@@ -1103,13 +1120,23 @@ async def _run_processing(job_id: str):
                     video_path.stem,
                 )
                 job["videos_processed"] = i + 1
+                processed += 1
             except Exception as e:
                 logger.error(f"[{job_id}] Failed on {video_path.name}: {e}")
+                job["failures"].append({"video": video_path.name, "error": str(e)})
                 # Continue with next video
 
+        # Terminal status: a cancel wins, otherwise failures are surfaced instead of
+        # a green "completed" that hides videos the pipeline could not process.
         if job["status"] != "cancelled":
-            job["status"] = "completed"
-            job["progress"] = 100
+            failures = job["failures"]
+            if failures:
+                job["status"] = "failed" if processed == 0 else "completed_with_errors"
+            else:
+                job["status"] = "completed"
+        job["progress"] = 100
+
+        if job["status"] != "cancelled":
             # Coverage is derived from the metadata just written. A failure here must not
             # mark the video job failed — the videos themselves processed.
             try:
@@ -1119,8 +1146,9 @@ async def _run_processing(job_id: str):
 
     except Exception as e:
         logger.error(f"[{job_id}] Processing failed: {e}")
-        job["status"] = "failed"
-        job["error"] = str(e)
+        if job["status"] != "cancelled":
+            job["status"] = "failed"
+            job["error"] = str(e)
     finally:
         job["completed_at"] = _now_ts()
         job["current_video"] = None

@@ -15,7 +15,14 @@ import {
 interface ProcessingJob {
   id: string;
   mode?: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  /** `completed_with_errors`: the run finished, but some reels failed. Never a clean success. */
+  status:
+    | 'queued'
+    | 'running'
+    | 'completed'
+    | 'completed_with_errors'
+    | 'failed'
+    | 'cancelled';
   progress: number;
   current_video?: string;
   videos_processed?: number;
@@ -25,6 +32,8 @@ interface ProcessingJob {
   started_at?: number | null;
   completed_at?: number | null;
   error?: string | null;
+  /** Reels that failed inside an otherwise finished run; one row each, in run order. */
+  failures?: Array<{ video: string; error: string }>;
 }
 
 interface VideoOption {
@@ -68,6 +77,9 @@ function getStatusVariant(status: string): 'success' | 'warning' | 'error' | 'ne
   switch (status) {
     case 'completed':
       return 'success';
+    case 'completed_with_errors':
+      // Amber warning stamp: the run ended, but not cleanly.
+      return 'warning';
     case 'running':
       return 'warning';
     case 'failed':
@@ -81,6 +93,9 @@ function getStatusColor(status: string): string {
   switch (status) {
     case 'completed':
       return 'bg-carbon';
+    case 'completed_with_errors':
+      // Faded amber so a partial run never reads as the full carbon success bar.
+      return 'bg-stamp/60';
     case 'running':
       return 'bg-carbon';
     case 'failed':
@@ -91,6 +106,29 @@ function getStatusColor(status: string): string {
       return 'bg-stamp';
   }
 }
+
+/**
+ * Statuses that end a job. The first sighting of a job in one of these is the transition the
+ * read-model invalidation below fires on: it must run once, not on every 5 s poll.
+ */
+const TERMINAL_STATUSES: Record<ProcessingJob['status'], boolean> = {
+  queued: false,
+  running: false,
+  completed: true,
+  completed_with_errors: true,
+  failed: true,
+  cancelled: true,
+};
+
+/** Every view whose numbers a finished job can change. */
+const JOB_INVALIDATED_QUERIES = [
+  ['videos'],
+  ['contestants'],
+  ['coverage'],
+  ['similarity-matrix'],
+  ['top-pairs'],
+  ['labels'],
+] as const;
 
 function formatDuration(start?: number | null, end?: number | null): string {
   if (!start) return '--';
@@ -124,9 +162,12 @@ export function Processing() {
   const [isProcessing, setIsProcessing] = useState(false);
   // A row was dropped because the listing never confirmed it.
   const [strandedNotice, setStrandedNotice] = useState(false);
+  // Job id → failures expanded. Collapsed by default: the count is the summary.
+  const [openFailures, setOpenFailures] = useState<Record<string, boolean>>({});
   const pollingRef = useRef<number | undefined>(undefined);
   const strandedNoticeTimerRef = useRef<number | undefined>(undefined);
-  // Last status per job, so a coverage/embedding job that just finished refreshes the read model.
+  // Last status per job: the first terminal status seen is the transition that refreshes the
+  // read models, so it must fire once and not on every poll.
   const seenStatusRef = useRef<Map<string, ProcessingJob['status']>>(new Map());
   // KV listing is eventually consistent, so a job created a second ago can be missing from it.
   // Hold the row the trigger returned until a poll reports that id.
@@ -218,16 +259,16 @@ export function Processing() {
 
       for (const job of next) {
         const prev = seenStatusRef.current.get(job.id);
-        if (
-          job.status === 'completed' &&
-          prev !== 'completed' &&
-          (job.mode === 'embedding-update' || job.mode === 'coverage-refresh')
-        ) {
-          void queryClient.invalidateQueries({ queryKey: ['coverage'] });
-          void queryClient.invalidateQueries({ queryKey: ['similarity-matrix'] });
-          void queryClient.invalidateQueries({ queryKey: ['top-pairs'] });
-        }
         seenStatusRef.current.set(job.id, job.status);
+        if (!TERMINAL_STATUSES[job.status]) continue;
+        // First sighting already terminal: the job ended before this page watched it, so
+        // whatever this page loaded is not stale because of it. Only a real transition fires.
+        if (prev === undefined || TERMINAL_STATUSES[prev]) continue;
+        for (const queryKey of JOB_INVALIDATED_QUERIES) {
+          // 'all', not 'active': the other admin views are unmounted, and marking them stale
+          // alone would leave their cached counts on screen until a manual reload.
+          void queryClient.invalidateQueries({ queryKey, refetchType: 'all' });
+        }
       }
     } catch (e) {
       setJobsError(e);
@@ -330,6 +371,9 @@ export function Processing() {
           missCount: 0,
         };
         updatePendingJobs([row, ...pendingJobsRef.current.filter((job) => job.id !== row.id)]);
+        // Watch this id from its first status, so a job that finishes inside one poll still
+        // counts as a transition and refreshes the read model.
+        seenStatusRef.current.set(row.id, row.status);
       }
       await fetchJobs();
     } catch (e) {
@@ -351,16 +395,23 @@ export function Processing() {
     await trigger('coverage-refresh');
   }
 
-  async function cancelJob(jobId: string) {
+  async function cancelJob(job: ProcessingJob) {
+    if (
+      !window.confirm(
+        `取消「${job.mode ?? '處理'}」工作？\n已處理完成的影片會保留，此工作會標記為 cancelled。`,
+      )
+    ) {
+      return;
+    }
     try {
-      const res = await adminFetch(`/admin/api/processing/cancel/${jobId}`, { method: 'POST' });
+      const res = await adminFetch(`/admin/api/processing/cancel/${job.id}`, { method: 'POST' });
       await assertOk(res);
       // The list lags the write, so a row still pending locally must not keep saying `queued`.
       updatePendingJobs(
-        pendingJobsRef.current.map((job) =>
-          job.id === jobId
-            ? { ...job, status: 'cancelled' as const, progress: 100, completed_at: Date.now() }
-            : job,
+        pendingJobsRef.current.map((pending) =>
+          pending.id === job.id
+            ? { ...pending, status: 'cancelled' as const, progress: 100, completed_at: Date.now() }
+            : pending,
         ),
       );
       await fetchJobs();
@@ -370,11 +421,18 @@ export function Processing() {
   }
 
   async function clearCompleted() {
+    if (
+      !window.confirm(
+        `清除 ${completedCount} 筆已完成的工作紀錄？\n只刪除狀態為 completed 的紀錄，失敗、部分失敗與已取消的工作都會保留。`,
+      )
+    ) {
+      return;
+    }
     try {
       const res = await adminFetch('/admin/api/processing/clear-completed', { method: 'POST' });
       await assertOk(res);
-      // The server drops every terminal record (completed, failed, cancelled); a local filter
-      // would keep the rows it disagrees about until the next poll.
+      // The server owns which records go; a local filter would keep the rows it disagrees about
+      // until the next poll.
       await fetchJobs();
     } catch (e) {
       setActionError(e);
@@ -555,7 +613,7 @@ export function Processing() {
               </Badge>
               {completedCount > 0 && (
                 <Button variant="ghost" size="sm" onClick={clearCompleted}>
-                  Clear Completed
+                  清除已完成
                 </Button>
               )}
             </div>
@@ -580,7 +638,9 @@ export function Processing() {
                         {job.mode ? job.mode.replace('-', ' ').toUpperCase() : 'Processing'}
                       </h3>
                       <Badge variant={getStatusVariant(job.status)} size="sm">
-                        {job.status}
+                        {job.status === 'completed_with_errors'
+                          ? 'completed · 部分失敗'
+                          : job.status}
                       </Badge>
                     </div>
 
@@ -610,12 +670,44 @@ export function Processing() {
                     </div>
 
                     {job.error && <p className="mt-2 text-xs text-stamp">{job.error}</p>}
+
+                    {job.failures && job.failures.length > 0 && (
+                      <div className="mt-2 border border-stamp/40 bg-stamp/5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenFailures((prev) => ({ ...prev, [job.id]: !prev[job.id] }))
+                          }
+                          className="flex w-full cursor-pointer items-center justify-between gap-2 px-2.5 py-1.5 text-left"
+                        >
+                          <span className="font-kai text-[12px] text-stamp">
+                            {job.failures.length} 失敗
+                          </span>
+                          <span className="font-mono text-[9px] tracking-[0.14em] text-stamp/80">
+                            {openFailures[job.id] ? '收起' : '展開'}
+                          </span>
+                        </button>
+                        {openFailures[job.id] && (
+                          <ul className="border-t border-stamp/30 px-2.5 py-1.5">
+                            {job.failures.map((failure, i) => (
+                              <li
+                                key={`${failure.video}-${i}`}
+                                className="flex flex-col gap-0.5 border-b border-stamp/20 py-1 font-mono text-[10px] leading-snug last:border-b-0"
+                              >
+                                <span className="text-carbon-deep">{failure.video}</span>
+                                <span className="break-words text-stamp">{failure.error}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions & Times */}
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     {(job.status === 'queued' || job.status === 'running') && (
-                      <Button variant="destructive" size="sm" onClick={() => cancelJob(job.id)}>
+                      <Button variant="destructive" size="sm" onClick={() => cancelJob(job)}>
                         Cancel
                       </Button>
                     )}
