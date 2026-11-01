@@ -74,6 +74,12 @@ export function Flagging() {
   // successful stamp word. Both render above the tray so they survive the slip being filtered out.
   const [writeError, setWriteError] = useState<unknown>(null);
   const [notice, setNotice] = useState('');
+  // The most recent single decision, the only one 復原 can target. Cleared by any other write
+  // (bulk, 改派, undo itself) so the affordance never reverts an older slip by surprise.
+  const [lastDecision, setLastDecision] = useState<{
+    id: string;
+    status: 'accepted' | 'rejected';
+  } | null>(null);
 
   const uniqueVideos = useMemo(
     () => [...new Set(flaggedFaces.map((f) => f.video_id))],
@@ -133,8 +139,28 @@ export function Flagging() {
     if (next) setFocusedId(next.id);
   }
 
+  /**
+   * 作廢 is destructive and only the latest single decision can be undone, so it always asks
+   * first and says how many slips the press will void. Bulk has no undo — the prompt says so.
+   */
+  function confirmReject(count: number, bulk = false): boolean {
+    if (count === 0) return false;
+    return window.confirm(
+      bulk
+        ? `確定作廢 ${count} 張待核紀錄？批量作廢沒有復原。`
+        : `確定作廢 ${count} 張待核紀錄？作廢後可從上方提示復原。`,
+    );
+  }
+
+  /** Tray/sheet 作廢: confirm, then drive the same single-decision primitive. */
+  function rejectOne(faceId: string) {
+    if (!confirmReject(1)) return;
+    void applyStatus(faceId, 'rejected');
+  }
+
   async function decideFocused(status: 'accepted' | 'rejected') {
     if (!focused || focused.status !== 'pending') return;
+    if (status === 'rejected' && !confirmReject(1)) return;
     const i = filtered.findIndex((f) => f.id === focused.id);
     const next = filtered.slice(i + 1).find((f) => f.status === 'pending');
     // A rejected write keeps the slip under the stamps, so 1/2 retries it instead of skipping it.
@@ -187,7 +213,10 @@ export function Flagging() {
   );
 
   /** One PATCH. A non-2xx throws — ApiError with the server's `.detail`, or SessionExpiredError. */
-  async function updateFaceStatus(faceId: string, status: 'accepted' | 'rejected'): Promise<void> {
+  async function updateFaceStatus(
+    faceId: string,
+    status: 'pending' | 'accepted' | 'rejected',
+  ): Promise<void> {
     const res = await adminFetch(`/admin/api/faces/flagged/${faceId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -204,6 +233,7 @@ export function Flagging() {
   async function applyStatus(faceId: string, status: 'accepted' | 'rejected'): Promise<boolean> {
     setWriteError(null);
     setNotice('');
+    setLastDecision(null);
     try {
       await updateFaceStatus(faceId, status);
     } catch (e) {
@@ -211,9 +241,29 @@ export function Flagging() {
       return false;
     }
     const word = status === 'accepted' ? '已核對' : '已作廢';
-    setNotice(`${word} · SLIP ${String(faceId).slice(-4).toUpperCase()}`);
+    setNotice(word);
+    setLastDecision({ id: faceId, status });
     void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
     return true;
+  }
+
+  /** 復原 the latest single decision: the same PATCH back to 待核. */
+  async function undoLastDecision() {
+    if (!lastDecision) return;
+    const { id } = lastDecision;
+    setWriteError(null);
+    setNotice('');
+    try {
+      await updateFaceStatus(id, 'pending');
+    } catch (e) {
+      setWriteError(e);
+      return;
+    }
+    setLastDecision(null);
+    setNotice('已復原 · 待核');
+    // Keep the slip under the sheet so it can be decided again.
+    setFocusedId(id);
+    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
   }
 
   /**
@@ -226,6 +276,7 @@ export function Flagging() {
     setBusy(true);
     setWriteError(null);
     setNotice('');
+    setLastDecision(null);
     const ids = [...selected];
     const failed = new Set<string>();
     let done = 0;
@@ -256,8 +307,11 @@ export function Flagging() {
 
   async function reassignFace() {
     if (!focused || !reassignTo) return;
+    // Unchanged picker = no write: the face is already filed there.
+    if (reassignTo === String(focused.contestant_id)) return;
     setWriteError(null);
     setNotice('');
+    setLastDecision(null);
     try {
       const res = await adminFetch('/admin/api/faces/flag/update', {
         method: 'POST',
@@ -343,7 +397,9 @@ export function Flagging() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => bulkUpdateStatus('rejected')}
+              onClick={() => {
+                if (confirmReject(selected.size, true)) void bulkUpdateStatus('rejected');
+              }}
               className="border border-stamp px-2.5 py-1 font-kai text-[11px] text-stamp hover:bg-stamp hover:text-paper-light"
             >
               全部作廢
@@ -370,6 +426,19 @@ export function Flagging() {
           className="min-h-[17px] font-kai text-[12px] tracking-[0.04em] text-carbon-soft"
         >
           {notice}
+          {lastDecision ? (
+            <>
+              {notice ? ' · ' : ''}
+              <button
+                type="button"
+                onClick={() => void undoLastDecision()}
+                title={`復原 SLIP ${String(lastDecision.id).slice(-4).toUpperCase()} 回待核`}
+                className="font-kai text-[12px] tracking-[0.04em] text-carbon underline decoration-dotted underline-offset-2 hover:text-stamp"
+              >
+                復原
+              </button>
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -438,7 +507,34 @@ export function Flagging() {
                     key={face.id}
                     data-slip={face.id}
                     onClick={() => setFocusedId(face.id)}
-                    className={`flex cursor-pointer flex-row items-center gap-3 border py-2 pl-3 pr-2 ${
+                    role="button"
+                    tabIndex={isFocused ? 0 : -1}
+                    aria-current={isFocused ? 'true' : undefined}
+                    onKeyDown={(e) => {
+                      // Only the row itself: Enter/Space inside the checkbox or a stamp stays theirs.
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                        e.preventDefault();
+                        setFocusedId(face.id);
+                        return;
+                      }
+                      // Arrow keys walk the tray and carry focus with the roving tab stop; the
+                      // window-level ↓ 下一張 handler is kept for focus outside the tray.
+                      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        const rows = [
+                          ...(trayRef.current?.querySelectorAll<HTMLElement>('[data-slip]') ?? []),
+                        ];
+                        const at = rows.indexOf(e.currentTarget);
+                        const next = rows[at + (e.key === 'ArrowDown' ? 1 : -1)];
+                        if (next) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFocusedId(next.dataset.slip ?? null);
+                          next.focus();
+                        }
+                      }
+                    }}
+                    className={`flex cursor-pointer flex-row items-center gap-3 border py-2 pl-3 pr-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stamp ${
                       isFocused
                         ? 'border-carbon/55 border-l-[3px] border-l-stamp bg-paper-light'
                         : 'border-carbon/15 border-l-[3px] border-l-carbon/20'
@@ -502,7 +598,7 @@ export function Flagging() {
                           tone="stamp"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void applyStatus(face.id, 'rejected');
+                            rejectOne(face.id);
                           }}
                         />
                       </div>
@@ -673,12 +769,18 @@ export function Flagging() {
                   </select>
                   <button
                     type="button"
+                    disabled={reassignTo === String(focused.contestant_id)}
                     onClick={() => void reassignFace()}
-                    className="border border-carbon px-3 py-2 font-kai text-[12px] tracking-[0.1em] text-carbon hover:bg-carbon hover:text-paper-light"
+                    className="border border-carbon px-3 py-2 font-kai text-[12px] tracking-[0.1em] text-carbon hover:bg-carbon hover:text-paper-light disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-carbon"
                   >
                     改派
                   </button>
                 </div>
+                {/* Reassign is not a silent relabel: the endpoint files the slip under the new
+                    contestant and puts it back in 待核, so a human must decide it again. */}
+                <span className="font-kai text-[11px] leading-snug text-carbon-soft">
+                  改派會把這張退回待核（status = pending），需要重新核對。
+                </span>
               </div>
 
               {/* Context: the two processed frames either side of the flag's floor frame, each a
@@ -737,7 +839,7 @@ export function Flagging() {
                 <button
                   type="button"
                   disabled={focused.status !== 'pending'}
-                  onClick={() => void applyStatus(focused.id, 'rejected')}
+                  onClick={() => rejectOne(focused.id)}
                   className="shrink-0 border border-carbon/45 px-3 py-3 disabled:opacity-40"
                 >
                   <span className="whitespace-nowrap font-kai text-[13px] tracking-[0.1em] text-carbon-soft">
