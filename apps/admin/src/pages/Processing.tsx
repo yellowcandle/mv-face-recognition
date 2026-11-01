@@ -471,8 +471,14 @@ export function Processing() {
 
         {/* Active Jobs Banner */}
         {activeCount > 0 && (
-          <div className="flex items-center gap-2 border border-carbon/50 bg-carbon/5 px-4 py-3 font-kai text-[13px] text-carbon">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-carbon border-t-transparent" />
+          <div
+            aria-live="polite"
+            className="flex items-center gap-2 border border-carbon/50 bg-carbon/5 px-4 py-3 font-kai text-[13px] text-carbon"
+          >
+            <div
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin rounded-full border-2 border-carbon border-t-transparent"
+            />
             {activeCount} job{activeCount !== 1 ? 's' : ''} running
           </div>
         )}
@@ -658,7 +664,14 @@ export function Processing() {
 
                     {/* Progress bar */}
                     <div className="mt-2 flex items-center gap-3">
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-paper-dark">
+                      <div
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={job.progress || 0}
+                        aria-label={`${job.mode ? job.mode.replace('-', ' ').toUpperCase() : 'Processing'} job progress`}
+                        className="h-2 flex-1 overflow-hidden rounded-full bg-paper-dark"
+                      >
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${getStatusColor(job.status)}`}
                           style={{ width: `${job.progress || 0}%` }}

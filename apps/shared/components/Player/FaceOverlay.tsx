@@ -54,11 +54,9 @@ export function FaceOverlay({
           face.matched && face.match_score != null
             ? `${face.match_score.toFixed(2)} cosine (${bandFor(face.match_score)} band)`
             : `unmatched · detection score ${face.det_score.toFixed(2)}`;
-        const action = !canFlag
-          ? null
-          : batchMode
-            ? 'click to select/deselect'
-            : 'click to flag this face';
+        const action = !canFlag ? null : batchMode ? 'select/deselect' : 'flag this face';
+        // Screen readers hear the same thing the tooltip says, minus the pointer verb.
+        const announcement = action ? `${name}, ${score}: ${action}` : `${name}, ${score}`;
 
         return (
           <button
@@ -78,7 +76,9 @@ export function FaceOverlay({
             `}
             style={getBboxStyle(face.bbox)}
             onClick={() => onFaceClick(face)}
-            title={action ? `${name} — ${score} — ${action}` : `${name} — ${score}`}
+            aria-label={announcement}
+            aria-pressed={batchMode ? isBatchSelected : undefined}
+            title={action ? `${name} — ${score} — click to ${action}` : `${name} — ${score}`}
           >
             {batchMode && isBatchSelected && (
               <span className="absolute top-0.5 right-0.5 text-white text-xs bg-stamp rounded-full w-4 h-4 flex items-center justify-center">

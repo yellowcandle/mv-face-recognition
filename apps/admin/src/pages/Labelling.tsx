@@ -559,6 +559,12 @@ export function Labelling() {
   const [saveError, setSaveError] = useState<unknown>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  /**
+   * The verdict a clear removed, per track, so the reviewer can take that clear back. The label is
+   * already out of `labels` — that removal is what the autosave writes — and the undo is a fresh
+   * edit of its own rather than a cancellation of the write that may already be in flight.
+   */
+  const [clearedLabels, setClearedLabels] = useState<Record<string, Label>>({});
 
   const savedJsonRef = useRef<string | null>(null);
   const saveSeqRef = useRef(0);
@@ -593,6 +599,8 @@ export function Labelling() {
       next[String(label.tracker_id)] = label;
     }
     setLabels(next);
+    // A clear belongs to the video it happened in; the next one starts with nothing to undo.
+    setClearedLabels({});
     savedJsonRef.current = JSON.stringify(serializeLabels(next));
     // A payload queued for the video being left is never written into this one's file.
     pendingSaveRef.current = null;
@@ -821,6 +829,18 @@ export function Labelling() {
         else delete next[key];
       }
       setLabels(next);
+      // A new verdict supersedes a clear: the undo offer only ever describes the last clear.
+      setClearedLabels((prev) => {
+        const rest = { ...prev };
+        let changed = false;
+        for (const [key, label] of entries) {
+          if (label && key in rest) {
+            delete rest[key];
+            changed = true;
+          }
+        }
+        return changed ? rest : prev;
+      });
       advanceFrom(next, fromKey);
     },
     [labels, advanceFrom],
@@ -879,14 +899,35 @@ export function Labelling() {
     [labels, advanceFrom, commit, armCommit],
   );
 
+  /**
+   * Backspace/Delete on a card, or "Clear label" in the sheet. The removal reaches disk through the
+   * autosave effect like any other change; the previous verdict is kept so it can be put back.
+   */
   const clearLabel = useCallback(
     (key: string) => {
-      if (!labels[key]) return;
+      const previous = labels[key];
+      if (!previous) return;
       const next = { ...labels };
       delete next[key];
       setLabels(next);
+      setClearedLabels((prev) => ({ ...prev, [key]: previous }));
     },
     [labels],
+  );
+
+  /** Put a cleared verdict back. That edit autosaves on its own; no write is cancelled. */
+  const undoClear = useCallback(
+    (key: string) => {
+      const previous = clearedLabels[key];
+      if (!previous) return;
+      setClearedLabels((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setLabels((prev) => ({ ...prev, [key]: previous }));
+    },
+    [clearedLabels],
   );
 
   // ---- derived rail data -------------------------------------------------
@@ -996,30 +1037,33 @@ export function Labelling() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {saveState === 'saving' && (
-            <Badge variant="warning" size="md">
-              Saving…
-            </Badge>
-          )}
-          {saveState === 'saved' && (
-            <Badge variant="success" size="md">
-              Saved{savedAt ? ` ${savedAt.toLocaleTimeString()}` : ''}
-            </Badge>
-          )}
-          {saveState === 'failed' && (
-            <>
+          {/* Autosave is otherwise silent: the badges are what tells AT the write landed. */}
+          <div role="status" aria-live="polite" className="flex items-center gap-3">
+            {saveState === 'saving' && (
+              <Badge variant="warning" size="md">
+                Saving…
+              </Badge>
+            )}
+            {saveState === 'saved' && (
+              <Badge variant="success" size="md">
+                Saved{savedAt ? ` ${savedAt.toLocaleTimeString()}` : ''}
+              </Badge>
+            )}
+            {saveState === 'failed' && (
               <Badge variant="error" size="md">
                 Save failed
               </Badge>
-              <Button variant="secondary" size="sm" onClick={() => void save(labelsJson)}>
-                Retry
-              </Button>
-            </>
-          )}
-          {saveState === 'idle' && savedAt && (
-            <Badge variant="neutral" size="md">
-              On disk · {savedAt.toLocaleString()}
-            </Badge>
+            )}
+            {saveState === 'idle' && savedAt && (
+              <Badge variant="neutral" size="md">
+                On disk · {savedAt.toLocaleString()}
+              </Badge>
+            )}
+          </div>
+          {saveState === 'failed' && (
+            <Button variant="secondary" size="sm" onClick={() => void save(labelsJson)}>
+              Retry
+            </Button>
           )}
         </div>
       </div>
@@ -1271,69 +1315,83 @@ export function Labelling() {
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
                   {visible.map((track) => {
                     const label = labels[track.key];
+                    const cleared = clearedLabels[track.key];
                     const chip = chipText(track.key);
                     const claim = claimText(track, contestantsById);
                     const votes = voteBreakdown(track, contestantsById);
                     const topVote = track.votes[0];
                     return (
-                      <button
-                        key={track.key}
-                        ref={(el) => {
-                          tileRefs.current.set(track.key, el);
-                        }}
-                        type="button"
-                        disabled={blocked}
-                        onClick={() => {
-                          setOpenKey(track.key);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Backspace' || e.key === 'Delete') {
-                            e.preventDefault();
-                            clearLabel(track.key);
-                          }
-                        }}
-                        title={`Track ${track.tracker_id} · ${track.frame_count} frame${track.frame_count === 1 ? '' : 's'} · matcher claim: ${votes} — click to label, Backspace to clear`}
-                        className={`relative bg-paper-light border rounded-none p-2 text-left transition-colors ${
-                          label ? 'border-carbon/50' : 'border-paper-dark'
-                        } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
-                      >
-                        <FaceCrop
-                          videoId={videoId ?? ''}
-                          frameNumber={track.representative.frame_number}
-                          detectionIndex={track.representative.detection_index}
-                          timestamp={track.representative.timestamp}
-                          bbox={track.representative.bbox}
-                          streamUrl={streamUrl}
-                          width={160}
-                          className="w-full aspect-square object-cover rounded bg-black"
-                        />
-                        <div className="mt-1.5 flex items-center justify-between gap-1">
-                          <span className="text-[10.5px] text-ledger font-mono">
-                            track {track.tracker_id} · {track.frame_count}f
-                          </span>
-                          <BandPill band={bandFor(track.representative.match_score)} />
-                        </div>
-                        <div
-                          className={`text-[11px] truncate ${track.claim ? 'text-carbon' : 'text-ledger'}`}
-                          title={track.claim?.name ?? undefined}
+                      <div key={track.key} className="relative">
+                        <button
+                          ref={(el) => {
+                            tileRefs.current.set(track.key, el);
+                          }}
+                          type="button"
+                          disabled={blocked}
+                          onClick={() => {
+                            setOpenKey(track.key);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Backspace' || e.key === 'Delete') {
+                              e.preventDefault();
+                              clearLabel(track.key);
+                            }
+                          }}
+                          title={`Track ${track.tracker_id} · ${track.frame_count} frame${track.frame_count === 1 ? '' : 's'} · matcher claim: ${votes} — click to label, Backspace to clear`}
+                          className={`relative w-full bg-paper-light border rounded-none p-2 text-left transition-colors ${
+                            label ? 'border-carbon/50' : 'border-paper-dark'
+                          } ${blocked ? 'opacity-50 cursor-not-allowed' : 'hover:border-carbon cursor-pointer'}`}
                         >
-                          {claim}
-                        </div>
-                        <div className="text-[10px] text-ledger truncate" title={votes}>
-                          {topVote
-                            ? `votes ${topVote.count}/${track.frame_count}${
-                                track.votes.length > 1 ? ` · +${track.votes.length - 1}` : ''
-                              }`
-                            : 'no named frames'}
-                        </div>
-                        {label && chip && (
-                          <span
-                            className={`absolute top-1 right-1 max-w-[calc(100%-0.5rem)] truncate rounded-full border px-1.5 py-0.5 text-[9.5px] font-medium ${VERDICT_PILL[label.verdict]}`}
+                          <FaceCrop
+                            videoId={videoId ?? ''}
+                            frameNumber={track.representative.frame_number}
+                            detectionIndex={track.representative.detection_index}
+                            timestamp={track.representative.timestamp}
+                            bbox={track.representative.bbox}
+                            streamUrl={streamUrl}
+                            width={160}
+                            className="w-full aspect-square object-cover rounded bg-black"
+                          />
+                          <div className="mt-1.5 flex items-center justify-between gap-1">
+                            <span className="text-[10.5px] text-ledger font-mono">
+                              track {track.tracker_id} · {track.frame_count}f
+                            </span>
+                            <BandPill band={bandFor(track.representative.match_score)} />
+                          </div>
+                          <div
+                            className={`text-[11px] truncate ${track.claim ? 'text-carbon' : 'text-ledger'}`}
+                            title={track.claim?.name ?? undefined}
                           >
-                            {chip}
-                          </span>
+                            {claim}
+                          </div>
+                          <div className="text-[10px] text-ledger truncate" title={votes}>
+                            {topVote
+                              ? `votes ${topVote.count}/${track.frame_count}${
+                                  track.votes.length > 1 ? ` · +${track.votes.length - 1}` : ''
+                                }`
+                              : 'no named frames'}
+                          </div>
+                          {label && chip && (
+                            <span
+                              className={`absolute top-1 right-1 max-w-[calc(100%-0.5rem)] truncate rounded-full border px-1.5 py-0.5 text-[9.5px] font-medium ${VERDICT_PILL[label.verdict]}`}
+                            >
+                              {chip}
+                            </span>
+                          )}
+                        </button>
+                        {/* The tile stays a button: the undo control sits beside it, not inside. */}
+                        {cleared && !label && (
+                          <button
+                            type="button"
+                            disabled={blocked}
+                            onClick={() => undoClear(track.key)}
+                            title={`Track ${track.tracker_id} · the verdict was cleared — restore it`}
+                            className="absolute top-1 right-1 max-w-[calc(100%-0.5rem)] truncate rounded-full border border-ledger bg-paper-light px-1.5 py-0.5 text-[9.5px] font-medium text-ledger transition-colors hover:border-carbon hover:bg-paper-dark hover:text-carbon disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            已清除 · 復原
+                          </button>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1491,12 +1549,17 @@ export function Labelling() {
           onClick={closeSheet}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="label-sheet-title"
             className="bg-paper-light border border-paper-deep rounded-none w-full max-w-xl max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-4 border-b border-paper-dark">
               <div>
-                <h3 className="text-lg font-semibold text-carbon-deep">Label this track</h3>
+                <h3 id="label-sheet-title" className="text-lg font-semibold text-carbon-deep">
+                  Label this track
+                </h3>
                 <p className="text-xs text-ledger">
                   track {openTrack.tracker_id} · {openTrack.frame_count} frame
                   {openTrack.frame_count === 1 ? '' : 's'} · tile{' '}
@@ -1583,6 +1646,14 @@ export function Labelling() {
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => clearLabel(openTrack.key)}>
                         Clear label
+                      </Button>
+                    </div>
+                  )}
+                  {/* The sheet stays open after a clear, so the undo has to live here as well. */}
+                  {!labels[openTrack.key] && clearedLabels[openTrack.key] && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button variant="ghost" size="sm" onClick={() => undoClear(openTrack.key)}>
+                        已清除 · 復原
                       </Button>
                     </div>
                   )}

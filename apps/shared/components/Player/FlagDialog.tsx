@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FaceDetection } from '../../types';
 import { bandFor } from '../../lib/bands';
 import { AdminErrorNotice } from '../AdminErrorNotice';
@@ -27,6 +27,49 @@ export function FlagDialog({
 }: FlagDialogProps) {
   const [contestantId, setContestantId] = useState<number | null>(null);
   const [userLabel, setUserLabel] = useState('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const contestantSelectRef = useRef<HTMLSelectElement>(null);
+
+  // Opening the dialog lands the caret on the contestant picker: it is the only field
+  // the operator came here to fill.
+  useEffect(() => {
+    contestantSelectRef.current?.focus();
+  }, []);
+
+  // The dialog is modal, so Tab stays inside it, and Escape is the Cancel button: it
+  // closes only while there is nothing in flight.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isSubmitting) onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const container = dialogRef.current;
+      if (!container) return;
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button, select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute('disabled') && el.getClientRects().length > 0);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const inside = active !== null && container.contains(active);
+      if (e.shiftKey) {
+        if (!inside || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isSubmitting, onClose]);
 
   const handleSubmit = () => {
     if (contestantId === null) return;
@@ -51,6 +94,7 @@ export function FlagDialog({
       }}
     >
       <div
+        ref={dialogRef}
         className="bg-paper-light border border-paper-deep rounded-none p-6 max-w-md w-full mx-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -62,8 +106,8 @@ export function FlagDialog({
         </h3>
         <p className="text-carbon-soft text-sm mb-4">
           {mode === 'batch'
-            ? 'Assign all selected faces to a single contestant.'
-            : 'Assign this detected face to a contestant to improve recognition accuracy.'}
+            ? 'Add all selected faces to the review queue for one human check.'
+            : 'Add this face to the review queue for a human check.'}
         </p>
 
         <div className="space-y-4">
@@ -110,6 +154,7 @@ export function FlagDialog({
             </label>
             <select
               id="flag-contestant-select"
+              ref={contestantSelectRef}
               className="w-full bg-paper-dark text-carbon-deep border border-paper-deep rounded-none px-3 py-2 text-sm"
               value={contestantId ?? ''}
               onChange={(e) =>
