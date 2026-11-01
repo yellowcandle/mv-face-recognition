@@ -88,8 +88,9 @@ export function SystemAdmin() {
   const withEmbeddings = contestants.filter((c) => c.has_embedding).length;
   // The roster is the source of truth once it loads; the status count is only a fallback
   // (the edge Worker still reports a hardcoded 96).
-  const rosterTotal: number | '—' =
-    contestantsQuery.data ? contestants.length : (status?.contestant_count ?? '—');
+  const rosterTotal: number | '—' = contestantsQuery.data
+    ? contestants.length
+    : (status?.contestant_count ?? '—');
   const pendingFlags = flags.filter((f) => f.status === 'pending').length;
   const labelsByVideo = new Map(labels.map((l) => [l.video_id, l]));
 

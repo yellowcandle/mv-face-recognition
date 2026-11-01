@@ -1,11 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import {
-  AdminErrorNotice,
-  Masthead,
-  formatMmSs,
-  useContestants,
-  useCoverage,
-} from '@mv/shared';
+import { AdminErrorNotice, Masthead, formatMmSs, useContestants, useCoverage } from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 interface Appearance {
@@ -129,11 +123,7 @@ export function Contestants() {
         <div className="mt-4 h-px bg-carbon/45" />
 
         {rosterError ? (
-          <AdminErrorNotice
-            error={rosterError}
-            onRetry={() => void refetch()}
-            className="mt-3"
-          />
+          <AdminErrorNotice error={rosterError} onRetry={() => void refetch()} className="mt-3" />
         ) : null}
 
         <div className="flex flex-row items-end justify-between py-3">
@@ -282,14 +272,8 @@ export function Contestants() {
             <div className="mt-4 flex flex-row gap-6 border-y border-carbon/25 py-2.5">
               {[
                 ['參考相', countText(selectedContestant.reference_count)],
-                [
-                  '偵測',
-                  countText(countsById.get(String(selectedContestant.id))?.detection_count),
-                ],
-                [
-                  '影片',
-                  countText(countsById.get(String(selectedContestant.id))?.videos_seen_in),
-                ],
+                ['偵測', countText(countsById.get(String(selectedContestant.id))?.detection_count)],
+                ['影片', countText(countsById.get(String(selectedContestant.id))?.videos_seen_in)],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex flex-col gap-0.5">
                   <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">

@@ -1,13 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import {
-  BAND_STAMP,
-  Masthead,
-  bandFor,
-  useContestants,
-  useCoverage,
-  useVideos,
-} from '@mv/shared';
+import { BAND_STAMP, Masthead, bandFor, useContestants, useCoverage, useVideos } from '@mv/shared';
 import type { Contestant } from '@mv/shared';
 
 /**

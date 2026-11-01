@@ -16,13 +16,7 @@ interface ProcessingJob {
   id: string;
   mode?: string;
   /** `completed_with_errors`: the run finished, but some reels failed. Never a clean success. */
-  status:
-    | 'queued'
-    | 'running'
-    | 'completed'
-    | 'completed_with_errors'
-    | 'failed'
-    | 'cancelled';
+  status: 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
   progress: number;
   current_video?: string;
   videos_processed?: number;

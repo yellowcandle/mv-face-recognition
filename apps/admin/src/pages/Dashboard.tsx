@@ -61,11 +61,7 @@ export function Dashboard() {
       <div className="mt-4 h-px bg-carbon/45" />
 
       {flagsError ? (
-        <AdminErrorNotice
-          error={flagsError}
-          onRetry={() => void refetchFlags()}
-          className="mt-3"
-        />
+        <AdminErrorNotice error={flagsError} onRetry={() => void refetchFlags()} className="mt-3" />
       ) : null}
 
       <div className="flex flex-row items-end gap-12 py-4">

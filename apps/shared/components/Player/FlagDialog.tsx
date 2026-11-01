@@ -49,8 +49,8 @@ export function FlagDialog({
       if (!container) return;
       const focusable = Array.from(
         container.querySelectorAll<HTMLElement>(
-          'button, select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])'
-        )
+          'button, select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])',
+        ),
       ).filter((el) => !el.hasAttribute('disabled') && el.getClientRects().length > 0);
       if (focusable.length === 0) return;
       const first = focusable[0];
