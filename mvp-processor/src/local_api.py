@@ -210,6 +210,56 @@ async def list_processed_videos():
     return videos
 
 
+# A rendition is only usable if its MP4 container has a `moov` atom. An aborted encode leaves
+# an `mdat` and no `moov`, which every browser refuses to demux; without this check a stale
+# 1080p would shadow the valid 720p and the reel would silently fail to play. Cached per
+# (path, size, mtime) so a re-encode is re-checked.
+_rendition_ok_cache: dict[tuple[str, int, int], bool] = {}
+
+
+def _rendition_playable(path: Path) -> bool:
+    """True when the file is an MP4 whose top-level boxes include `moov`."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    cached = _rendition_ok_cache.get(key)
+    if cached is not None:
+        return cached
+
+    ok = False
+    try:
+        with path.open("rb") as fh:
+            offset = 0
+            for _ in range(64):
+                if offset + 8 > stat.st_size:
+                    break
+                fh.seek(offset)
+                header = fh.read(16)
+                if len(header) < 8:
+                    break
+                size = int.from_bytes(header[0:4], "big")
+                box = header[4:8]
+                if box == b"moov":
+                    ok = True
+                    break
+                if size == 1:
+                    if len(header) < 16:
+                        break
+                    size = int.from_bytes(header[8:16], "big")
+                if size < 8:
+                    break
+                offset += size
+    except OSError:
+        ok = False
+
+    if len(_rendition_ok_cache) >= 32:
+        _rendition_ok_cache.clear()
+    _rendition_ok_cache[key] = ok
+    return ok
+
+
 @app.get("/api/videos/stream/{video_id}")
 async def stream_video(video_id: str):
     """Stream a processed video (FileResponse handles HTTP Range)."""
@@ -227,8 +277,12 @@ async def stream_video(video_id: str):
         ]
 
     for path in candidates:
-        if path.exists():
-            return FileResponse(path, media_type="video/mp4")
+        if not path.exists():
+            continue
+        if path.name.endswith(("_1080p.mp4", "_720p.mp4")) and not _rendition_playable(path):
+            logger.warning(f"Skipping unfinalized rendition {path.name} (no moov atom)")
+            continue
+        return FileResponse(path, media_type="video/mp4")
     raise HTTPException(404, f"No video file found for {video_id}")
 
 
