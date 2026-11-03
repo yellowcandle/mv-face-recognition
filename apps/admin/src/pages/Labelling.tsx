@@ -304,7 +304,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
 
 export function Labelling() {
   const queryClient = useQueryClient();
-  const { data: videos = [], isLoading: videosLoading } = useVideos();
+  const { data: videos = [], isLoading: videosLoading } = useVideos('', { includeTests: true });
   const { data: contestantsRaw = [] } = useContestants();
   // `useContestants` is untyped JSON; `Contestant` is the domain type for it, asserted at this
   // boundary the same way `Flagging.tsx` asserts it. Only id/nickname/name are read, and a

@@ -146,7 +146,6 @@ export function Home() {
                       <img
                         src={portrait}
                         alt={`${c.nickname || c.name} ${c.name}`}
-                        loading="lazy"
                         decoding="async"
                         className="relative h-full w-full object-cover object-[50%_22%] transition-transform duration-300 group-hover:scale-[1.03]"
                         onError={(e) => {
