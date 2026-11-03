@@ -621,17 +621,19 @@ export function Labelling() {
 
   const [query, setQuery] = useState('');
   const [unlabelledOnly, setUnlabelledOnly] = useState(false);
+  const [claimedOnly, setClaimedOnly] = useState(false);
   const [verdictFilter, setVerdictFilter] = useState<'all' | Verdict>('all');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [videoId, query, unlabelledOnly, verdictFilter]);
+  }, [videoId, query, unlabelledOnly, claimedOnly, verdictFilter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tracks.filter((track) => {
+    const rows = tracks.filter((track) => {
       const label = labels[track.key];
+      if (claimedOnly && !track.claim) return false;
       if (unlabelledOnly && label) return false;
       if (verdictFilter !== 'all' && label?.verdict !== verdictFilter) return false;
       if (!q) return true;
@@ -642,7 +644,19 @@ export function Labelling() {
         (track.claim?.name ?? '').toLowerCase().includes(q)
       );
     });
-  }, [tracks, labels, query, unlabelledOnly, verdictFilter]);
+    // Highest cosine first: the claimed-track sample is meant to see the riskiest claims first.
+    if (claimedOnly) {
+      rows.sort((a, b) => {
+        const sa = a.representative.match_score;
+        const sb = b.representative.match_score;
+        if (sa === null && sb === null) return a.tracker_id - b.tracker_id;
+        if (sa === null) return 1;
+        if (sb === null) return -1;
+        return sb - sa;
+      });
+    }
+    return rows;
+  }, [tracks, labels, query, unlabelledOnly, claimedOnly, verdictFilter]);
 
   // ---- the sheet ---------------------------------------------------------
 
@@ -997,6 +1011,19 @@ export function Labelling() {
               />
               Unlabelled only
             </label>
+
+            <label
+              className="flex items-center gap-2 text-xs text-carbon-soft cursor-pointer"
+              title="Only tracks the matcher named, sorted by match cosine — highest risk first"
+            >
+              <input
+                type="checkbox"
+                checked={claimedOnly}
+                onChange={(e) => setClaimedOnly(e.target.checked)}
+                className="w-4 h-4 cursor-pointer accent-stamp"
+              />
+              Claimed only (cosine first)
+            </label>
           </>
         )}
 
@@ -1335,7 +1362,7 @@ export function Labelling() {
                   timestamp={openTrack.representative.timestamp}
                   bbox={openTrack.representative.bbox}
                   streamUrl={streamUrl}
-                  width={320}
+                  width={512}
                   className="w-full sm:w-[200px] shrink-0 aspect-square object-cover rounded bg-black"
                 />
                 <div className="space-y-1.5 text-xs text-carbon-soft">
@@ -1404,6 +1431,25 @@ export function Labelling() {
               </div>
 
               <>
+                {openTrack.claim && (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="w-full"
+                    onClick={() =>
+                      commitOne(openTrack, 'contestant', openTrack.claim?.contestant_id)
+                    }
+                    title={`Accept the matcher's claim for this whole track: ${claimText(
+                      openTrack,
+                      contestantsById,
+                    )}`}
+                  >
+                    Accept matcher's claim · {openTrack.claim.nickname ?? '—'} (#
+                    {openTrack.claim.contestant_id}) — {openTrack.claim.count}/
+                    {openTrack.frame_count} frames
+                  </Button>
+                )}
+
                 <ContestantPicker
                   key={openKey}
                   contestants={contestants}
