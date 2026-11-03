@@ -835,17 +835,27 @@ _crop_cache: dict[tuple[str, int], list[bytes]] = {}
 _CROP_CACHE_MAX_FRAMES = 240
 
 
-def _rendition_for(video_id: str) -> Path:
-    """The rendered file to crop from, most preferred first."""
-    for name in (f"{video_id}_1080p.mp4", f"{video_id}_720p.mp4"):
-        candidate = _safe_child(PROCESSED_DIR, name)
-        if candidate.exists():
-            return candidate
+def _rendition_candidates(video_id: str) -> list[Path]:
+    """Renditions/source to crop from, sharpest useful first.
+
+    The 1080p rendition is the default; the source sits before the 720p so a corrupt or missing
+    1080p does not silently drop the crop to softest rendition. The box is in frame fractions, so
+    any resolution crops correctly.
+    """
+    out: list[Path] = []
+    p1080 = _safe_child(PROCESSED_DIR, f"{video_id}_1080p.mp4")
+    if p1080.exists():
+        out.append(p1080)
     for ext in VIDEO_EXTENSIONS:
-        candidate = _safe_child(SOURCE_DIR, f"{video_id}{ext}")
-        if candidate.exists():
-            return candidate
-    raise HTTPException(404, f"No video file found for {video_id}")
+        source = _safe_child(SOURCE_DIR, f"{video_id}{ext}")
+        if source.exists():
+            out.append(source)
+    p720 = _safe_child(PROCESSED_DIR, f"{video_id}_720p.mp4")
+    if p720.exists():
+        out.append(p720)
+    if not out:
+        raise HTTPException(404, f"No video file found for {video_id}")
+    return out
 
 
 def _build_frame_crops(video_id: str, frame: dict, width: int) -> list[bytes]:
@@ -858,16 +868,22 @@ def _build_frame_crops(video_id: str, frame: dict, width: int) -> list[bytes]:
     import numpy as np
     import subprocess
 
-    video = _rendition_for(video_id)
-    result = subprocess.run(
-        ["ffmpeg", "-v", "error", "-ss", str(frame["timestamp"]), "-i", str(video),
-         "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-"],
-        capture_output=True,
-    )
-    if result.returncode != 0 or not result.stdout:
-        raise HTTPException(500, f"Could not decode {video.name} at {frame['timestamp']}s")
+    decoded = None
+    last = None
+    for candidate in _rendition_candidates(video_id):
+        result = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", str(frame["timestamp"]), "-i", str(candidate),
+             "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-"],
+            capture_output=True,
+        )
+        last = candidate
+        if result.returncode == 0 and result.stdout:
+            decoded = result.stdout
+            break
+    if decoded is None:
+        raise HTTPException(500, f"Could not decode {last.name} at {frame['timestamp']}s")
 
-    image = cv2.imdecode(np.frombuffer(result.stdout, np.uint8), cv2.IMREAD_COLOR)
+    image = cv2.imdecode(np.frombuffer(decoded, np.uint8), cv2.IMREAD_COLOR)
     if image is None:
         raise HTTPException(500, "Decoded frame was empty")
 
