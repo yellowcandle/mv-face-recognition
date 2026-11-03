@@ -4,8 +4,8 @@ title: Decide the batch gate on labelled ground truth
 label: wayfinder:grilling
 mode: HITL
 blocked_by: [006]
-status: open
-assignee:
+status: closed
+assignee: omp
 ---
 
 ## Question
@@ -19,9 +19,10 @@ rejected as the measure, because it cannot distinguish right answers from confid
 
 ## What the labels make answerable for the first time
 
-- **The real separation.** Each labelled detection is either a true match (its cosine joins the
-  matched distribution) or an impostor the matcher named anyway (its cosine joins the cross-person
-  distribution, instead of being invisible). The leave-one-out sweep that set the current cutoffs
+- **The real separation.** Each labelled track is either a true match (its representative
+  detection's cosine joins the matched distribution) or an impostor the matcher named anyway (its
+  cosine joins the cross-person distribution, instead of being invisible). The leave-one-out sweep
+  that set the current cutoffs
   measured *reference photos* against each other; this measures *video faces* against the reference
   set, which is the quantity that decides the batch.
 - **Whether the acceptance threshold moves.** 0.45 was chosen to sit on the leave-one-out 1%
@@ -51,5 +52,36 @@ rejected as the measure, because it cannot distinguish right answers from confid
   labelling more until this gate says the labelling was worth it.
 - Reference-photo curation ("How far does curation go") hangs on the answer here: if the gate
   fails on impostors, curation is the lever; if it fails on misses, curation will not help.
-- A reprocess invalidates labels — `labels/v1` pins `source.processing_date`, so any
+- A reprocess invalidates labels — `labels/v2` pins `source.processing_date`, so any
   re-run must be labelled again or shown to be box-for-box identical.
+
+## Resolution (2026-11-01)
+
+Decided with the user on the live label data, not the ticket's original premises.
+
+**What the data showed.** The batch runs at `acceptance_threshold: 0.412` (commit `757741c7`,
+bands `0.445 / 0.412`); test-video-mv2 is the only file still at the old `0.45` (processed before
+that commit), so its 35 clean labels cannot validate the 0.412 batch. Across the fresh labels —
+MV #3 10, MV #4 77, MV #5 3, test-video-mv2 35 — there were **0 impostors**: every
+`not_a_contestant` verdict landed on a track the matcher never named (spot-checked on MV #4: 66 of
+66 unclaimed). Matched-side means sat 0.499–0.598. The labels prove the matcher's *claims* are
+clean, but they are skewed to unclaimed tracks, so the cross-person side at 0.412 is still
+unmeasured.
+
+**Decisions.**
+
+1. **Gate rule replaced.** The ≥3-impostor rule is a sampling proxy a clean matcher cannot satisfy.
+   Measure precision over **claimed** tracks instead: label **~30 claimed tracks per MV, highest
+   cosine first**, and pass at **≥95% correct claims** with no impostor above the 0.2 cross-person
+   line. The *Accept matcher's claim* button makes the true ones one click.
+2. **test-video-mv2 retired as the gate** — a 30 s clip at the old threshold; its 35 labels stay on
+   disk and remain valid for their run.
+3. **MV #1 stale labels cleared.** It was reprocessed 2026-11-01T00:03; its 11 labels pinned the
+   2026-10-21 run and now 409. Renamed to `…_labels.json.stale-20261021` (recoverable) so the new
+   run is labelable.
+4. **Bands/threshold stay `provisional`** until the claimed-track sample lands, then recompute from
+   video-face labels, not just the reference-photo leave-one-out.
+5. **No reprocess / no compute decision needed** — all five MVs are already at 0.412 (MV #1 was
+   reprocessed locally today).
+
+**Follows**: *Sample claimed tracks on the 0.412 batch* (ticket 020).
