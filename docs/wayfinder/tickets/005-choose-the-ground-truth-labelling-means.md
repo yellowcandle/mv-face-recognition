@@ -141,4 +141,9 @@ file](018-build-the-crop-grid-labeller-and-the-labels-file.md)**, which is what
 (*Fix the tracker's inverted matching threshold*, 017) is **not** a blocker — per-detection
 labelling needs no tracks — but it is what would later turn 399 clicks into ~42.
 
+**Superseded 2026-10-22 (commit `5c8a1299`).** The labeller labels **tracks** now (`labels/v2`,
+one verdict per `tracker_id`; 42 tracks / 237 labelable detections, 162 untracked not shown). The
+per-detection `labels/v1` file this decision chose is ignored by the API and left on disk; the
+first v2 save replaces it. The gate arithmetic is unchanged — one cosine per track.
+
 

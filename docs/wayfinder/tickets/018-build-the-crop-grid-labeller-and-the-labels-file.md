@@ -61,6 +61,10 @@ means, the verdicts, the unit and the storage are all fixed by its Resolution; t
    convenience with an "apply to the N frames of this track" confirmation, never the unit of
    truth.
 
+**Superseded 2026-10-22 (commit `5c8a1299`):** the shipped labeller labels **tracks**, not
+detections — `labels/v2`, one verdict per `tracker_id`, 42 track cards. The per-detection v1 file
+is ignored by the API and left on disk; the first v2 save replaces it.
+
 ## Reference implementation
 
 The prototype at `docs/wayfinder/assets/labelling-prototype/index.html` is the interactive spec —

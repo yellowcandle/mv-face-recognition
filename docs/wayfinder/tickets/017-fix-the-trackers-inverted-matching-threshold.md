@@ -94,6 +94,11 @@ exactly what *Choose the ground-truth labelling means* decided (labels are per d
 facts are now written into *Build the crop-grid labeller and the labels file*, which asks for an
 apply-to-track action with an "apply to the N frames of this track" confirmation.
 
+**Superseded 2026-10-22 (commit `5c8a1299`):** the labeller labels **tracks** — `labels/v2`, one
+verdict per `tracker_id` (42 tracks / 237 labelable detections; the 162 untracked ones are not
+shown). The two double-contestant tracks are why a track verdict can still be wrong for part of
+its frames.
+
 ### The false alarm, not repeated
 
 The ticket carried a warning that the id assignment once *looked* misaligned. It was: the earlier

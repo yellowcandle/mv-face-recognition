@@ -63,8 +63,10 @@ enforced, not just intended:
   it is gone, so the secret is dead weight. Flagged, deliberately not run.
 - **Tracks are usable but not truth** (ticket 017): `minimum_matching_threshold` 0.3 → 0.8 puts ids
   on 237 of the 399 detections as 42 tracks (longest 19), but 162 detections still carry none,
-  **2 of the 42 tracks hold two different contestants**, and 9 contestants span 2–4 tracks. Any
-  apply-to-track affordance needs a confirmation step; labels stay per detection.
+  **2 of the 42 tracks hold two different contestants**, and 9 contestants span 2–4 tracks. The
+  labeller now labels **tracks** (`labels/v2`, commit `5c8a1299`): 42 track cards, 237 tracked
+  detections labelable, 162 untracked detections not shown. A track verdict can still be wrong
+  for part of the track — those two tracks are why.
 
 **Scope decisions settled while charting**:
 - Fix matching *before* running the pipeline — reprocessing 1.3 GB of 4K is far more
@@ -174,7 +176,8 @@ enforced, not just intended:
   flagging untouched. Ground truth is a verdict, not a `status: pending` flag.
   Builds as [Build the crop-grid labeller and the labels file](tickets/018-build-the-crop-grid-labeller-and-the-labels-file.md);
   the tracker's unusable ids are [Fix the tracker's inverted matching threshold](tickets/017-fix-the-trackers-inverted-matching-threshold.md),
-  not a blocker.
+  not a blocker. **Superseded 2026-10-22 (commit `5c8a1299`):** the labeller now labels **tracks**
+  (`labels/v2`, 42 tracks / 237 labelable detections); the v1 file is ignored and left on disk.
 
 - [Remove the flagging write path and gate the admin-only player affordances](tickets/015-remove-the-flagging-write-path-and-gate-admin-affordances.md):
   done, both modes verified against a real `wrangler dev`. Four routes and their handlers are
@@ -226,6 +229,19 @@ enforced, not just intended:
   published with relative paths, no galleries; the four upload scripts collapse into
   `scripts/publish.js` reading `local_output/`; R2 keys `processed_videos/<video_id>_{1080p,720p}.mp4`.
   The worker-side key and fallback changes are implementation work, not decisions.
+
+- [Label 30 seconds of test-video-mv2](tickets/006-label-30-seconds-of-test-video-mv2.md):
+  retired — all five MVs were reprocessed 2026-10-21, so the pre-batch gate had no compute left to
+  guard; the user labelled test-video-mv2 to 35/42 and moved to the real MVs (MV #4 73, MV #5 2,
+  MV #1 3). Labels say the matcher's claims are clean: **25 true matches, mean cosine 0.542, 10
+  missed, 0 impostors** — only 2 claimed tracks remained, so the ≥3-impostor minimum is
+  structurally unreachable. `labels/v2` files kept as ground truth.
+
+- [Decide the batch gate on labelled ground truth](tickets/019-decide-the-batch-gate-on-labelled-ground-truth.md):
+  the 0.412 batch's fresh labels show **0 impostors** and matched means 0.499–0.598, but the samples
+  are skewed to *unclaimed* tracks, so the ≥3-impostor rule is replaced by **precision over ~30
+  claimed tracks per MV, ≥95% correct**. test-video-mv2 retired as the gate (it ran at 0.45, not
+  0.412); MV #1's stale labels cleared; bands stay provisional until the sample.
 
 ## Not yet specified
 
