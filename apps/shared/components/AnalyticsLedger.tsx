@@ -21,7 +21,7 @@ function BandStamp({ band, title }: { band: Band; title: string }) {
   return (
     <span
       title={title}
-      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
+      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[11px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
     >
       {BAND_STAMP[band].word}
     </span>
@@ -80,8 +80,9 @@ export function AnalyticsLedger({
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
       <Masthead eyebrow={eyebrow} title="紀錄" latin="RECOGNITION LEDGER">
         <div className="flex flex-col items-end gap-1">
-          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">REEL</span>
+          <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">REEL</span>
           <select
+            aria-label="Reel"
             className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
             value={selectedVideoId}
             onChange={(e) => setSelectedVideoId(e.target.value)}
@@ -109,7 +110,7 @@ export function AnalyticsLedger({
               <span className="font-serif text-[28px] font-bold leading-none text-carbon-deep">
                 {s.value}
               </span>
-              <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">{s.label}</span>
+              <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">{s.label}</span>
             </div>
           ))}
         </div>
@@ -117,7 +118,7 @@ export function AnalyticsLedger({
       <div className="h-px bg-carbon/20" />
 
       <div className="flex flex-row items-center gap-4 py-2.5">
-        <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">SORT</span>
+        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">SORT</span>
         {(
           [
             ['appearances', '出場次數'],
@@ -148,20 +149,20 @@ export function AnalyticsLedger({
       ) : (
         <div className="flex flex-col">
           <div className="flex flex-row items-center border-b border-carbon/40 py-2.5">
-            <span className="w-[52px] font-mono text-[8px] tracking-[0.18em] text-ledger">NO.</span>
-            <span className="flex-1 font-mono text-[8px] tracking-[0.18em] text-ledger">
+            <span className="w-[52px] font-mono text-[11px] tracking-[0.12em] text-ledger">NO.</span>
+            <span className="flex-1 font-mono text-[11px] tracking-[0.12em] text-ledger">
               CONTESTANT
             </span>
-            <span className="w-[110px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+            <span className="w-[110px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
               APPEARANCES
             </span>
-            <span className="w-[120px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+            <span className="w-[120px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
               AVG
             </span>
-            <span className="w-[120px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+            <span className="w-[120px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
               MAX
             </span>
-            <span className="w-[150px] text-right font-mono text-[8px] tracking-[0.18em] text-ledger">
+            <span className="w-[150px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
               SCREEN TIME
             </span>
           </div>
@@ -181,7 +182,7 @@ export function AnalyticsLedger({
                   <span className="font-kai text-[15px] font-bold text-carbon-deep">
                     {s.nickname}
                   </span>
-                  <span className="font-mono text-[9px] text-ledger">#{s.id}</span>
+                  <span className="font-mono text-[11px] text-ledger">#{s.id}</span>
                 </span>
                 <span className="w-[110px] text-right font-mono text-[12px] text-carbon">
                   {s.appearances}
@@ -195,7 +196,7 @@ export function AnalyticsLedger({
                 <span className="flex w-[120px] justify-end">
                   <BandStamp band={maxBand} title={`${s.maxMatchScore.toFixed(2)} cosine max`} />
                 </span>
-                <span className="w-[150px] text-right font-mono text-[10px] text-carbon-soft">
+                <span className="w-[150px] text-right font-mono text-[11px] text-carbon-soft">
                   {formatMmSs(s.firstSeen)} — {formatMmSs(s.lastSeen)}
                 </span>
               </div>
@@ -205,7 +206,7 @@ export function AnalyticsLedger({
       )}
 
       <div className="flex flex-row items-center gap-8 pt-4">
-        <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">BANDS 分級</span>
+        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">BANDS 分級</span>
         {(
           [
             ['high', `≥ ${BAND_CUTOFFS.high}`],
@@ -219,15 +220,15 @@ export function AnalyticsLedger({
                 band === 'high' ? 'bg-carbon' : band === 'medium' ? 'bg-stamp' : 'bg-ledger'
               }`}
             />
-            <span className="font-kai text-[10px] text-carbon-deep">{BAND_STAMP[band].word}</span>
-            <span className="font-mono text-[9px] text-ledger">{range}</span>
+            <span className="font-kai text-[11px] text-carbon-deep">{BAND_STAMP[band].word}</span>
+            <span className="font-mono text-[11px] text-ledger">{range}</span>
           </span>
         ))}
       </div>
 
       <div className="flex-1" />
       <div className="flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
-        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
+        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
           分級為暫定值，依實測誤配率調整
         </span>
         <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>

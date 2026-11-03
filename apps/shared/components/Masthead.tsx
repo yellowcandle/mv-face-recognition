@@ -24,7 +24,7 @@ export function Masthead({ eyebrow, title, latin, size = 'lg', children }: Masth
   return (
     <div className="flex flex-row items-end justify-between gap-6">
       <div className="flex flex-col gap-1.5">
-        <div className="font-mono text-[10px] tracking-[0.28em] text-carbon-soft">{eyebrow}</div>
+        <div className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">{eyebrow}</div>
         <div className="flex flex-row items-baseline gap-3.5">
           <h1
             className={`font-serif ${

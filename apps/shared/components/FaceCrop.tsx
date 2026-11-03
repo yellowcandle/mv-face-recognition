@@ -311,7 +311,7 @@ export function FaceCrop({
         <img src={image} alt={alt ?? 'Face crop'} width={width} className="block h-auto w-full" />
       ) : (
         <div
-          className="flex items-center justify-center border border-dashed border-carbon/35 bg-paper-dark font-mono text-[8px] tracking-[0.18em] text-carbon-soft"
+          className="flex items-center justify-center border border-dashed border-carbon/35 bg-paper-dark font-mono text-[11px] tracking-[0.12em] text-carbon-soft"
           style={{ width, height: placeholderHeight }}
         >
           {fallbackFailed || !canFallback ? 'NO CROP' : ''}

@@ -1022,7 +1022,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                       ) : (
                         <div
                           aria-hidden="true"
-                          className="flex h-14 w-14 shrink-0 items-center justify-center border border-carbon/20 bg-paper text-[10px] text-ledger"
+                          className="flex h-14 w-14 shrink-0 items-center justify-center border border-carbon/20 bg-paper text-[11px] text-ledger"
                         >
                           無縮圖
                         </div>
@@ -1035,7 +1035,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                         <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
                         <span
                           title={flag.status}
-                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${FLAG_STATUS[flag.status].ink}`}
+                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${FLAG_STATUS[flag.status].ink}`}
                         >
                           {FLAG_STATUS[flag.status].word}
                         </span>

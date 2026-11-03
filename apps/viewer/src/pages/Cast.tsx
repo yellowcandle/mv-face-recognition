@@ -38,14 +38,14 @@ export function Cast() {
     <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
       <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="名冊" latin="CAST SHEET">
         <div className="flex flex-col items-end gap-0.5">
-          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
-          <span className="font-mono text-[12px] text-carbon">
+          <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">ON FILE</span>
+          <span className="font-mono text-[13px] text-carbon">
             {all.length} 位 · {withPhoto} 有相
           </span>
         </div>
         <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
           <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
-          <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
+          <div className="font-mono text-[11px] tracking-[0.12em] text-stamp">PUBLIC · COPY 2</div>
         </div>
       </Masthead>
 
@@ -53,7 +53,7 @@ export function Cast() {
 
       <div className="flex flex-row items-end justify-between gap-6 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
+          <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
             SEARCH 編號 / 姓名 / 暱稱
           </span>
           <input
@@ -63,7 +63,7 @@ export function Cast() {
             className="w-full max-w-[420px] border-b border-carbon/45 bg-transparent pb-1.5 font-kai text-[15px] text-carbon-deep placeholder:text-ledger focus:border-stamp focus:outline-none"
           />
         </div>
-        <span className="font-mono text-[10px] text-carbon-soft">
+        <span className="font-mono text-[11px] text-carbon-soft">
           {filtered.length} / {all.length}
         </span>
       </div>
@@ -92,7 +92,7 @@ export function Cast() {
                 <div className="relative aspect-[3/4] overflow-hidden bg-paper-dark">
                   {/* The stamp sits underneath; a loaded portrait covers it, a missing one shows it. */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="-rotate-6 border border-ledger px-2 py-1 font-kai text-[11px] tracking-[0.18em] text-ledger">
+                    <span className="-rotate-6 border border-ledger px-2 py-1 font-kai text-[11px] tracking-[0.12em] text-ledger">
                       缺相
                     </span>
                   </div>
@@ -103,7 +103,7 @@ export function Cast() {
                       alt={`${c.nickname} ${c.name}`}
                       loading="lazy"
                       decoding="async"
-                      className="relative h-full w-full object-cover object-[50%_22%] transition-transform duration-300 group-hover:scale-[1.03]"
+                      className="relative h-full w-full object-cover object-[50%_22%]"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.visibility = 'hidden';
                       }}
@@ -111,7 +111,7 @@ export function Cast() {
                   ) : null}
 
                   {c.quality !== 'good' && c.reference_count > 0 && (
-                    <span className="absolute right-1.5 top-1.5 -rotate-2 border border-stamp bg-paper-light/85 px-1 py-0.5 font-kai text-[9px] tracking-[0.1em] text-stamp">
+                    <span className="absolute right-2 top-2 -rotate-2 border border-stamp bg-paper-light/85 px-2 py-0.5 font-kai text-[11px] tracking-[0.12em] text-stamp">
                       {QUALITY_WORD[c.quality]}
                     </span>
                   )}
@@ -119,7 +119,7 @@ export function Cast() {
 
                 <figcaption className="flex flex-col gap-0.5 border-t border-carbon/15 px-2 py-1.5">
                   <div className="flex flex-row items-baseline gap-1.5">
-                    <span className="font-mono text-[10px] text-carbon-soft">
+                    <span className="font-mono text-[11px] text-carbon-soft">
                       {String(c.id).padStart(2, '0')}
                     </span>
                     <span className="truncate font-kai text-[14px] font-bold leading-tight text-carbon-deep group-hover:text-stamp">
@@ -136,7 +136,7 @@ export function Cast() {
 
       <div className="flex-1" />
       <div className="mt-4 flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
-        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
+        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
           相片來源 精選歷史相片集 CURATED HISTORICAL SET · 臉部裁切為衍生縮圖
         </span>
         <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>
