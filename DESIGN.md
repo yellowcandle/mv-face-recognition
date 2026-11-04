@@ -1408,9 +1408,17 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200 with no
       references, so 缺 contestants get an image. Serve real face crops.
 - [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
-- [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded;
-      boxes lag at shot cuts.
+- [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.
+- [ ] Accepted flags change nothing but their own status: the name in 播放, 紀錄 and the published
+      metadata stays wrong. Decide how an accepted flag becomes a correction.
 - [ ] Draw and implement designs for states still only styled by analogy.
+- [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
+      publish, which `/api/faces/crop` already serves.
+- [ ] Serve portraits through Cloudflare Images (enabled 2026-11). Stream stays parked until
+      viewers report playback problems.
+
+The published reel list now carries `duration` and `height`. `height` is the served rendition's
+(1080 for `_1080p` encodes), so the public 首頁 reads 1080P while local dev reads the source's.

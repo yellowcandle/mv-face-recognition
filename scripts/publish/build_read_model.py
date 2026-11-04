@@ -620,9 +620,11 @@ def main() -> int:
         if os.path.exists(encoded_path):
             published = encoded
             published_path = encoded_path
+            stream_height = 1080
         else:
             published = f"{stem}.mp4"
             published_path = os.path.join(REPO, "source/videos", published)
+            stream_height = info.get("height")
         # Cache-bust when an encode is replaced: the Worker serves video with a 24 h
         # Cache-Control, so a new file behind the same URL would stay stale.
         try:
@@ -650,6 +652,9 @@ def main() -> int:
                 "filename": published,
                 "stream_url": stream_url,
                 "has_metadata": True,
+                "duration": info["duration"],
+                # The rendition the viewer plays, not `video_info.height` (the source's).
+                "height": stream_height,
             }
         )
 

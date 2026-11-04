@@ -2828,6 +2828,14 @@ async function handleFaceDetection(
       if (fd.timestamp <= timestamp) frame = fd;
       else break;
     }
+    // Frames with no faces aren't stored, so a frame only speaks for its own sample: past that
+    // the faces have left the shot. Same rule as `frameAt` in apps/shared and local_api.py.
+    let sampleGap = Infinity;
+    for (let i = 1; i < frames.length; i++) {
+      const step = frames[i].timestamp - frames[i - 1].timestamp;
+      if (step > 0 && step < sampleGap) sampleGap = step;
+    }
+    if (frame && timestamp - frame.timestamp > sampleGap * 1.25) frame = null;
 
     // Stored bboxes are frame fractions in canonical [x1, y1, x2, y2] order and are
     // served verbatim: never reordered, never scaled by any width or height.

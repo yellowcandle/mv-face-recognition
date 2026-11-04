@@ -590,6 +590,8 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
 
     Floor matching: returns the most recent frame at or before the timestamp,
     so boxes never appear ahead of the face (same convention as the annotator).
+    Frames with no faces aren't stored, so a frame only speaks for its own sample: past
+    that the faces have left the shot. Same rule as `frameAt` in apps/shared and the Worker.
     """
     import bisect
 
@@ -607,6 +609,9 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
     if idx == 0:
         return {"faces": []}
     frame = frames[idx - 1]
+    steps = [b - a for a, b in zip(timestamps, timestamps[1:]) if b > a]
+    if steps and timestamp - frame["timestamp"] > min(steps) * 1.25:
+        return {"faces": []}
 
     faces = []
     for detection in frame.get("detections", []):

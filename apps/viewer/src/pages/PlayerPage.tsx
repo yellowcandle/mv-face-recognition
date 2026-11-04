@@ -5,6 +5,7 @@ import {
   BAND_STAMP,
   Button,
   FaceCrop,
+  FrameFace,
   Masthead,
   Stamp,
   VideoCanvas,
@@ -61,7 +62,6 @@ export function PlayerPage() {
   const faces = useMemo(() => (meta.metadata ? meta.getFacesAtTime(time) : []), [meta, time]);
 
   const matched = faces.filter((f) => f.matched && f.contestant_id != null);
-  const frame = meta.metadata ? meta.getFrameAtTime(time) : null;
 
   /** Every time a contestant enters after being absent — the queue reads from this. */
   const entries = useMemo<QueueEntry[]>(() => {
@@ -249,20 +249,11 @@ export function PlayerPage() {
         <div className="grid grid-cols-5 gap-4 border-t border-carbon-deep/13 pt-4">
           {matched.map((face, i) => (
             <div key={i} className="flex min-w-0 flex-row items-center gap-2.5">
-              <div className="h-20 w-[60px] shrink-0 overflow-hidden rounded bg-tint">
-                {/* ponytail: frames arrive 6 times a second and a first crop costs 1.5s, so crops
-                    load only while paused. Add a throttle if they're wanted during playback. */}
-                {video && frame && !playing ? (
-                  <FaceCrop
-                    videoId={video.id}
-                    frameNumber={frame.frame_number}
-                    detectionIndex={faces.indexOf(face)}
-                    timestamp={frame.timestamp}
-                    bbox={face.bbox}
-                    streamUrl={video.stream_url}
-                    alt={nameOf(face)}
-                    className="h-full w-full! [&>div]:hidden [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
-                  />
+              <div className="flex h-20 w-[60px] shrink-0 justify-center overflow-hidden rounded bg-tint">
+                {/* ponytail: paused only. Detections are sampled, so during playback the box can
+                    outlive a shot cut and crop the wrong pixels. Blank beats a wrong face. */}
+                {!playing ? (
+                  <FrameFace video={videoEl} bbox={face.bbox} size={80} alt={nameOf(face)} />
                 ) : null}
               </div>
               <div className="flex min-w-0 flex-col gap-1">
