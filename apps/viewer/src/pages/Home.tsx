@@ -7,6 +7,7 @@ import {
   contestantsSeen,
   formatMmSs,
   mostSeen,
+  isTestClip,
   reelRange,
   reelSubtitle,
   renditionLabel,
@@ -27,7 +28,7 @@ export function Home() {
   const { data, isLoading } = useVideos();
   const { data: coverage } = useCoverage();
 
-  const videos: FiledVideo[] = data ?? [];
+  const videos: FiledVideo[] = (data ?? []).filter((video) => !isTestClip(video.id));
   const summary = coverage?.summary;
   const contestants = coverage?.contestants ?? [];
   const regulars = mostSeen(contestants, 4);

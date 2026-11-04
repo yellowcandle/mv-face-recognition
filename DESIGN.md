@@ -1397,7 +1397,6 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 
 ### TODO
 
-- [ ] Decide whether the public 首頁 should list the two `test-*` clips.
 - [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
 - [ ] Five of six live flags store confidence 0, so they show as `0.00 存疑`.
 - [ ] Flag write failures: 待核 only logs to the console; 播放 uses `alert()`.

@@ -1,6 +1,7 @@
 import { expect, test } from 'vite-plus/test';
 import {
   contestantsSeen,
+  isTestClip,
   mostSeen,
   reelHeading,
   reelRange,
@@ -55,4 +56,11 @@ test('mostSeen sorts by detections without mutating, and drops anyone never seen
   expect(mostSeen(all, 2).map((c) => c.id)).toEqual(['b', 'd']);
   expect(mostSeen(all, 9).map((c) => c.id)).toEqual(['b', 'd', 'a']);
   expect(all[0].id).toBe('a');
+});
+
+test('isTestClip matches only the test- prefix', () => {
+  expect(isTestClip('test-video-mv2')).toBe(true);
+  expect(isTestClip('test-unmatched')).toBe(true);
+  expect(isTestClip(MV1)).toBe(false);
+  expect(isTestClip('4-test-reel')).toBe(false);
 });

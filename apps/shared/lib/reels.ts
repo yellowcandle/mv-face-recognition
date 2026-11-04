@@ -14,6 +14,11 @@ export function reelSubtitle(name: string): string {
   return rest.split('！').pop()!.replace(/MV$/, ' MV');
 }
 
+/** Processing test clips, kept out of the public reel list. */
+export function isTestClip(id: string): boolean {
+  return id.startsWith('test-');
+}
+
 /** A reel by number, title and station, e.g. 第 1 卷 · 首部曲 · 造星の駅. Test clips keep their name. */
 export function reelHeading(name: string): string {
   const number = name.match(/^(\d+)-/)?.[1];
