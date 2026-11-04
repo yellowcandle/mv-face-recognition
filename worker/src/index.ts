@@ -311,8 +311,11 @@ export default {
     // Identity-dependent responses must never be reused. Without this, the browser heuristically
     // caches `GET /admin/api/faces/flagged` (no validator, no Cache-Control), so accepting a flag
     // writes to KV but the review queue keeps showing it and never asks again.
+    // The two detection reads carry accepted flags, so they must not be reused either.
     const routeHeaders: CorsHeaders =
       pathname.startsWith('/api/faces/flag') ||
+      pathname.startsWith('/api/faces/detect') ||
+      pathname.startsWith('/api/videos/metadata/') ||
       pathname.startsWith('/api/labels') ||
       pathname.startsWith('/api/processing')
         ? { ...corsHeaders, 'Cache-Control': 'no-store' }
@@ -1895,7 +1898,7 @@ async function putFlag(env: Env, record: FlagRecord): Promise<void> {
  * The legacy array is still read for this release. Every mutation claims it first, so a flag
  * cannot be resurrected from it after a delete.
  */
-async function readFlags(env: Env): Promise<FlagRecord[]> {
+async function readFlags(env: Env, ceiling = Infinity): Promise<FlagRecord[]> {
   const byId = new Map<string, FlagRecord>();
 
   const legacy = await env.METADATA_KV.get(FLAGS_KEY);
@@ -1911,17 +1914,136 @@ async function readFlags(env: Env): Promise<FlagRecord[]> {
   }
 
   let cursor: string | undefined;
+  let read = 0;
   do {
     const page = await env.METADATA_KV.list({ prefix: FLAG_PREFIX, cursor });
-    for (const key of page.keys) {
-      const record = parseFlagRecord(await env.METADATA_KV.get(key.name));
+    const keys = page.keys.slice(0, ceiling - read);
+    read += keys.length;
+    const stored = await Promise.all(keys.map((key) => env.METADATA_KV.get(key.name)));
+    for (const value of stored) {
+      const record = parseFlagRecord(value);
       if (record) byId.set(record.id, record);
     }
     cursor = page.list_complete ? undefined : page.cursor;
+    if (read >= ceiling && (cursor || keys.length < page.keys.length)) {
+      logger.warn('More flags than the read ceiling; the rest were not read', { ceiling });
+      break;
+    }
   } while (cursor);
 
   // Oldest first: the order the single array appended in.
-  return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return [...byId.values()].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
+}
+
+// ponytail: every detection read lists and reads every flag, so the ceiling keeps one request to
+// 200 KV reads. Past it, accepted flags can go unapplied (a warning is logged). Upgrade: keep
+// `video_id` and `status` in KV key metadata in `putFlag`, so the list alone says which to read.
+const FLAG_READ_CEILING = 200;
+
+/** A face in stored metadata. Bounding boxes are frame fractions, canonical [x1, y1, x2, y2]. */
+interface StoredDetection {
+  /** ByteTrack id within a shot; -1 when untracked. */
+  tracker_id?: number | null;
+  match_source?: 'frame' | 'track' | 'flag' | null;
+  contestant_id?: string | null;
+  contestant_name?: string | null;
+  contestant_nickname?: string | null;
+  /** Raw cosine similarity to the contestant's best reference embedding, null when unmatched */
+  match_score?: number | null;
+  /** Detector's own face score, present on every detection */
+  det_score?: number;
+  bbox?: number[];
+  matched?: boolean;
+}
+
+interface StoredFrame {
+  timestamp: number;
+  frame_number?: number;
+  detections?: StoredDetection[];
+}
+
+/** This reel's accepted flags and the roster that names them. */
+interface FlagOverlay {
+  flags: FlagRecord[];
+  roster: Map<string, Pick<Contestant, 'name' | 'nickname'>>;
+}
+
+/** Floor match over frames sorted by timestamp: the most recent frame at or before `timestamp`. */
+function floorFrame(frames: StoredFrame[], timestamp: number): StoredFrame | null {
+  let found: StoredFrame | null = null;
+  for (const frame of frames) {
+    if (frame.timestamp <= timestamp) found = frame;
+    else break;
+  }
+  return found;
+}
+
+/**
+ * Accepted flags laid over stored frames. Each flag names one detection by floor frame and exact
+ * box, and the newest wins. Nothing is guessed by proximity, and only named fields are copied, so
+ * a flag's private fields cannot reach a public read. Returns `frames` itself when no flag lands.
+ * Same rule as `_overlay_accepted_flags` in local_api.py.
+ */
+function overlayAcceptedFlags(
+  frames: StoredFrame[],
+  { flags, roster }: FlagOverlay,
+): StoredFrame[] {
+  const sorted = frames
+    .filter((frame) => typeof frame.timestamp === 'number')
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const named = new Map<StoredDetection, string>();
+  const oldestFirst = [...flags].sort((a, b) =>
+    (a.created_at ?? '').localeCompare(b.created_at ?? ''),
+  );
+  for (const flag of oldestFirst) {
+    const id = String(flag.contestant_id);
+    const detection = floorFrame(sorted, flag.timestamp)?.detections?.find((d) =>
+      sameBbox(d.bbox, flag.bbox as number[] | undefined),
+    );
+    if (detection && roster.has(id)) named.set(detection, id);
+  }
+  if (named.size === 0) return frames;
+
+  return frames.map((frame) => ({
+    ...frame,
+    detections: frame.detections?.map((detection) => {
+      const id = named.get(detection);
+      if (id === undefined) return detection;
+      const contestant = roster.get(id);
+      return {
+        ...detection,
+        contestant_id: id,
+        contestant_name: contestant?.name ?? null,
+        contestant_nickname: contestant?.nickname ?? null,
+        matched: true,
+        match_source: 'flag' as const,
+        match_score: null, // A cosine belongs to the old identity; a flag carries none.
+      };
+    }),
+  }));
+}
+
+/**
+ * What to lay over this reel, or null when it has no accepted flags, which spends no roster read.
+ * A public read must survive a flag or roster failure, so that serves the frames as stored.
+ */
+async function readFlagOverlay(env: Env, videoId: string): Promise<FlagOverlay | null> {
+  try {
+    const flags = (await readFlags(env, FLAG_READ_CEILING)).filter(
+      (flag) => flag.status === 'accepted' && flag.video_id === videoId,
+    );
+    if (flags.length === 0) return null;
+    const stored = await env.METADATA_KV.get('contestants_structured');
+    const parsed: unknown = stored ? JSON.parse(stored) : null;
+    const list = Array.isArray(parsed) ? (parsed as Contestant[]) : allContestants;
+    return { flags, roster: new Map(list.map((person) => [String(person.id), person])) };
+  } catch (error) {
+    logger.warn('Serving detections without accepted flags', {
+      message: (error as Error).message,
+      videoId,
+    });
+    return null;
+  }
 }
 
 /** Move the legacy array into per-flag keys, then drop it. Safe to call on every mutation. */
@@ -2785,26 +2907,7 @@ async function handleFaceDetection(
   const denseMetadata = await env.METADATA_KV.get(`metadata_${videoId}`);
 
   if (denseMetadata) {
-    let parsed: {
-      frame_data?: Array<{
-        timestamp: number;
-        frame_number?: number;
-        detections?: Array<{
-          /** ByteTrack id within a shot; -1 when untracked. */
-          tracker_id?: number | null;
-          match_source?: 'frame' | 'track' | null;
-          contestant_id?: string | null;
-          contestant_name?: string | null;
-          contestant_nickname?: string | null;
-          /** Raw cosine similarity to the contestant's best reference embedding, null when unmatched */
-          match_score?: number | null;
-          /** Detector's own face score, present on every detection */
-          det_score?: number;
-          /** Frame fractions, canonical [x1, y1, x2, y2] */
-          bbox?: number[];
-        }>;
-      }>;
-    };
+    let parsed: { frame_data?: StoredFrame[] };
     try {
       parsed = JSON.parse(denseMetadata) as typeof parsed;
     } catch (error) {
@@ -2820,14 +2923,12 @@ async function handleFaceDetection(
 
     // Floor match: most recent frame at or before the timestamp, so boxes
     // never appear ahead of the face (same convention as local_api.py).
-    const frames = (parsed.frame_data || [])
+    const overlay = await readFlagOverlay(env, videoId);
+    const stored = parsed.frame_data || [];
+    const frames = (overlay ? overlayAcceptedFlags(stored, overlay) : stored)
       .filter((fd) => typeof fd.timestamp === 'number')
       .sort((a, b) => a.timestamp - b.timestamp);
-    let frame: (typeof frames)[number] | null = null;
-    for (const fd of frames) {
-      if (fd.timestamp <= timestamp) frame = fd;
-      else break;
-    }
+    let frame = floorFrame(frames, timestamp);
     // Frames with no faces aren't stored, so a frame only speaks for its own sample: past that
     // the faces have left the shot. Same rule as `frameAt` in apps/shared and local_api.py.
     let sampleGap = Infinity;
@@ -3019,9 +3120,33 @@ async function handleRecognitionResults(
 // Admin Endpoints
 
 /**
+ * The stored metadata text with accepted flags applied. Parsed only if the reel has any, since the
+ * document is large and most reels have none; otherwise, or if none land, the same text.
+ */
+async function withAcceptedFlags(env: Env, videoId: string, stored: string): Promise<string> {
+  const overlay = await readFlagOverlay(env, videoId);
+  if (!overlay) return stored;
+  try {
+    const parsed = JSON.parse(stored) as { frame_data?: StoredFrame[] };
+    if (!Array.isArray(parsed.frame_data)) return stored;
+    const frames = overlayAcceptedFlags(parsed.frame_data, overlay);
+    return frames === parsed.frame_data
+      ? stored
+      : JSON.stringify({ ...parsed, frame_data: frames });
+  } catch (error) {
+    logger.warn('Serving metadata without accepted flags', {
+      message: (error as Error).message,
+      videoId,
+    });
+    return stored;
+  }
+}
+
+/**
  * `/videos/metadata/{id}` and `/videos/metadata/dense/{id}` are one read: both return
- * the `metadata_{id}` blob verbatim. A single handler strips either prefix, so the two
- * routes cannot drift apart.
+ * the `metadata_{id}` blob, verbatim unless an accepted flag lands on one of its detections.
+ * `contestant_timeline` and the summaries are stored, so they stay as the pipeline wrote them.
+ * A single handler strips either prefix, so the two routes cannot drift apart.
  */
 async function handleVideoMetadata(
   path: string,
@@ -3042,7 +3167,7 @@ async function handleVideoMetadata(
   const storedMetadata = await env.METADATA_KV?.get(key);
 
   if (storedMetadata) {
-    return new Response(storedMetadata, {
+    return new Response(await withAcceptedFlags(env, videoId, storedMetadata), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

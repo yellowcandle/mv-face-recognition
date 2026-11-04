@@ -581,7 +581,7 @@ async def get_dense_metadata(video_id: str):
     meta_path = _metadata_path(video_id)
     if not meta_path.exists():
         raise HTTPException(404, f"Metadata not found for {video_id}")
-    return _load_json_cached(meta_path)
+    return _with_accepted_flags(_load_json_cached(meta_path), video_id, meta_path)
 
 
 @app.get("/api/faces/detect")
@@ -598,7 +598,7 @@ async def detect_faces_at_timestamp(video_id: str, timestamp: float = 0):
     meta_path = _metadata_path(video_id)
     if not meta_path.exists():
         return {"faces": []}
-    data = _load_json_cached(meta_path)
+    data = _with_accepted_flags(_load_json_cached(meta_path), video_id, meta_path)
     frame_data = data.get("frame_data", [])
     if not frame_data:
         return {"faces": []}
@@ -637,6 +637,74 @@ def _same_bbox(left: Any, right: Any) -> bool:
     if len(left) != 4 or len(right) != 4:
         return False
     return all(abs(a - b) < 1e-6 for a, b in zip(left, right))
+
+
+def _overlay_accepted_flags(frame_data: list[dict], flags: list[dict], roster: dict) -> list[dict]:
+    """Accepted flags laid over stored frames.
+
+    Each flag names one detection by floor frame and exact box, and the newest wins. Nothing is
+    guessed by proximity, and only named fields are copied, so a flag's private fields cannot
+    reach a read. Returns `frame_data` itself when no flag lands, and never mutates it: it is the
+    shared `_load_json_cached` dict. Same rule as `overlayAcceptedFlags` in the Worker.
+    """
+    import bisect
+
+    frames = sorted(frame_data, key=lambda fd: fd["timestamp"])
+    timestamps = [fd["timestamp"] for fd in frames]
+    named: dict[int, dict] = {}
+    for flag in sorted(flags, key=lambda f: str(f.get("created_at") or "")):
+        contestant = roster.get(str(flag.get("contestant_id")))
+        timestamp = flag.get("timestamp")
+        if contestant is None or not isinstance(timestamp, (int, float)):
+            continue
+        index = bisect.bisect_right(timestamps, timestamp)
+        if index == 0:
+            continue
+        for detection in frames[index - 1].get("detections") or []:
+            if _same_bbox(detection.get("bbox"), flag.get("bbox")):
+                named[id(detection)] = contestant
+                break
+    if not named:
+        return frame_data
+
+    def laid_over(detection: dict) -> dict:
+        contestant = named.get(id(detection))
+        if contestant is None:
+            return detection
+        # match_score: a cosine belongs to the old identity, and a flag carries none.
+        return {
+            **detection,
+            **contestant,
+            "matched": True,
+            "match_source": "flag",
+            "match_score": None,
+        }
+
+    return [
+        {**frame, "detections": [laid_over(d) for d in frame.get("detections") or []]}
+        for frame in frame_data
+    ]
+
+
+def _with_accepted_flags(data: dict, video_id: str, meta_path: Path) -> dict:
+    """`data` with this reel's accepted flags applied; `data` itself when none land.
+
+    `contestant_timeline` and the summaries are stored, so they stay as the pipeline wrote them.
+    """
+    # ponytail: re-reads the whole flag file per request, thumbnails included. Fine for a local
+    # tool with few flags; cache by mtime if flags ever number in the thousands.
+    # A bare-number request still reaches flags filed on the reel's full stem.
+    names = {video_id, meta_path.name.removesuffix("_metadata.json")}
+    flags = [
+        flag
+        for flag in _load_flags()
+        if flag.get("status") == "accepted" and flag.get("video_id") in names
+    ]
+    frame_data = data.get("frame_data")
+    if not flags or not frame_data:
+        return data
+    frames = _overlay_accepted_flags(frame_data, flags, _contestant_roster())
+    return data if frames is frame_data else {**data, "frame_data": frames}
 
 
 @app.get("/api/recognition/results")
@@ -752,6 +820,22 @@ def _contestant_ids() -> set[str]:
         return set()
     with open(CONTESTANT_CSV, encoding="utf-8") as f:
         return {row["編號"].strip() for row in csv.DictReader(f)}
+
+
+def _contestant_roster() -> dict[str, dict]:
+    """The detection fields a flag sets, keyed by contestant id as a string."""
+    import csv
+    if not CONTESTANT_CSV.exists():
+        return {}
+    with open(CONTESTANT_CSV, encoding="utf-8") as f:
+        return {
+            row["編號"].strip(): {
+                "contestant_id": row["編號"].strip(),
+                "contestant_name": row["姓名"].strip(),
+                "contestant_nickname": row["暱稱"].strip(),
+            }
+            for row in csv.DictReader(f)
+        }
 
 
 def _known_tracker_ids(data: dict) -> set[int]:

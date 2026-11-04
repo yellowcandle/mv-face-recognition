@@ -70,6 +70,15 @@ claim's own score. Flagging is an **admin** act.
 _Avoid_: correction, label, annotation, ground truth — a flag is a proposal, and only becomes
 evidence once accepted.
 
+**Accepted-flag overlay**:
+What the server does as it serves a **detection**: an accepted **flag** names that one detection
+for its **contestant**, found by the frame it was filed against and its exact **bounding box**.
+The served detection has `match_source: 'flag'`, no **match score** and no **band**, and shows
+已核對. Stored metadata is never written, so rejecting or re-pending the flag undoes it. It covers
+one detection, never the track, and stored summaries such as `contestant_timeline` do not change.
+_Avoid_: correcting the metadata, relabelling, propagating — nothing is rewritten, and a label is
+a verdict on a whole track.
+
 ### Data
 
 **Contestant**:

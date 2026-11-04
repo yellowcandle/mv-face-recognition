@@ -1412,8 +1412,14 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.
-- [ ] Accepted flags change nothing but their own status: the name in 播放, 紀錄 and the published
-      metadata stays wrong. Decide how an accepted flag becomes a correction.
+- [x] Accepted flags show at read time: `/api/faces/detect` and dense metadata, in the Worker and
+      `local_api.py`, overlay them on detections as served, and the face stamps a tilted 已核對
+      with no cosine or band. Stored metadata is untouched, so rejecting or re-pending undoes it.
+      Both routes are `no-store`; KV itself can lag a decision by up to about 60s.
+- [ ] Accepted-flag limits: a flag covers one detection, not its track. `contestant_timeline`,
+      `timeline_markers`, `processing_summary` and `recognitions_count` are stored and stay as
+      found, so 紀錄 rows, `/api/recognition/results` and the player's timeline keep the old name
+      until a reprocess. The Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.
