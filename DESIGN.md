@@ -1415,7 +1415,7 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [x] Accepted flags show at read time: `/api/faces/detect` and dense metadata, in the Worker and
       `local_api.py`, overlay them on detections as served, and the face stamps a tilted 已核對
       with no cosine or band. Stored metadata is untouched, so rejecting or re-pending undoes it.
-      Both routes are `no-store`; KV itself can lag a decision by up to about 60s.
+      These reads are `no-store`; KV itself can lag a decision by up to about 60s.
       The overlay also moves the appearance: `contestant_timeline`, `processing_summary`,
       `recognitions_count` and `/api/recognition/results` are recounted per reel as served, so
       紀錄 and the player agree. Appearances are complete in the timeline, so this is exact and reads
@@ -1425,6 +1425,9 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       until the next publish, since an exact average needs every reel per read. `timeline_markers`
       and `match_score_stats` exist only in local runs, have no reader, and stay as stored. The
       Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
+- [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
+      bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
+      count videos correctly. A new reference set changes nothing until a reel is reprocessed.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.

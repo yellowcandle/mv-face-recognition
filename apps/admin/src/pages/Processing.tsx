@@ -491,13 +491,24 @@ export function Processing() {
         <ActionColumn
           className="min-w-0 flex-1 border-r border-carbon-deep/13 pr-6"
           title="首次處理"
-          description="用本機流程處理這台機器上的所有影片"
-          does={[
-            '處理所有未處理的影片',
-            '偵測並辨識人臉',
-            '可用時啟用硬件加速',
-            '結果寫入 local_output/',
-          ]}
+          description={
+            isEdge ? '在雲端工作上重新處理一部影片' : '用本機流程處理這台機器上的所有影片'
+          }
+          does={
+            isEdge
+              ? [
+                  '每次處理一部影片',
+                  '偵測並辨識人臉',
+                  '結果寫入 bucket',
+                  '之後經 publish:metadata 發佈',
+                ]
+              : [
+                  '處理所有未處理的影片',
+                  '偵測並辨識人臉',
+                  '可用時啟用硬件加速',
+                  '結果寫入 local_output/',
+                ]
+          }
           controls={
             <>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -511,10 +522,13 @@ export function Processing() {
                   disabled={!jobsAvailable}
                   className="field field-select h-10 w-full disabled:opacity-45"
                 >
-                  <option value="">全部來源影片</option>
+                  <option value="" disabled={isEdge}>
+                    {isEdge ? '請揀選影片' : '全部來源影片'}
+                  </option>
                   {videoOptions.map((v) => (
                     <option key={v.filename} value={v.filename}>
-                      {v.filename} ({v.size_mb.toFixed(1)} MB)
+                      {v.filename}
+                      {v.size_mb > 0 ? ` (${v.size_mb.toFixed(1)} MB)` : ''}
                     </option>
                   ))}
                 </select>
@@ -522,7 +536,8 @@ export function Processing() {
               <Button
                 variant="primary"
                 onClick={startInitialProcessing}
-                disabled={unavailableBecauseProcessing}
+                // Each reel on the edge is a paid run, so it must be named (ADR 0006).
+                disabled={unavailableBecauseProcessing || (isEdge && !selectedVideo)}
               >
                 {isProcessing ? startingLabel : '開始處理'}
               </Button>
@@ -533,13 +548,19 @@ export function Processing() {
         <ActionColumn
           className="w-[296px] shrink-0 border-r border-carbon-deep/13 px-6"
           title="更新向量"
-          description="由硬碟上揀選好的參考相重建參考向量"
-          does={[
-            '提升人臉辨識準確度',
-            '重建 reference_embeddings.npz',
-            '快速重算向量',
-            '自動更新覆蓋率',
-          ]}
+          description={
+            isEdge ? '由 bucket 內的參考相重建參考向量' : '由硬碟上揀選好的參考相重建參考向量'
+          }
+          does={
+            isEdge
+              ? ['重建 reference_embeddings.npz', '寫入 bucket', '重新處理影片後才影響辨識結果']
+              : [
+                  '提升人臉辨識準確度',
+                  '重建 reference_embeddings.npz',
+                  '快速重算向量',
+                  '自動更新覆蓋率',
+                ]
+          }
           controls={
             <Button
               className="w-full"
