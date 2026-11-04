@@ -121,3 +121,31 @@ test('contestant appearances list and read full-id keys', async () => {
     `an unfiltered scan must use the metadata_ prefix, read ${allReads.join(', ')}`,
   );
 });
+
+test('/api/faces/detect drops a frame once the faces have left the shot', async () => {
+  const worker = await loadWorker();
+  const frame = (frame_number, timestamp) => ({
+    frame_number,
+    timestamp,
+    detections: [{ bbox: [0.1, 0.2, 0.3, 0.4], contestant_id: '1' }],
+  });
+  // Sampled every 0.16s; frames with no faces aren't stored, so the next one is 10s away.
+  const metadata = JSON.stringify({
+    frame_data: [frame(90, 14.4), frame(91, 14.56), frame(92, 14.72), frame(150, 25)],
+  });
+  const env = { METADATA_KV: { get: async (key) => (key === 'metadata_x' ? metadata : null) } };
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const at = async (t) => {
+    const url = `https://worker.test/api/faces/detect?video_id=x&timestamp=${t}`;
+    return (await worker.fetch(new Request(url), env, ctx)).json();
+  };
+
+  assert.equal((await at(14.8)).frame, 92);
+  assert.equal((await at(14.8)).faces.length, 1);
+  for (const t of [15, 18, 24.9, 1]) {
+    const body = await at(t);
+    assert.equal(body.frame, null, `t=${t}`);
+    assert.deepEqual(body.faces, [], `t=${t}`);
+  }
+  assert.equal((await at(25)).frame, 150);
+});
