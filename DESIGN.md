@@ -1405,8 +1405,8 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 
 - [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
 - [ ] Five of six live flags store confidence 0, so they show as `0.00 存疑`.
-- [ ] `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200 with no
-      references, so 缺 contestants get an image. Serve real face crops.
+- [ ] The local API's `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200
+      with no references, so 缺 contestants get an image (the deployed copy is a 512px WebP crop).
 - [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
 - [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
@@ -1417,8 +1417,9 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.
-- [ ] Serve portraits through Cloudflare Images (enabled 2026-11). Stream stays parked until
-      viewers report playback problems.
+- [x] Portraits are requested through `/cdn-cgi/image` at 64/256/512px via `portraitSrc`
+      (`apps/shared/lib/portrait.ts`, deployed host only, falls back to the original on error).
+      Stream stays parked until viewers report playback problems.
 
 The published reel list now carries `duration` and `height`. `height` is the served rendition's
 (1080 for `_1080p` encodes), so the public 首頁 reads 1080P while local dev reads the source's.

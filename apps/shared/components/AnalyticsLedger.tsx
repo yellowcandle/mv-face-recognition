@@ -6,6 +6,7 @@ import { ledgerRows, spanPercent, type LedgerRow, type LedgerSort } from './ledg
 import { useContestants } from '../hooks/useContestants';
 import { useVideos } from '../hooks/useVideos';
 import { BAND_CUTOFFS, BAND_STAMP, bandFor, type Band } from '../lib/bands';
+import { portraitSrc } from '../lib/portrait';
 import { formatMmSs, videoShortName } from '../lib/format';
 import type { VideoMetadata } from '../types';
 
@@ -79,13 +80,18 @@ function Face({
       : null;
   const [failed, setFailed] = useState<string | null>(null);
   const src = crop && crop !== failed ? crop : portrait;
+  const sized = src === portrait ? portraitSrc(src, 28) : src;
   return src && src !== failed ? (
     <img
-      src={src}
+      src={sized!}
       alt=""
       loading="lazy"
       className="size-7 shrink-0 rounded object-cover"
-      onError={() => setFailed(src)}
+      onError={(e) => {
+        // A failed resize retries the original once before the face is given up on.
+        if (e.currentTarget.src.includes('/cdn-cgi/image/')) e.currentTarget.src = src!;
+        else setFailed(src);
+      }}
     />
   ) : (
     <div className="size-7 shrink-0 rounded bg-tint" />
