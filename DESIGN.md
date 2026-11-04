@@ -1408,8 +1408,7 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200 with no
       references, so 缺 contestants get an image. Serve real face crops.
 - [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
-- [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded;
-      boxes lag at shot cuts.
+- [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.

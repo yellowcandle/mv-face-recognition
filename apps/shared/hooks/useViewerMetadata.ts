@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { frameAt, sampleGap } from '../lib/frameAt';
 import type { FaceDetection, FrameData, VideoMetadata } from '../types';
 
 export function useViewerMetadata(apiBase: string, videoId: string | null) {
@@ -33,30 +34,11 @@ export function useViewerMetadata(apiBase: string, videoId: string | null) {
     return [...metadata.frame_data].sort((a, b) => a.timestamp - b.timestamp);
   }, [metadata]);
 
-  const timestamps = useMemo(() => sortedFrames.map((f) => f.timestamp), [sortedFrames]);
+  const gap = useMemo(() => sampleGap(sortedFrames), [sortedFrames]);
 
-  // Get frame data at a given time (floor match - most recent past detection)
   const getFrameAtTime = useCallback(
-    (time: number): FrameData | null => {
-      if (sortedFrames.length === 0) return null;
-
-      // Binary search for floor
-      let lo = 0,
-        hi = sortedFrames.length - 1;
-      let result = -1;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        if (timestamps[mid] <= time) {
-          result = mid;
-          lo = mid + 1;
-        } else {
-          hi = mid - 1;
-        }
-      }
-
-      return result >= 0 ? sortedFrames[result] : null;
-    },
-    [sortedFrames, timestamps],
+    (time: number): FrameData | null => frameAt(sortedFrames, time, gap),
+    [sortedFrames, gap],
   );
 
   // Stored detections already carry the served shape: frame-fraction bbox, raw cosine

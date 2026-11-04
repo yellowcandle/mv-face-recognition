@@ -62,7 +62,6 @@ export function PlayerPage() {
   const faces = useMemo(() => (meta.metadata ? meta.getFacesAtTime(time) : []), [meta, time]);
 
   const matched = faces.filter((f) => f.matched && f.contestant_id != null);
-  const frame = meta.metadata ? meta.getFrameAtTime(time) : null;
 
   /** Every time a contestant enters after being absent — the queue reads from this. */
   const entries = useMemo<QueueEntry[]>(() => {
