@@ -1722,6 +1722,8 @@ async function handleApiRequest(
 
 const FLAGS_KEY = 'flagged_faces'; // legacy single array; migrated on the first write
 const FLAG_PREFIX = 'flag_';
+const FLAG_LIST_PREFIX = 'flag'; // covers FLAGS_KEY too, so a listing says whether it still exists
+const KV_METADATA_LIMIT = 1024; // bytes of JSON; KV refuses the whole put past it
 const LABEL_PREFIX = 'labels_';
 const LABELS_SCHEMA = 'labels/v2';
 const FLAG_STATUSES = ['pending', 'accepted', 'rejected'] as const;
@@ -1888,8 +1890,23 @@ function parseFlagRecord(stored: string | null): FlagRecord | null {
   }
 }
 
+/**
+ * The only writer of `flag_` keys. A put replaces metadata, so a status change rewrites it, and
+ * one that no longer fits clears it rather than leaving it stale.
+ */
 async function putFlag(env: Env, record: FlagRecord): Promise<void> {
-  await env.METADATA_KV.put(flagKey(record.id), JSON.stringify(record));
+  const metadata = { video_id: record.video_id, status: record.status };
+  const fits = new TextEncoder().encode(JSON.stringify(metadata)).length <= KV_METADATA_LIMIT;
+  await env.METADATA_KV.put(flagKey(record.id), JSON.stringify(record), fits ? { metadata } : {});
+}
+
+/** False only when well-formed metadata rules a flag out. Anything else must be read. */
+function flagMayApply(metadata: unknown, videoId: string | null): boolean {
+  const { status, video_id: reel } = (metadata ?? {}) as { status?: unknown; video_id?: unknown };
+  if (typeof reel !== 'string' || !(FLAG_STATUSES as readonly unknown[]).includes(status)) {
+    return true;
+  }
+  return status === 'accepted' && (videoId === null || reel === videoId);
 }
 
 /**
@@ -1899,46 +1916,67 @@ async function putFlag(env: Env, record: FlagRecord): Promise<void> {
  * The legacy array is still read for this release. Every mutation claims it first, so a flag
  * cannot be resurrected from it after a delete.
  */
-async function readFlags(env: Env, ceiling = Infinity): Promise<FlagRecord[]> {
+async function readFlags(
+  env: Env,
+  mayApply: (metadata: unknown) => boolean = () => true,
+  ceiling = Infinity,
+): Promise<FlagRecord[]> {
   const byId = new Map<string, FlagRecord>();
+  const ruledOut = new Set<string>();
+  let legacyListed = false;
+  let cursor: string | undefined;
+  let read = 0;
+  let unread = 0;
+  do {
+    const page = await env.METADATA_KV.list({ prefix: FLAG_LIST_PREFIX, cursor });
+    const wanted: string[] = [];
+    for (const key of page.keys) {
+      if (key.name === FLAGS_KEY) legacyListed = true;
+      else if (key.name.startsWith(FLAG_PREFIX)) {
+        if (mayApply(key.metadata)) wanted.push(key.name);
+        else ruledOut.add(key.name);
+      }
+    }
+    const names = wanted.slice(0, ceiling - read);
+    read += names.length;
+    unread += wanted.length - names.length;
+    const stored = await Promise.all(names.map((name) => env.METADATA_KV.get(name)));
+    for (const value of stored) {
+      const record = parseFlagRecord(value);
+      if (record) byId.set(record.id, record);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  if (unread > 0)
+    logger.warn('More flags than the read ceiling; the rest were not read', { unread });
 
-  const legacy = await env.METADATA_KV.get(FLAGS_KEY);
+  // A flag's own key outranks its copy in the array, even when the metadata ruled the key out.
+  const legacy = legacyListed ? await env.METADATA_KV.get(FLAGS_KEY) : null;
   if (legacy) {
     try {
       const parsed: unknown = JSON.parse(legacy);
       if (Array.isArray(parsed)) {
-        for (const record of parsed) if (isFlagRecord(record)) byId.set(record.id, record);
+        for (const record of parsed) {
+          if (isFlagRecord(record) && !byId.has(record.id) && !ruledOut.has(flagKey(record.id))) {
+            byId.set(record.id, record);
+          }
+        }
       }
     } catch {
       logger.warn('Could not read the legacy flagged_faces array');
     }
   }
 
-  let cursor: string | undefined;
-  let read = 0;
-  do {
-    const page = await env.METADATA_KV.list({ prefix: FLAG_PREFIX, cursor });
-    const keys = page.keys.slice(0, ceiling - read);
-    read += keys.length;
-    const stored = await Promise.all(keys.map((key) => env.METADATA_KV.get(key.name)));
-    for (const value of stored) {
-      const record = parseFlagRecord(value);
-      if (record) byId.set(record.id, record);
-    }
-    cursor = page.list_complete ? undefined : page.cursor;
-    if (read >= ceiling && (cursor || keys.length < page.keys.length)) {
-      logger.warn('More flags than the read ceiling; the rest were not read', { ceiling });
-      break;
-    }
-  } while (cursor);
-
   // Oldest first: the order the single array appended in.
   return [...byId.values()].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
 }
 
-// ponytail: every detection read lists and reads every flag, so the ceiling keeps one request to
-// 200 KV reads. Past it, accepted flags can go unapplied (a warning is logged). Upgrade: keep
-// `video_id` and `status` in KV key metadata in `putFlag`, so the list alone says which to read.
+// ponytail: the most flag gets one public read spends: flags whose metadata says accepted for this
+// reel (any reel when none is named), plus flags with no usable metadata. Past it, accepted flags
+// can go unapplied (a warning is logged). Listed keys it rules out cost nothing here, but every
+// read still costs one KV list per 1000 flag keys, unbounded and on the unauthenticated surface.
+// Upgrade: one accepted-flags document per reel, written where `putFlag` is called, so a read is
+// one get and no list.
 const FLAG_READ_CEILING = 200;
 
 /** A face in stored metadata. Bounding boxes are frame fractions, canonical [x1, y1, x2, y2]. */
@@ -2154,7 +2192,8 @@ function overlayAcceptedFlags(doc: StoredMetadata, { flags, roster }: FlagOverla
  */
 async function readFlagOverlay(env: Env, videoId: string | null): Promise<FlagOverlay | null> {
   try {
-    const flags = (await readFlags(env, FLAG_READ_CEILING)).filter(
+    const mayApply = (metadata: unknown) => flagMayApply(metadata, videoId);
+    const flags = (await readFlags(env, mayApply, FLAG_READ_CEILING)).filter(
       (flag) => flag.status === 'accepted' && (videoId === null || flag.video_id === videoId),
     );
     if (flags.length === 0) return null;

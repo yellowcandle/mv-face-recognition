@@ -134,8 +134,17 @@ const flag = (overrides = {}) => ({
   ...overrides,
 });
 
-/** Stored text keeps odd spacing so a verbatim read can be told from a re-serialised one. */
-function makeEnv(flags, { roster = ROSTER, extra = {} } = {}) {
+const metadataOf = ({ video_id, status }) => ({ video_id, status });
+
+/**
+ * KV as workerd behaves (checked against Miniflare): `put` replaces metadata, and without any
+ * clears it; `list` returns it, with no `metadata` key when there is none; 1000 keys a page, with a
+ * cursor only when more remain; over 1024 bytes of JSON the put throws and nothing is stored.
+ *
+ * Stored text keeps odd spacing so a verbatim read can be told from a re-serialised one.
+ * Flags have no metadata, like every flag written before it existed, unless `keyMetadata` is set.
+ */
+function makeEnv(flags, { roster = ROSTER, extra = {}, keyMetadata = false } = {}) {
   const store = new Map(
     Object.entries({
       [`metadata_${VIDEO}`]: JSON.stringify(STORED, null, 1),
@@ -143,25 +152,49 @@ function makeEnv(flags, { roster = ROSTER, extra = {} } = {}) {
       ...extra,
     }),
   );
-  for (const record of flags) store.set(`flag_${record.id}`, JSON.stringify(record));
-  const log = { gets: [], puts: [] };
+  const keyMeta = new Map();
+  for (const record of flags) {
+    store.set(`flag_${record.id}`, JSON.stringify(record));
+    if (keyMetadata) keyMeta.set(`flag_${record.id}`, metadataOf(record));
+  }
+  const log = { gets: [], puts: [], lists: 0 };
   return {
     log,
     store,
+    keyMeta,
     METADATA_KV: {
       get: async (key) => {
         log.gets.push(key);
         return store.get(key) ?? null;
       },
-      put: async (key) => log.puts.push(key),
-      delete: async (key) => log.puts.push(key),
-      list: async ({ prefix = '' } = {}) => ({
-        keys: [...store.keys()]
-          .filter((name) => name.startsWith(prefix))
-          .sort()
-          .map((name) => ({ name })),
-        list_complete: true,
-      }),
+      put: async (key, value, options = {}) => {
+        log.puts.push(key);
+        const length = new TextEncoder().encode(JSON.stringify(options.metadata) ?? '').length;
+        if (length > 1024) {
+          throw new Error(`KV PUT failed: 413 Metadata length of ${length} exceeds limit of 1024.`);
+        }
+        store.set(key, value);
+        if (options.metadata === undefined) keyMeta.delete(key);
+        else keyMeta.set(key, options.metadata);
+      },
+      delete: async (key) => {
+        log.puts.push(key);
+        store.delete(key);
+        keyMeta.delete(key);
+      },
+      list: async ({ prefix = '', cursor } = {}) => {
+        log.lists += 1;
+        const names = [...store.keys()].filter((name) => name.startsWith(prefix)).sort();
+        const start = cursor ? Number(cursor) : 0;
+        const done = start + 1000 >= names.length;
+        return {
+          keys: names
+            .slice(start, start + 1000)
+            .map((name) => (keyMeta.has(name) ? { name, metadata: keyMeta.get(name) } : { name })),
+          list_complete: done,
+          ...(done ? {} : { cursor: String(start + 1000) }),
+        };
+      },
     },
   };
 }
@@ -526,4 +559,248 @@ test('malformed flag records and a failing flag read leave the stored metadata s
   assert.equal(degraded.status, 200);
   assert.equal((await degraded.json()).frame_data[0].detections[0].contestant_id, null);
   assert.equal((await facesAt(failing, 10.03))[0].contestant_id, null);
+});
+
+// ─── Which flags a public read fetches: KV key metadata ───
+
+const flagGets = (env) => env.log.gets.filter((key) => key.startsWith('flag'));
+
+// The Access application the admin routes check, as in worker-is-read-only.test.mjs.
+const TEAM_DOMAIN = 'test-team.cloudflareaccess.com';
+const AUD = 'test-aud';
+const KID = 'k1';
+const { publicKey, privateKey } = await crypto.subtle.generateKey(
+  {
+    name: 'RSASSA-PKCS1-v1_5',
+    modulusLength: 2048,
+    publicExponent: new Uint8Array([1, 0, 1]),
+    hash: 'SHA-256',
+  },
+  true,
+  ['sign', 'verify'],
+);
+const publicJwk = { ...(await crypto.subtle.exportKey('jwk', publicKey)), kid: KID };
+const encodePart = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+
+async function signAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: `https://${TEAM_DOMAIN}`,
+    aud: [AUD],
+    email: 'admin@example.com',
+    iat: now,
+    nbf: now,
+    exp: now + 600,
+  };
+  const input = `${encodePart({ alg: 'RS256', kid: KID, typ: 'JWT' })}.${encodePart(payload)}`;
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    privateKey,
+    new TextEncoder().encode(input),
+  );
+  return `${input}.${Buffer.from(signature).toString('base64url')}`;
+}
+
+/** An authenticated admin request through the fetch handler; only the JWKS is fetched. */
+async function admin(env, method, path, body) {
+  const worker = await loadWorker();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ keys: [publicJwk] });
+  try {
+    const response = await worker.fetch(
+      new Request(`https://worker.test${path}`, {
+        method,
+        headers: { 'Cf-Access-Jwt-Assertion': await signAccessToken() },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }),
+      { ...env, CF_ACCESS_TEAM_DOMAIN: TEAM_DOMAIN, CF_ACCESS_AUD: AUD },
+      CONTEXT,
+    );
+    assert.equal(response.status, 200, `${method} ${path}`);
+    return await response.json();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+const NEW_FLAG = { contestant_id: 1, video_id: VIDEO, timestamp: 10.03, bbox: BOX_A };
+
+test('a read gets only the accepted flags of its reel, and applies them', async () => {
+  const env = makeEnv(
+    [
+      flag({ id: 'pending', status: 'pending' }),
+      flag({ id: 'rejected', status: 'rejected' }),
+      flag({ id: 'other-reel', video_id: 'reel-2' }),
+      flag({ id: 'mine' }),
+    ],
+    { keyMetadata: true },
+  );
+  assert.equal(denseFace(await dense(env)).contestant_id, '1');
+  assert.deepEqual(flagGets(env), ['flag_mine']);
+  assert.equal(env.log.lists, 1);
+});
+
+test('a read with no reel gets accepted flags of every reel, and nothing else', async () => {
+  const env = makeEnv(
+    [flag({ id: 'pending', status: 'pending' }), flag(), flag({ id: 'b', video_id: 'reel-2' })],
+    { keyMetadata: true },
+  );
+  await get(env, '/api/recognition/results?contestant_id=1');
+  assert.deepEqual(flagGets(env).sort(), ['flag_b', 'flag_f1']);
+});
+
+test('a reel with only pending flags costs the list and no get at all', async () => {
+  const env = makeEnv(
+    [flag({ status: 'pending' }), flag({ id: 'g', status: 'pending', video_id: 'reel-2' })],
+    { keyMetadata: true },
+  );
+  await dense(env);
+  assert.deepEqual(flagGets(env), [], 'no flag read and no legacy read');
+  assert.ok(!env.log.gets.includes('contestants_structured'), 'no roster read');
+  assert.equal(env.log.lists, 1);
+});
+
+test('a key with no or malformed metadata is still read and applied', async () => {
+  const malformed = [
+    undefined,
+    null,
+    'pending',
+    7,
+    [],
+    {},
+    { status: 'pending' },
+    { video_id: 'reel-2' },
+    { status: 'PENDING', video_id: 'reel-2' },
+    { status: 'pending', video_id: 9 },
+    { status: 9, video_id: 'reel-2' },
+  ];
+  for (const metadata of malformed) {
+    const env = makeEnv([flag()]);
+    if (metadata !== undefined) env.keyMeta.set('flag_f1', metadata);
+    const label = JSON.stringify(metadata);
+    assert.equal(denseFace(await dense(env)).contestant_id, '1', label);
+    assert.deepEqual(flagGets(env), ['flag_f1'], label);
+    assert.deepEqual(env.log.puts, [], `${label}: a read never backfills`);
+  }
+});
+
+test('the value decides: metadata saying accepted over a rejected value does not apply', async () => {
+  for (const actual of [{ status: 'rejected' }, { video_id: 'reel-2' }]) {
+    const env = makeEnv([flag(actual)]);
+    env.keyMeta.set('flag_f1', { video_id: VIDEO, status: 'accepted' });
+    assert.equal(denseFace(await dense(env)).contestant_id, null);
+    assert.deepEqual(flagGets(env), ['flag_f1']);
+    assert.ok(!env.log.gets.includes('contestants_structured'));
+  }
+});
+
+test('every write keeps the metadata true, and the overlay follows it', async () => {
+  const env = makeEnv([]);
+  const { id } = await admin(env, 'POST', '/api/faces/flag', NEW_FLAG);
+  const key = `flag_${id}`;
+  assert.deepEqual(env.keyMeta.get(key), { video_id: VIDEO, status: 'pending' });
+  assert.equal(denseFace(await dense(env)).contestant_id, null);
+
+  await admin(env, 'PATCH', `/api/faces/flagged/${id}`, { status: 'accepted' });
+  assert.deepEqual(env.keyMeta.get(key), { video_id: VIDEO, status: 'accepted' });
+  assert.equal(denseFace(await dense(env)).contestant_id, '1');
+
+  await admin(env, 'PATCH', `/api/faces/flagged/${id}`, { status: 'rejected' });
+  assert.deepEqual(env.keyMeta.get(key), { video_id: VIDEO, status: 'rejected' });
+  env.log.gets.length = 0;
+  assert.equal(denseFace(await dense(env)).contestant_id, null);
+  assert.deepEqual(flagGets(env), [], 'a rejected flag is not read');
+
+  await admin(env, 'PATCH', `/api/faces/flagged/${id}`, { status: 'accepted' });
+  await admin(env, 'POST', '/api/faces/flag/update', { face_id: id, contestant_id: 2 });
+  assert.deepEqual(env.keyMeta.get(key), { video_id: VIDEO, status: 'pending' }, 'reassign');
+  assert.equal(denseFace(await dense(env)).contestant_id, null);
+
+  await admin(env, 'DELETE', `/api/faces/flagged/${id}`);
+  assert.equal(env.keyMeta.has(key), false);
+});
+
+test('a video id too long for key metadata loses neither the flag nor its overlay', async () => {
+  const video = '好'.repeat(400);
+  const env = makeEnv([], { extra: { [`metadata_${video}`]: JSON.stringify(STORED) } });
+  const { id } = await admin(env, 'POST', '/api/faces/flag', { ...NEW_FLAG, video_id: video });
+  assert.ok(env.store.has(`flag_${id}`), 'the flag is stored');
+  assert.equal(env.keyMeta.has(`flag_${id}`), false, 'with no metadata');
+
+  await admin(env, 'PATCH', `/api/faces/flagged/${id}`, { status: 'accepted' });
+  const path = `/api/videos/metadata/dense/${encodeURIComponent(video)}`;
+  assert.equal(denseFace(await (await get(env, path)).json()).contestant_id, '1');
+});
+
+test('a status that stops the metadata fitting clears it rather than leaving it stale', async () => {
+  // {"video_id":"","status":"pending"} is 34 bytes and 330 CJK characters 990: exactly 1024.
+  // "accepted" is one byte longer.
+  const video = '好'.repeat(330);
+  const env = makeEnv([], { extra: { [`metadata_${video}`]: JSON.stringify(STORED) } });
+  const { id } = await admin(env, 'POST', '/api/faces/flag', { ...NEW_FLAG, video_id: video });
+  assert.deepEqual(env.keyMeta.get(`flag_${id}`), { video_id: video, status: 'pending' });
+
+  await admin(env, 'PATCH', `/api/faces/flagged/${id}`, { status: 'accepted' });
+  assert.equal(env.keyMeta.has(`flag_${id}`), false);
+  const path = `/api/videos/metadata/dense/${encodeURIComponent(video)}`;
+  assert.equal(denseFace(await (await get(env, path)).json()).contestant_id, '1');
+});
+
+test('an old flag gains metadata when a decision rewrites it, and a read never writes it', async () => {
+  const env = makeEnv([flag({ status: 'pending' })]);
+  await dense(env);
+  assert.equal(env.keyMeta.has('flag_f1'), false);
+  await admin(env, 'PATCH', '/api/faces/flagged/f1', { status: 'accepted' });
+  assert.deepEqual(env.keyMeta.get('flag_f1'), { video_id: VIDEO, status: 'accepted' });
+});
+
+test('the legacy array is read only when listed, and a ruled-out key beats its copy in it', async () => {
+  const legacy = flag({ id: 'old' });
+  const applies = makeEnv([], { extra: { flagged_faces: JSON.stringify([legacy]) } });
+  assert.equal(denseFace(await dense(applies)).contestant_id, '1');
+  assert.deepEqual(flagGets(applies), ['flagged_faces']);
+
+  // A claim wrote the key, a reviewer rejected it, and the array's delete has yet to propagate.
+  const claimed = makeEnv([flag({ id: 'old', status: 'rejected' })], {
+    keyMetadata: true,
+    extra: { flagged_faces: JSON.stringify([legacy]) },
+  });
+  assert.equal(denseFace(await dense(claimed)).contestant_id, null);
+});
+
+test('claiming the legacy array writes metadata for each flag', async () => {
+  const env = makeEnv([], {
+    extra: { flagged_faces: JSON.stringify([flag({ id: 'old', status: 'rejected' })]) },
+  });
+  await admin(env, 'POST', '/api/faces/flag', NEW_FLAG);
+  assert.equal(env.store.has('flagged_faces'), false);
+  assert.deepEqual(env.keyMeta.get('flag_old'), { video_id: VIDEO, status: 'rejected' });
+});
+
+test('ruled-out keys cost no get and no ceiling, past a list page too', async () => {
+  const many = Array.from({ length: 1500 }, (_, i) =>
+    flag({ id: `n${String(i).padStart(4, '0')}`, status: 'pending' }),
+  );
+  const env = makeEnv([...many, flag({ id: 'z-accepted' })], { keyMetadata: true });
+  assert.equal(denseFace(await dense(env)).contestant_id, '1');
+  assert.deepEqual(flagGets(env), ['flag_z-accepted']);
+  assert.equal(env.log.lists, 2);
+});
+
+test('the ceiling bounds the flags that need a get, across list pages', async () => {
+  const accepted = Array.from({ length: 1100 }, (_, i) =>
+    flag({ id: `a${String(i).padStart(4, '0')}`, bbox: null }),
+  );
+  const env = makeEnv(accepted, { keyMetadata: true });
+  await dense(env);
+  assert.equal(flagGets(env).length, 200);
+});
+
+test('the admin listing still reads every flag, whatever its metadata says', async () => {
+  const env = makeEnv(
+    [flag({ status: 'pending' }), flag({ id: 'r', status: 'rejected', video_id: 'reel-2' })],
+    { keyMetadata: true },
+  );
+  const { flagged_faces: listed } = await admin(env, 'GET', '/api/faces/flagged');
+  assert.deepEqual(listed.map((entry) => entry.id).sort(), ['f1', 'r']);
 });

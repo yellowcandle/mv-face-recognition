@@ -1424,7 +1424,15 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       (`contestants_structured`, `embedding_coverage`: 首頁, 名冊, 儀表, 工作台) stay as published
       until the next publish, since an exact average needs every reel per read. `timeline_markers`
       and `match_score_stats` exist only in local runs, have no reader, and stay as stored. The
-      Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
+      Worker gets at most 200 flags per request (`FLAG_READ_CEILING`).
+- [x] Public reads get only the flags they need: `putFlag` keeps `video_id` and `status` in KV key
+      metadata, so the list rules out everything not accepted for the reel, and the legacy array is
+      fetched only if listed. No or malformed metadata means read the flag; the value still decides.
+      Every public read still costs one KV list per 1000 flag keys. Upgrade: one accepted-flags
+      document per reel, so a read is one get and no list.
+- [ ] Follow-up: the production flags written before this (4 at last count) have no metadata until
+      a decision rewrites them. The fallback keeps them applied, and each is read on every request
+      until then. Reads never backfill: the public surface stays read-only.
 - [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
       bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
       count videos correctly. A new reference set changes nothing until a reel is reprocessed.
