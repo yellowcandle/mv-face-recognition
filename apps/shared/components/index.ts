@@ -6,4 +6,5 @@ export { Masthead } from './Masthead';
 export { FaceCrop } from './FaceCrop';
 export type { FaceCropProps } from './FaceCrop';
 export { AnalyticsLedger } from './AnalyticsLedger';
+export { AdminErrorNotice } from './AdminErrorNotice';
 export * from './Player';

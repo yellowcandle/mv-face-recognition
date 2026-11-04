@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { FaceDetection, Video, VideoMetadata } from '../../types';
+import type { FaceDetection, FlaggedFace, Video, VideoMetadata } from '../../types';
 import { bandFor } from '../../lib/bands';
-import { adminFetch } from '../../lib/adminApi';
+import { adminFetch, assertOk, isSessionExpired } from '../../lib/adminApi';
+import { AdminErrorNotice } from '../AdminErrorNotice';
 import { useVideos } from '../../hooks/useVideos';
 import { useContestants } from '../../hooks/useContestants';
 import { useFlaggedFaces } from '../../hooks/useFlaggedFaces';
@@ -43,7 +44,12 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const canFlag = mode === 'admin';
 
   // Data queries
-  const { data: videos = [], isLoading, error: videosError } = useVideos(apiBase);
+  // 管理 links into test clips, so the admin player has to be able to open them.
+  const {
+    data: videos = [],
+    isLoading,
+    error: videosError,
+  } = useVideos(apiBase, { includeTests: canFlag });
   const { data: contestants = [] } = useContestants(apiBase);
   const { data: flaggedFaces = [], refetch: refetchFlagged } = useFlaggedFaces(apiBase, canFlag);
 
@@ -51,6 +57,8 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const videoCanvasRef = useRef<VideoCanvasHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // A flag can point at another video: the seek waits for that video's metadata to load.
+  const pendingSeekRef = useRef<{ videoId: string; time: number } | null>(null);
 
   // Video state
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
@@ -71,6 +79,16 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [showBatchFlagDialog, setShowBatchFlagDialog] = useState(false);
   const [isFlagging, setIsFlagging] = useState(false);
+  const [flagError, setFlagError] = useState<unknown>(null);
+  const [flagNotice, setFlagNotice] = useState<string | null>(null);
+
+  // Freezing the frame on first interaction keeps face-object identity stable across the
+  // 200 ms poll, and pins the timestamp the correction is written against.
+  const [selectionSnapshot, setSelectionSnapshot] = useState<{
+    faces: FaceDetection[];
+    timestamp: number;
+    videoId: string;
+  } | null>(null);
 
   // Panel state
   const [showFlaggedPanel, setShowFlaggedPanel] = useState(false);
@@ -113,6 +131,14 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     () => getVideoRenderRect(getVideoEl(), containerRef.current),
     [getVideoEl],
   );
+
+  const clearSelection = useCallback(() => {
+    setSelectedFace(null);
+    setShowFlagDialog(false);
+    setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
+    setFlagError(null);
+  }, []);
 
   // --- Data fetching ---
 
@@ -180,12 +206,14 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       setIsPlaying(false);
       setCurrentTime(0);
       setDetectedFaces([]);
-      setSelectedFace(null);
+      clearSelection();
+      setBatchMode(false);
+      setFlagNotice(null);
       setFilterContestantId(null);
       setContestantAppearances([]);
       await loadVideoMetadata(video.id);
     },
-    [loadVideoMetadata, stopPolling],
+    [loadVideoMetadata, stopPolling, clearSelection],
   );
 
   const handleTogglePlay = useCallback(() => {
@@ -200,13 +228,47 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const handleSeek = useCallback(
     (time: number) => {
+      // A seek lands on a different frame; anything selected against the old one is stale.
+      clearSelection();
       const video = getVideoEl();
       if (video) {
         video.currentTime = time;
         void fetchFacesAtTime(time);
       }
     },
-    [getVideoEl, fetchFacesAtTime],
+    [getVideoEl, fetchFacesAtTime, clearSelection],
+  );
+
+  /** Metadata of a freshly loaded video is where a queued cross-video seek lands. */
+  const handleLoadedMetadata = useCallback(
+    (loadedDuration: number) => {
+      setDuration(loadedDuration);
+      const pending = pendingSeekRef.current;
+      if (!pending) return;
+      pendingSeekRef.current = null;
+      // A quick switch can surface another video's metadata first; the queued seek names one.
+      if (pending.videoId !== selectedVideo?.id) return;
+      handleSeek(pending.time);
+    },
+    [handleSeek, selectedVideo],
+  );
+
+  /** Jump to the frame a flag was taken from, switching videos first when it belongs elsewhere. */
+  const handleJumpToFlag = useCallback(
+    (flag: FlaggedFace) => {
+      if (selectedVideo && flag.video_id === selectedVideo.id) {
+        handleSeek(flag.timestamp);
+        return;
+      }
+      const target = videos.find((v) => v.id === flag.video_id);
+      if (!target) {
+        setFlagNotice(`找不到影片 ${flag.video_id}，無法跳到標記位置。`);
+        return;
+      }
+      pendingSeekRef.current = { videoId: target.id, time: flag.timestamp };
+      void handleSelectVideo(target);
+    },
+    [selectedVideo, videos, handleSeek, handleSelectVideo],
   );
 
   const handleSpeedChange = useCallback(
@@ -231,23 +293,25 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     (frames: number) => {
       const video = getVideoEl();
       if (!video) return;
+      clearSelection();
       const fps = videoMetadata?.video_info?.fps || 25;
       const newTime = Math.max(0, Math.min(duration, video.currentTime + frames / fps));
       video.currentTime = newTime;
       void fetchFacesAtTime(newTime);
     },
-    [getVideoEl, videoMetadata, duration, fetchFacesAtTime],
+    [getVideoEl, videoMetadata, duration, fetchFacesAtTime, clearSelection],
   );
 
   const handleSkipSeconds = useCallback(
     (seconds: number) => {
       const video = getVideoEl();
       if (!video) return;
+      clearSelection();
       const newTime = Math.max(0, Math.min(duration, video.currentTime + seconds));
       video.currentTime = newTime;
       void fetchFacesAtTime(newTime);
     },
-    [getVideoEl, duration, fetchFacesAtTime],
+    [getVideoEl, duration, fetchFacesAtTime, clearSelection],
   );
 
   const handleToggleAnnotations = useCallback(() => {
@@ -299,6 +363,18 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   const handleFaceClick = useCallback(
     (face: FaceDetection) => {
+      if (!canFlag) return;
+      // First interaction freezes the frame: pausing stops the poll from replacing the
+      // objects, and the snapshot pins the timestamp the correction is written against.
+      if (!selectionSnapshot) {
+        const video = getVideoEl();
+        if (video && !video.paused) video.pause();
+        setSelectionSnapshot({
+          faces: detectedFaces,
+          timestamp: video?.currentTime ?? currentTime,
+          videoId: selectedVideo?.id ?? '',
+        });
+      }
       if (batchMode) {
         setSelectedFaces((prev) => {
           const next = new Set(prev);
@@ -306,116 +382,152 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           else next.add(face);
           return next;
         });
-      } else if (canFlag) {
+      } else {
         setSelectedFace(face);
+        setFlagError(null);
         setShowFlagDialog(true);
       }
     },
-    [batchMode, canFlag],
+    [batchMode, canFlag, selectionSnapshot, detectedFaces, currentTime, selectedVideo, getVideoEl],
   );
 
   const handleToggleBatchMode = useCallback(() => {
-    setBatchMode((prev) => {
-      if (prev) setSelectedFaces(new Set());
-      return !prev;
-    });
+    setBatchMode((prev) => !prev);
+    setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
+    setFlagError(null);
   }, []);
 
   const handleSelectAllFaces = useCallback(() => {
-    setSelectedFaces(new Set(detectedFaces));
-  }, [detectedFaces]);
+    const faces = selectionSnapshot?.faces ?? detectedFaces;
+    if (faces.length === 0) return;
+    if (!selectionSnapshot) {
+      const video = getVideoEl();
+      if (video && !video.paused) video.pause();
+      setSelectionSnapshot({
+        faces,
+        timestamp: video?.currentTime ?? currentTime,
+        videoId: selectedVideo?.id ?? '',
+      });
+    }
+    setSelectedFaces(new Set(faces));
+  }, [selectionSnapshot, detectedFaces, getVideoEl, currentTime, selectedVideo]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedFaces(new Set());
+    setSelectionSnapshot(null);
   }, []);
 
   const handleFlagSubmit = useCallback(
     async (contestantId: number, userLabel: string) => {
-      if (!selectedVideo) return;
+      if (!selectedVideo || !selectedFace) return;
       setIsFlagging(true);
+      setFlagError(null);
+      const snapshot = selectionSnapshot;
+      const timestamp = snapshot?.timestamp ?? currentTime;
+      const videoId = snapshot?.videoId ?? selectedVideo.id;
       try {
-        const thumbnail = selectedFace ? extractFaceThumbnail(selectedFace) : null;
+        const thumbnail = extractFaceThumbnail(selectedFace);
         const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contestant_id: contestantId,
-            video_id: selectedVideo.id,
-            timestamp: currentTime,
-            bbox: selectedFace?.bbox,
-            confidence: selectedFace?.match_score ?? null,
-            user_label: userLabel || `Flagged by user at ${formatMmSs(currentTime)}`,
+            video_id: videoId,
+            timestamp,
+            bbox: selectedFace.bbox,
+            confidence: selectedFace.match_score ?? null,
+            user_label: userLabel || `Flagged by user at ${formatMmSs(timestamp)}`,
             thumbnail,
           }),
         });
-        if (res.ok) {
-          setShowFlagDialog(false);
-          setSelectedFace(null);
-          void refetchFlagged();
-          alert('已標記這張臉。');
-        } else {
-          alert('標記失敗。');
-        }
+        await assertOk(res);
+        setShowFlagDialog(false);
+        setSelectedFace(null);
+        setSelectionSnapshot(null);
+        setFlagNotice(`已標記一張人臉於 ${formatMmSs(timestamp)}，已送入待核。`);
+        void refetchFlagged();
       } catch (e) {
-        console.error('Failed to flag face:', e);
-        alert('標記時發生錯誤。');
+        setFlagError(e);
       } finally {
         setIsFlagging(false);
       }
     },
-    [apiBase, selectedVideo, selectedFace, currentTime, extractFaceThumbnail, refetchFlagged],
+    [
+      apiBase,
+      selectedVideo,
+      selectedFace,
+      selectionSnapshot,
+      currentTime,
+      extractFaceThumbnail,
+      refetchFlagged,
+    ],
   );
 
   const handleBatchFlagSubmit = useCallback(
     async (contestantId: number, _userLabel: string) => {
       if (!selectedVideo || selectedFaces.size === 0) return;
       setIsFlagging(true);
-      let successCount = 0;
-      let failCount = 0;
+      setFlagError(null);
+      const snapshot = selectionSnapshot;
+      const timestamp = snapshot?.timestamp ?? currentTime;
+      const videoId = snapshot?.videoId ?? selectedVideo.id;
       const facesArray = Array.from(selectedFaces);
+      const failed: FaceDetection[] = [];
+      let successCount = 0;
 
-      try {
-        for (const face of facesArray) {
-          try {
-            const thumbnail = extractFaceThumbnail(face);
-            const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contestant_id: contestantId,
-                video_id: selectedVideo.id,
-                timestamp: currentTime,
-                bbox: face.bbox,
-                confidence: face.match_score ?? null,
-                user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(currentTime)}`,
-                thumbnail,
-              }),
-            });
-            if (res.ok) successCount++;
-            else failCount++;
-          } catch {
-            failCount++;
+      for (let i = 0; i < facesArray.length; i++) {
+        const face = facesArray[i];
+        try {
+          const thumbnail = extractFaceThumbnail(face);
+          const res = await adminFetch(`${apiBase}/admin/api/faces/flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contestant_id: contestantId,
+              video_id: videoId,
+              timestamp,
+              bbox: face.bbox,
+              confidence: face.match_score ?? null,
+              user_label: `Batch flagged (${facesArray.length} faces) at ${formatMmSs(timestamp)}`,
+              thumbnail,
+            }),
+          });
+          await assertOk(res);
+          successCount++;
+        } catch (e) {
+          // Keep the failed (and, on session expiry, all remaining) faces selected so the
+          // operator can retry instead of losing the batch.
+          if (isSessionExpired(e)) {
+            failed.push(...facesArray.slice(i));
+            setFlagError(e);
+            break;
           }
+          failed.push(face);
         }
-
-        setShowBatchFlagDialog(false);
-        setSelectedFaces(new Set());
-        setBatchMode(false);
-        void refetchFlagged();
-
-        if (failCount === 0) {
-          alert(`已標記 ${successCount} 張臉。`);
-        } else {
-          alert(`已標記 ${successCount} 張臉，${failCount} 張失敗。`);
-        }
-      } catch (e) {
-        console.error('Batch flag error:', e);
-        alert('批次標記時發生錯誤。');
-      } finally {
-        setIsFlagging(false);
       }
+
+      setSelectedFaces(new Set(failed));
+      void refetchFlagged();
+      if (failed.length === 0) {
+        setShowBatchFlagDialog(false);
+        setBatchMode(false);
+        setSelectionSnapshot(null);
+        setFlagNotice(`已標記 ${successCount} 張人臉，已送入待核。`);
+      } else {
+        setFlagNotice(`已標記 ${successCount} 張，${failed.length} 張失敗；保留選取以便重試。`);
+      }
+      setIsFlagging(false);
     },
-    [apiBase, selectedVideo, selectedFaces, currentTime, extractFaceThumbnail, refetchFlagged],
+    [
+      apiBase,
+      selectedVideo,
+      selectedFaces,
+      selectionSnapshot,
+      currentTime,
+      extractFaceThumbnail,
+      refetchFlagged,
+    ],
   );
 
   // --- Timeline filter (admin mode) ---
@@ -496,15 +608,21 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const closeFlagDialog = useCallback(() => {
     setShowFlagDialog(false);
     setSelectedFace(null);
+    setSelectionSnapshot(null);
+    setFlagError(null);
   }, []);
 
-  const closeBatchDialog = useCallback(() => setShowBatchFlagDialog(false), []);
+  const closeBatchDialog = useCallback(() => {
+    setShowBatchFlagDialog(false);
+    setFlagError(null);
+  }, []);
 
   // --- Render ---
 
   const videoSrc = getVideoSource(selectedVideo);
   const fps = videoMetadata?.video_info?.fps || 25;
   const frameNumber = Math.floor(currentTime * fps);
+  const displayFaces = selectionSnapshot?.faces ?? detectedFaces;
 
   if (isLoading) {
     return (
@@ -534,10 +652,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   return (
     <div className="relative flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
-      <Masthead
-        title="播放"
-        hint={canFlag ? '播放影片並標記人臉' : '看片、人臉框與時間軸'}
-      >
+      <Masthead title="播放" hint={canFlag ? '播放影片並標記人臉' : '看片、人臉框與時間軸'}>
         <div className="flex items-center gap-2">
           {canFlag && (
             <Button
@@ -566,6 +681,17 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         </div>
       </Masthead>
 
+      {flagError ? <AdminErrorNotice error={flagError} label="標記失敗" /> : null}
+      {flagNotice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-carbon-deep/13 bg-tint px-4 py-2 font-kai text-[13px] text-carbon-deep"
+        >
+          {flagNotice}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         <div
           ref={containerRef}
@@ -576,18 +702,18 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
               <VideoCanvas
                 ref={videoCanvasRef}
                 videoSrc={videoSrc}
-                faces={detectedFaces}
+                faces={displayFaces}
                 showAnnotations={showAnnotations}
                 isSelected={isFaceSelected}
                 containerRef={containerRef}
                 onTimeUpdate={setCurrentTime}
-                onLoadedMetadata={setDuration}
+                onLoadedMetadata={handleLoadedMetadata}
                 onPlay={handlePlay}
                 onPause={handlePause}
                 onEnded={handleEnded}
               />
               <FaceOverlay
-                faces={detectedFaces}
+                faces={displayFaces}
                 onFaceClick={handleFaceClick}
                 selectedFace={selectedFace}
                 batchMode={batchMode}
@@ -623,8 +749,8 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       <div className="flex flex-1 gap-6">
         <div className="flex min-w-0 flex-1 flex-col gap-6">
           <DetectionBar
-            faceCount={detectedFaces.length}
-            recognizedCount={detectedFaces.filter((f) => f.matched).length}
+            faceCount={displayFaces.length}
+            recognizedCount={displayFaces.filter((f) => f.matched).length}
             frameNumber={frameNumber}
             showAnnotations={showAnnotations}
             batchMode={batchMode}
@@ -662,7 +788,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
               {batchMode && (
                 <>
-                  <Button onClick={handleSelectAllFaces} disabled={detectedFaces.length === 0}>
+                  <Button onClick={handleSelectAllFaces} disabled={displayFaces.length === 0}>
                     全選
                   </Button>
                   <Button onClick={handleClearSelection} disabled={selectedFaces.size === 0}>
@@ -687,7 +813,10 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           {mode === 'admin' && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <label htmlFor="contestant-filter" className="font-kai text-[13px] text-carbon-soft">
+                <label
+                  htmlFor="contestant-filter"
+                  className="font-kai text-[13px] text-carbon-soft"
+                >
                   篩選時間軸
                 </label>
                 <select
@@ -742,19 +871,17 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
         <div className="flex w-[300px] shrink-0 flex-col gap-0.5 border-l border-carbon-deep/13 pl-6">
           <h3 className="pb-2 font-kai text-[18px] font-normal text-carbon-deep">目前畫格人臉</h3>
-          {detectedFaces.length === 0 ? (
+          {displayFaces.length === 0 ? (
             <p className="font-kai text-[13px] text-ink-muted">這個時間點沒有偵測到人臉。</p>
           ) : (
-            detectedFaces.map((face, i) => (
+            displayFaces.map((face, i) => (
               <button
                 key={i}
                 className={`flex h-8 w-full shrink-0 items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-tint ${
                   isFaceSelected(face) ? 'bg-tint' : ''
                 }`}
                 onClick={() => handleFaceClick(face)}
-                title={
-                  face.matched ? undefined : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`
-                }
+                title={face.matched ? undefined : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`}
               >
                 <FrameFace video={videoEl} bbox={face.bbox} size={24} alt="" />
                 <span
@@ -813,10 +940,11 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           face={selectedFace}
           contestants={contestantList}
           video={videoEl}
-          where={`${formatMmSs(currentTime)} · ${shortName}`}
+          where={`${formatMmSs(selectionSnapshot?.timestamp ?? currentTime)} · ${shortName}`}
           onSubmit={handleFlagSubmit}
           onClose={closeFlagDialog}
           isSubmitting={isFlagging}
+          error={flagError}
         />
       )}
 
@@ -830,6 +958,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           onSubmit={handleBatchFlagSubmit}
           onClose={closeBatchDialog}
           isSubmitting={isFlagging}
+          error={flagError}
         />
       )}
 
@@ -855,22 +984,50 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                 return (
                   <div
                     key={flag.id}
-                    className="flex items-center gap-3 border-b border-carbon-deep/13 py-3"
+                    className="flex flex-col gap-2 border-b border-carbon-deep/13 py-3"
                   >
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate font-kai text-[14px] text-carbon-deep">
-                        {getContestantName(flag.contestant_id)}
-                      </span>
-                      <span className="truncate font-kai text-[12px] text-ink-muted">
-                        {videoShortName(flag.video_id)}
-                      </span>
-                      <span className="font-mono text-[12px] tabular-nums text-ink-muted">
-                        {formatMmSs(flag.timestamp)}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {flag.thumbnail ? (
+                        <img
+                          src={flag.thumbnail}
+                          alt={`被標記的人臉 @ ${formatMmSs(flag.timestamp)}`}
+                          className="size-14 shrink-0 rounded bg-tint object-cover"
+                        />
+                      ) : (
+                        <div
+                          aria-hidden="true"
+                          className="flex size-14 shrink-0 items-center justify-center rounded bg-tint font-kai text-[12px] text-ink-muted"
+                        >
+                          無縮圖
+                        </div>
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate font-kai text-[14px] text-carbon-deep">
+                          {getContestantName(flag.contestant_id)}
+                        </span>
+                        <span className="truncate font-kai text-[12px] text-ink-muted">
+                          {videoShortName(flag.video_id)}
+                        </span>
+                        <span className="font-mono text-[12px] tabular-nums text-ink-muted">
+                          {formatMmSs(flag.timestamp)}
+                        </span>
+                      </div>
+                      <Stamp tone={status.tone} tilt={status.tilt}>
+                        {status.word}
+                      </Stamp>
                     </div>
-                    <Stamp tone={status.tone} tilt={status.tilt}>
-                      {status.word}
-                    </Stamp>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => handleJumpToFlag(flag)}>
+                        跳到該幀
+                      </Button>
+                      {/* The admin SPA is mounted at /admin; a plain anchor survives the trip. */}
+                      <a
+                        href="/admin/flagging"
+                        className="inline-flex h-8 items-center rounded-md px-3 font-kai text-[13px] text-carbon transition-colors hover:bg-tint"
+                      >
+                        前往待核
+                      </a>
+                    </div>
                   </div>
                 );
               })

@@ -25,10 +25,9 @@ export function ledgerRows(
   const frameByNumber = new Map(frames.map((f) => [f.frame_number, f]));
   return Object.entries(timeline)
     .map(([id, info]) => {
-      const best = (info.appearances ?? []).reduce<ContestantTimelineEntry['appearances'][number] | null>(
-        (top, a) => (top && top.match_score >= a.match_score ? top : a),
-        null,
-      );
+      const best = (info.appearances ?? []).reduce<
+        ContestantTimelineEntry['appearances'][number] | null
+      >((top, a) => (top && top.match_score >= a.match_score ? top : a), null);
       const detections = best ? (frameByNumber.get(best.frame_number)?.detections ?? []) : [];
       const detectionIndex = detections.reduce((top, d, i) => {
         if (String(d.contestant_id) !== id) return top;
@@ -44,9 +43,7 @@ export function ledgerRows(
         firstSeen: info.first_appearance,
         lastSeen: info.last_appearance,
         crop:
-          best && detectionIndex >= 0
-            ? { frameNumber: best.frame_number, detectionIndex }
-            : null,
+          best && detectionIndex >= 0 ? { frameNumber: best.frame_number, detectionIndex } : null,
       };
     })
     .sort((a, b) =>

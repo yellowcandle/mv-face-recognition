@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { adminFetch } from '../lib/adminApi';
+import { adminFetch, assertOk } from '../lib/adminApi';
 import type { FlaggedFace } from '../types';
 
 /**
@@ -13,7 +13,7 @@ export function useFlaggedFaces(apiBase = '', enabled = true) {
     enabled,
     queryFn: async () => {
       const res = await adminFetch(`${apiBase}/admin/api/faces/flagged?details=true`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await assertOk(res);
       const data = await res.json();
       return data.flagged_faces || [];
     },

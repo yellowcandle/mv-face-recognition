@@ -45,7 +45,10 @@ export function contestantsSeen(contestants: { detection_count: number }[]): num
 }
 
 /** "Most seen" is a count, not a recency: the read model has no cross-reel timeline. */
-export function mostSeen<T extends { detection_count: number }>(contestants: T[], limit: number): T[] {
+export function mostSeen<T extends { detection_count: number }>(
+  contestants: T[],
+  limit: number,
+): T[] {
   return contestants
     .filter((c) => c.detection_count > 0)
     .sort((a, b) => b.detection_count - a.detection_count)

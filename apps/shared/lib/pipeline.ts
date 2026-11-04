@@ -11,6 +11,7 @@ const STATUS_LABEL: Record<string, string> = {
   queued: '排隊中',
   running: '進行中',
   completed: '已完成',
+  completed_with_errors: '完成 · 部分失敗',
   failed: '失敗',
   cancelled: '已取消',
 };

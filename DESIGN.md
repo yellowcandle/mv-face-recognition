@@ -1394,13 +1394,17 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - Only 已核對 and human decisions tilt. Band and quality stamps are upright.
 - Red means action, selection or missing. 偏弱 is muted.
 - Icons: `lucide-react`. Stamp tones live on `BAND_STAMP` in `apps/shared/lib/bands.ts`.
+- Merged with #99 by one rule: the look comes from this redesign, the behaviour from #99. The
+  12px floor stands; #99's 11px floor does not.
+- The 標註 sheet is docked, so it is a labelled region, not a modal dialog: no focus trap, and
+  closing it moves focus nowhere, so Esc then Backspace can't clear a tile's label.
+- Test clips: `useVideos` hides them through `isTestClip` unless a caller passes `includeTests`.
+  The viewer never does; admin 儀表, 待核, 標註, 播放 and 管理 do.
 
 ### TODO
 
 - [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
 - [ ] Five of six live flags store confidence 0, so they show as `0.00 存疑`.
-- [ ] Flag write failures: 待核 only logs to the console; 播放 uses `alert()`.
-- [ ] 向量 詳情 「重新生成向量」 runs coverage-refresh, not an embedding rebuild.
 - [ ] `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200 with no
       references, so 缺 contestants get an image. Serve real face crops.
 - [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
@@ -1408,5 +1412,5 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       boxes lag at shot cuts.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
-      參賽者 read as 沒有出場; its roster has no loading or error state.
+      參賽者 read as 沒有出場.
 - [ ] Draw and implement designs for states still only styled by analogy.

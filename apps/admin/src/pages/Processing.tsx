@@ -2,7 +2,15 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
-import { Button, Masthead, adminFetch, formatMmSs, LOCAL_API_OFFLINE_NOTICE } from '@mv/shared';
+import {
+  AdminErrorNotice,
+  Button,
+  Masthead,
+  adminFetch,
+  assertOk,
+  formatMmSs,
+  LOCAL_API_OFFLINE_NOTICE,
+} from '@mv/shared';
 import {
   formatJobCreated,
   jobModeLabel,
@@ -13,7 +21,8 @@ import {
 interface ProcessingJob {
   id: string;
   mode?: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  /** `completed_with_errors`: the run finished, but some reels failed. Never a clean success. */
+  status: 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
   progress: number;
   current_video?: string;
   videos_processed?: number;
@@ -23,12 +32,26 @@ interface ProcessingJob {
   started_at?: number | null;
   completed_at?: number | null;
   error?: string | null;
+  /** Reels that failed inside an otherwise finished run; one row each, in run order. */
+  failures?: Array<{ video: string; error: string }>;
 }
 
 interface VideoOption {
   filename: string;
   size_mb: number;
 }
+
+/**
+ * A row the trigger returned that the eventual-consistency listing has not confirmed yet.
+ * `missCount` counts consecutive listings that predate the row: a job that never shows up —
+ * because the API restarted and lost it — is dropped instead of staying "queued" forever.
+ */
+type PendingJob = ProcessingJob & { missCount?: number };
+
+/** ~30 s at the 5 s poll cadence: long enough for KV lag, short enough to admit a lost job. */
+const STRANDED_LISTING_LIMIT = 6;
+/** The stranded notice clears itself; the dead row it announced will not come back. */
+const STRANDED_NOTICE_MS = 15_000;
 
 /**
  * Both video lists use `filename` and byte sizes: the local API reports `size_mb` directly,
@@ -50,33 +73,12 @@ function toVideoOptions(list: unknown[]): VideoOption[] {
   return options;
 }
 
-/** FastAPI answers with `detail`; Worker handlers use `error` (string or `{message}`). */
-async function failureMessage(res: Response, fallback: string): Promise<string> {
-  try {
-    const body: unknown = await res.json();
-    if (body && typeof body === 'object') {
-      const values = [
-        'detail' in body ? body.detail : undefined,
-        'error' in body ? body.error : undefined,
-      ];
-      for (const value of values) {
-        if (typeof value === 'string' && value) return value;
-        if (value && typeof value === 'object' && 'message' in value) {
-          const message = value.message;
-          if (typeof message === 'string' && message) return message;
-        }
-      }
-    }
-  } catch {
-    /* non-JSON body: fall through to the generic message */
-  }
-  return `${fallback} (HTTP ${res.status})`;
-}
-
 const STATUS_INK: Record<ProcessingJob['status'], string> = {
   queued: 'text-carbon-soft',
   running: 'text-carbon',
   completed: 'text-ink-muted',
+  // The run ended, but not cleanly: it never reads as a plain completed.
+  completed_with_errors: 'text-stamp',
   failed: 'text-stamp',
   cancelled: 'text-ink-muted',
 };
@@ -85,9 +87,33 @@ const BAR_FILL: Record<ProcessingJob['status'], string> = {
   queued: 'bg-carbon',
   running: 'bg-carbon',
   completed: 'bg-carbon',
+  completed_with_errors: 'bg-stamp/60',
   failed: 'bg-stamp',
   cancelled: 'bg-ink-muted',
 };
+
+/**
+ * Statuses that end a job. The first sighting of a job in one of these is the transition the
+ * read-model invalidation below fires on: it must run once, not on every 5 s poll.
+ */
+const TERMINAL_STATUSES: Record<ProcessingJob['status'], boolean> = {
+  queued: false,
+  running: false,
+  completed: true,
+  completed_with_errors: true,
+  failed: true,
+  cancelled: true,
+};
+
+/** Every view whose numbers a finished job can change. */
+const JOB_INVALIDATED_QUERIES = [
+  ['videos'],
+  ['contestants'],
+  ['coverage'],
+  ['similarity-matrix'],
+  ['top-pairs'],
+  ['labels'],
+] as const;
 
 function formatDuration(start?: number | null, end?: number | null): string {
   if (!start) return '--';
@@ -142,25 +168,86 @@ export function Processing() {
   const [selectedVideo, setSelectedVideo] = useState('');
   // Fail-open until the first probe answers, so a healthy API never flashes the notice.
   const [jobsAvailable, setJobsAvailable] = useState(true);
+  // The poll's own failure (dead API, 5xx, expired Access session), not a click's.
+  const [jobsError, setJobsError] = useState<unknown>(null);
+  // A trigger/cancel/clear failure; kept apart so 重試 re-runs the read, never the write.
+  const [actionError, setActionError] = useState<unknown>(null);
   // Coverage refresh needs the local API; the Worker has no path into the KV read model.
   const [isEdge, setIsEdge] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  // A row was dropped because the listing never confirmed it.
+  const [strandedNotice, setStrandedNotice] = useState(false);
+  // Job id → failures expanded. Collapsed by default: the count is the summary.
+  const [openFailures, setOpenFailures] = useState<Record<string, boolean>>({});
   const pollingRef = useRef<number | undefined>(undefined);
-  // Last status per job, so a coverage/embedding job that just finished refreshes the read model.
+  const strandedNoticeTimerRef = useRef<number | undefined>(undefined);
+  // Last status per job: the first terminal status seen is the transition that refreshes the
+  // read models, so it must fire once and not on every poll.
   const seenStatusRef = useRef<Map<string, ProcessingJob['status']>>(new Map());
   // KV listing is eventually consistent, so a job created a second ago can be missing from it.
   // Hold the row the trigger returned until a poll reports that id.
-  const [pendingJobs, setPendingJobs] = useState<ProcessingJob[]>([]);
-  const visibleJobs = useMemo(() => {
+  const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
+  // Mirror of `pendingJobs`: the reconciler counts each listing once, and a React state updater
+  // may be replayed, so the miss counters cannot live inside one.
+  const pendingJobsRef = useRef<PendingJob[]>([]);
+  // Identity of the listing already reconciled; the same array must never be counted twice.
+  const reconciledListingRef = useRef<ProcessingJob[] | null>(null);
+
+  const updatePendingJobs = useCallback((next: PendingJob[]) => {
+    pendingJobsRef.current = next;
+    setPendingJobs(next);
+  }, []);
+
+  /**
+   * Drop local rows the listing confirms, and drop the ones it never confirms: a job lost to an
+   * API restart would otherwise sit at "queued" forever. Runs once per listing.
+   */
+  const reconcilePendingJobs = useCallback(
+    (listing: ProcessingJob[]) => {
+      if (reconciledListingRef.current === listing) return;
+      reconciledListingRef.current = listing;
+      if (pendingJobsRef.current.length === 0) return;
+      const listedIds = new Set(listing.map((job) => job.id));
+      let stranded = 0;
+      const kept: PendingJob[] = [];
+      for (const job of pendingJobsRef.current) {
+        if (listedIds.has(job.id)) continue; // the server owns it now
+        const missCount = (job.missCount ?? 0) + 1;
+        if (missCount >= STRANDED_LISTING_LIMIT) {
+          stranded += 1;
+          continue;
+        }
+        kept.push({ ...job, missCount });
+      }
+      updatePendingJobs(kept);
+      if (stranded === 0) return;
+      setStrandedNotice(true);
+      window.clearTimeout(strandedNoticeTimerRef.current);
+      strandedNoticeTimerRef.current = window.setTimeout(
+        () => setStrandedNotice(false),
+        STRANDED_NOTICE_MS,
+      );
+    },
+    [updatePendingJobs],
+  );
+
+  // Local rows the listing has not reported yet: the only ones safe to add to the server's own.
+  const unconfirmedJobs = useMemo(() => {
     const listed = new Set(jobs.map((job) => job.id));
-    return [...pendingJobs.filter((job) => !listed.has(job.id)), ...jobs];
+    return pendingJobs.filter((job) => !listed.has(job.id));
   }, [jobs, pendingJobs]);
 
-  const activeCount = useMemo(
-    () => visibleJobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
-    [visibleJobs],
-  );
+  const visibleJobs = useMemo(() => [...unconfirmedJobs, ...jobs], [unconfirmedJobs, jobs]);
+
+  // Server rows plus unconfirmed local rows only, so a listed row is never counted twice.
+  const activeCount = useMemo(() => {
+    let active = 0;
+    for (const job of jobs) if (job.status === 'running' || job.status === 'queued') active += 1;
+    for (const job of unconfirmedJobs) {
+      if (job.status === 'running' || job.status === 'queued') active += 1;
+    }
+    return active;
+  }, [jobs, unconfirmedJobs]);
   const completedCount = useMemo(
     () => visibleJobs.filter((j) => j.status === 'completed').length,
     [visibleJobs],
@@ -172,37 +259,43 @@ export function Processing() {
       if (res.status === 404) {
         // A Worker without the job routes cannot run the pipeline at all.
         setJobsAvailable(false);
+        setJobsError(null);
         return;
       }
-      if (!res.ok) return;
+      // A 5xx is a live server refusing the read: show it, but the API is not offline.
+      await assertOk(res);
       setJobsAvailable(true);
+      setJobsError(null);
       const data = await res.json();
       const jobList = data.jobs || data || [];
       const next: ProcessingJob[] = Array.isArray(jobList) ? jobList : [];
       setJobs(next);
-      const listed = new Set(next.map((job) => job.id));
-      setPendingJobs((prev) =>
-        prev.length === 0 ? prev : prev.filter((job) => !listed.has(job.id)),
-      );
+      reconcilePendingJobs(next);
 
       for (const job of next) {
         const prev = seenStatusRef.current.get(job.id);
-        if (
-          job.status === 'completed' &&
-          prev !== 'completed' &&
-          (job.mode === 'embedding-update' || job.mode === 'coverage-refresh')
-        ) {
-          void queryClient.invalidateQueries({ queryKey: ['coverage'] });
-          void queryClient.invalidateQueries({ queryKey: ['similarity-matrix'] });
-          void queryClient.invalidateQueries({ queryKey: ['top-pairs'] });
-        }
         seenStatusRef.current.set(job.id, job.status);
+        if (!TERMINAL_STATUSES[job.status]) continue;
+        // First sighting already terminal: the job ended before this page watched it, so
+        // whatever this page loaded is not stale because of it. Only a real transition fires.
+        if (prev === undefined || TERMINAL_STATUSES[prev]) continue;
+        for (const queryKey of JOB_INVALIDATED_QUERIES) {
+          // 'all', not 'active': the other admin views are unmounted, and marking them stale
+          // alone would leave their cached counts on screen until a manual reload.
+          void queryClient.invalidateQueries({ queryKey, refetchType: 'all' });
+        }
       }
     } catch (e) {
-      setJobsAvailable(false);
+      setJobsError(e);
+      // Only a request that never reached a server means the API is down.
+      if (e instanceof TypeError) setJobsAvailable(false);
       console.error('Failed to fetch jobs:', e);
     }
-  }, [queryClient]);
+  }, [queryClient, reconcilePendingJobs]);
+
+  const retryJobs = useCallback(() => {
+    void fetchJobs();
+  }, [fetchJobs]);
 
   // Source reels for the picker. The Worker has no local filesystem, so it publishes the
   // processed list instead; the local API knows what is on disk. A failure leaves the
@@ -251,9 +344,16 @@ export function Processing() {
     };
   }, [fetchJobs]);
 
+  useEffect(
+    () => () => {
+      window.clearTimeout(strandedNoticeTimerRef.current);
+    },
+    [],
+  );
+
   async function trigger(mode: 'initial' | 'embedding-update' | 'coverage-refresh') {
     setIsProcessing(true);
-    setError(null);
+    setActionError(null);
     try {
       const body =
         mode === 'initial'
@@ -264,14 +364,14 @@ export function Processing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(await failureMessage(res, '無法開始處理'));
+      await assertOk(res);
       const started = (await res.json()) as {
         job_id?: string;
         status?: ProcessingJob['status'];
         total_videos?: number;
       };
       if (typeof started.job_id === 'string' && started.job_id !== '') {
-        const row: ProcessingJob = {
+        const row: PendingJob = {
           id: started.job_id,
           mode,
           status: started.status ?? 'queued',
@@ -283,12 +383,16 @@ export function Processing() {
           started_at: started.status === 'running' ? Date.now() : null,
           completed_at: null,
           error: undefined,
+          missCount: 0,
         };
-        setPendingJobs((prev) => [row, ...prev.filter((job) => job.id !== row.id)]);
+        updatePendingJobs([row, ...pendingJobsRef.current.filter((job) => job.id !== row.id)]);
+        // Watch this id from its first status, so a job that finishes inside one poll still
+        // counts as a transition and refreshes the read model.
+        seenStatusRef.current.set(row.id, row.status);
       }
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '無法開始處理');
+      setActionError(e);
     } finally {
       setIsProcessing(false);
     }
@@ -306,33 +410,47 @@ export function Processing() {
     await trigger('coverage-refresh');
   }
 
-  async function cancelJob(jobId: string) {
+  async function cancelJob(job: ProcessingJob) {
+    if (
+      !window.confirm(
+        `取消「${jobModeLabel(job.mode)}」工作？\n已處理完成的影片會保留，此工作會標記為已取消。`,
+      )
+    ) {
+      return;
+    }
     try {
-      const res = await adminFetch(`/admin/api/processing/cancel/${jobId}`, { method: 'POST' });
-      if (!res.ok) throw new Error(await failureMessage(res, '無法取消工作'));
+      const res = await adminFetch(`/admin/api/processing/cancel/${job.id}`, { method: 'POST' });
+      await assertOk(res);
       // The list lags the write, so a row still pending locally must not keep saying `queued`.
-      setPendingJobs((prev) =>
-        prev.map((job) =>
-          job.id === jobId
-            ? { ...job, status: 'cancelled', progress: 100, completed_at: Date.now() }
-            : job,
+      updatePendingJobs(
+        pendingJobsRef.current.map((pending) =>
+          pending.id === job.id
+            ? { ...pending, status: 'cancelled' as const, progress: 100, completed_at: Date.now() }
+            : pending,
         ),
       );
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '無法取消工作');
+      setActionError(e);
     }
   }
 
   async function clearCompleted() {
+    if (
+      !window.confirm(
+        `清除 ${completedCount} 筆已完成的工作紀錄？\n只刪除狀態為 completed 的紀錄，失敗、部分失敗與已取消的工作都會保留。`,
+      )
+    ) {
+      return;
+    }
     try {
       const res = await adminFetch('/admin/api/processing/clear-completed', { method: 'POST' });
-      if (!res.ok) throw new Error(await failureMessage(res, '無法清除已完成工作'));
-      // The server drops every terminal record (completed, failed, cancelled); a local filter
-      // would keep the rows it disagrees about until the next poll.
+      await assertOk(res);
+      // The server owns which records go; a local filter would keep the rows it disagrees about
+      // until the next poll.
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '無法清除已完成工作');
+      setActionError(e);
     }
   }
 
@@ -353,7 +471,21 @@ export function Processing() {
       </Masthead>
 
       {!jobsAvailable && <Banner>{LOCAL_API_OFFLINE_NOTICE}</Banner>}
-      {error && <Banner>{error}</Banner>}
+
+      {/* Poll failure: 重試 re-reads the listing; an expired session offers reload instead. */}
+      <AdminErrorNotice error={jobsError} onRetry={retryJobs} label="無法讀取工作清單" />
+
+      {/* A click failed; there is nothing to retry automatically, so the reason alone is shown. */}
+      <AdminErrorNotice error={actionError} label="操作失敗" />
+
+      {strandedNotice && (
+        <div
+          role="status"
+          className="border-y border-carbon-deep/13 py-2 font-kai text-[13px] text-carbon-soft"
+        >
+          工作已不在伺服器上，可能已隨 API 重啟中止
+        </div>
+      )}
 
       <div className="flex flex-row border-y border-carbon-deep/13 py-5">
         <ActionColumn
@@ -499,6 +631,37 @@ export function Processing() {
                         {progressLine}
                       </p>
                     )}
+                    {job.failures && job.failures.length > 0 && (
+                      <div className="mt-1 rounded-md border border-stamp/40">
+                        <button
+                          type="button"
+                          aria-expanded={!!openFailures[job.id]}
+                          onClick={() =>
+                            setOpenFailures((prev) => ({ ...prev, [job.id]: !prev[job.id] }))
+                          }
+                          className="flex h-8 w-full cursor-pointer items-center justify-between gap-2 px-2 text-left font-kai text-[12px] text-stamp"
+                        >
+                          <span>
+                            <span className="font-mono tabular-nums">{job.failures.length}</span>{' '}
+                            失敗
+                          </span>
+                          <span>{openFailures[job.id] ? '收起' : '展開'}</span>
+                        </button>
+                        {openFailures[job.id] && (
+                          <ul className="border-t border-stamp/20 px-2 py-1">
+                            {job.failures.map((failure, i) => (
+                              <li
+                                key={`${failure.video}-${i}`}
+                                className="flex flex-col gap-0.5 border-b border-stamp/20 py-1 font-mono text-[12px] leading-snug last:border-b-0"
+                              >
+                                <span className="break-all text-carbon-deep">{failure.video}</span>
+                                <span className="break-words text-stamp">{failure.error}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -532,7 +695,7 @@ export function Processing() {
 
                   <div className="flex h-8 w-16 shrink-0 flex-row justify-end">
                     {(job.status === 'queued' || job.status === 'running') && (
-                      <Button variant="destructive" size="sm" onClick={() => cancelJob(job.id)}>
+                      <Button variant="destructive" size="sm" onClick={() => cancelJob(job)}>
                         取消
                       </Button>
                     )}

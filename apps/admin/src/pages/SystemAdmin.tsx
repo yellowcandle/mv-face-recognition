@@ -64,7 +64,7 @@ export function SystemAdmin() {
     retry: false,
   });
 
-  const videosQuery = useVideos();
+  const videosQuery = useVideos('', { includeTests: true });
   const contestantsQuery = useContestants();
   const flagsQuery = useFlaggedFaces();
 
@@ -87,6 +87,11 @@ export function SystemAdmin() {
   const labels = labelsQuery.data?.labels ?? [];
 
   const withEmbeddings = contestants.filter((c) => c.has_embedding).length;
+  // The roster is the source of truth once it loads; the status count is only a fallback
+  // (the edge Worker still reports a hardcoded 96).
+  const rosterTotal: number | '—' = contestantsQuery.data
+    ? contestants.length
+    : (status?.contestant_count ?? '—');
   const pendingFlags = flags.filter((f) => f.status === 'pending').length;
   const labelsByVideo = new Map(labels.map((l) => [l.video_id, l]));
 
@@ -111,7 +116,7 @@ export function SystemAdmin() {
     { label: '已存影片', value: videosQuery.isError ? '—' : String(reels.length) },
     {
       label: '向量名冊',
-      value: contestantsQuery.isError ? '—' : `${withEmbeddings} / ${contestants.length}`,
+      value: contestantsQuery.isError ? '—' : `${withEmbeddings} / ${rosterTotal}`,
     },
     { label: '待核', value: flagsQuery.isError ? '—' : String(pendingFlags) },
     { label: '已標註影片', value: labelsQuery.isError ? '—' : String(labels.length) },
@@ -212,7 +217,10 @@ export function SystemAdmin() {
                     >
                       播放
                     </Link>
-                    <Link to="/labelling" className="ml-2 text-stamp hover:underline">
+                    <Link
+                      to={`/labelling?video=${encodeURIComponent(v.id)}`}
+                      className="ml-2 text-stamp hover:underline"
+                    >
                       標註
                     </Link>
                   </td>

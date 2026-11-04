@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import {
+  AdminErrorNotice,
   Masthead,
   Stamp,
   bandFor,
@@ -32,8 +33,13 @@ const SHORTCUTS = [
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
-  const { data: videos = [] } = useVideos();
-  const { data: flagged = [], error: flaggedError } = useFlaggedFaces();
+  const { data: videos = [] } = useVideos('', { includeTests: true });
+  const {
+    data: flagged = [],
+    error: flaggedError,
+    isLoading: flaggedLoading,
+    refetch: refetchFlagged,
+  } = useFlaggedFaces();
   const { data: contestants = [] } = useContestants();
   const { data: coverage, error: coverageError } = useCoverage();
 
@@ -44,6 +50,10 @@ export function Dashboard() {
   const pending = flagged.filter((f) => f.status === 'pending');
   const accepted = flagged.filter((f) => f.status === 'accepted').length;
   const recent = recentDecisions(flagged);
+  // The preview is a queue, not an archive: pending slips only, newest first.
+  const recentPending = [...pending]
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+    .slice(0, 6);
 
   const contestantOf = (id: number) =>
     (contestants as Contestant[]).find((c) => Number(c.id) === Number(id));
@@ -83,8 +93,12 @@ export function Dashboard() {
           </div>
           {summary ? (
             <div className="flex flex-row items-center gap-4 font-kai text-[13px] text-carbon-soft">
-              <LegendKey fill={QUALITY_FILL.good}>{QUALITY_WORD.good} {summary.good}</LegendKey>
-              <LegendKey fill={QUALITY_FILL.weak}>{QUALITY_WORD.weak} {summary.weak}</LegendKey>
+              <LegendKey fill={QUALITY_FILL.good}>
+                {QUALITY_WORD.good} {summary.good}
+              </LegendKey>
+              <LegendKey fill={QUALITY_FILL.weak}>
+                {QUALITY_WORD.weak} {summary.weak}
+              </LegendKey>
               <LegendKey fill={QUALITY_FILL.missing}>
                 {QUALITY_WORD.missing} {summary.missing}
                 {missing.length > 0
@@ -95,7 +109,9 @@ export function Dashboard() {
           ) : null}
         </div>
         {coverageError ? (
-          <div className="font-kai text-[13px] text-stamp">讀不到參考相覆蓋率 — 後台 API 未啟動？</div>
+          <div className="font-kai text-[13px] text-stamp">
+            讀不到參考相覆蓋率 — 後台 API 未啟動？
+          </div>
         ) : (
           <div
             role="img"
@@ -136,20 +152,25 @@ export function Dashboard() {
               <h2 className="font-kai font-normal text-carbon-deep">待核紀錄</h2>
               <span className="font-mono tabular-nums text-stamp">{pending.length}</span>
             </div>
-            <Link to="/flagging" className="rounded-md font-kai text-[14px] text-stamp hover:underline">
+            <Link
+              to="/flagging"
+              className="rounded-md font-kai text-[14px] text-stamp hover:underline"
+            >
               前往待核 →
             </Link>
           </div>
           {flaggedError ? (
-            <div className="border-t border-carbon-deep/13 py-10 text-center font-kai text-[13px] text-stamp">
-              讀不到待核紀錄 — 後台 API 未啟動？
+            <AdminErrorNotice error={flaggedError} onRetry={() => void refetchFlagged()} />
+          ) : flaggedLoading ? (
+            <div className="border-t border-carbon-deep/13 py-10 text-center font-kai text-[13px] text-carbon-soft">
+              正在調閱待核紀錄…
             </div>
-          ) : pending.length === 0 ? (
+          ) : recentPending.length === 0 ? (
             <div className="border-t border-carbon-deep/13 py-10 text-center font-kai text-[13px] text-carbon-soft">
               目前沒有待核的人臉標記。
             </div>
           ) : (
-            pending.slice(0, 6).map((f) => {
+            recentPending.map((f) => {
               const c = contestantOf(f.contestant_id);
               return (
                 <div
@@ -158,8 +179,16 @@ export function Dashboard() {
                 >
                   <div className="h-11 w-11 shrink-0 overflow-hidden rounded bg-tint">
                     {f.thumbnail ? (
-                      <img src={f.thumbnail} alt="" className="h-full w-full object-cover" />
-                    ) : null}
+                      <img
+                        src={f.thumbnail}
+                        alt={`待核 ${c?.nickname ?? `#${f.contestant_id}`}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-kai text-[12px] text-ink-muted">
+                        無相
+                      </div>
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex flex-row items-baseline gap-2">

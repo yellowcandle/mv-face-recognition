@@ -110,9 +110,11 @@ function Face({
 
 interface ProcessingJob {
   id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
   error?: string | null;
   current_video?: string | null;
+  progress?: number;
+  failures?: Array<{ video: string; error: string }>;
 }
 
 interface RecognitionResult {
@@ -140,23 +142,51 @@ class LocalApiUnavailableError extends Error {
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
-async function waitForJob(jobId: string): Promise<ProcessingJob> {
+/** Sleep, or reject the moment `signal` aborts, so a wait never outlives the page. */
+// `Promise.withResolvers` is ES2024; this package targets ES2022 (see tsconfig).
+function sleepUntil(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('已離開頁面', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('已離開頁面', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function waitForJob(
+  jobId: string,
+  signal: AbortSignal,
+  onProgress: (job: ProcessingJob) => void,
+): Promise<ProcessingJob> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   for (;;) {
     let res: Response;
     try {
-      res = await fetch(`/api/processing/jobs/${encodeURIComponent(jobId)}`);
-    } catch {
+      res = await fetch(`/api/processing/jobs/${encodeURIComponent(jobId)}`, { signal });
+    } catch (e) {
+      // An aborted read is the page going away, not a dead API.
+      if (signal.aborted) throw e;
       throw new LocalApiUnavailableError();
     }
     if (!res.ok) throw new Error(`讀取工作狀態失敗：HTTP ${res.status}`);
     const job = (await res.json()) as ProcessingJob;
-    if (job.status === 'completed') return job;
+    onProgress(job);
+    // `completed_with_errors` still ended: the caller reports which reels failed.
+    if (job.status === 'completed' || job.status === 'completed_with_errors') return job;
     if (job.status === 'failed' || job.status === 'cancelled') {
       throw new Error(job.error || `工作${job.status === 'failed' ? '失敗' : '已取消'}`);
     }
     if (Date.now() >= deadline) throw new Error('等待工作完成逾時（15 分鐘）');
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    await sleepUntil(POLL_INTERVAL_MS, signal);
   }
 }
 
@@ -173,6 +203,22 @@ export function EmbeddingWorkbench() {
   } | null>(null);
   const [running, setRunning] = useState<RefreshMode | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // The polled job, not a fixed label: percent and the reel being worked on come from it.
+  const [jobProgress, setJobProgress] = useState<{ percent: number; video: string | null }>({
+    percent: 0,
+    video: null,
+  });
+  const [elapsedSec, setElapsedSec] = useState(0);
+  // Aborting this on unmount ends the poll instead of leaving it running for 15 minutes.
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -220,8 +266,13 @@ export function EmbeddingWorkbench() {
 
   const runRefresh = useCallback(
     async (mode: RefreshMode) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setRunning(mode);
       setNotice(null);
+      setElapsedSec(0);
+      setJobProgress({ percent: 0, video: null });
       try {
         let res: Response;
         try {
@@ -229,8 +280,10 @@ export function EmbeddingWorkbench() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode }),
+            signal: controller.signal,
           });
         } catch {
+          if (controller.signal.aborted) return;
           throw new LocalApiUnavailableError();
         }
         if (res.status === 404) throw new LocalApiUnavailableError();
@@ -242,12 +295,42 @@ export function EmbeddingWorkbench() {
         }
         const payload = (await res.json()) as { job_id?: string };
         if (!payload.job_id) throw new Error('本機 API 未回傳 job id');
-        await waitForJob(payload.job_id);
+        const finished = await waitForJob(payload.job_id, controller.signal, (job) => {
+          setJobProgress({ percent: job.progress ?? 0, video: job.current_video ?? null });
+        });
+
+        // Everything a finished job can change: coverage, the read models derived from it, and
+        // the detections shown on the detail tab.
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['coverage'] }),
-          queryClient.invalidateQueries({ queryKey: ['similarity-matrix'] }),
-          queryClient.invalidateQueries({ queryKey: ['top-pairs'] }),
+          queryClient.invalidateQueries({ queryKey: ['recognition-results'] }),
+          queryClient.invalidateQueries({ queryKey: ['contestants'] }),
         ]);
+        // The similarity queries are `enabled: false` (loaded on demand), so invalidating them
+        // only marks them stale — the heatmap would keep the old numbers under the notice.
+        const [matrix, pairs] = await Promise.all([
+          similarity.matrix.refetch(),
+          similarity.pairs.refetch(),
+        ]);
+        if (controller.signal.aborted) return;
+        if (matrix.isError || pairs.isError) {
+          const reason = matrix.error ?? pairs.error;
+          setNotice({
+            tone: 'error',
+            text: `工作已完成，但相似度資料讀取失敗：${
+              reason instanceof Error ? reason.message : '未知錯誤'
+            }`,
+          });
+          return;
+        }
+        const failedCount = finished.failures?.length ?? 0;
+        if (failedCount > 0) {
+          setNotice({
+            tone: 'error',
+            text: `工作完成，但有 ${failedCount} 個項目失敗；覆蓋率與相似度已更新。`,
+          });
+          return;
+        }
         setNotice({
           tone: 'ok',
           text:
@@ -256,16 +339,18 @@ export function EmbeddingWorkbench() {
               : '覆蓋率與相似度已重新計算。',
         });
       } catch (e) {
+        // Navigating away aborts the poll; that is not a failure to report.
+        if (controller.signal.aborted) return;
         if (e instanceof LocalApiUnavailableError) {
           setNotice({ tone: 'error', text: LOCAL_API_OFFLINE_NOTICE });
         } else {
           setNotice({ tone: 'error', text: e instanceof Error ? e.message : '操作失敗' });
         }
       } finally {
-        setRunning(null);
+        if (!controller.signal.aborted) setRunning(null);
       }
     },
-    [queryClient],
+    [queryClient, similarity],
   );
 
   const switchTab = useCallback(
@@ -364,19 +449,25 @@ export function EmbeddingWorkbench() {
       ? ([similarityData.labels[hoveredCell.row], similarityData.labels[hoveredCell.col]] as const)
       : null;
 
+  /** A running button reports the polled percent and elapsed time, not a static word. */
+  const refreshLabel = (mode: RefreshMode, idle: string) =>
+    running === mode
+      ? `${mode === 'embedding-update' ? '重建中' : '更新中'}… ${jobProgress.percent}% · ${formatMmSs(elapsedSec)}`
+      : idle;
+
   return (
     <div className="flex min-h-full flex-1 flex-col gap-5 px-8 pb-5 pt-8">
       <Masthead title="向量" hint="檢查覆蓋率、重建參考向量">
         <div className="flex flex-row items-center gap-2">
           <Button onClick={() => void runRefresh('embedding-update')} disabled={running !== null}>
-            {running === 'embedding-update' ? '重建中…' : '重建全部參考向量'}
+            {refreshLabel('embedding-update', '重建全部參考向量')}
           </Button>
           <Button
             variant="primary"
             onClick={() => void runRefresh('coverage-refresh')}
             disabled={running !== null}
           >
-            {running === 'coverage-refresh' ? '更新中…' : '更新覆蓋率 / 相似度'}
+            {refreshLabel('coverage-refresh', '更新覆蓋率 / 相似度')}
           </Button>
         </div>
       </Masthead>
@@ -391,6 +482,32 @@ export function EmbeddingWorkbench() {
           }`}
         >
           {notice.text}
+        </div>
+      )}
+
+      {/* Live job progress: the polled percent, the reel in flight, and elapsed time. */}
+      {running && (
+        <div className="flex flex-row items-center gap-3 rounded-md border border-carbon-deep/13 px-4 py-2">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-carbon-deep/13">
+            <div
+              className="h-full rounded-full bg-carbon-deep transition-[width] duration-300"
+              style={{ width: `${jobProgress.percent}%` }}
+            />
+          </div>
+          <span className="font-mono text-[13px] tabular-nums text-carbon-deep">
+            {jobProgress.percent}%
+          </span>
+          <span className="font-mono text-[13px] tabular-nums text-ink-muted">
+            {formatMmSs(elapsedSec)}
+          </span>
+          {jobProgress.video && (
+            <span
+              className="max-w-[220px] truncate font-kai text-[13px] text-carbon-soft"
+              title={jobProgress.video}
+            >
+              {videoShortName(jobProgress.video)}
+            </span>
+          )}
         </div>
       )}
 
@@ -512,8 +629,9 @@ export function EmbeddingWorkbench() {
                     size="sm"
                     onClick={() => void runRefresh('coverage-refresh')}
                     disabled={running !== null}
+                    title="重新計算全站覆蓋率與相似度（不是單一參賽者的向量）"
                   >
-                    {running === 'coverage-refresh' ? '重新生成中…' : '重新生成向量'}
+                    {refreshLabel('coverage-refresh', '重新計算覆蓋率與相似度')}
                   </Button>
                 </div>
 

@@ -187,6 +187,20 @@ async def list_local_videos():
     return {"videos": videos}
 
 
+def _stream_version(stem: str) -> str | None:
+    """A cache-busting token for the rendition the stream route will serve."""
+    for suffix in ("_1080p.mp4", "_720p.mp4"):
+        path = _safe_child(PROCESSED_DIR, f"{stem}{suffix}")
+        if not path.exists():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            return None
+        return f"{stat.st_size:x}-{int(stat.st_mtime):x}"
+    return None
+
+
 @app.get("/api/videos/processed/list")
 async def list_processed_videos():
     """List processed videos from local_output/metadata/."""
@@ -198,16 +212,67 @@ async def list_processed_videos():
             continue
         vi = data.get("video_info", {})
         source_file = SOURCE_DIR / f"{name}.mp4"
+        version = _stream_version(name)
         videos.append({
             "id": name,
             "name": name,
-            "stream_url": f"/api/videos/stream/{name}",
+            "stream_url": f"/api/videos/stream/{name}" + (f"?v={version}" if version else ""),
             "filename": source_file.name if source_file.exists() else None,
             "duration": vi.get("duration", 0),
             "width": vi.get("width", 0),
             "height": vi.get("height", 0),
         })
     return videos
+
+
+# A rendition is only usable if its MP4 container has a `moov` atom. An aborted encode leaves
+# an `mdat` and no `moov`, which every browser refuses to demux; without this check a stale
+# 1080p would shadow the valid 720p and the reel would silently fail to play. Cached per
+# (path, size, mtime) so a re-encode is re-checked.
+_rendition_ok_cache: dict[tuple[str, int, int], bool] = {}
+
+
+def _rendition_playable(path: Path) -> bool:
+    """True when the file is an MP4 whose top-level boxes include `moov`."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    cached = _rendition_ok_cache.get(key)
+    if cached is not None:
+        return cached
+
+    ok = False
+    try:
+        with path.open("rb") as fh:
+            offset = 0
+            for _ in range(64):
+                if offset + 8 > stat.st_size:
+                    break
+                fh.seek(offset)
+                header = fh.read(16)
+                if len(header) < 8:
+                    break
+                size = int.from_bytes(header[0:4], "big")
+                box = header[4:8]
+                if box == b"moov":
+                    ok = True
+                    break
+                if size == 1:
+                    if len(header) < 16:
+                        break
+                    size = int.from_bytes(header[8:16], "big")
+                if size < 8:
+                    break
+                offset += size
+    except OSError:
+        ok = False
+
+    if len(_rendition_ok_cache) >= 32:
+        _rendition_ok_cache.clear()
+    _rendition_ok_cache[key] = ok
+    return ok
 
 
 @app.get("/api/videos/stream/{video_id}")
@@ -227,8 +292,12 @@ async def stream_video(video_id: str):
         ]
 
     for path in candidates:
-        if path.exists():
-            return FileResponse(path, media_type="video/mp4")
+        if not path.exists():
+            continue
+        if path.name.endswith(("_1080p.mp4", "_720p.mp4")) and not _rendition_playable(path):
+            logger.warning(f"Skipping unfinalized rendition {path.name} (no moov atom)")
+            continue
+        return FileResponse(path, media_type="video/mp4")
     raise HTTPException(404, f"No video file found for {video_id}")
 
 
@@ -281,9 +350,10 @@ def _recompute_coverage() -> dict:
     generate_coverage = _script_import("generate_coverage").generate_coverage
     coverage = generate_coverage(CONTESTANT_CSV, EMBEDDINGS_DIR, METADATA_DIR)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "coverage.json").write_text(
-        json.dumps(coverage, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    path = DATA_DIR / "coverage.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(coverage, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
     return coverage
 
 
@@ -317,12 +387,14 @@ def _recompute_similarity() -> None:
     }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "similarity_matrix.json").write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (DATA_DIR / "top_pairs.json").write_text(
-        json.dumps(pairs_payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    for name, body in (
+        ("similarity_matrix.json", payload),
+        ("top_pairs.json", pairs_payload),
+    ):
+        path = DATA_DIR / name
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
 
 
 @app.get("/api/embedding/coverage")
@@ -400,6 +472,11 @@ async def trigger_processing(req: ProcessRequest):
     """Start a local video processing job, or one of the derived-cache refresh jobs."""
     if req.mode not in PROCESSING_MODES:
         raise HTTPException(400, f"Invalid mode: {req.mode}")
+    if any(
+        j.get("mode") == req.mode and j["status"] in ("queued", "running", "cancelling")
+        for j in jobs.values()
+    ):
+        raise HTTPException(409, f"A {req.mode} job is already running")
     job_id = str(uuid.uuid4())[:8]
 
     if req.mode in EMBEDDING_MODES:
@@ -449,6 +526,7 @@ async def trigger_processing(req: ProcessRequest):
         "started_at": None,
         "completed_at": None,
         "error": None,
+        "failures": [],
         "video_files": [str(f) for f in video_files],
     }
 
@@ -488,8 +566,8 @@ async def cancel_job(job_id: str):
 
 @app.post("/api/processing/clear-completed")
 async def clear_completed():
-    """Remove completed jobs from the list."""
-    to_remove = [jid for jid, j in jobs.items() if j["status"] in ("completed", "failed", "cancelled")]
+    """Remove successfully completed jobs from the list (failures stay for inspection)."""
+    to_remove = [jid for jid, j in jobs.items() if j["status"] == "completed"]
     for jid in to_remove:
         del jobs[jid]
     return {"cleared": len(to_remove)}
@@ -972,7 +1050,7 @@ async def flag_face(req: FlagRequest):
         "contestant_id": req.contestant_id,
         "video_id": req.video_id,
         "timestamp": req.timestamp,
-        "confidence": req.confidence if req.confidence is not None else 0,
+        "confidence": req.confidence,
         "bbox": req.bbox,
         "status": "pending",
         "user_label": req.user_label,
@@ -1068,18 +1146,24 @@ async def _run_embedding_job(job_id: str, mode: str):
             job["current_video"] = "coverage.json"
             job["progress"] = 60
 
+        if job["status"] == "cancelled":
+            return
+
         await asyncio.to_thread(_recompute_coverage)
         job["current_video"] = "similarity_matrix.json"
         job["progress"] = 80
 
         await asyncio.to_thread(_recompute_similarity)
         job["videos_processed"] = 1
-        job["status"] = "completed"
-        job["progress"] = 100
+        # An operator cancel must survive: never overwrite it with success.
+        if job["status"] != "cancelled":
+            job["status"] = "completed"
+            job["progress"] = 100
     except (Exception, SystemExit) as e:
         logger.error(f"[{job_id}] {mode} failed: {e}")
-        job["status"] = "failed"
-        job["error"] = str(e)
+        if job["status"] != "cancelled":
+            job["status"] = "failed"
+            job["error"] = str(e)
     finally:
         job["completed_at"] = _now_ts()
         job["current_video"] = None
@@ -1093,6 +1177,8 @@ async def _run_processing(job_id: str):
     job = jobs[job_id]
     job["status"] = "running"
     job["started_at"] = _now_ts()
+    job["failures"] = []
+    processed = 0
 
     try:
         from process_video import VideoProcessingPipeline
@@ -1119,13 +1205,23 @@ async def _run_processing(job_id: str):
                     video_path.stem,
                 )
                 job["videos_processed"] = i + 1
+                processed += 1
             except Exception as e:
                 logger.error(f"[{job_id}] Failed on {video_path.name}: {e}")
+                job["failures"].append({"video": video_path.name, "error": str(e)})
                 # Continue with next video
 
+        # Terminal status: a cancel wins, otherwise failures are surfaced instead of
+        # a green "completed" that hides videos the pipeline could not process.
         if job["status"] != "cancelled":
-            job["status"] = "completed"
-            job["progress"] = 100
+            failures = job["failures"]
+            if failures:
+                job["status"] = "failed" if processed == 0 else "completed_with_errors"
+            else:
+                job["status"] = "completed"
+        job["progress"] = 100
+
+        if job["status"] != "cancelled":
             # Coverage is derived from the metadata just written. A failure here must not
             # mark the video job failed — the videos themselves processed.
             try:
@@ -1135,8 +1231,9 @@ async def _run_processing(job_id: str):
 
     except Exception as e:
         logger.error(f"[{job_id}] Processing failed: {e}")
-        job["status"] = "failed"
-        job["error"] = str(e)
+        if job["status"] != "cancelled":
+            job["status"] = "failed"
+            job["error"] = str(e)
     finally:
         job["completed_at"] = _now_ts()
         job["current_video"] = None

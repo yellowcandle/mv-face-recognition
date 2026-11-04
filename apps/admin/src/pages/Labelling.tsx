@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, X } from 'lucide-react';
+import { useSearchParams } from 'react-router';
 import {
+  AdminErrorNotice,
   Button,
   Card,
   FaceCrop,
   Masthead,
   Stamp,
   adminFetch,
+  assertOk,
   useContestants,
   useVideos,
   bandFor,
   videoShortName,
+  isSessionExpired,
 } from '@mv/shared';
 import type { Contestant, VideoInfo, VideoMetadata } from '@mv/shared';
 import { sheetPosition, slipTime } from '@mv/shared/lib/labelling';
@@ -111,6 +115,13 @@ type DenseMetadata = Omit<VideoMetadata, 'video_info'> & {
 /** Tracks rendered at once. 530 lazy images at once is a request storm, not a grid. */
 const PAGE_SIZE = 120;
 const AUTOSAVE_DEBOUNCE_MS = 400;
+/**
+ * How long the sheet's verdict controls stay inert after a commit. The commit advances to the
+ * next unlabelled track in the same geometry, so without a window a double-click would label
+ * two tracks: the second click lands on a sheet that has already moved on. The window covers
+ * the advance plus the autosave debounce it starts.
+ */
+const COMMIT_SETTLE_MS = AUTOSAVE_DEBOUNCE_MS + 100;
 
 /** The separation gate the labels exist to decide (ticket 005). */
 const GATE = { trueMatchMean: 0.45, worstImpostor: 0.2 } as const;
@@ -172,7 +183,9 @@ function readErrorDetail(value: unknown): string | null {
  */
 async function fetchDenseMetadata(videoId: string): Promise<DenseMetadata> {
   const res = await fetch(`/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
-  if (!res.ok) throw new Error(`無法載入中繼資料：HTTP ${res.status}`);
+  // Public route, so no Access plumbing: `assertOk` still turns a non-2xx into an error that
+  // carries the server's detail instead of a bare status code.
+  await assertOk(res);
   return (await res.json()) as DenseMetadata;
 }
 
@@ -235,9 +248,12 @@ function GateFigure({ value, failing, test }: { value: number; failing: boolean;
 
 function ContestantPicker({
   contestants,
+  busy,
   onPick,
 }: {
   contestants: Contestant[];
+  /** True while the commit that just ran is still settling; every control is inert. */
+  busy: boolean;
   onPick: (contestantId: string) => void;
 }) {
   const [query, setQuery] = useState('');
@@ -268,6 +284,7 @@ function ContestantPicker({
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
+                if (busy) return;
                 const first = hits[0];
                 if (first) onPick(String(first.id));
               }
@@ -286,8 +303,9 @@ function ContestantPicker({
               <button
                 key={c.id}
                 type="button"
+                disabled={busy}
                 onClick={() => onPick(String(c.id))}
-                className={`flex h-7 w-full items-center gap-2 px-2.5 text-left font-kai transition-colors hover:bg-tint ${
+                className={`flex h-7 w-full items-center gap-2 px-2.5 text-left font-kai transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50 ${
                   i === 0 ? 'bg-tint' : ''
                 }`}
               >
@@ -315,12 +333,17 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
 
 export function Labelling() {
   const queryClient = useQueryClient();
-  const { data: videos = [], isLoading: videosLoading } = useVideos();
+  const { data: videos = [], isLoading: videosLoading } = useVideos('', { includeTests: true });
   const { data: contestantsRaw = [] } = useContestants();
   // `useContestants` is untyped JSON; `Contestant` is the domain type for it, asserted at this
   // boundary the same way `Flagging.tsx` asserts it. Only id/nickname/name are read, and a
   // non-array reply contributes no contestants rather than throwing through the picker.
   const contestants = Array.isArray(contestantsRaw) ? (contestantsRaw as Contestant[]) : [];
+
+  // `?video=<id>` names the reel a link came for; the probe below tries it before falling back
+  // to its usual first-labelable walk.
+  const [searchParams] = useSearchParams();
+  const requestedVideoId = searchParams.get('video');
 
   const [videoId, setVideoId] = useState<string | null>(null);
   const streamUrl = videos.find((v) => v.id === videoId)?.stream_url;
@@ -333,13 +356,20 @@ export function Labelling() {
   // carries no contract marker, so the probe walks it in order and stops at the first video
   // whose metadata parses with `frame_data[].detections`; the rest are marked stale. If no video
   // qualifies, the first one is selected and explains itself — never a blank screen. The probe
-  // shares the metadata query's cache, so the chosen video is not fetched twice.
+  // shares the metadata query's cache, so the chosen video is not fetched twice. A `?video=`
+  // request is simply walked first, so an unlabelable one still falls back to the usual order.
   useEffect(() => {
     if (videos.length === 0 || userPickedRef.current) return;
     let cancelled = false;
     void (async () => {
       const stale: string[] = [];
-      for (const video of videos) {
+      const probeOrder = requestedVideoId
+        ? [
+            ...videos.filter((video) => video.id === requestedVideoId),
+            ...videos.filter((video) => video.id !== requestedVideoId),
+          ]
+        : videos;
+      for (const video of probeOrder) {
         let labelable = false;
         try {
           const metadata = await queryClient.fetchQuery({
@@ -367,7 +397,7 @@ export function Labelling() {
     return () => {
       cancelled = true;
     };
-  }, [videos, queryClient]);
+  }, [videos, queryClient, requestedVideoId]);
 
   // ---- queries -----------------------------------------------------------
 
@@ -387,12 +417,12 @@ export function Labelling() {
         const detail = readErrorDetail(await res.json().catch(() => null));
         return {
           status: 'conflict' as const,
-          detail:
-            detail ??
-            '現有標註檔的來源與目前的中繼資料不符：重新處理使它失效。',
+          detail: detail ?? '現有標註檔的來源與目前的中繼資料不符：重新處理使它失效。',
         };
       }
-      if (!res.ok) throw new Error(`無法載入標註：HTTP ${res.status}`);
+      // Anything else that is not 2xx throws an `ApiError` carrying the server's detail (or a
+      // `SessionExpiredError`), so the page can name the real failure instead of guessing.
+      await assertOk(res);
       // `labels/v2` on the wire: the server rejects anything else on PUT, so a file that reads
       // back through GET was well-formed when it was written. A v1 file is not an error: it
       // comes back as an empty v2 set with `legacy_ignored`, so the page can explain re-labelling.
@@ -405,12 +435,14 @@ export function Labelling() {
   const conflict = labelsQuery.data?.status === 'conflict' ? labelsQuery.data.detail : null;
   const legacyIgnored = file?.legacy_ignored === true;
   // A labels file that cannot be read must not be silently replaced by an empty set, so the
-  // failure is surfaced and labelling is blocked until it is readable.
-  const labelsLoadError = labelsQuery.isError
-    ? labelsQuery.error instanceof Error
-      ? labelsQuery.error.message
-      : '無法載入標註'
+  // failure is surfaced and labelling is blocked until it is readable. The error object is kept
+  // whole: an expired Access session is not a corrupt file, and `AdminErrorNotice` tells the two
+  // apart (one offers reload, the other a retry).
+  const labelsLoadFailure: unknown = labelsQuery.isError
+    ? (labelsQuery.error ?? new Error('無法載入標註'))
     : null;
+  const labelsLoadError = labelsLoadFailure !== null;
+  const labelsLoadExpired = isSessionExpired(labelsLoadFailure);
 
   // ---- detections and tracks ---------------------------------------------
 
@@ -551,12 +583,38 @@ export function Labelling() {
   const [labels, setLabels] = useState<Record<string, Label>>({});
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<unknown>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  /**
+   * The verdict a clear removed, per track, so the reviewer can take that clear back. The label is
+   * already out of `labels` — that removal is what the autosave writes — and the undo is a fresh
+   * edit of its own rather than a cancellation of the write that may already be in flight.
+   */
+  const [clearedLabels, setClearedLabels] = useState<Record<string, Label>>({});
 
   const savedJsonRef = useRef<string | null>(null);
   const saveSeqRef = useRef(0);
+  /** Tail of the write queue, so a labels file is never replaced by two PUTs racing each other. */
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  /**
+   * The payload the debounce is holding. It lives here, not only in the timer closure, because
+   * every dependency change, a video switch and an unmount all clear that timer — and clearing
+   * it is exactly what used to drop the last verdict typed inside the 400 ms window.
+   */
+  const pendingSaveRef = useRef<{ videoId: string; json: string } | null>(null);
+  /** The video the badges describe; a write finishing after a switch must not move them. */
+  const liveVideoRef = useRef<string | null>(null);
+  /**
+   * A write the reviewer switched away from cannot move the badges — they describe the video on
+   * screen — but its failure must not vanish with it: the flush before a switch is exactly the
+   * write that must not fail silently. Held per video and shown when that video is reopened.
+   */
+  const failedSaveRef = useRef(new Map<string, unknown>());
+
+  useEffect(() => {
+    liveVideoRef.current = videoId;
+  }, [videoId]);
 
   // Resume: reopening a video shows the labels already on disk. The baseline for
   // "has anything changed?" is what the server last told us, so hydration never
@@ -568,69 +626,90 @@ export function Labelling() {
       next[String(label.tracker_id)] = label;
     }
     setLabels(next);
+    // A clear belongs to the video it happened in; the next one starts with nothing to undo.
+    setClearedLabels({});
     savedJsonRef.current = JSON.stringify(serializeLabels(next));
+    // A payload queued for the video being left is never written into this one's file.
+    pendingSaveRef.current = null;
+    const failedSave = failedSaveRef.current.get(videoId);
     setHydratedFor(videoId);
-    setSaveState('idle');
-    setSaveError(null);
+    setSaveState(failedSave ? 'failed' : 'idle');
+    setSaveError(failedSave ?? null);
     setSavedAt(file.labelled_at ? new Date(file.labelled_at) : null);
   }, [videoId, file, hydratedFor]);
 
   const labelsJson = useMemo(() => JSON.stringify(serializeLabels(labels)), [labels]);
 
   const save = useCallback(
-    async (bodyLabelsJson: string) => {
-      if (!videoId || !source) return;
+    (bodyLabelsJson: string): Promise<void> => {
+      if (!videoId || !source) return Promise.resolve();
+      // Everything below is pinned to this video: the request, the cache entry it refreshes and
+      // the badges it may move. `live()` asks again at each step, because the reviewer can switch
+      // video while a write is in flight.
+      const forVideo = videoId;
       const seq = ++saveSeqRef.current;
-      setSaveState('saving');
-      setSaveError(null);
-      try {
-        // Round-trip of this page's own serialization, not external input: the debounce effect
-        // hands over the exact JSON it built from the labels map.
-        const labelList = JSON.parse(bodyLabelsJson) as Label[];
-        const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(videoId)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source, labels: labelList }),
-        });
-        if (!res.ok) {
-          const detail = readErrorDetail(await res.json().catch(() => null));
+      const live = () => forVideo === liveVideoRef.current;
+      if (live()) {
+        setSaveState('saving');
+        setSaveError(null);
+      }
+      // The endpoint replaces the whole file, so writes are serialized: two overlapping PUTs can
+      // otherwise finish out of order and leave the older label set on disk. `seq` was taken at
+      // enqueue time, so only the newest queued payload may move the badges.
+      const run = saveChainRef.current.then(async () => {
+        try {
+          // Round-trip of this page's own serialization, not external input: the debounce effect
+          // hands over the exact JSON it built from the labels map.
+          const labelList = JSON.parse(bodyLabelsJson) as Label[];
+          const res = await adminFetch(`/admin/api/labels/${encodeURIComponent(forVideo)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source, labels: labelList }),
+          });
+          // A non-2xx throws here: an `ApiError` with the server's `detail`, or a
+          // `SessionExpiredError` the notice renders as "reload", never as a broken file.
+          await assertOk(res);
+          const savedBody: unknown = await res.json().catch(() => null);
+          // Keep the cache equal to disk so remounting the page mid-session shows
+          // the verdicts that were just written. This is keyed by `forVideo`, so it stays correct
+          // even when the reviewer has already moved to another video.
+          queryClient.setQueryData<LabelsResult>(['labels', forVideo], (): LabelsResult => ({
+            status: 'loaded',
+            file: {
+              schema: 'labels/v2',
+              video_id: forVideo,
+              labelled_at: new Date().toISOString(),
+              source,
+              labels: labelList,
+              legacy_ignored: false,
+            },
+          }));
+          failedSaveRef.current.delete(forVideo);
+          if (!live() || seq !== saveSeqRef.current) return;
+          savedJsonRef.current = bodyLabelsJson;
+          setSaveState('saved');
+          setSaveError(null);
+          setSavedAt(new Date());
+          setSavedPath(
+            typeof savedBody === 'object' &&
+              savedBody !== null &&
+              'path' in savedBody &&
+              typeof savedBody.path === 'string'
+              ? savedBody.path
+              : null,
+          );
+        } catch (e) {
+          if (!live()) {
+            failedSaveRef.current.set(forVideo, e);
+            return;
+          }
           if (seq !== saveSeqRef.current) return;
           setSaveState('failed');
-          setSaveError(detail ?? `HTTP ${res.status}`);
-          return;
+          setSaveError(e);
         }
-        const savedBody: unknown = await res.json().catch(() => null);
-        if (seq !== saveSeqRef.current) return;
-        savedJsonRef.current = bodyLabelsJson;
-        setSaveState('saved');
-        setSaveError(null);
-        setSavedAt(new Date());
-        setSavedPath(
-          typeof savedBody === 'object' &&
-            savedBody !== null &&
-            'path' in savedBody &&
-            typeof savedBody.path === 'string'
-            ? savedBody.path
-            : null,
-        );
-        // Keep the cache equal to disk so remounting the page mid-session shows
-        // the verdicts that were just written.
-        queryClient.setQueryData<LabelsResult>(['labels', videoId], (): LabelsResult => ({
-          status: 'loaded',
-          file: {
-            schema: 'labels/v2',
-            video_id: videoId,
-            labelled_at: new Date().toISOString(),
-            source,
-            labels: labelList,
-            legacy_ignored: false,
-          },
-        }));
-      } catch (e) {
-        if (seq !== saveSeqRef.current) return;
-        setSaveState('failed');
-        setSaveError(e instanceof Error ? e.message : String(e));
-      }
+      });
+      saveChainRef.current = run;
+      return run;
     },
     [videoId, source, queryClient],
   );
@@ -639,12 +718,63 @@ export function Labelling() {
   // when the payload is byte-identical to what was last saved.
   useEffect(() => {
     if (!videoId || hydratedFor !== videoId || conflict || labelsLoadError || metadataIssue) return;
-    if (savedJsonRef.current === labelsJson) return;
+    if (savedJsonRef.current === labelsJson) {
+      pendingSaveRef.current = null;
+      return;
+    }
+    pendingSaveRef.current = { videoId, json: labelsJson };
     const timer = setTimeout(() => {
+      pendingSaveRef.current = null;
       void save(labelsJson);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [labelsJson, videoId, hydratedFor, conflict, labelsLoadError, metadataIssue, save]);
+
+  /**
+   * Write what the debounce is holding — or the labels in memory when the effect has not queued
+   * them yet — instead of waiting out the timer. Called before a video switch and on unmount: the
+   * two paths where the cleanup above would otherwise cancel the only write the reviewer's last
+   * verdict had.
+   */
+  const flushPendingSave = useCallback(() => {
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    // The same gate as the debounce: a blocked page never writes, not even on the way out, and a
+    // payload queued for another video is never written into this one's file.
+    if (conflict || labelsLoadError || metadataIssue) return;
+    // Between a switch and that video's hydration the labels in memory still belong to the video
+    // being left, so nothing in this state is theirs to write.
+    if (!videoId || hydratedFor !== videoId) return;
+    const queued = pending !== null && pending.videoId === videoId ? pending.json : null;
+    const target = queued ?? (labelsJson !== savedJsonRef.current ? labelsJson : null);
+    if (target === null) return;
+    void save(target);
+  }, [conflict, labelsLoadError, metadataIssue, videoId, hydratedFor, labelsJson, save]);
+
+  // `save` (and `videoId`) change across renders; an unmount cleanup must reach the newest pair.
+  const flushRef = useRef(flushPendingSave);
+  useEffect(() => {
+    flushRef.current = flushPendingSave;
+  }, [flushPendingSave]);
+  useEffect(() => () => flushRef.current(), []);
+
+  /** Verdicts typed but not yet on disk: the debounce is still running, or a write is in flight. */
+  const unsaved =
+    videoId !== null &&
+    hydratedFor === videoId &&
+    (saveState === 'saving' || labelsJson !== savedJsonRef.current);
+
+  // Leaving the page inside that window must not silently discard it. The browser owns the
+  // prompt, so this only asks; the flush above is what actually keeps the edit.
+  useEffect(() => {
+    if (!unsaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsaved]);
 
   // ---- filters -----------------------------------------------------------
 
@@ -740,13 +870,66 @@ export function Labelling() {
         else delete next[key];
       }
       setLabels(next);
+      // A new verdict supersedes a clear: the undo offer only ever describes the last clear.
+      setClearedLabels((prev) => {
+        const rest = { ...prev };
+        let changed = false;
+        for (const [key, label] of entries) {
+          if (label && key in rest) {
+            delete rest[key];
+            changed = true;
+          }
+        }
+        return changed ? rest : prev;
+      });
       advanceFrom(next, fromKey);
     },
     [labels, advanceFrom],
   );
 
+  // ---- commit arming -----------------------------------------------------
+  // A commit advances the sheet to the next unlabelled track *in the same geometry*, so the
+  // second click of a double-click would land on a different track and label it too. The gate is
+  // a ref: it flips synchronously inside the first handler, before React re-renders, so the
+  // second click cannot slip between the two. `committing` only disables the controls visually.
+  const [committing, setCommitting] = useState(false);
+  const commitLockRef = useRef(false);
+  const commitTimerRef = useRef<number | null>(null);
+
+  const armCommit = useCallback(() => {
+    commitLockRef.current = true;
+    setCommitting(true);
+    if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
+    // Released once the advance has rendered and the autosave it queued has fired.
+    commitTimerRef.current = window.setTimeout(() => {
+      commitTimerRef.current = null;
+      commitLockRef.current = false;
+      setCommitting(false);
+    }, COMMIT_SETTLE_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
+    },
+    [],
+  );
+
   const commitOne = useCallback(
     (track: Track, verdict: Verdict, contestantId?: string) => {
+      if (commitLockRef.current) return;
+      armCommit();
+      const existing = labels[track.key];
+      if (
+        existing &&
+        existing.verdict === verdict &&
+        (verdict !== 'contestant' || existing.contestant_id === contestantId)
+      ) {
+        // Re-stating the verdict already on the track writes nothing; it only moves on, which is
+        // what the reviewer asked for by clicking it again.
+        advanceFrom(labels, track.key);
+        return;
+      }
       const label: Label = {
         tracker_id: track.tracker_id,
         verdict,
@@ -754,17 +937,38 @@ export function Labelling() {
       };
       commit([[track.key, label]], track.key);
     },
-    [commit],
+    [labels, advanceFrom, commit, armCommit],
   );
 
+  /**
+   * Backspace/Delete on a card, or "Clear label" in the sheet. The removal reaches disk through the
+   * autosave effect like any other change; the previous verdict is kept so it can be put back.
+   */
   const clearLabel = useCallback(
     (key: string) => {
-      if (!labels[key]) return;
+      const previous = labels[key];
+      if (!previous) return;
       const next = { ...labels };
       delete next[key];
       setLabels(next);
+      setClearedLabels((prev) => ({ ...prev, [key]: previous }));
     },
     [labels],
+  );
+
+  /** Put a cleared verdict back. That edit autosaves on its own; no write is cancelled. */
+  const undoClear = useCallback(
+    (key: string) => {
+      const previous = clearedLabels[key];
+      if (!previous) return;
+      setClearedLabels((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setLabels((prev) => ({ ...prev, [key]: previous }));
+    },
+    [clearedLabels],
   );
 
   // ---- derived rail data -------------------------------------------------
@@ -857,7 +1061,7 @@ export function Labelling() {
   const visible = filtered.slice(0, visibleCount);
   // Labelling is blocked whenever the labels on disk cannot be read (a stale file, or a load
   // failure) or the metadata is not under the current contract. A blocked page never writes.
-  const blocked = conflict !== null || labelsLoadError !== null || metadataIssue !== null;
+  const blocked = conflict !== null || labelsLoadError || metadataIssue !== null;
   const labelable = metadataIssue === null;
   const loading = !videoId || metadataQuery.isLoading || labelsQuery.isLoading;
 
@@ -867,7 +1071,8 @@ export function Labelling() {
       <div className="flex min-w-0 flex-col gap-3 pb-5 pl-8 pr-5 pt-8 xl:flex-1 xl:overflow-y-auto">
         <div className="pb-1">
           <Masthead title="標註" hint="替未認出的臉指定參賽者">
-            <span className="font-mono text-[12px] tabular-nums">
+            {/* Autosave is otherwise silent: this is what tells AT the write landed. */}
+            <span role="status" aria-live="polite" className="font-mono text-[12px] tabular-nums">
               {saveState === 'saving' && '儲存中…'}
               {saveState === 'saved' && `已儲存${savedAt ? ` · ${slipTime(savedAt)}` : ''}`}
               {saveState === 'failed' && <span className="font-kai text-stamp">儲存失敗</span>}
@@ -881,10 +1086,12 @@ export function Labelling() {
           </Masthead>
         </div>
 
-        {saveError && (
-          <div className="rounded-md border border-stamp/50 px-4 py-2 font-kai text-[13px] text-stamp">
-            儲存失敗：{saveError}
-          </div>
+        {saveError != null && (
+          <AdminErrorNotice
+            error={saveError}
+            onRetry={() => void save(labelsJson)}
+            label="標註儲存失敗"
+          />
         )}
 
         {legacyIgnored && (
@@ -925,9 +1132,7 @@ export function Labelling() {
                       {file.source.detections}
                     </span>
                   ) : (
-                    <span className="font-kai">
-                      所屬批次見上面的訊息；409 回覆沒有其他副本。
-                    </span>
+                    <span className="font-kai">所屬批次見上面的訊息；409 回覆沒有其他副本。</span>
                   )}
                 </div>
               </div>
@@ -940,17 +1145,29 @@ export function Labelling() {
           </div>
         )}
 
-        {labelsLoadError !== null && (
-          <div className={BANNER}>
-            <p className="font-kai text-[14px] text-stamp">
-              無法讀取標註檔：標註已封鎖，以免儲存時蓋掉磁碟上已有的判定。
-            </p>
-            <p className="font-mono text-[12px] text-ink-muted">{labelsLoadError}</p>
-            <div>
-              <Button variant="secondary" size="sm" onClick={() => void labelsQuery.refetch()}>
-                重試
-              </Button>
-            </div>
+        {labelsLoadError && (
+          <div className="flex flex-col gap-2">
+            <AdminErrorNotice
+              error={labelsLoadFailure}
+              onRetry={() => void labelsQuery.refetch()}
+              label="標註檔讀取失敗"
+            />
+            {/* An expired session is not a broken file: the notice above already offers the only
+                action that helps, and the file is untouched and unread, not corrupt. */}
+            {!labelsLoadExpired && (
+              <div className={BANNER}>
+                <p className="font-kai text-[14px] text-stamp">
+                  標註已封鎖，直到標註檔可以讀取，以免儲存時蓋掉磁碟上已有的判定。
+                </p>
+                <p className="font-kai text-[12px] text-ink-muted">
+                  修復或移走{' '}
+                  <span className="break-all font-mono">
+                    local_output/labels/{videoId}_labels.json
+                  </span>{' '}
+                  後重試。在此之前不會寫入任何內容。
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -960,6 +1177,9 @@ export function Labelling() {
             aria-label="影片"
             value={videoId ?? ''}
             onChange={(e) => {
+              // The debounce timer is about to be cleared by this switch, so the verdict typed a
+              // moment ago is written first — to the video it was typed for.
+              flushPendingSave();
               // An explicit choice wins over the auto-probe for the rest of the session.
               userPickedRef.current = true;
               setVideoId(e.target.value || null);
@@ -1097,14 +1317,16 @@ export function Labelling() {
             <p>載入軌跡中…</p>
           </div>
         ) : metadataQuery.error ? (
-          <Card padding="lg">
-            <div className="py-8 text-center">
-              <p className="mb-4 font-kai text-[14px] text-stamp">無法載入影片中繼資料</p>
-              <Button variant="secondary" size="sm" onClick={() => metadataQuery.refetch()}>
-                重試
-              </Button>
-            </div>
-          </Card>
+          <div className="flex flex-col gap-2">
+            <AdminErrorNotice
+              error={metadataQuery.error}
+              onRetry={() => void metadataQuery.refetch()}
+              label="中繼資料讀取失敗"
+            />
+            <p className="font-kai text-[12px] text-ink-muted">
+              中繼資料讀回來之前無法標註：軌跡由它建立，也不會替讀不到的批次寫入標註檔。
+            </p>
+          </div>
         ) : filtered.length === 0 ? (
           <Card padding="lg">
             <div className="py-8 text-center font-kai">
@@ -1124,83 +1346,102 @@ export function Labelling() {
                 const votes = voteBreakdown(track, contestantsById);
                 const topVote = track.votes[0];
                 const isOpen = track.key === openKey;
+                const cleared = clearedLabels[track.key];
                 return (
-                  <button
-                    key={track.key}
-                    ref={(el) => {
-                      tileRefs.current.set(track.key, el);
-                    }}
-                    type="button"
-                    disabled={blocked}
-                    aria-current={isOpen ? 'true' : undefined}
-                    onClick={() => {
-                      setOpenKey(track.key);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Backspace' || e.key === 'Delete') {
-                        e.preventDefault();
-                        clearLabel(track.key);
-                      }
-                    }}
-                    title={`軌跡 ${track.tracker_id} · ${track.frame_count} 格 · 系統認為：${votes}。按一下標註，Backspace 清除`}
-                    className={`group flex min-w-0 flex-col gap-1.5 rounded text-left ${
-                      blocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                    }`}
-                  >
-                    <span
-                      className={`relative block rounded ${
-                        isOpen ? 'ring-2 ring-stamp' : 'group-hover:ring-1 group-hover:ring-carbon-deep/33'
+                  <div key={track.key} className="relative min-w-0">
+                    <button
+                      ref={(el) => {
+                        tileRefs.current.set(track.key, el);
+                      }}
+                      type="button"
+                      disabled={blocked}
+                      aria-current={isOpen ? 'true' : undefined}
+                      onClick={() => {
+                        setOpenKey(track.key);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' || e.key === 'Delete') {
+                          e.preventDefault();
+                          clearLabel(track.key);
+                        }
+                      }}
+                      title={`軌跡 ${track.tracker_id} · ${track.frame_count} 格 · 系統認為：${votes}。按一下標註，Backspace 清除`}
+                      className={`group flex w-full min-w-0 flex-col gap-1.5 rounded text-left ${
+                        blocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                       }`}
                     >
-                      <FaceCrop
-                        videoId={videoId ?? ''}
-                        frameNumber={track.representative.frame_number}
-                        detectionIndex={track.representative.detection_index}
-                        timestamp={track.representative.timestamp}
-                        bbox={track.representative.bbox}
-                        streamUrl={streamUrl}
-                        width={160}
-                        className={`${CROP_FILL} !w-full`}
-                      />
-                      {chip && (
-                        <Stamp
-                          tilt
-                          className="absolute bottom-2 left-1.5 max-w-[calc(100%-0.75rem)] overflow-hidden text-ellipsis"
-                        >
-                          {chip}
-                        </Stamp>
-                      )}
-                    </span>
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="flex items-center justify-between gap-1">
-                        <span className="truncate font-mono text-[12px] tabular-nums text-ink-muted">
-                          {track.tracker_id} · {track.frame_count}格
-                        </span>
-                        <Stamp band={bandFor(track.representative.match_score)} />
-                      </span>
                       <span
-                        className={`truncate font-kai text-[14px] ${
+                        className={`relative block rounded ${
                           isOpen
-                            ? 'font-bold text-carbon-deep'
-                            : track.claim
-                              ? 'text-carbon'
-                              : 'text-ink-muted'
+                            ? 'ring-2 ring-stamp'
+                            : 'group-hover:ring-1 group-hover:ring-carbon-deep/33'
                         }`}
-                        title={track.claim?.name ?? undefined}
                       >
-                        {claimText(track, contestantsById)}
-                      </span>
-                      <span className="truncate font-mono text-[12px] tabular-nums text-ink-muted" title={votes}>
-                        {topVote ? (
-                          `票 ${topVote.count}/${track.frame_count}${
-                            track.votes.length > 1 ? ` · +${track.votes.length - 1}` : ''
-                          }`
-                        ) : (
-                          <span className="font-kai">沒有命名的格</span>
+                        <FaceCrop
+                          videoId={videoId ?? ''}
+                          frameNumber={track.representative.frame_number}
+                          detectionIndex={track.representative.detection_index}
+                          timestamp={track.representative.timestamp}
+                          bbox={track.representative.bbox}
+                          streamUrl={streamUrl}
+                          width={160}
+                          className={`${CROP_FILL} !w-full`}
+                        />
+                        {chip && (
+                          <Stamp
+                            tilt
+                            className="absolute bottom-2 left-1.5 max-w-[calc(100%-0.75rem)] overflow-hidden text-ellipsis"
+                          >
+                            {chip}
+                          </Stamp>
                         )}
                       </span>
-                    </span>
-                  </button>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="flex items-center justify-between gap-1">
+                          <span className="truncate font-mono text-[12px] tabular-nums text-ink-muted">
+                            {track.tracker_id} · {track.frame_count}格
+                          </span>
+                          <Stamp band={bandFor(track.representative.match_score)} />
+                        </span>
+                        <span
+                          className={`truncate font-kai text-[14px] ${
+                            isOpen
+                              ? 'font-bold text-carbon-deep'
+                              : track.claim
+                                ? 'text-carbon'
+                                : 'text-ink-muted'
+                          }`}
+                          title={track.claim?.name ?? undefined}
+                        >
+                          {claimText(track, contestantsById)}
+                        </span>
+                        <span
+                          className="truncate font-mono text-[12px] tabular-nums text-ink-muted"
+                          title={votes}
+                        >
+                          {topVote ? (
+                            `票 ${topVote.count}/${track.frame_count}${
+                              track.votes.length > 1 ? ` · +${track.votes.length - 1}` : ''
+                            }`
+                          ) : (
+                            <span className="font-kai">沒有命名的格</span>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                    {/* The tile stays a button: the undo control sits beside it, not inside. */}
+                    {cleared && !labels[track.key] && (
+                      <button
+                        type="button"
+                        disabled={blocked}
+                        onClick={() => undoClear(track.key)}
+                        title={`軌跡 ${track.tracker_id} 的判定已清除，按一下復原`}
+                        className="absolute left-1.5 top-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-md border border-carbon-deep/33 bg-ground px-1.5 py-0.5 font-kai text-[12px] text-carbon hover:bg-tint"
+                      >
+                        已清除 · 復原
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -1222,13 +1463,18 @@ export function Labelling() {
 
       {/* The sheet, docked between the grid and the rail. Stacks first below xl. */}
       {openTrack && !blocked && (
+        // Docked beside the grid, so a labelled region rather than a modal dialog: no focus trap,
+        // and closing it moves focus nowhere, so Esc then Backspace can't clear a tile's label.
         <aside
-          aria-label="標註這條軌跡"
+          aria-labelledby="label-sheet-title"
           className="order-first flex shrink-0 flex-col gap-4 border-b border-carbon-deep/13 px-6 pb-5 pt-8 xl:order-none xl:w-[416px] xl:overflow-y-auto xl:border-b-0 xl:border-l"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
-              <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">
+              <h2
+                id="label-sheet-title"
+                className="font-kai text-[18px] font-normal leading-tight text-carbon-deep"
+              >
                 標註這條軌跡
               </h2>
               <p className="font-mono text-[12px] tabular-nums text-ink-muted">
@@ -1312,6 +1558,14 @@ export function Labelling() {
                   </Button>
                 </div>
               )}
+              {/* The sheet stays open after a clear, so the undo has to live here as well. */}
+              {!labels[openTrack.key] && clearedLabels[openTrack.key] && (
+                <div className="pt-1">
+                  <Button variant="ghost" size="sm" onClick={() => undoClear(openTrack.key)}>
+                    已清除 · 復原
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1331,6 +1585,7 @@ export function Labelling() {
           <ContestantPicker
             key={openKey}
             contestants={contestants}
+            busy={committing}
             onPick={(contestantId) => commitOne(openTrack, 'contestant', contestantId)}
           />
 
@@ -1339,8 +1594,9 @@ export function Labelling() {
               <button
                 key={v}
                 type="button"
+                disabled={committing}
                 onClick={() => commitOne(openTrack, v)}
-                className="flex cursor-pointer flex-col gap-0.5 rounded-md border border-carbon-deep/33 px-2.5 py-1.5 text-left font-kai transition-colors hover:bg-tint"
+                className="flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-col gap-0.5 rounded-md border border-carbon-deep/33 px-2.5 py-1.5 text-left font-kai transition-colors hover:bg-tint"
               >
                 <span className="text-[14px] text-carbon-deep">{VERDICT_LABEL[v]}</span>
                 <span className="text-[12px] text-carbon-soft">{VERDICT_BLURB[v]}</span>
@@ -1362,7 +1618,9 @@ export function Labelling() {
           className="flex shrink-0 flex-col gap-6 border-t border-carbon-deep/13 px-5 pb-5 pt-8 xl:w-[248px] xl:overflow-y-auto xl:border-l xl:border-t-0"
         >
           <section className="flex flex-col gap-1.5">
-            <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">判定</h2>
+            <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">
+              判定
+            </h2>
             {VERDICTS.map((v) => (
               <RailRow key={v} label={VERDICT_LABEL[v]} value={rail.counts[v]} />
             ))}
@@ -1419,7 +1677,9 @@ export function Labelling() {
           </section>
 
           <section className="flex flex-col gap-1.5 text-[12px]">
-            <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">標註檔</h2>
+            <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">
+              標註檔
+            </h2>
             <FileRow label="結構" value={file?.schema ?? 'labels/v2'} />
             <FileRow label="已標註軌跡" value={rail.labelled} />
             <FileRow label="標註時間" value={savedAt ? slipTime(savedAt) : '—'} />
@@ -1435,7 +1695,8 @@ export function Labelling() {
           </section>
 
           <p className="mt-auto font-kai text-[12px] text-ink-muted">
-            每條軌跡一個判定：tracker_id 跨格連起同一張臉。裁切取自處理後的版本，這裏不會重新換算分數。
+            每條軌跡一個判定：tracker_id
+            跨格連起同一張臉。裁切取自處理後的版本，這裏不會重新換算分數。
           </p>
         </aside>
       )}

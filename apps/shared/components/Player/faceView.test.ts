@@ -16,9 +16,7 @@ const face = (over: Partial<FaceDetection>): FaceDetection => ({
 describe('faceName', () => {
   it('prefers the nickname', () => {
     expect(
-      faceName(
-        face({ matched: true, contestant_name: '蘇雅琳', contestant_nickname: 'Ivy So' }),
-      ),
+      faceName(face({ matched: true, contestant_name: '蘇雅琳', contestant_nickname: 'Ivy So' })),
     ).toBe('Ivy So');
   });
 

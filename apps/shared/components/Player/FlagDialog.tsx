@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FaceDetection } from '../../types';
 import { bandFor } from '../../lib/bands';
+import { AdminErrorNotice } from '../AdminErrorNotice';
 import { Button } from '../Button';
 import { Stamp } from '../Stamp';
 import { FrameFace } from './FrameFace';
@@ -18,6 +19,8 @@ interface FlagDialogProps {
   onSubmit: (contestantId: number, userLabel: string) => void;
   onClose: () => void;
   isSubmitting: boolean;
+  /** Submit failure; the dialog stays open so the operator can retry. */
+  error?: unknown;
 }
 
 export function FlagDialog({
@@ -30,17 +33,53 @@ export function FlagDialog({
   onSubmit,
   onClose,
   isSubmitting,
+  error,
 }: FlagDialogProps) {
   const [contestantId, setContestantId] = useState<number | null>(null);
   const [userLabel, setUserLabel] = useState('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const contestantSelectRef = useRef<HTMLSelectElement>(null);
 
+  // Opening the dialog lands the caret on the contestant picker: it is the only field
+  // the operator came here to fill.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSubmitting) onClose();
+    contestantSelectRef.current?.focus();
+  }, []);
+
+  // The dialog is modal, so Tab stays inside it, and Escape is the Cancel button: it
+  // closes only while there is nothing in flight.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isSubmitting) onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const container = dialogRef.current;
+      if (!container) return;
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button, select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute('disabled') && el.getClientRects().length > 0);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const inside = active !== null && container.contains(active);
+      if (e.shiftKey) {
+        if (!inside || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, isSubmitting]);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isSubmitting, onClose]);
 
   const handleSubmit = () => {
     if (contestantId === null) return;
@@ -58,9 +97,12 @@ export function FlagDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-carbon-deep/47"
-      onClick={onClose}
+      onClick={() => {
+        if (!isSubmitting) onClose();
+      }}
     >
       <div
+        ref={dialogRef}
         className="mx-4 flex w-full max-w-[448px] flex-col gap-5 rounded-md border border-carbon-deep/33 bg-ground p-6"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -73,8 +115,8 @@ export function FlagDialog({
           </h3>
           <p className="font-kai text-[14px] text-carbon-soft">
             {batch
-              ? '把所選的臉全部指定給同一位參賽者。'
-              : '把這張偵測到的臉指定給參賽者，以改善辨識準確度。'}
+              ? '把所選的臉全部指定給同一位參賽者，送入待核，由人覆核。'
+              : '把這張偵測到的臉指定給參賽者，送入待核，由人覆核。'}
           </p>
         </div>
 
@@ -122,7 +164,7 @@ export function FlagDialog({
           </label>
           <select
             id="flag-contestant-select"
-            autoFocus
+            ref={contestantSelectRef}
             className="field field-select h-10 w-full text-[14px] text-carbon-deep"
             value={contestantId ?? ''}
             onChange={(e) => setContestantId(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -152,8 +194,12 @@ export function FlagDialog({
           </div>
         )}
 
+        {error ? <AdminErrorNotice error={error} label="送出失敗" /> : null}
+
         <div className="flex items-center justify-end gap-2">
-          <Button onClick={onClose}>取消</Button>
+          <Button onClick={onClose} disabled={isSubmitting}>
+            取消
+          </Button>
           <Button
             variant="primary"
             onClick={handleSubmit}

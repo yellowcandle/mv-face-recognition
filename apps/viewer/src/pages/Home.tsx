@@ -7,7 +7,6 @@ import {
   contestantsSeen,
   formatMmSs,
   mostSeen,
-  isTestClip,
   reelRange,
   reelSubtitle,
   renditionLabel,
@@ -28,7 +27,7 @@ export function Home() {
   const { data, isLoading } = useVideos();
   const { data: coverage } = useCoverage();
 
-  const videos: FiledVideo[] = (data ?? []).filter((video) => !isTestClip(video.id));
+  const videos: FiledVideo[] = data ?? [];
   const summary = coverage?.summary;
   const contestants = coverage?.contestants ?? [];
   const regulars = mostSeen(contestants, 4);
@@ -139,7 +138,6 @@ export function Home() {
                     <img
                       src={c.portrait_url}
                       alt={`${c.nickname || c.name} ${c.name}`}
-                      loading="lazy"
                       decoding="async"
                       className="relative h-full w-full object-cover object-[50%_22%]"
                       onError={(e) => {

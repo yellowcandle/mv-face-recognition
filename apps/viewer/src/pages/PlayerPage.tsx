@@ -32,6 +32,10 @@ interface QueueEntry {
   contestantId: number;
   name: string;
   band: Band;
+  /** Enough of the source detection to crop the face from the reel. */
+  frameNumber: number;
+  detectionIndex: number;
+  bbox: [number, number, number, number];
 }
 
 export function PlayerPage() {
@@ -68,8 +72,8 @@ export function PlayerPage() {
     let previous = new Set<number>();
     for (const frame of sorted) {
       const now = new Set<number>();
-      for (const d of frame.detections ?? []) {
-        if (d.contestant_id == null) continue;
+      (frame.detections ?? []).forEach((d, detectionIndex) => {
+        if (d.contestant_id == null) return;
         const id = Number(d.contestant_id);
         now.add(id);
         if (!previous.has(id) && d.match_score != null) {
@@ -78,9 +82,12 @@ export function PlayerPage() {
             contestantId: id,
             name: d.contestant_nickname || d.contestant_name || `#${id}`,
             band: bandFor(d.match_score),
+            frameNumber: frame.frame_number,
+            detectionIndex,
+            bbox: d.bbox,
           });
         }
-      }
+      });
       previous = now;
       if (out.length > 600) break;
     }
@@ -140,7 +147,11 @@ export function PlayerPage() {
     <div className="flex min-h-full flex-1 flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-4 pb-5 pl-14 pr-8 pt-8">
         <div className="flex flex-row items-center gap-3">
-          <Link to="/" aria-label="返回點唱單" className="rounded-md text-ink-muted hover:text-stamp">
+          <Link
+            to="/"
+            aria-label="返回點唱單"
+            className="rounded-md text-ink-muted hover:text-stamp"
+          >
             <ArrowLeft size={20} aria-hidden="true" />
           </Link>
           <div className="min-w-0 flex-1">
@@ -201,7 +212,11 @@ export function PlayerPage() {
             aria-label={playing ? '暫停' : '播放'}
             className="w-10 shrink-0 px-0!"
           >
-            {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+            {playing ? (
+              <Pause size={16} aria-hidden="true" />
+            ) : (
+              <Play size={16} aria-hidden="true" />
+            )}
           </Button>
           <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
             {formatMmSs(time)}
@@ -305,6 +320,17 @@ export function PlayerPage() {
               onClick={() => seek(entry.at)}
               className="flex h-14 flex-row items-center gap-3 border-b border-carbon-deep/13 text-left transition-colors hover:bg-ground/60"
             >
+              <FaceCrop
+                videoId={video?.id ?? ''}
+                frameNumber={entry.frameNumber}
+                detectionIndex={entry.detectionIndex}
+                timestamp={entry.at}
+                bbox={entry.bbox}
+                streamUrl={video?.stream_url}
+                width={64}
+                alt={entry.name}
+                className="h-10 w-10! shrink-0 overflow-hidden rounded bg-carbon-deep/13 [&>div]:h-full! [&>div]:w-full! [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
+              />
               <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
                 {formatMmSs(entry.at)}
               </span>

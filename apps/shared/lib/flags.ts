@@ -1,3 +1,4 @@
+import { isTestClip } from './reels';
 import type { FlaggedFace } from '../types';
 
 /**
@@ -22,7 +23,7 @@ export function rulerPercent(score: number): number {
 
 /** The note under 已存影片, e.g. `5 卷 MV 加 2 段測試`. Test clips have `test-` ids. */
 export function reelSummary(videoIds: string[]): string {
-  const tests = videoIds.filter((id) => id.startsWith('test-')).length;
+  const tests = videoIds.filter(isTestClip).length;
   const reels = `${videoIds.length - tests} 卷 MV`;
   return tests ? `${reels} 加 ${tests} 段測試` : reels;
 }

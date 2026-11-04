@@ -267,7 +267,8 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
             </thead>
             <tbody>
               {rows.map((r) => {
-                const span = variant === 'admin' ? spanPercent(r.firstSeen, r.lastSeen, duration) : null;
+                const span =
+                  variant === 'admin' ? spanPercent(r.firstSeen, r.lastSeen, duration) : null;
                 const cell = 'border-b border-carbon-deep/13';
                 return (
                   <tr key={r.id} className={`${look.row} hover:bg-tint`}>

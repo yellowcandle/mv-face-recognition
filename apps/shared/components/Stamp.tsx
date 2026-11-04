@@ -19,7 +19,14 @@ const TONE_INK: Record<Tone, string> = {
 };
 
 /** The stamp mark. Upright for bands and quality; `tilt` only where a human decided. */
-export function Stamp({ band, tone, tilt = false, className = '', children, ...props }: StampProps) {
+export function Stamp({
+  band,
+  tone,
+  tilt = false,
+  className = '',
+  children,
+  ...props
+}: StampProps) {
   const ink = TONE_INK[tone ?? (band ? BAND_STAMP[band].tone : 'stamp')];
   return (
     <span

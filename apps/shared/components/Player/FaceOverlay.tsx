@@ -56,6 +56,8 @@ export function FaceOverlay({
             ? `${face.match_score.toFixed(2)} ${BAND_STAMP[bandFor(face.match_score)].word}`
             : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`;
         const action = !canFlag ? null : batchMode ? '點選以選取或取消' : '點選以標記這張臉';
+        // Screen readers hear the same thing the tooltip says.
+        const announcement = action ? `${name}，${score}，${action}` : `${name}，${score}`;
 
         return (
           <button
@@ -65,9 +67,9 @@ export function FaceOverlay({
             }`}
             style={getBboxStyle(face.bbox)}
             onClick={() => onFaceClick(face)}
-            title={action ? `${name} — ${score} — ${action}` : `${name} — ${score}`}
-            aria-label={action ? `${name}，${action}` : name}
+            aria-label={announcement}
             aria-pressed={batchMode ? isBatchSelected : undefined}
+            title={action ? `${name} — ${score} — ${action}` : `${name} — ${score}`}
           >
             {isBatchSelected && (
               <span className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-xs bg-stamp text-paper-light">

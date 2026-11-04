@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import {
+  AdminErrorNotice,
   Button,
   Masthead,
   Stamp,
@@ -32,9 +33,19 @@ const QUALITY_TONE: Record<Contestant['quality'], 'carbon' | 'muted' | 'stamp'> 
   missing: 'stamp',
 };
 
-/** 名冊 — the cast, read as a filing index. 96 people, one row each. */
+/** A count the read model may not have: absent reads as an em dash, never as zero. */
+function countText(value: number | undefined): string {
+  return typeof value === 'number' ? String(value) : '—';
+}
+
+/** 名冊 — the cast, read as a filing index. One row per contestant. */
 export function Contestants() {
-  const { data: contestants = [], refetch } = useContestants();
+  const {
+    data: contestants = [],
+    refetch,
+    isLoading: rosterLoading,
+    error: rosterError,
+  } = useContestants();
   const { data: coverage, refetch: refetchCoverage } = useCoverage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -104,14 +115,22 @@ export function Contestants() {
       <div className="flex min-w-0 flex-1 flex-col px-8 pb-5 pt-8">
         <div className="pb-5">
           <Masthead title="參賽者" hint="名冊、參考照與出場次數" align="center">
-            <Button variant="secondary" size="sm" onClick={() => {
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
                 void refetch();
                 void refetchCoverage();
-              }}>
+              }}
+            >
               重新調閱
             </Button>
           </Masthead>
         </div>
+
+        {rosterError ? (
+          <AdminErrorNotice error={rosterError} onRetry={() => void refetch()} className="mb-3" />
+        ) : null}
 
         <div className="flex flex-row items-center justify-between gap-4 pb-3">
           <div className="relative w-full max-w-[360px]">
@@ -129,7 +148,13 @@ export function Contestants() {
             />
           </div>
           <span className="shrink-0 font-mono text-[13px] tabular-nums text-carbon-soft">
-            {filtered.length} / {roster.length}
+            {rosterLoading ? (
+              <span className="font-kai">調閱中…</span>
+            ) : rosterError ? (
+              '—'
+            ) : (
+              `${filtered.length} / ${roster.length}`
+            )}
           </span>
         </div>
 
@@ -182,14 +207,17 @@ export function Contestants() {
                 {c.reference_count}
               </span>
               <span className="w-16 text-right font-mono text-[13px] tabular-nums text-carbon-soft">
-                {c.detection_count ?? '—'}
+                {countText(c.detection_count)}
               </span>
               <span className="flex w-[72px] justify-center">
                 <Stamp tone={QUALITY_TONE[c.quality]}>{QUALITY_WORD[c.quality]}</Stamp>
               </span>
             </button>
           ))}
-          {filtered.length === 0 && (
+          {rosterLoading && (
+            <div className="py-12 text-center font-kai text-[14px] text-carbon-soft">調閱中…</div>
+          )}
+          {!rosterLoading && !rosterError && filtered.length === 0 && (
             <div className="border-b border-carbon-deep/13 py-12 text-center font-kai text-[14px] text-carbon-soft">
               名冊裡沒有這個人。
             </div>
@@ -250,14 +278,14 @@ export function Contestants() {
 
             <div className="flex flex-row border-y border-carbon-deep/13 py-3">
               {[
-                ['參考相', selectedContestant.reference_count],
-                ['偵測', selectedContestant.detection_count],
-                ['影片', selectedContestant.videos_seen_in],
+                ['參考相', countText(selectedContestant.reference_count)],
+                ['偵測', countText(selectedContestant.detection_count)],
+                ['影片', countText(selectedContestant.videos_seen_in)],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex flex-1 flex-col gap-0.5">
                   <span className="font-kai text-[12px] text-carbon-soft">{label}</span>
                   <span className="font-mono text-[28px] leading-tight tabular-nums text-carbon-deep">
-                    {value ?? '—'}
+                    {value}
                   </span>
                 </div>
               ))}
