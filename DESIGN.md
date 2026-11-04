@@ -1412,8 +1412,19 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.
-- [ ] Accepted flags change nothing but their own status: the name in 播放, 紀錄 and the published
-      metadata stays wrong. Decide how an accepted flag becomes a correction.
+- [x] Accepted flags show at read time: `/api/faces/detect` and dense metadata, in the Worker and
+      `local_api.py`, overlay them on detections as served, and the face stamps a tilted 已核對
+      with no cosine or band. Stored metadata is untouched, so rejecting or re-pending undoes it.
+      These reads are `no-store`; KV itself can lag a decision by up to about 60s.
+      The overlay also moves the appearance: `contestant_timeline`, `processing_summary`,
+      `recognitions_count` and `/api/recognition/results` are recounted per reel as served, so
+      紀錄 and the player agree. Appearances are complete in the timeline, so this is exact and reads
+      no other reel; a reel with no flag landing is served verbatim, with no parse.
+- [ ] Accepted-flag limits: a flag covers one detection, not its track. Cross-reel figures
+      (`contestants_structured`, `embedding_coverage`: 首頁, 名冊, 儀表, 工作台) stay as published
+      until the next publish, since an exact average needs every reel per read. `timeline_markers`
+      and `match_score_stats` exist only in local runs, have no reader, and stay as stored. The
+      Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
 - [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
       bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
       count videos correctly. A new reference set changes nothing until a reel is reprocessed.

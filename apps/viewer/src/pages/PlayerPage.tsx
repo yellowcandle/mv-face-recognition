@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ArrowLeft, Pause, Play } from 'lucide-react';
 import {
-  BAND_STAMP,
   Button,
+  DetectionStamp,
   FaceCrop,
   FrameFace,
   Masthead,
   Stamp,
   VideoCanvas,
-  bandFor,
+  detectionWord,
   formatMmSs,
   getVideoRenderRect,
+  isFlagDecision,
   reelHeading,
   renditionLabel,
   type VideoCanvasHandle,
@@ -19,7 +20,7 @@ import {
   useVideos,
   useViewerMetadata,
 } from '@mv/shared';
-import type { Band, FaceDetection, Video } from '@mv/shared';
+import type { FaceDetection, Video } from '@mv/shared';
 
 /** The list route also sends this; `Video` doesn't declare it. */
 type FiledVideo = Video & { height?: number };
@@ -32,7 +33,7 @@ interface QueueEntry {
   at: number;
   contestantId: number;
   name: string;
-  band: Band;
+  word: string;
   /** Enough of the source detection to crop the face from the reel. */
   frameNumber: number;
   detectionIndex: number;
@@ -76,12 +77,12 @@ export function PlayerPage() {
         if (d.contestant_id == null) return;
         const id = Number(d.contestant_id);
         now.add(id);
-        if (!previous.has(id) && d.match_score != null) {
+        if (!previous.has(id) && (d.match_score != null || isFlagDecision(d))) {
           out.push({
             at: frame.timestamp,
             contestantId: id,
             name: d.contestant_nickname || d.contestant_name || `#${id}`,
-            band: bandFor(d.match_score),
+            word: detectionWord(d),
             frameNumber: frame.frame_number,
             detectionIndex,
             bbox: d.bbox,
@@ -261,10 +262,12 @@ export function PlayerPage() {
                   {nameOf(face)}
                 </span>
                 <span className="flex flex-row items-center gap-1.5">
-                  <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
-                    {face.match_score == null ? '—' : face.match_score.toFixed(2)}
-                  </span>
-                  <Stamp band={bandFor(face.match_score)} />
+                  {!isFlagDecision(face) && (
+                    <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
+                      {face.match_score == null ? '—' : face.match_score.toFixed(2)}
+                    </span>
+                  )}
+                  <DetectionStamp detection={face} />
                 </span>
               </div>
             </div>
@@ -330,7 +333,7 @@ export function PlayerPage() {
                   {entry.name}
                 </span>
                 <span className="font-kai text-[12px] tabular-nums text-ink-muted">
-                  #{entry.contestantId} · {BAND_STAMP[entry.band].word}
+                  #{entry.contestantId} · {entry.word}
                 </span>
               </span>
             </button>

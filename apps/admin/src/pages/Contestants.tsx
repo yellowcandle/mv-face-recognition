@@ -3,9 +3,11 @@ import { Search } from 'lucide-react';
 import {
   AdminErrorNotice,
   Button,
+  DetectionStamp,
   Masthead,
   Stamp,
   formatMmSs,
+  isFlagDecision,
   useContestants,
   useCoverage,
   videoShortName,
@@ -19,6 +21,7 @@ interface Appearance {
   video_name: string;
   timestamp: number;
   match_score: number | null;
+  match_source?: 'flag';
 }
 
 interface ContestantStats {
@@ -84,6 +87,7 @@ export function Contestants() {
             video_name: videoShortName(String(r.video_id)),
             timestamp: r.timestamp as number,
             match_score: (r.match_score ?? null) as number | null,
+            match_source: r.match_source as 'flag' | undefined,
           })),
         );
         setStats({
@@ -316,12 +320,16 @@ export function Contestants() {
                   <span className="min-w-0 flex-1 truncate font-kai text-carbon-soft">
                     {a.video_name}
                   </span>
-                  <span
-                    className="font-mono tabular-nums text-carbon-deep"
-                    title={a.match_score == null ? undefined : String(a.match_score)}
-                  >
-                    {a.match_score == null ? '—' : a.match_score.toFixed(2)}
-                  </span>
+                  {isFlagDecision(a) ? (
+                    <DetectionStamp detection={a} />
+                  ) : (
+                    <span
+                      className="font-mono tabular-nums text-carbon-deep"
+                      title={a.match_score == null ? undefined : String(a.match_score)}
+                    >
+                      {a.match_score == null ? '—' : a.match_score.toFixed(2)}
+                    </span>
+                  )}
                 </div>
               ))}
               {!isLoadingAppearances && appearances.length === 0 && (

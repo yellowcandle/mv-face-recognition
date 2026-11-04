@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Masthead } from './Masthead';
-import { Stamp } from './Stamp';
+import { DetectionStamp, Stamp } from './Stamp';
 import { ledgerRows, spanPercent, type LedgerRow, type LedgerSort } from './ledgerRows';
 import { useContestants } from '../hooks/useContestants';
 import { useVideos } from '../hooks/useVideos';
@@ -53,7 +53,29 @@ const LOOK = {
   },
 } as const;
 
-function Score({ value, label, className }: { value: number; label: string; className: string }) {
+function Score({
+  value,
+  label,
+  className,
+  decided,
+}: {
+  value: number | null;
+  label: string;
+  className: string;
+  decided: boolean;
+}) {
+  if (value == null) {
+    if (decided) {
+      return (
+        <span className="flex justify-end">
+          <DetectionStamp detection={{ match_source: 'flag', match_score: null }} />
+        </span>
+      );
+    }
+    return (
+      <span className={`block text-right font-mono text-[13px] tabular-nums ${className}`}>—</span>
+    );
+  }
   return (
     <span className="flex items-center justify-end gap-2" title={`${label} ${value.toFixed(3)}`}>
       <span className={`font-mono text-[13px] tabular-nums ${className}`}>{value.toFixed(2)}</span>
@@ -303,10 +325,20 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
                       {r.appearances}
                     </td>
                     <td className={cell}>
-                      <Score value={r.avgMatchScore} label="平均" className={look.score} />
+                      <Score
+                        value={r.avgMatchScore}
+                        label="平均"
+                        className={look.score}
+                        decided={r.decided}
+                      />
                     </td>
                     <td className={cell}>
-                      <Score value={r.maxMatchScore} label="最高" className={look.score} />
+                      <Score
+                        value={r.maxMatchScore}
+                        label="最高"
+                        className={look.score}
+                        decided={r.decided}
+                      />
                     </td>
                     <td className={cell}>
                       <span className="flex items-center justify-end gap-2">

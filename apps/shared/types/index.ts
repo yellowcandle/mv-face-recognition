@@ -49,9 +49,9 @@ export interface FaceDetection {
   bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
   /** ByteTrack id within a shot; -1 when the detection was not tracked. */
   tracker_id?: number | null;
-  /** How the identity was assigned: this frame, or inherited from the track. */
-  match_source?: 'frame' | 'track' | null;
-  match_score: number | null; // raw cosine; null when the detection is unmatched
+  /** How the identity was assigned: this frame, inherited from the track, or an accepted flag. */
+  match_source?: 'frame' | 'track' | 'flag' | null;
+  match_score: number | null; // raw cosine; null when unmatched or named by a flag
   det_score: number; // the detector's own face score — always present, and the only score an unmatched detection carries
   contestant_id: string | null;
   contestant_name: string | null;
@@ -65,12 +65,12 @@ export interface FaceDetection {
 export interface FrameDetection {
   /** ByteTrack id within a shot; -1 when the detection was not tracked. */
   tracker_id?: number | null;
-  /** How the identity was assigned: this frame, or inherited from the track. */
-  match_source?: 'frame' | 'track' | null;
+  /** How the identity was assigned: this frame, inherited from the track, or an accepted flag. */
+  match_source?: 'frame' | 'track' | 'flag' | null;
   contestant_id: string | null;
   contestant_name: string | null;
   contestant_nickname: string | null;
-  match_score: number | null; // raw cosine; null when unmatched
+  match_score: number | null; // raw cosine; null when unmatched or named by a flag
   det_score: number;
   bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
 }
@@ -87,11 +87,12 @@ export interface ContestantTimelineEntry {
   appearances: Array<{
     timestamp: number;
     frame_number: number;
-    match_score: number; // raw cosine
+    match_score: number | null; // raw cosine; null when an accepted flag named this appearance
+    match_source?: 'flag';
     bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
   }>;
   total_appearances: number;
-  average_match_score: number; // raw cosine
+  average_match_score: number | null; // raw cosine; null when only flags named this contestant
   first_appearance: number;
   last_appearance: number;
   contestant_info: { id: string; name: string; nickname: string };

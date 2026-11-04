@@ -239,6 +239,18 @@ export function Flagging() {
     await assertOk(res);
   }
 
+  /** A decision changes what the detection reads serve, so their cached copies go too. */
+  function refreshAfterDecision() {
+    for (const queryKey of [
+      ['flaggedFaces'],
+      ['dense-metadata'],
+      ['video-metadata'],
+      ['recognition-results'],
+    ]) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  }
+
   /**
    * A single decision with its feedback: true only when the write landed, so the caller can hold
    * the slip where it is on failure. The write itself never refreshes — this path refreshes once,
@@ -257,7 +269,7 @@ export function Flagging() {
     const word = status === 'accepted' ? '已核對' : '已作廢';
     setNotice(word);
     setLastDecision({ id: faceId, status });
-    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+    refreshAfterDecision();
     return true;
   }
 
@@ -277,7 +289,7 @@ export function Flagging() {
     setNotice('已復原 · 待核');
     // Keep the slip under the sheet so it can be decided again.
     setFocusedId(id);
-    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+    refreshAfterDecision();
   }
 
   /**
@@ -311,7 +323,7 @@ export function Flagging() {
       }
     } finally {
       setBusy(false);
-      void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      refreshAfterDecision();
     }
     setSelected(failed);
     setWriteError(failure);
@@ -339,7 +351,7 @@ export function Flagging() {
     }
     setReassignOpen(false);
     setNotice(`已改派 · SLIP ${String(focused.id).slice(-4).toUpperCase()}`);
-    void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+    refreshAfterDecision();
   }
 
   function toggleSelection(id: string) {

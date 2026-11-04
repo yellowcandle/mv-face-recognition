@@ -47,3 +47,19 @@ export const BAND_STAMP: Record<Band, { word: string; tone: 'carbon' | 'stamp' |
   medium: { word: '尚可', tone: 'stamp' },
   low: { word: '存疑', tone: 'muted' },
 };
+
+/**
+ * Named by an accepted flag. Its `match_score` is null because a flag carries no cosine, so it has
+ * no band: it shows the human decision instead, and null must not read as 存疑.
+ */
+export function isFlagDecision(detection: { match_source?: string | null }): boolean {
+  return detection.match_source === 'flag';
+}
+
+/** The word a detection is stamped with, for surfaces that can only write it. */
+export function detectionWord(detection: {
+  match_source?: string | null;
+  match_score: number | null;
+}): string {
+  return isFlagDecision(detection) ? '已核對' : BAND_STAMP[bandFor(detection.match_score)].word;
+}

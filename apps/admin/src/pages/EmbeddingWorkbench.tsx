@@ -5,8 +5,8 @@ import {
   Button,
   FaceCrop,
   Masthead,
+  DetectionStamp,
   Stamp,
-  bandFor,
   formatMmSs,
   LOCAL_API_OFFLINE_NOTICE,
   useCoverage,
@@ -121,6 +121,7 @@ interface RecognitionResult {
   video_id: string;
   timestamp: number;
   match_score: number | null;
+  match_source?: 'flag';
   frame_number?: number | null;
   bbox?: [number, number, number, number] | null;
   detection_index?: number | null;
@@ -742,7 +743,7 @@ export function EmbeddingWorkbench() {
                                       {r.match_score.toFixed(2)}
                                     </span>
                                   )}
-                                  <Stamp band={bandFor(r.match_score)} />
+                                  <DetectionStamp detection={r} />
                                 </span>
                               </div>
                               <div

@@ -7,13 +7,13 @@ import {
   Button,
   Card,
   FaceCrop,
+  DetectionStamp,
   Masthead,
   Stamp,
   adminFetch,
   assertOk,
   useContestants,
   useVideos,
-  bandFor,
   videoShortName,
   isSessionExpired,
 } from '@mv/shared';
@@ -76,6 +76,7 @@ interface Detection {
   timestamp: number;
   detection_index: number;
   tracker_id: number | null;
+  match_source?: string | null;
   match_score: number | null;
   det_score: number;
   bbox: [number, number, number, number];
@@ -468,6 +469,7 @@ export function Labelling() {
           timestamp: frame.timestamp,
           detection_index: index,
           tracker_id: typeof d.tracker_id === 'number' ? d.tracker_id : null,
+          match_source: d.match_source,
           match_score: d.match_score,
           det_score: d.det_score,
           bbox: d.bbox,
@@ -1401,7 +1403,7 @@ export function Labelling() {
                           <span className="truncate font-mono text-[12px] tabular-nums text-ink-muted">
                             {track.tracker_id} · {track.frame_count}格
                           </span>
-                          <Stamp band={bandFor(track.representative.match_score)} />
+                          <DetectionStamp detection={track.representative} />
                         </span>
                         <span
                           className={`truncate font-kai text-[14px] ${
@@ -1513,7 +1515,7 @@ export function Labelling() {
                     ? '—'
                     : openTrack.representative.match_score.toFixed(3)}
                 </span>
-                <Stamp band={bandFor(openTrack.representative.match_score)} />
+                <DetectionStamp detection={openTrack.representative} />
               </div>
               <div className="font-kai">配對分數</div>
               <div className="font-mono tabular-nums">
