@@ -87,11 +87,12 @@ export interface ContestantTimelineEntry {
   appearances: Array<{
     timestamp: number;
     frame_number: number;
-    match_score: number; // raw cosine
+    match_score: number | null; // raw cosine; null when an accepted flag named this appearance
+    match_source?: 'flag';
     bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
   }>;
   total_appearances: number;
-  average_match_score: number; // raw cosine
+  average_match_score: number | null; // raw cosine; null when only flags named this contestant
   first_appearance: number;
   last_appearance: number;
   contestant_info: { id: string; name: string; nickname: string };

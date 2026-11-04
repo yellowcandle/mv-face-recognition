@@ -241,7 +241,12 @@ export function Flagging() {
 
   /** A decision changes what the detection reads serve, so their cached copies go too. */
   function refreshAfterDecision() {
-    for (const queryKey of [['flaggedFaces'], ['dense-metadata'], ['video-metadata']]) {
+    for (const queryKey of [
+      ['flaggedFaces'],
+      ['dense-metadata'],
+      ['video-metadata'],
+      ['recognition-results'],
+    ]) {
       void queryClient.invalidateQueries({ queryKey });
     }
   }

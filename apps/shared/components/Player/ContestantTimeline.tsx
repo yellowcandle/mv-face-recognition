@@ -1,17 +1,17 @@
 import React, { useMemo, useCallback } from 'react';
-import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { BAND_STAMP, bandFor, detectionWord } from '../../lib/bands';
 
 interface Appearance {
   timestamp: number;
   frame_number: number;
-  match_score: number; // raw cosine
+  match_score: number | null; // raw cosine; null when an accepted flag named this appearance
   bbox: [number, number, number, number]; // frame fractions, canonical [x1, y1, x2, y2]
 }
 
 interface ContestantData {
   appearances: Appearance[];
   total_appearances: number;
-  average_match_score: number; // raw cosine
+  average_match_score: number | null; // raw cosine; null when only flags named this contestant
   first_appearance: number;
   last_appearance: number;
   contestant_info: { id: string; name: string; nickname: string };
@@ -88,7 +88,11 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
           >
             <div
               className="w-16 shrink-0 truncate font-kai text-[12px] text-carbon-soft"
-              title={`${entry.data.contestant_info.nickname} · 平均 ${entry.data.average_match_score.toFixed(2)} ${BAND_STAMP[bandFor(entry.data.average_match_score)].word}`}
+              title={
+                entry.data.average_match_score == null
+                  ? `${entry.data.contestant_info.nickname} · ${detectionWord({ match_source: 'flag', match_score: null })}`
+                  : `${entry.data.contestant_info.nickname} · 平均 ${entry.data.average_match_score.toFixed(2)} ${BAND_STAMP[bandFor(entry.data.average_match_score)].word}`
+              }
             >
               {entry.data.contestant_info.nickname}
             </div>
