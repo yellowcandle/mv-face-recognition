@@ -149,3 +149,27 @@ test('/api/faces/detect drops a frame once the faces have left the shot', async 
   }
   assert.equal((await at(25)).frame, 150);
 });
+
+test('HTML revalidates so a deploy shows at once; hashed bundles stay cached', async () => {
+  const worker = await loadWorker();
+  const get = (path) =>
+    worker.fetch(new Request(`https://worker.test${path}`), keyRecordingEnv([]), {
+      waitUntil() {},
+    });
+
+  for (const path of ['/', '/index.html', '/cast', '/admin', '/admin/', '/admin/flagging']) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get('Content-Type'), /text\/html/, path);
+    assert.equal(response.headers.get('Cache-Control'), 'no-cache', path);
+  }
+
+  for (const shell of ['/', '/admin/']) {
+    const html = await (await get(shell)).text();
+    const bundle = html.match(/src="([^"]*assets\/[^"]+\.js)"/)?.[1];
+    assert.ok(bundle, `${shell} names a hashed bundle`);
+    const response = await get(bundle);
+    assert.equal(response.status, 200, bundle);
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=31536000', bundle);
+  }
+});

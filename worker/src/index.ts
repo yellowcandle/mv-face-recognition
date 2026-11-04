@@ -3283,6 +3283,10 @@ async function handleRecognitionResults(
   );
 }
 
+// HTML names the hashed bundles, so a cached page keeps running the previous deploy. It must
+// revalidate; the hashed files it points to can stay cached for a year.
+const HTML_CACHE_CONTROL = 'no-cache';
+
 // Admin Endpoints
 
 /**
@@ -3446,9 +3450,11 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
     logger.debug(`Successfully serving embedded asset: ${assetKey}`);
 
     const contentType = getContentType(finalPath);
-    const cacheControl = finalPath.includes('assets/')
-      ? 'public, max-age=31536000'
-      : 'public, max-age=3600';
+    const cacheControl = finalPath.endsWith('.html')
+      ? HTML_CACHE_CONTROL
+      : finalPath.includes('assets/')
+        ? 'public, max-age=31536000'
+        : 'public, max-age=3600';
 
     // Binary assets are stored base64-encoded by scripts/update-worker-assets.js
     const body = BINARY_ASSETS.has(assetKey)
@@ -3473,7 +3479,7 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'public, max-age=3600',
+          'Cache-Control': HTML_CACHE_CONTROL,
         },
       });
     }
@@ -3488,7 +3494,7 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': HTML_CACHE_CONTROL,
       },
     });
   }
