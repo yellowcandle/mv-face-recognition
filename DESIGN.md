@@ -1414,6 +1414,9 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       參賽者 read as 沒有出場.
 - [ ] Accepted flags change nothing but their own status: the name in 播放, 紀錄 and the published
       metadata stays wrong. Decide how an accepted flag becomes a correction.
+- [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
+      bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
+      count videos correctly. A new reference set changes nothing until a reel is reprocessed.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.
