@@ -15,6 +15,7 @@ import {
 } from '@mv/shared';
 import { QUALITY_WORD } from '@mv/shared/lib/pipeline';
 import type { Contestant } from '@mv/shared';
+import { useIsEdge } from '../useIsEdge';
 
 const QUALITY_FILL: Record<Contestant['quality'], string> = {
   good: 'bg-carbon',
@@ -33,6 +34,7 @@ const SHORTCUTS = [
 
 /** 儀表 — the operator's desk: what is filed, what is waiting, where to go. */
 export function Dashboard() {
+  const isEdge = useIsEdge();
   const { data: videos = [] } = useVideos('', { includeTests: true });
   const {
     data: flagged = [],
@@ -78,7 +80,7 @@ export function Dashboard() {
   return (
     <div className="flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
       <Masthead title="儀表" hint="待辦、數量與捷徑總覽">
-        所有寫入只在這一台機器上發生
+        {isEdge === false && '所有寫入只在這一台機器上發生'}
       </Masthead>
 
       <section className="flex flex-col gap-3">

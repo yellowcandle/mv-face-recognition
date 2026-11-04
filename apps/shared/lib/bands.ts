@@ -63,3 +63,12 @@ export function detectionWord(detection: {
 }): string {
   return isFlagDecision(detection) ? '已核對' : BAND_STAMP[bandFor(detection.match_score)].word;
 }
+
+/**
+ * The real match score a flag carries, or null. A flag filed on a previously unrecognised face
+ * stores `confidence` 0 (or null) rather than a cosine; no genuine cosine is exactly 0, so both
+ * mean "no score" and must not read as 存疑.
+ */
+export function flagScore(confidence: number | null | undefined): number | null {
+  return confidence == null || confidence <= 0 ? null : confidence;
+}

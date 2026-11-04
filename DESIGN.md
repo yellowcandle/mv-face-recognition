@@ -1398,13 +1398,14 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
   12px floor stands; #99's 11px floor does not.
 - The 標註 sheet is docked, so it is a labelled region, not a modal dialog: no focus trap, and
   closing it moves focus nowhere, so Esc then Backspace can't clear a tile's label.
+- 2026-11 Admin edge polish: on `mode: edge` (`useIsEdge`) the 向量 coverage buttons are disabled, the local-only write footer is hidden, the 處理 reel picker stacks above its button, and a flag with confidence 0/null shows no score. Gates (shared/admin/viewer check, vp check, vp test, builds, check-shared-css) pass.
 - Test clips: `useVideos` hides them through `isTestClip` unless a caller passes `includeTests`.
   The viewer never does; admin 儀表, 待核, 標註, 播放 and 管理 do.
 
 ### TODO
 
 - [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
-- [ ] Five of six live flags store confidence 0, so they show as `0.00 存疑`.
+- [x] Flags with confidence 0 or null (unrecognised faces) show no score, stamp or ruler (`flagScore`, 2026-11).
 - [ ] The local API's `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200
       with no references, so 缺 contestants get an image (the deployed copy is a 512px WebP crop).
 - [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.

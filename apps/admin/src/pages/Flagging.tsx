@@ -10,6 +10,7 @@ import {
   adminFetch,
   assertOk,
   bandFor,
+  flagScore,
   formatMmSs,
   rulerPercent,
   isSessionExpired,
@@ -95,7 +96,11 @@ export function Flagging() {
       flaggedFaces.filter((f) => {
         if (statusFilter !== 'all' && f.status !== statusFilter) return false;
         if (videoFilter && f.video_id !== videoFilter) return false;
-        if (bandFilter !== 'all' && bandFor(f.confidence ?? 0) !== bandFilter) return false;
+        if (bandFilter !== 'all') {
+          // A flag with no score has no band, so only 全部 shows it.
+          const score = flagScore(f.confidence);
+          if (score == null || bandFor(score) !== bandFilter) return false;
+        }
         return true;
       }),
     [flaggedFaces, statusFilter, videoFilter, bandFilter],
@@ -565,13 +570,17 @@ export function Flagging() {
                             : 'group-focus-within:opacity-0 group-hover:opacity-0'
                       }`}
                     >
-                      <span
-                        title="被標記偵測的配對分數（標記本身不帶分數）"
-                        className="font-mono text-[14px] tabular-nums text-carbon-deep"
-                      >
-                        {face.confidence == null ? '—' : face.confidence.toFixed(2)}
-                      </span>
-                      <Stamp band={bandFor(face.confidence ?? 0)} />
+                      {flagScore(face.confidence) != null && (
+                        <>
+                          <span
+                            title="被標記偵測的配對分數（標記本身不帶分數）"
+                            className="font-mono text-[14px] tabular-nums text-carbon-deep"
+                          >
+                            {flagScore(face.confidence)?.toFixed(2)}
+                          </span>
+                          <Stamp band={bandFor(flagScore(face.confidence) ?? 0)} />
+                        </>
+                      )}
                     </div>
                     {isPending && (
                       // Opacity, not display:none, keeps these in the tab order. Hidden ones ignore
@@ -698,49 +707,45 @@ export function Flagging() {
 
             {/* The flag asserts no score of its own (CONTEXT.md, "Flag"). `confidence` is the
                 flagged detection's match score, carried as context for the claim. */}
-            <div className="flex shrink-0 flex-col gap-2">
-              <div className="flex flex-row items-end justify-between gap-6">
-                <div className="flex flex-row items-end gap-2">
-                  <span className="font-mono text-[28px] leading-none tabular-nums text-carbon-deep">
-                    {focused.confidence == null ? '—' : focused.confidence.toFixed(3)}
+            {flagScore(focused.confidence) != null && (
+              <div className="flex shrink-0 flex-col gap-2">
+                <div className="flex flex-row items-end justify-between gap-6">
+                  <div className="flex flex-row items-end gap-2">
+                    <span className="font-mono text-[28px] leading-none tabular-nums text-carbon-deep">
+                      {flagScore(focused.confidence)?.toFixed(3)}
+                    </span>
+                    <Stamp band={bandFor(flagScore(focused.confidence) ?? 0)} />
+                  </div>
+                  <span className="font-kai text-[12px] text-ink-muted">
+                    被標記偵測的配對分數，僅供參考；標記本身不帶分數
                   </span>
-                  {focused.confidence == null ? (
-                    <Stamp tone="muted">未配對</Stamp>
-                  ) : (
-                    <Stamp band={bandFor(focused.confidence)} />
-                  )}
                 </div>
-                <span className="font-kai text-[12px] text-ink-muted">
-                  被標記偵測的配對分數，僅供參考；標記本身不帶分數
-                </span>
-              </div>
-              <div className="relative flex h-2.5 flex-row gap-0.5">
-                <div
-                  className="h-full bg-ledger/27"
-                  style={{ width: `${lowEnd}%` }}
-                  title={`接受門檻 ${ACCEPTANCE_THRESHOLD}`}
-                />
-                <div className="h-full bg-stamp/33" style={{ width: `${midWidth}%` }} />
-                <div className="h-full flex-1 bg-carbon/20" />
-                {focused.confidence != null && (
+                <div className="relative flex h-2.5 flex-row gap-0.5">
+                  <div
+                    className="h-full bg-ledger/27"
+                    style={{ width: `${lowEnd}%` }}
+                    title={`接受門檻 ${ACCEPTANCE_THRESHOLD}`}
+                  />
+                  <div className="h-full bg-stamp/33" style={{ width: `${midWidth}%` }} />
+                  <div className="h-full flex-1 bg-carbon/20" />
                   <div
                     className="absolute -top-[3px] h-4 w-0.5 bg-carbon-deep"
-                    style={{ left: `${rulerPercent(focused.confidence)}%` }}
+                    style={{ left: `${rulerPercent(flagScore(focused.confidence) ?? 0)}%` }}
                   />
-                )}
+                </div>
+                <div className="flex flex-row gap-0.5 font-kai text-[12px] text-ink-muted">
+                  <span style={{ width: `${lowEnd}%` }}>
+                    {BAND_STAMP.low.word} &lt; {BAND_CUTOFFS.medium}
+                  </span>
+                  <span className="whitespace-nowrap" style={{ width: `${midWidth}%` }}>
+                    {BAND_STAMP.medium.word}
+                  </span>
+                  <span className="flex-1">
+                    {BAND_STAMP.high.word} ≥ {BAND_CUTOFFS.high}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-row gap-0.5 font-kai text-[12px] text-ink-muted">
-                <span style={{ width: `${lowEnd}%` }}>
-                  {BAND_STAMP.low.word} &lt; {BAND_CUTOFFS.medium}
-                </span>
-                <span className="whitespace-nowrap" style={{ width: `${midWidth}%` }}>
-                  {BAND_STAMP.medium.word}
-                </span>
-                <span className="flex-1">
-                  {BAND_STAMP.high.word} ≥ {BAND_CUTOFFS.high}
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* The two processed frames either side of the flag's floor frame, each a real frame
                 of the served rendition (`stream_url` seeked by a #t media fragment). */}

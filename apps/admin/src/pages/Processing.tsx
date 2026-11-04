@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
+import { useIsEdge } from '../useIsEdge';
 import {
   AdminErrorNotice,
   Button,
@@ -150,7 +151,7 @@ function ActionColumn({
         <h2 className="font-kai text-[18px] font-normal text-carbon-deep">{title}</h2>
         <p className="font-kai text-[14px] leading-[1.4] text-carbon-soft">{description}</p>
       </div>
-      <div className="flex h-[60px] flex-row items-end gap-2">{controls}</div>
+      <div className="flex h-[108px] flex-col justify-end gap-2">{controls}</div>
       {note && <p className="font-kai text-[12px] leading-[1.4] text-ink-muted">{note}</p>}
       <ul className="flex flex-col gap-1 font-kai text-[12px] text-ink-muted">
         {does.map((line) => (
@@ -173,7 +174,8 @@ export function Processing() {
   // A trigger/cancel/clear failure; kept apart so 重試 re-runs the read, never the write.
   const [actionError, setActionError] = useState<unknown>(null);
   // Coverage refresh needs the local API; the Worker has no path into the KV read model.
-  const [isEdge, setIsEdge] = useState(false);
+  const edge = useIsEdge();
+  const isEdge = edge === true;
   const [isProcessing, setIsProcessing] = useState(false);
   // A row was dropped because the listing never confirmed it.
   const [strandedNotice, setStrandedNotice] = useState(false);
@@ -301,14 +303,10 @@ export function Processing() {
   // processed list instead; the local API knows what is on disk. A failure leaves the
   // "all videos" default.
   useEffect(() => {
+    if (edge === undefined) return;
     let cancelled = false;
     void (async () => {
       try {
-        const statusRes = await adminFetch('/admin/api/system/status');
-        const status: unknown = statusRes.ok ? await statusRes.json() : null;
-        const edge =
-          !!status && typeof status === 'object' && 'mode' in status && status.mode === 'edge';
-        setIsEdge(edge);
         const res = await adminFetch(
           edge ? '/admin/api/videos/processed/list' : '/admin/api/videos/local',
         );
@@ -333,7 +331,7 @@ export function Processing() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [edge]);
 
   // Initial load + polling
   useEffect(() => {
@@ -489,7 +487,7 @@ export function Processing() {
 
       <div className="flex flex-row border-y border-carbon-deep/13 py-5">
         <ActionColumn
-          className="min-w-0 flex-1 border-r border-carbon-deep/13 pr-6"
+          className="min-w-0 flex-1 border-r border-carbon-deep/13 pr-5"
           title="首次處理"
           description={
             isEdge ? '在雲端工作上重新處理一部影片' : '用本機流程處理這台機器上的所有影片'
@@ -511,7 +509,7 @@ export function Processing() {
           }
           controls={
             <>
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor="source-reel" className="font-kai text-[12px] text-ink-muted">
                   來源影片
                 </label>
@@ -546,7 +544,7 @@ export function Processing() {
         />
 
         <ActionColumn
-          className="w-[296px] shrink-0 border-r border-carbon-deep/13 px-6"
+          className="w-[232px] shrink-0 border-r border-carbon-deep/13 px-5"
           title="更新向量"
           description={
             isEdge ? '由 bucket 內的參考相重建參考向量' : '由硬碟上揀選好的參考相重建參考向量'
@@ -573,7 +571,7 @@ export function Processing() {
         />
 
         <ActionColumn
-          className="w-[296px] shrink-0 pl-6"
+          className="w-[232px] shrink-0 pl-5"
           title="覆蓋率與相似度"
           description="重新計算向量覆蓋率、餘弦矩陣與最相近的配對"
           does={[

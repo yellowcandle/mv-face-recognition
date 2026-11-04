@@ -11,6 +11,7 @@ import {
   videoShortName,
 } from '@mv/shared';
 import type { Contestant, FlaggedFace, Video } from '@mv/shared';
+import { useIsEdge } from '../useIsEdge';
 
 /** The processed-videos payload also carries reel dimensions; the shared type does not. */
 type Reel = Video & {
@@ -53,6 +54,7 @@ function runtimeMode(status: SystemStatus | undefined): 'EDGE' | 'LOCAL' | '—'
 
 /** 管理 — the read model and the runbook, in one cabinet. */
 export function SystemAdmin() {
+  const isEdge = useIsEdge();
   const statusQuery = useQuery<SystemStatus>({
     queryKey: ['system-status'],
     queryFn: async () => {
@@ -277,7 +279,7 @@ export function SystemAdmin() {
 
       <div className="flex-1" />
       <div className="flex flex-row items-center justify-between font-kai text-[12px] text-ink-muted">
-        <span>所有寫入只在這一台機器上發生</span>
+        <span>{isEdge === false && '所有寫入只在這一台機器上發生'}</span>
         <span>存根 · 唯讀檢查</span>
       </div>
     </div>
