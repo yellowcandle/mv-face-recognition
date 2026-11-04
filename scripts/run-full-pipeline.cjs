@@ -232,7 +232,7 @@ function printSummary(videoFiles, options) {
   console.log('');
   
   console.log('🌐 Access your application:');
-  console.log('   🔗 https://mv-face-recognition-api.herballemon.workers.dev/');
+  console.log('   🔗 https://mv.herballemon.dev/');
   console.log('');
   console.log('🛠️  Development commands:');
   console.log('   📹 Process new video: uv run python mvp-processor/src/process_video.py -i path/to/video.mp4 --local-only');

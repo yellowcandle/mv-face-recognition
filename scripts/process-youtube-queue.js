@@ -20,7 +20,7 @@ const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
 // Configuration
-const API_BASE_URL = process.env.API_URL || 'https://mv-face-recognition-api.herballemon.workers.dev';
+const API_BASE_URL = process.env.API_URL || 'https://mv.herballemon.dev';
 const POLL_INTERVAL = 30000; // 30 seconds
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const KV_NAMESPACE_ID = process.env.KV_NAMESPACE_ID || '890d77e11bfc4623ac4ef56db6b9a4ab';

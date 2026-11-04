@@ -1412,6 +1412,8 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.
+- [ ] Accepted flags change nothing but their own status: the name in 播放, 紀錄 and the published
+      metadata stays wrong. Decide how an accepted flag becomes a correction.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.

@@ -1,6 +1,9 @@
 name = "mv-face-recognition-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-08"
+# Served from mv.herballemon.dev, the only host behind Cloudflare Access. workers.dev would
+# serve the admin pages without a login.
+workers_dev = false
 
 # Enable Workers Logs
 [observability]

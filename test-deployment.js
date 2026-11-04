@@ -8,8 +8,8 @@
 const https = require('https');
 const WebSocket = require('ws');
 
-const BASE_URL = 'https://mv-face-recognition-api.herballemon.workers.dev';
-const WS_URL = 'wss://mv-face-recognition-api.herballemon.workers.dev';
+const BASE_URL = 'https://mv.herballemon.dev';
+const WS_URL = 'wss://mv.herballemon.dev';
 
 class DeploymentTester {
   constructor() {

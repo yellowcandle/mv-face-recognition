@@ -97,7 +97,7 @@ cloudflare:
   r2_secret_key: "${CLOUDFLARE_R2_SECRET_ACCESS_KEY}"
   r2_bucket: "mv-face-recognition-videos"
   r2_endpoint: "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-  worker_url: "https://mv-face-recognition-api.herballemon.workers.dev"
+  worker_url: "https://mv.herballemon.dev"
 
 # Integration with Deployment Scripts
 integration:
