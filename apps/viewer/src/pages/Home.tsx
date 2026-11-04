@@ -14,6 +14,7 @@ import {
   useVideos,
   videoShortName,
 } from '@mv/shared';
+import { portraitSrc } from '@mv/shared/lib/portrait';
 import type { Video } from '@mv/shared';
 
 /** The list route also sends these; `Video` doesn't declare them. */
@@ -136,12 +137,15 @@ export function Home() {
                   </div>
                   {c.portrait_url ? (
                     <img
-                      src={c.portrait_url}
+                      src={portraitSrc(c.portrait_url, 204)!}
                       alt={`${c.nickname || c.name} ${c.name}`}
                       decoding="async"
                       className="relative h-full w-full object-cover object-[50%_22%]"
                       onError={(e) => {
-                        e.currentTarget.style.visibility = 'hidden';
+                        // A failed resize falls back to the original before the 缺相 stamp shows.
+                        if (e.currentTarget.src.includes('/cdn-cgi/image/'))
+                          e.currentTarget.src = c.portrait_url!;
+                        else e.currentTarget.style.visibility = 'hidden';
                       }}
                     />
                   ) : null}

@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Masthead, Stamp, useContestants, useCoverage } from '@mv/shared';
+import { portraitSrc } from '@mv/shared/lib/portrait';
 import { QUALITY_WORD } from '@mv/shared/lib/pipeline';
 import type { Contestant } from '@mv/shared';
 
@@ -100,13 +101,16 @@ export function Cast() {
 
                   {src ? (
                     <img
-                      src={src}
+                      src={portraitSrc(src, 128)!}
                       alt={`${c.nickname} ${c.name}`}
                       loading="lazy"
                       decoding="async"
                       className="relative h-full w-full object-cover object-[50%_22%]"
                       onError={(e) => {
-                        e.currentTarget.style.visibility = 'hidden';
+                        // A failed resize falls back to the original before the 缺相 stamp shows.
+                        if (e.currentTarget.src.includes('/cdn-cgi/image/'))
+                          e.currentTarget.src = src;
+                        else e.currentTarget.style.visibility = 'hidden';
                       }}
                     />
                   ) : null}
