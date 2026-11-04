@@ -1414,3 +1414,10 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
       參賽者 read as 沒有出場.
 - [ ] Draw and implement designs for states still only styled by analogy.
+- [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
+      publish, which `/api/faces/crop` already serves.
+- [ ] Serve portraits through Cloudflare Images (enabled 2026-11). Stream stays parked until
+      viewers report playback problems.
+
+The published reel list now carries `duration` and `height`. `height` is the served rendition's
+(1080 for `_1080p` encodes), so the public 首頁 reads 1080P while local dev reads the source's.
