@@ -1,5 +1,7 @@
+import { Check } from 'lucide-react';
 import type { FaceDetection } from '../../types';
-import { bandFor } from '../../lib/bands';
+import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { faceName } from './faceView';
 import type { VideoRenderRect } from './useAnnotations';
 
 interface FaceOverlayProps {
@@ -13,6 +15,7 @@ interface FaceOverlayProps {
   getVideoRenderRect: () => VideoRenderRect;
 }
 
+/** The clickable layer over each face. The canvas underneath draws the box and its label. */
 export function FaceOverlay({
   faces,
   onFaceClick,
@@ -40,49 +43,37 @@ export function FaceOverlay({
   };
 
   return (
-    <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[2]">
+    <div className="pointer-events-none absolute left-0 top-0 z-[2] h-full w-full">
       {faces.map((face, i) => {
         const isSelected = selectedFace === face;
         const isBatchSelected = batchMode && selectedFaces.has(face);
         // The band is the headline; the raw cosine goes in the tooltip, never as a
         // percentage — and an unmatched detection has no contestant and no cosine, only
         // the detector's own score.
-        const name = face.matched
-          ? face.contestant_name || face.contestant_nickname || 'Unmatched'
-          : 'Unmatched';
+        const name = faceName(face);
         const score =
           face.matched && face.match_score != null
-            ? `${face.match_score.toFixed(2)} cosine (${bandFor(face.match_score)} band)`
-            : `unmatched · detection score ${face.det_score.toFixed(2)}`;
-        const action = !canFlag ? null : batchMode ? 'select/deselect' : 'flag this face';
-        // Screen readers hear the same thing the tooltip says, minus the pointer verb.
-        const announcement = action ? `${name}, ${score}: ${action}` : `${name}, ${score}`;
+            ? `${face.match_score.toFixed(2)} ${BAND_STAMP[bandFor(face.match_score)].word}`
+            : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`;
+        const action = !canFlag ? null : batchMode ? '點選以選取或取消' : '點選以標記這張臉';
+        // Screen readers hear the same thing the tooltip says.
+        const announcement = action ? `${name}，${score}，${action}` : `${name}，${score}`;
 
         return (
           <button
             key={i}
-            className={`
-              pointer-events-auto cursor-pointer p-0 rounded-none
-              border-2 transition-all duration-200
-              ${
-                isSelected
-                  ? 'border-stamp bg-stamp/20'
-                  : isBatchSelected
-                    ? 'border-stamp bg-stamp/20'
-                    : face.matched
-                      ? 'border-carbon/60 bg-carbon/10 hover:border-carbon hover:bg-carbon/20'
-                      : 'border-ledger/60 bg-ledger/10 hover:border-carbon hover:bg-carbon/20'
-              }
-            `}
+            className={`pointer-events-auto cursor-pointer p-0 transition-colors ${
+              isSelected || isBatchSelected ? 'bg-stamp/20' : 'hover:bg-paper-light/15'
+            }`}
             style={getBboxStyle(face.bbox)}
             onClick={() => onFaceClick(face)}
             aria-label={announcement}
             aria-pressed={batchMode ? isBatchSelected : undefined}
-            title={action ? `${name} — ${score} — click to ${action}` : `${name} — ${score}`}
+            title={action ? `${name} — ${score} — ${action}` : `${name} — ${score}`}
           >
-            {batchMode && isBatchSelected && (
-              <span className="absolute top-0.5 right-0.5 text-white text-xs bg-stamp rounded-full w-4 h-4 flex items-center justify-center">
-                &#10003;
+            {isBatchSelected && (
+              <span className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-xs bg-stamp text-paper-light">
+                <Check size={12} aria-hidden />
               </span>
             )}
           </button>

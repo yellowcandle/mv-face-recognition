@@ -25,16 +25,16 @@ export function AdminErrorNotice({
   return (
     <div
       role="alert"
-      className={`flex flex-row items-center justify-between gap-4 border border-stamp/50 bg-stamp/5 px-4 py-2.5 ${className}`}
+      className={`flex flex-row items-center justify-between gap-4 rounded-md border border-stamp/40 px-4 py-2 ${className}`}
     >
-      <span className="font-kai text-[12px] leading-snug text-stamp">
+      <span className="font-kai text-[13px] leading-snug text-stamp">
         {expired ? '登入已過期，請重新載入頁面。' : `${label} — ${errorMessage(error)}`}
       </span>
       {expired ? (
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="shrink-0 border border-stamp px-3 py-1 font-kai text-[11px] text-stamp hover:bg-stamp hover:text-paper-light"
+          className="h-8 shrink-0 rounded-md border border-stamp px-3 font-kai text-[13px] text-stamp transition-colors hover:bg-stamp hover:text-paper-light"
         >
           重新載入
         </button>
@@ -42,7 +42,7 @@ export function AdminErrorNotice({
         <button
           type="button"
           onClick={onRetry}
-          className="shrink-0 border border-stamp/60 px-3 py-1 font-kai text-[11px] text-stamp hover:bg-stamp hover:text-paper-light"
+          className="h-8 shrink-0 rounded-md border border-stamp px-3 font-kai text-[13px] text-stamp transition-colors hover:bg-stamp hover:text-paper-light"
         >
           重試
         </button>

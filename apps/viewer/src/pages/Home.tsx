@@ -1,45 +1,52 @@
-import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { BAND_STAMP, Masthead, bandFor, useContestants, useCoverage, useVideos } from '@mv/shared';
-import type { Contestant } from '@mv/shared';
+import {
+  Badge,
+  Masthead,
+  Stamp,
+  bandFor,
+  contestantsSeen,
+  formatMmSs,
+  mostSeen,
+  reelRange,
+  reelSubtitle,
+  renditionLabel,
+  useCoverage,
+  useVideos,
+  videoShortName,
+} from '@mv/shared';
+import type { Video } from '@mv/shared';
+
+/** The list route also sends these; `Video` doesn't declare them. */
+type FiledVideo = Video & { duration?: number; height?: number };
 
 /**
- * 點唱單 — the request slip. Five reels filed on the left, the current tally on the
- * right, and the faces that keep returning along the foot of the page.
+ * 點唱單 — the request slip. The reels filed on the left, the current tally on the right,
+ * and the faces that keep returning along the foot of the page.
  */
 export function Home() {
-  const { data: videos = [], isLoading } = useVideos();
+  const { data, isLoading } = useVideos();
   const { data: coverage } = useCoverage();
-  const { data: rosterData = [] } = useContestants();
 
+  const videos: FiledVideo[] = data ?? [];
   const summary = coverage?.summary;
   const contestants = coverage?.contestants ?? [];
+  const regulars = mostSeen(contestants, 4);
 
-  // Coverage carries the counts; the roster carries the portrait. Join them by id.
-  const roster = rosterData as Contestant[];
-  const portraitById = useMemo(
-    () => new Map(roster.map((r) => [String(r.id), r.portrait_url ?? null] as const)),
-    [roster],
-  );
-
-  // "Most seen" is a count, not a recency: the read model has no cross-reel timeline.
-  const mostSeen = [...contestants]
-    .sort((a, b) => b.detection_count - a.detection_count)
-    .slice(0, 4);
+  const tally = [
+    ['平均配對分數', summary ? summary.avg_match_score.toFixed(2) : '—'],
+    ['出場參賽者', coverage ? `${contestantsSeen(contestants)} 位` : '—'],
+    ['辨識率', summary ? `${(summary.recognition_rate * 100).toFixed(1)}%` : '—'],
+  ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-14 pb-10 pt-12">
-      <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="點唱單" latin="JUKEBOX" />
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-14 pb-5 pt-8">
+      <Masthead title="點唱單" hint="選片入口 · 點唱單" />
 
-      <div className="mt-6 h-px bg-carbon/45" />
-
-      <div className="flex flex-row gap-14 pt-7">
+      <div className="flex flex-row gap-14">
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex flex-row items-baseline justify-between pb-4">
-            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
-              REEL 01 — {String(videos.length).padStart(2, '0')}
-            </span>
-            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
+          <div className="flex flex-row items-end justify-between border-b border-carbon-deep/33 pb-3 font-kai text-[13px] leading-tight tabular-nums text-carbon-soft">
+            <span>{isLoading ? '—' : reelRange(videos.length)}</span>
+            <span>
               {summary
                 ? `${summary.total} 位 · ${summary.total_faces_recognized.toLocaleString('en-US')} 辨識`
                 : '—'}
@@ -47,136 +54,119 @@ export function Home() {
           </div>
 
           {isLoading ? (
-            <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
+            <div className="py-16 text-center font-kai text-[13px] text-ink-muted">正在調閱…</div>
           ) : videos.length === 0 ? (
-            <div className="border border-dashed border-carbon/35 px-4 py-14 text-center">
-              <div className="font-kai text-[15px] font-bold text-carbon-deep">
-                尚未有已處理影片
-              </div>
-              <div className="mt-1 font-kai text-[12px] text-carbon-soft">
+            <div className="border-b border-carbon-deep/13 px-4 py-14 text-center">
+              <div className="font-kai text-[15px] text-carbon-deep">尚未有已處理影片</div>
+              <div className="mt-1 font-kai text-[13px] text-ink-muted">
                 處理完成的影片會存進這裡。
               </div>
             </div>
           ) : (
-            videos.map((video, index) => (
-              <Link
-                key={video.id}
-                to={`/player?video=${encodeURIComponent(video.id)}`}
-                className="group flex flex-row items-center justify-between gap-6 border-b border-carbon/20 py-5 transition-colors hover:bg-paper-light"
-              >
-                <div className="flex min-w-0 flex-row items-center gap-5">
-                  <span className="w-6 shrink-0 font-mono text-[11px] text-carbon-soft">
+            videos.map((video, index) => {
+              const subtitle = reelSubtitle(video.name);
+              const rendition = renditionLabel(video.height);
+              return (
+                <Link
+                  key={video.id}
+                  to={`/player?video=${encodeURIComponent(video.id)}`}
+                  className="flex h-[72px] flex-row items-center gap-4 border-b border-carbon-deep/13 transition-colors hover:bg-tint"
+                >
+                  <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  <span className="truncate font-serif text-[24px] font-bold leading-tight text-carbon-deep">
-                    {video.name
-                      .replace(/^\d+-/, '')
-                      .replace(/^《全民造星IV》/, '')
-                      .trim() || video.name}
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-kai text-[18px] leading-tight text-carbon-deep">
+                      {videoShortName(video.name)}
+                    </span>
+                    {subtitle ? (
+                      <span className="truncate font-kai text-[13px] text-ink-muted">
+                        {subtitle}
+                      </span>
+                    ) : null}
                   </span>
-                </div>
-                <div className="flex shrink-0 flex-row items-center gap-4">
-                  <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">1080P</span>
-                </div>
-              </Link>
-            ))
+                  {video.duration ? (
+                    <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
+                      {formatMmSs(video.duration)}
+                    </span>
+                  ) : null}
+                  {rendition ? <Badge className="font-mono!">{rendition}</Badge> : null}
+                </Link>
+              );
+            })
           )}
         </div>
 
-        <aside className="flex w-[360px] shrink-0 flex-col gap-4">
-          <div className="flex flex-col gap-3 border border-carbon/25 bg-paper-light p-6">
-            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">此刻 / NOW</span>
-            <span className="font-serif text-[52px] font-bold leading-none text-carbon-deep">
-              {summary ? summary.total_faces_recognized.toLocaleString('en-US') : '—'}
-            </span>
-            <span className="font-kai text-[13px] text-carbon-soft">五卷合計的辨識次數</span>
-            <div className="h-px bg-carbon/20" />
-            {[
-              ['平均配對分數', summary ? summary.avg_match_score.toFixed(2) : '—'],
-              ['出場參賽者', summary ? `${summary.total} 位` : '—'],
-              ['辨識率', summary ? `${(summary.recognition_rate * 100).toFixed(1)}%` : '—'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex flex-row items-baseline justify-between py-1">
+        <aside className="flex w-[360px] shrink-0 flex-col gap-3">
+          <span className="font-kai text-[13px] text-carbon-soft">此刻</span>
+          <span className="font-mono text-[28px] leading-tight tabular-nums text-carbon-deep">
+            {summary ? summary.total_faces_recognized.toLocaleString('en-US') : '—'}
+          </span>
+          <span className="font-kai text-[12px] text-ink-muted">全部影片合計的辨識次數</span>
+          <div className="flex flex-col border-t border-carbon-deep/13 py-2">
+            {tally.map(([label, value]) => (
+              <div key={label} className="flex h-9 flex-row items-center justify-between">
                 <span className="font-kai text-[13px] text-carbon-soft">{label}</span>
-                <span className="font-mono text-[11px] text-carbon-deep">{value}</span>
+                <span className="font-mono text-[13px] tabular-nums text-carbon-deep">{value}</span>
               </div>
             ))}
           </div>
-
           <Link
             to="/player"
-            className="flex flex-row items-center justify-center gap-2.5 border border-stamp bg-stamp px-4 py-4 transition-colors hover:bg-carbon"
+            className="flex h-10 items-center justify-center rounded-md border border-stamp bg-stamp font-kai text-[15px] font-bold text-paper-light transition-colors hover:bg-stamp/90"
           >
-            <span className="font-kai text-[14px] tracking-[0.12em] text-paper-light">
-              進入播放
-            </span>
-            <span className="font-mono text-[11px] tracking-[0.12em] text-paper-light">PLAY</span>
+            進入播放
           </Link>
         </aside>
       </div>
 
-      {mostSeen.length > 0 && (
-        <div className="flex flex-col gap-4 pt-10">
-          <div className="flex flex-row items-baseline justify-between">
-            <span className="font-serif text-[16px] font-bold text-carbon-deep">常駐面孔</span>
-            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
-              MOST SEEN · ACROSS FIVE REELS
-            </span>
+      {regulars.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-row items-end justify-between">
+            <h2 className="font-kai text-[18px] font-normal text-carbon-deep">常駐面孔</h2>
+            <span className="font-kai text-[12px] text-ink-muted">全部影片合計出場最多</span>
           </div>
-          <div className="flex flex-row gap-4">
-            {mostSeen.map((c) => {
-              const band = bandFor(c.avg_match_score);
-              const portrait = portraitById.get(String(c.id)) ?? null;
-              return (
-                <div
-                  key={c.id}
-                  className="group flex min-w-0 flex-1 flex-col border border-carbon/25 bg-paper-light transition-colors group-hover:border-carbon/50"
-                >
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-paper-dark">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="-rotate-6 border border-ledger px-2 py-1 font-kai text-[11px] tracking-[0.12em] text-ledger">
-                        缺相
-                      </span>
-                    </div>
-                    {portrait ? (
-                      <img
-                        src={portrait}
-                        alt={`${c.nickname || c.name} ${c.name}`}
-                        decoding="async"
-                        className="relative h-full w-full object-cover object-[50%_22%]"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.visibility = 'hidden';
-                        }}
-                      />
-                    ) : null}
-                    <span className="absolute right-2 top-2 -rotate-2 border border-carbon/40 bg-paper-light/85 px-2 py-0.5 font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
-                      #{c.id}
-                    </span>
+          <div className="flex flex-row gap-6">
+            {regulars.map((c) => (
+              <div key={c.id} className="flex min-w-0 flex-1 flex-row items-center gap-4">
+                <div className="relative h-[204px] w-[152px] shrink-0 overflow-hidden rounded bg-tint">
+                  {/* The stamp sits underneath; a loaded portrait covers it, a missing one shows it. */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Stamp>缺相</Stamp>
                   </div>
-                  <div className="flex flex-col gap-2 px-5 py-4">
-                    <span className="truncate font-serif text-[16px] font-bold leading-tight text-carbon-deep">
-                      {c.nickname || c.name}
+                  {c.portrait_url ? (
+                    <img
+                      src={c.portrait_url}
+                      alt={`${c.nickname || c.name} ${c.name}`}
+                      decoding="async"
+                      className="relative h-full w-full object-cover object-[50%_22%]"
+                      onError={(e) => {
+                        e.currentTarget.style.visibility = 'hidden';
+                      }}
+                    />
+                  ) : null}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate font-kai text-[18px] leading-tight text-carbon-deep">
+                    {c.nickname || c.name}
+                  </span>
+                  <span className="truncate font-kai text-[13px] tabular-nums text-carbon-soft">
+                    {c.name} #{c.id}
+                  </span>
+                  <span className="font-kai text-[12px] tabular-nums text-ink-muted">
+                    {c.detection_count} 次 · {c.videos_seen_in} 卷
+                  </span>
+                  <div className="flex flex-row items-center gap-2 pt-2">
+                    <span className="font-mono text-[13px] tabular-nums text-carbon-deep">
+                      {c.avg_match_score.toFixed(2)}
                     </span>
-                    <span className="font-kai text-[11px] text-carbon-soft">{c.name}</span>
-                    <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
-                      {c.detection_count} 次 · {c.videos_seen_in} 卷
-                    </span>
-                    <div className="flex flex-row items-center justify-between pt-1">
-                      <span className="font-mono text-[11px] text-carbon-soft">
-                        {c.avg_match_score.toFixed(2)}
-                      </span>
-                      <span
-                        className={`inline-block -rotate-2 border px-2 py-0.5 font-kai text-[11px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
-                      >
-                        {BAND_STAMP[band].word}
-                      </span>
-                    </div>
+                    <Stamp band={bandFor(c.avg_match_score)} />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

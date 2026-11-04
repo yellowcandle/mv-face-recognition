@@ -1,42 +1,32 @@
 import type { ReactNode } from 'react';
 
 interface MastheadProps {
-  /** Small tracked line above the title, e.g. "MV FACE RECOGNITION · 全民造星 IV". */
-  eyebrow: string;
-  /** The folio's name, set in the printed serif. */
   title: string;
-  /** The tracked English line beside the title. */
-  latin: string;
-  /** Viewer headings are 46px, admin headings 44px. */
-  size?: 'lg' | 'md';
-  /** The right-hand slot: counters, a select, a stamp. Varies per page. */
+  /** The one line under the title saying what this page is for. */
+  hint?: string;
+  /** Right slot alignment. Text sits on the baseline (`end`); a lone button centres. */
+  align?: 'end' | 'center';
+  /** The right-hand slot: a note, a select, a button. Varies per page. */
   children?: ReactNode;
 }
 
-/**
- * The masthead every page shares: eyebrow, title + latin, and a right-hand slot.
- *
- * Before this, seven pages carried their own copy — 176 lines that differed only in
- * the right slot (and a 2px title size). Keeping the structure here means a change to
- * the masthead is one edit, and the folio identity cannot drift between pages.
- */
-export function Masthead({ eyebrow, title, latin, size = 'lg', children }: MastheadProps) {
+/** The page head every page shares: 32px title, a hint under it, and a right-hand slot. */
+export function Masthead({ title, hint, align = 'end', children }: MastheadProps) {
   return (
-    <div className="flex flex-row items-end justify-between gap-6">
-      <div className="flex flex-col gap-1.5">
-        <div className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">{eyebrow}</div>
-        <div className="flex flex-row items-baseline gap-3.5">
-          <h1
-            className={`font-serif ${
-              size === 'lg' ? 'text-[46px]' : 'text-[44px]'
-            } font-black leading-none tracking-[0.06em] text-carbon`}
-          >
-            {title}
-          </h1>
-          <span className="font-mono text-[11px] tracking-[0.26em] text-ledger">{latin}</span>
-        </div>
+    <div
+      className={`flex flex-row justify-between gap-6 ${
+        align === 'center' ? 'items-center' : 'items-end'
+      }`}
+    >
+      <div className="flex min-w-0 flex-col gap-1">
+        <h1 className="font-kai text-[32px] font-normal leading-tight text-carbon-deep">{title}</h1>
+        {hint ? <p className="font-kai text-[14px] text-carbon-soft">{hint}</p> : null}
       </div>
-      {children ? <div className="flex flex-row items-center gap-4 pb-1">{children}</div> : null}
+      {children ? (
+        <div className="flex shrink-0 flex-row items-center gap-4 font-kai text-[13px] text-ink-muted">
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }

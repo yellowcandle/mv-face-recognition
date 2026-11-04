@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { FaceDetection, FlaggedFace, Video, VideoMetadata } from '../../types';
-import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { bandFor } from '../../lib/bands';
 import { adminFetch, assertOk, isSessionExpired } from '../../lib/adminApi';
 import { AdminErrorNotice } from '../AdminErrorNotice';
 import { useVideos } from '../../hooks/useVideos';
@@ -12,7 +12,13 @@ import { PlayerControls } from './PlayerControls';
 import { DetectionBar } from './DetectionBar';
 import { FlagDialog } from './FlagDialog';
 import { getVideoRenderRect } from './useAnnotations';
-import { formatMmSs } from '../../lib/format';
+import { formatMmSs, videoShortName } from '../../lib/format';
+import { X } from 'lucide-react';
+import { Button } from '../Button';
+import { Masthead } from '../Masthead';
+import { Stamp } from '../Stamp';
+import { FrameFace } from './FrameFace';
+import { faceName, tickPercent } from './faceView';
 import { useViewerMetadata } from '../../hooks/useViewerMetadata';
 import { ContestantTimeline } from './ContestantTimeline';
 import { pickInitialVideo } from './pickInitialVideo';
@@ -24,36 +30,12 @@ interface PlayerProps {
   initialVideoId?: string | null;
 }
 
-/**
- * How a detection reads in the UI: an unmatched one has no contestant and no match
- * score, so it names no band; a matched one shows its band, and its raw cosine goes in
- * the tooltip — never a percentage.
- */
-function detectionTier(face: FaceDetection): { label: string; className: string; title: string } {
-  if (!face.matched) {
-    return {
-      label: 'unmatched',
-      className: 'text-ledger',
-      title: `unmatched · detection score ${face.det_score.toFixed(2)}`,
-    };
-  }
-  const band = bandFor(face.match_score);
-  return {
-    label: band,
-    className: BAND_STAMP[band].ink,
-    title: face.match_score != null ? `${face.match_score.toFixed(2)} cosine` : 'no match score',
-  };
-}
-
-/**
- * A flag's status reads like a slip in the tray: 待核 still in stamp red, 已核對 stamped in
- * carbon, 作廢 filed away in ledger grey — the same ink the tray uses.
- */
-const FLAG_STATUS: Record<FlaggedFace['status'], { word: string; ink: string }> = {
-  pending: { word: '待核', ink: 'bg-stamp/20 text-stamp' },
-  accepted: { word: '已核對', ink: 'bg-carbon/20 text-carbon' },
-  rejected: { word: '作廢', ink: 'bg-ledger/20 text-ledger' },
-};
+/** A flag's state on the slip. Decided flags were decided by a human, so they tilt. */
+const FLAG_STATUS = {
+  pending: { word: '待核', tone: 'stamp', tilt: false },
+  accepted: { word: '已核對', tone: 'carbon', tilt: true },
+  rejected: { word: '作廢', tone: 'muted', tilt: true },
+} as const;
 
 export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   // Flagging is an admin act. The deployed Worker is read-only and no longer serves the flag
@@ -62,7 +44,12 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const canFlag = mode === 'admin';
 
   // Data queries
-  const { data: videos = [], isLoading, error: videosError } = useVideos(apiBase);
+  // 管理 links into test clips, so the admin player has to be able to open them.
+  const {
+    data: videos = [],
+    isLoading,
+    error: videosError,
+  } = useVideos(apiBase, { includeTests: canFlag });
   const { data: contestants = [] } = useContestants(apiBase);
   const { data: flaggedFaces = [], refetch: refetchFlagged } = useFlaggedFaces(apiBase, canFlag);
 
@@ -575,7 +562,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
       const c = (
         contestants as Array<{ number: number; id: string; nickname: string; name: string }>
       ).find((c) => c.number === id || c.id === String(id));
-      return c ? `${c.nickname} (${c.name})` : `Contestant #${id}`;
+      return c ? `${c.nickname}（${c.name}）` : `參賽者 #${id}`;
     },
     [contestants],
   );
@@ -612,6 +599,24 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
     setDetectedFaces(viewerMeta.getFacesAtTime(currentTime));
   }, [mode, currentTime, viewerMeta, viewerVideoId]);
 
+  // Stable identities: the canvas redraws, and the dialog rebinds Escape, whenever these change.
+  const isFaceSelected = useCallback(
+    (face: FaceDetection) => selectedFace === face || (batchMode && selectedFaces.has(face)),
+    [selectedFace, batchMode, selectedFaces],
+  );
+
+  const closeFlagDialog = useCallback(() => {
+    setShowFlagDialog(false);
+    setSelectedFace(null);
+    setSelectionSnapshot(null);
+    setFlagError(null);
+  }, []);
+
+  const closeBatchDialog = useCallback(() => {
+    setShowBatchFlagDialog(false);
+    setFlagError(null);
+  }, []);
+
   // --- Render ---
 
   const videoSrc = getVideoSource(selectedVideo);
@@ -621,135 +626,128 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-carbon-soft">
-        <div className="w-10 h-10 border-2 border-paper-deep border-t-stamp rounded-full animate-spin mb-4" />
-        <p>Loading videos...</p>
+      <div className="flex h-full flex-col items-center justify-center gap-4 font-kai text-[14px] text-carbon-soft">
+        <div className="size-10 animate-spin rounded-full border-2 border-carbon-deep/13 border-t-stamp" />
+        <p>正在載入影片…</p>
       </div>
     );
   }
 
   if (videosError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-carbon-soft">
-        <p className="text-stamp mb-2">Failed to load videos</p>
-        <button
-          className="px-4 py-2 bg-paper-dark border border-paper-deep rounded text-sm text-carbon hover:bg-paper-deep"
-          onClick={() => window.location.reload()}
-        >
-          Retry
-        </button>
+      <div className="flex h-full flex-col items-center justify-center gap-3 font-kai text-[14px]">
+        <p className="text-stamp">讀不到影片清單。</p>
+        <Button size="sm" onClick={() => window.location.reload()}>
+          重試
+        </Button>
       </div>
     );
   }
 
+  const info = videoMetadata?.video_info;
+  const summary = videoMetadata?.processing_summary;
+  const videoEl = getVideoEl();
+  const shortName = selectedVideo ? videoShortName(selectedVideo.name) : '';
+  const contestantList = contestants as Array<{ number: number; name: string; nickname: string }>;
+
   return (
-    <div className="h-full flex flex-col bg-paper text-carbon-deep relative">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-paper-dark">
-        <h1 className="text-xl font-semibold text-carbon-deep">Annotated Video Player</h1>
-        <div className="flex items-center gap-4">
+    <div className="relative flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
+      <Masthead title="播放" hint={canFlag ? '播放影片並標記人臉' : '看片、人臉框與時間軸'}>
+        <div className="flex items-center gap-2">
           {canFlag && (
-            <button
-              className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-sm text-carbon hover:bg-paper-deep"
+            <Button
+              size="sm"
+              aria-expanded={showFlaggedPanel}
               onClick={() => setShowFlaggedPanel((p) => !p)}
             >
-              Flagged ({flaggedFaces.length})
-            </button>
+              已標記 {flaggedFaces.length}
+            </Button>
           )}
-          <div className="flex items-center gap-2">
-            <label htmlFor="video-select" className="text-sm text-carbon-soft">
-              Video:
-            </label>
-            <select
-              id="video-select"
-              className="bg-paper-dark text-carbon-deep border border-paper-deep rounded-none px-3 py-1.5 text-sm max-w-[300px]"
-              value={selectedVideo?.id ?? ''}
-              onChange={(e) => {
-                const v = videos.find((v) => v.id === e.target.value);
-                if (v) void handleSelectVideo(v);
-              }}
-            >
-              {videos.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            aria-label="影片"
+            className="field field-select w-[220px]"
+            value={selectedVideo?.id ?? ''}
+            onChange={(e) => {
+              const v = videos.find((v) => v.id === e.target.value);
+              if (v) void handleSelectVideo(v);
+            }}
+          >
+            {videos.map((v) => (
+              <option key={v.id} value={v.id}>
+                {videoShortName(v.name)}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      </Masthead>
 
-      {flagError ? (
-        <AdminErrorNotice error={flagError} label="標記失敗" className="mx-5 mt-3" />
-      ) : null}
+      {flagError ? <AdminErrorNotice error={flagError} label="標記失敗" /> : null}
       {flagNotice ? (
         <div
           role="status"
           aria-live="polite"
-          className="mx-5 mt-3 border border-carbon/30 bg-paper-dark px-4 py-2 font-kai text-[12px] text-carbon-deep"
+          className="rounded-md border border-carbon-deep/13 bg-tint px-4 py-2 font-kai text-[13px] text-carbon-deep"
         >
           {flagNotice}
         </div>
       ) : null}
 
-      {/* Main content */}
-      <div className="flex-1 flex gap-5 p-5 min-h-0">
-        {/* Video area */}
-        <div className="flex-[2] flex flex-col gap-2">
-          {/* Video frame */}
-          <div
-            ref={containerRef}
-            className="flex-1 bg-black rounded-none overflow-hidden relative min-h-[400px]"
-          >
-            {selectedVideo ? (
-              <>
-                <VideoCanvas
-                  ref={videoCanvasRef}
-                  videoSrc={videoSrc}
-                  faces={displayFaces}
-                  showAnnotations={showAnnotations}
-                  containerRef={containerRef}
-                  onTimeUpdate={setCurrentTime}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onEnded={handleEnded}
-                />
-                <FaceOverlay
-                  faces={displayFaces}
-                  onFaceClick={handleFaceClick}
-                  selectedFace={selectedFace}
-                  batchMode={batchMode}
-                  canFlag={canFlag}
-                  selectedFaces={selectedFaces}
-                  getVideoRenderRect={getRenderRect}
-                />
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full text-ledger">
-                Select a video to play
-              </div>
-            )}
-          </div>
+      <div className="flex flex-col gap-2">
+        <div
+          ref={containerRef}
+          className="relative aspect-[2.4/1] w-full overflow-hidden rounded bg-black"
+        >
+          {selectedVideo ? (
+            <>
+              <VideoCanvas
+                ref={videoCanvasRef}
+                videoSrc={videoSrc}
+                faces={displayFaces}
+                showAnnotations={showAnnotations}
+                isSelected={isFaceSelected}
+                containerRef={containerRef}
+                onTimeUpdate={setCurrentTime}
+                onLoadedMetadata={handleLoadedMetadata}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onEnded={handleEnded}
+              />
+              <FaceOverlay
+                faces={displayFaces}
+                onFaceClick={handleFaceClick}
+                selectedFace={selectedFace}
+                batchMode={batchMode}
+                canFlag={canFlag}
+                selectedFaces={selectedFaces}
+                getVideoRenderRect={getRenderRect}
+              />
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center font-kai text-[14px] text-paper-light/70">
+              請選擇影片
+            </div>
+          )}
+        </div>
 
-          {/* Controls */}
-          <PlayerControls
-            videoRef={{ current: getVideoEl() }}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            playbackSpeed={playbackSpeed}
-            volume={volume}
-            onTogglePlay={handleTogglePlay}
-            onSeek={handleSeek}
-            onSpeedChange={handleSpeedChange}
-            onVolumeChange={handleVolumeChange}
-            onSkipFrames={handleSkipFrames}
-            onSkipSeconds={handleSkipSeconds}
-            disabled={!selectedVideo}
-          />
+        <PlayerControls
+          videoRef={{ current: videoEl }}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          playbackSpeed={playbackSpeed}
+          volume={volume}
+          onTogglePlay={handleTogglePlay}
+          onSeek={handleSeek}
+          onSpeedChange={handleSpeedChange}
+          onVolumeChange={handleVolumeChange}
+          onSkipFrames={handleSkipFrames}
+          onSkipSeconds={handleSkipSeconds}
+          disabled={!selectedVideo}
+        />
+      </div>
 
-          {/* Detection bar */}
+      <div className="flex flex-1 gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
           <DetectionBar
             faceCount={displayFaces.length}
             recognizedCount={displayFaces.filter((f) => f.matched).length}
@@ -780,42 +778,32 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           {/* Batch controls — admin only: every button in here ends in a flag */}
           {canFlag && (
             <div className="flex items-center gap-2">
-              <button
-                className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors border ${
-                  batchMode
-                    ? 'bg-stamp/20 text-stamp border-stamp/40'
-                    : 'bg-paper-dark text-carbon-soft border-paper-deep hover:text-carbon-deep'
-                }`}
+              <Button
+                className={batchMode ? 'bg-tint font-bold text-carbon-deep' : ''}
+                aria-pressed={batchMode}
                 onClick={handleToggleBatchMode}
               >
-                {batchMode ? 'Batch Mode ON' : 'Batch Mode'}
-              </button>
+                {batchMode ? '批次模式 開' : '批次模式'}
+              </Button>
 
               {batchMode && (
                 <>
-                  <button
-                    className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
-                    onClick={handleSelectAllFaces}
-                    disabled={displayFaces.length === 0}
-                  >
-                    Select All
-                  </button>
-                  <button
-                    className="px-3 py-1.5 bg-paper-dark border border-paper-deep rounded-none text-xs text-carbon hover:bg-paper-deep disabled:opacity-40"
-                    onClick={handleClearSelection}
-                    disabled={selectedFaces.size === 0}
-                  >
-                    Clear
-                  </button>
-                  <button
-                    className="px-3 py-1.5 bg-stamp text-white rounded-none text-xs font-medium hover:bg-stamp disabled:opacity-40"
+                  <Button onClick={handleSelectAllFaces} disabled={displayFaces.length === 0}>
+                    全選
+                  </Button>
+                  <Button onClick={handleClearSelection} disabled={selectedFaces.size === 0}>
+                    清除
+                  </Button>
+                  <div className="flex-1" />
+                  <Button
+                    variant="primary"
                     onClick={() => {
                       if (selectedFaces.size > 0) setShowBatchFlagDialog(true);
                     }}
                     disabled={selectedFaces.size === 0}
                   >
-                    Flag Selected ({selectedFaces.size})
-                  </button>
+                    標記所選 {selectedFaces.size}
+                  </Button>
                 </>
               )}
             </div>
@@ -823,139 +811,125 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
           {/* Timeline filter (admin mode only) */}
           {mode === 'admin' && (
-            <div className="bg-paper-light/80 border border-paper-dark rounded-none px-4 py-2">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <label htmlFor="contestant-filter" className="text-xs text-carbon-soft">
-                  Filter Timeline:
+                <label
+                  htmlFor="contestant-filter"
+                  className="font-kai text-[13px] text-carbon-soft"
+                >
+                  篩選時間軸
                 </label>
                 <select
                   id="contestant-filter"
-                  className="bg-paper-dark text-carbon-deep border border-paper-deep rounded px-2 py-1 text-xs"
+                  className="field field-select w-[200px]"
                   onChange={(e) =>
                     handleFilterByContestant(e.target.value ? parseInt(e.target.value, 10) : null)
                   }
                   value={filterContestantId ?? ''}
                 >
-                  <option value="">All Contestants</option>
-                  {(contestants as Array<{ number: number; nickname: string }>).map((c) => (
+                  <option value="">全部參賽者</option>
+                  {contestantList.map((c) => (
                     <option key={c.number} value={c.number}>
-                      #{c.number} - {c.nickname}
+                      #{c.number} · {c.nickname}
                     </option>
                   ))}
                 </select>
                 {filterContestantId !== null && (
-                  <span className="text-xs text-ledger">
-                    {contestantAppearances.length} appearances
+                  <span className="font-kai text-[12px] text-ink-muted">
+                    出場 {contestantAppearances.length} 次
                   </span>
                 )}
               </div>
 
               {filterContestantId !== null && contestantAppearances.length > 0 && (
-                <div className="mt-2 relative h-4 bg-paper-dark rounded-full overflow-hidden">
-                  {contestantAppearances.map((a, i) => (
-                    <button
-                      key={i}
-                      className="absolute top-0 w-1.5 h-full bg-stamp rounded-full hover:bg-stamp"
-                      style={{
-                        left: `${duration > 0 ? (a.timestamp / duration) * 100 : 0}%`,
-                      }}
-                      onClick={() => handleSeek(a.timestamp)}
-                      title={`Jump to ${formatMmSs(a.timestamp)}`}
+                <>
+                  <div className="relative h-8 overflow-hidden rounded-xs bg-tint">
+                    {contestantAppearances.map((a, i) => (
+                      <button
+                        key={i}
+                        className="absolute top-0 h-full w-0.5 bg-carbon-soft hover:bg-carbon-deep"
+                        style={{ left: `${tickPercent(a.timestamp, duration)}%` }}
+                        onClick={() => handleSeek(a.timestamp)}
+                        title={`跳到 ${formatMmSs(a.timestamp)}`}
+                        aria-label={`跳到 ${formatMmSs(a.timestamp)}`}
+                      />
+                    ))}
+                    <div
+                      className="pointer-events-none absolute top-0 h-full w-0.5 bg-stamp"
+                      style={{ left: `${tickPercent(currentTime, duration)}%` }}
                     />
-                  ))}
-                  <div
-                    className="absolute top-0 w-0.5 h-full bg-white"
-                    style={{
-                      left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
+                  </div>
+                  <div className="flex justify-between font-mono text-[12px] tabular-nums text-ink-muted">
+                    <span>00:00</span>
+                    <span>{formatMmSs(duration)}</span>
+                  </div>
+                </>
               )}
             </div>
           )}
         </div>
 
-        {/* Info panel */}
-        <div className="flex-1 max-w-xs bg-paper-light border border-paper-dark rounded-none p-4 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-carbon-deep mb-3">Video Information</h3>
+        <div className="flex w-[300px] shrink-0 flex-col gap-0.5 border-l border-carbon-deep/13 pl-6">
+          <h3 className="pb-2 font-kai text-[18px] font-normal text-carbon-deep">目前畫格人臉</h3>
+          {displayFaces.length === 0 ? (
+            <p className="font-kai text-[13px] text-ink-muted">這個時間點沒有偵測到人臉。</p>
+          ) : (
+            displayFaces.map((face, i) => (
+              <button
+                key={i}
+                className={`flex h-8 w-full shrink-0 items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-tint ${
+                  isFaceSelected(face) ? 'bg-tint' : ''
+                }`}
+                onClick={() => handleFaceClick(face)}
+                title={face.matched ? undefined : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`}
+              >
+                <FrameFace video={videoEl} bbox={face.bbox} size={24} alt="" />
+                <span
+                  className={`min-w-0 flex-1 truncate font-kai text-[14px] ${
+                    face.matched ? 'text-carbon-deep' : 'text-carbon-soft'
+                  }`}
+                >
+                  {faceName(face)}
+                </span>
+                {face.matched && (
+                  <>
+                    {face.match_score != null && (
+                      <span className="font-mono text-[12px] tabular-nums text-carbon">
+                        {face.match_score.toFixed(2)}
+                      </span>
+                    )}
+                    <Stamp band={bandFor(face.match_score)} />
+                  </>
+                )}
+              </button>
+            ))
+          )}
+        </div>
 
+        <div className="flex w-[236px] shrink-0 flex-col gap-4 border-l border-carbon-deep/13 pl-6">
           {selectedVideo && (
             <>
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-carbon-soft mb-2">Details</h4>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-ledger">Title</span>
-                    <span className="text-carbon truncate ml-2">{selectedVideo.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ledger">Resolution</span>
-                    <span className="text-carbon">
-                      {videoMetadata?.video_info?.width ?? 1920}x
-                      {videoMetadata?.video_info?.height ?? 1080}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ledger">FPS</span>
-                    <span className="text-carbon">{fps}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-carbon-soft mb-2">Recognition Summary</h4>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-ledger">Unique Contestants</span>
-                    <span className="text-carbon">
-                      {videoMetadata?.processing_summary?.unique_contestants ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ledger">Faces Detected</span>
-                    <span className="text-carbon">
-                      {videoMetadata?.processing_summary?.total_faces_detected ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ledger">Faces Recognized</span>
-                    <span className="text-carbon">
-                      {videoMetadata?.processing_summary?.total_recognitions ?? 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <InfoBlock
+                title="影片資料"
+                rows={[
+                  { key: '標題', value: shortName, text: true },
+                  {
+                    key: '解析度',
+                    value: info?.width && info?.height ? `${info.width}×${info.height}` : '—',
+                  },
+                  { key: '每秒格數', value: String(fps) },
+                ]}
+              />
+              <InfoBlock
+                title="辨識摘要"
+                rows={[
+                  { key: '參賽者', value: count(summary?.unique_contestants) },
+                  { key: '偵測人臉', value: count(summary?.total_faces_detected) },
+                  { key: '認出人臉', value: count(summary?.total_recognitions) },
+                ]}
+              />
             </>
           )}
-
-          <div>
-            <h4 className="text-xs font-medium text-carbon-soft mb-2">Current Frame Faces</h4>
-            {displayFaces.length === 0 ? (
-              <p className="text-xs text-carbon italic">No faces detected at this timestamp</p>
-            ) : (
-              <div className="space-y-1">
-                {displayFaces.map((face, i) => {
-                  const tier = detectionTier(face);
-                  return (
-                    <button
-                      key={i}
-                      className="w-full flex items-center justify-between px-2 py-1.5 bg-paper-dark rounded text-xs hover:bg-paper-deep transition-colors"
-                      onClick={() => handleFaceClick(face)}
-                    >
-                      <span className="text-carbon-deep">
-                        {face.matched
-                          ? face.contestant_name || face.contestant_nickname || 'Unmatched'
-                          : 'Unmatched'}
-                      </span>
-                      <span className={`${tier.className} font-medium`} title={tier.title}>
-                        {tier.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -964,14 +938,11 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         <FlagDialog
           mode="single"
           face={selectedFace}
-          contestants={contestants as Array<{ number: number; name: string; nickname: string }>}
+          contestants={contestantList}
+          video={videoEl}
+          where={`${formatMmSs(selectionSnapshot?.timestamp ?? currentTime)} · ${shortName}`}
           onSubmit={handleFlagSubmit}
-          onClose={() => {
-            setShowFlagDialog(false);
-            setSelectedFace(null);
-            setSelectionSnapshot(null);
-            setFlagError(null);
-          }}
+          onClose={closeFlagDialog}
           isSubmitting={isFlagging}
           error={flagError}
         />
@@ -982,12 +953,10 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         <FlagDialog
           mode="batch"
           selectedFaces={Array.from(selectedFaces)}
-          contestants={contestants as Array<{ number: number; name: string; nickname: string }>}
+          contestants={contestantList}
+          video={videoEl}
           onSubmit={handleBatchFlagSubmit}
-          onClose={() => {
-            setShowBatchFlagDialog(false);
-            setFlagError(null);
-          }}
+          onClose={closeBatchDialog}
           isSubmitting={isFlagging}
           error={flagError}
         />
@@ -995,75 +964,105 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
       {/* Flagged Faces Panel */}
       {canFlag && showFlaggedPanel && (
-        <div className="absolute top-0 right-0 w-80 h-full bg-paper-light border-l border-paper-dark z-40 flex flex-col shadow-2xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-paper-dark">
-            <h3 className="text-sm font-semibold text-carbon-deep">Flagged Faces</h3>
+        <div className="absolute right-0 top-0 z-40 flex h-full w-80 flex-col border-l border-carbon-deep/33 bg-ground">
+          <div className="flex items-center justify-between border-b border-carbon-deep/13 px-4 py-3">
+            <h3 className="font-kai text-[18px] font-normal text-carbon-deep">已標記人臉</h3>
             <button
-              className="text-carbon-soft hover:text-carbon-deep text-lg"
+              className="inline-flex size-8 items-center justify-center rounded-md text-carbon-soft transition-colors hover:bg-tint"
+              aria-label="關閉"
               onClick={() => setShowFlaggedPanel(false)}
             >
-              &#10005;
+              <X size={16} aria-hidden />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto px-4">
             {flaggedFaces.length === 0 ? (
-              <p className="text-sm text-carbon italic">No faces have been flagged yet.</p>
+              <p className="py-4 font-kai text-[13px] text-ink-muted">還沒有標記任何人臉。</p>
             ) : (
-              <div className="space-y-2">
-                {flaggedFaces.map((flag) => (
-                  <div key={flag.id} className="bg-paper-dark rounded-none p-3 text-xs">
-                    <div className="flex gap-3">
+              flaggedFaces.map((flag) => {
+                const status = FLAG_STATUS[flag.status];
+                return (
+                  <div
+                    key={flag.id}
+                    className="flex flex-col gap-2 border-b border-carbon-deep/13 py-3"
+                  >
+                    <div className="flex items-center gap-3">
                       {flag.thumbnail ? (
                         <img
                           src={flag.thumbnail}
                           alt={`被標記的人臉 @ ${formatMmSs(flag.timestamp)}`}
-                          className="h-14 w-14 shrink-0 border border-carbon/25 bg-paper object-cover"
+                          className="size-14 shrink-0 rounded bg-tint object-cover"
                         />
                       ) : (
                         <div
                           aria-hidden="true"
-                          className="flex h-14 w-14 shrink-0 items-center justify-center border border-carbon/20 bg-paper text-[11px] text-ledger"
+                          className="flex size-14 shrink-0 items-center justify-center rounded bg-tint font-kai text-[12px] text-ink-muted"
                         >
                           無縮圖
                         </div>
                       )}
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <div className="truncate text-carbon-deep font-medium">
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate font-kai text-[14px] text-carbon-deep">
                           {getContestantName(flag.contestant_id)}
-                        </div>
-                        <div className="truncate text-ledger">Video: {flag.video_id}</div>
-                        <div className="text-ledger">@ {formatMmSs(flag.timestamp)}</div>
-                        <span
-                          title={flag.status}
-                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${FLAG_STATUS[flag.status].ink}`}
-                        >
-                          {FLAG_STATUS[flag.status].word}
+                        </span>
+                        <span className="truncate font-kai text-[12px] text-ink-muted">
+                          {videoShortName(flag.video_id)}
+                        </span>
+                        <span className="font-mono text-[12px] tabular-nums text-ink-muted">
+                          {formatMmSs(flag.timestamp)}
                         </span>
                       </div>
+                      <Stamp tone={status.tone} tilt={status.tilt}>
+                        {status.word}
+                      </Stamp>
                     </div>
-                    <div className="mt-2 flex items-center gap-3 border-t border-carbon/15 pt-2">
-                      <button
-                        type="button"
-                        className="text-[11px] text-carbon underline-offset-2 hover:text-carbon-deep hover:underline"
-                        onClick={() => handleJumpToFlag(flag)}
-                      >
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => handleJumpToFlag(flag)}>
                         跳到該幀
-                      </button>
+                      </Button>
                       {/* The admin SPA is mounted at /admin; a plain anchor survives the trip. */}
                       <a
                         href="/admin/flagging"
-                        className="text-[11px] text-carbon underline-offset-2 hover:text-carbon-deep hover:underline"
+                        className="inline-flex h-8 items-center rounded-md px-3 font-kai text-[13px] text-carbon transition-colors hover:bg-tint"
                       >
                         前往待核
                       </a>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })
             )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function count(value: number | undefined): string {
+  return value?.toLocaleString() ?? '—';
+}
+
+function InfoBlock({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ key: string; value: string; text?: boolean }>;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="font-kai text-[18px] font-normal text-carbon-deep">{title}</h3>
+      {rows.map((r) => (
+        <div key={r.key} className="flex items-center justify-between gap-2 text-[13px]">
+          <span className="shrink-0 font-kai text-carbon-soft">{r.key}</span>
+          <span
+            className={`truncate text-carbon-deep ${r.text ? 'font-kai' : 'font-mono tabular-nums'}`}
+          >
+            {r.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

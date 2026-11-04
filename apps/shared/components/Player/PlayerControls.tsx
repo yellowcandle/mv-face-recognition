@@ -1,4 +1,6 @@
+import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { formatMmSs } from '../../lib/format';
+import { tickPercent } from './faceView';
 
 interface PlayerControlsProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -18,6 +20,56 @@ interface PlayerControlsProps {
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
+const STEP =
+  'inline-flex h-8 items-center justify-center rounded-md px-2 font-mono text-[13px] text-carbon transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-45';
+
+/** A native range for input and keyboard, invisible over a drawn track. */
+function Slider({
+  label,
+  value,
+  max,
+  step,
+  disabled,
+  knob,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  step: number;
+  disabled?: boolean;
+  knob?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const percent = tickPercent(value, max);
+  return (
+    <div className="relative h-4 w-full">
+      <input
+        type="range"
+        aria-label={label}
+        className="peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+        min={0}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+      />
+      <div className="absolute inset-x-0 top-1.5 h-1 rounded-xs bg-carbon-deep/13 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-stamp" />
+      <div
+        className="absolute left-0 top-1.5 h-1 rounded-xs bg-carbon"
+        style={{ width: `${percent}%` }}
+      />
+      {knob ? (
+        <div
+          className="absolute top-0.5 h-3 w-2 -translate-x-1/2 rounded-xs bg-carbon-deep"
+          style={{ left: `${percent}%` }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function PlayerControls({
   isPlaying,
   currentTime,
@@ -33,74 +85,74 @@ export function PlayerControls({
   disabled,
 }: PlayerControlsProps) {
   return (
-    <div className="flex items-center gap-3 bg-paper-light border border-paper-dark rounded-none px-4 py-2">
-      {/* Playback buttons */}
+    <div className="flex h-10 items-center gap-3">
       <div className="flex items-center gap-1">
         <button
-          className="text-carbon hover:text-white px-1.5 py-1 text-sm disabled:opacity-40"
+          className={STEP}
           onClick={() => onSkipSeconds(-5)}
           disabled={disabled}
-          title="Back 5 seconds"
+          title="後退五秒"
+          aria-label="後退五秒"
         >
           -5s
         </button>
         <button
-          className="text-carbon hover:text-white px-1.5 py-1 text-sm disabled:opacity-40"
+          className={STEP}
           onClick={() => onSkipFrames(-1)}
           disabled={disabled}
-          title="Previous frame"
+          title="上一格"
+          aria-label="上一格"
         >
-          &lt;
+          <ChevronLeft size={16} aria-hidden />
         </button>
         <button
-          className="w-10 h-10 rounded-full bg-stamp hover:bg-stamp text-white text-lg flex items-center justify-center disabled:opacity-40 disabled:hover:bg-stamp"
+          className="inline-flex size-10 items-center justify-center rounded-md bg-carbon-deep text-paper-light transition-colors hover:bg-carbon disabled:cursor-not-allowed disabled:opacity-45"
           onClick={onTogglePlay}
           disabled={disabled}
+          aria-label={isPlaying ? '暫停' : '播放'}
         >
-          {isPlaying ? '\u23F8' : '\u25B6'}
+          {isPlaying ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
         </button>
         <button
-          className="text-carbon hover:text-white px-1.5 py-1 text-sm disabled:opacity-40"
+          className={STEP}
           onClick={() => onSkipFrames(1)}
           disabled={disabled}
-          title="Next frame"
+          title="下一格"
+          aria-label="下一格"
         >
-          &gt;
+          <ChevronRight size={16} aria-hidden />
         </button>
         <button
-          className="text-carbon hover:text-white px-1.5 py-1 text-sm disabled:opacity-40"
+          className={STEP}
           onClick={() => onSkipSeconds(5)}
           disabled={disabled}
-          title="Forward 5 seconds"
+          title="前進五秒"
+          aria-label="前進五秒"
         >
           +5s
         </button>
       </div>
 
-      {/* Time display */}
-      <span className="text-carbon-soft text-sm font-mono whitespace-nowrap">
+      <span className="whitespace-nowrap font-mono text-[13px] tabular-nums text-carbon-soft">
         {formatMmSs(currentTime)} / {formatMmSs(duration)}
       </span>
 
-      {/* Seek bar */}
-      <div className="flex-1 mx-2">
-        <input
-          type="range"
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-paper-deep accent-stamp"
-          min={0}
+      <div className="min-w-0 flex-1">
+        <Slider
+          label="播放位置"
+          value={currentTime}
           max={duration || 0}
           step={0.1}
-          value={currentTime}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
           disabled={disabled}
+          knob
+          onChange={onSeek}
         />
       </div>
 
-      {/* Speed selector */}
-      <div className="flex items-center gap-1">
-        <span className="text-ledger text-xs">Speed</span>
+      <label className="flex items-center gap-2 font-kai text-[12px] text-ink-muted">
+        速度
         <select
-          className="bg-paper-dark text-carbon-deep border border-paper-deep rounded px-1.5 py-1 text-xs"
+          className="field field-select w-[72px] pl-2 pr-6 font-mono"
           value={playbackSpeed}
           onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
         >
@@ -110,20 +162,15 @@ export function PlayerControls({
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
-      {/* Volume */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-carbon-soft text-sm">Vol</span>
-        <input
-          type="range"
-          className="w-16 h-1 rounded-full appearance-none cursor-pointer bg-paper-deep accent-stamp"
-          min={0}
-          max={1}
-          step={0.1}
-          value={volume}
-          onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-        />
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="font-kai text-[12px] text-ink-muted">
+          音量
+        </span>
+        <div className="w-16">
+          <Slider label="音量" value={volume} max={1} step={0.1} onChange={onVolumeChange} />
+        </div>
       </div>
     </div>
   );

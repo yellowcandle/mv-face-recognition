@@ -1,22 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { FaceDetection } from '../../types';
-import { bandFor } from '../../lib/bands';
-
-const COLOR_PALETTE = [
-  '#22c55e',
-  '#3b82f6',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#06b6d4',
-  '#84cc16',
-];
-
-/** Unmatched detections are neither a contestant nor a band — they get slate. */
-const UNMATCHED_COLOR = '#94a3b8';
+import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { faceName } from './faceView';
 
 export interface VideoRenderRect {
   offsetX: number;
@@ -63,6 +48,7 @@ export function useAnnotations(
   containerRef: React.RefObject<HTMLDivElement | null>,
   faces: FaceDetection[],
   showAnnotations: boolean,
+  isSelected?: (face: FaceDetection) => boolean,
 ) {
   const animFrameRef = useRef<number>(0);
 
@@ -91,51 +77,53 @@ export function useAnnotations(
     // videoWidth/videoHeight are not a scale factor for a stored box.
     const { offsetX, offsetY, renderW, renderH } = getVideoRenderRect(video, container);
 
-    const colorMap = new Map<string, string>();
+    // Canvas cannot read Tailwind classes: take the same tokens from the stylesheet.
+    const css = getComputedStyle(document.documentElement);
+    const token = (name: string) => css.getPropertyValue(name).trim();
+    const paper = token('--color-paper-light');
+    const ink = token('--color-carbon-deep');
+    const stamp = token('--color-stamp');
+    const TEXT_H = 20;
+
+    ctx.font = `12px ${token('--font-kai')}`;
+    ctx.textBaseline = 'middle';
 
     for (const face of faces) {
       const [x1, y1, x2, y2] = face.bbox || [0, 0, 0, 0];
       if (x2 <= x1 || y2 <= y1) continue;
 
-      const name = face.contestant_name || 'Unmatched';
-      let color = UNMATCHED_COLOR;
-      if (face.matched) {
-        if (!colorMap.has(name)) {
-          colorMap.set(name, COLOR_PALETTE[colorMap.size % COLOR_PALETTE.length]);
-        }
-        color = colorMap.get(name)!;
-      }
-
       const sx = offsetX + x1 * renderW;
       const sy = offsetY + y1 * renderH;
       const sw = (x2 - x1) * renderW;
       const sh = (y2 - y1) * renderH;
+      const selected = isSelected?.(face) ?? false;
 
-      // Bounding box
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = selected ? stamp : paper;
       ctx.lineWidth = 2;
       ctx.strokeRect(sx, sy, sw, sh);
 
       // Band, not a percentage: 0.51 is a cosine, and "51%" would read as certainty.
       // The raw cosine lives in the overlay button's tooltip.
-      const label = face.matched ? `${name}  ${bandFor(face.match_score)}` : 'Unmatched';
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      const textMetrics = ctx.measureText(label);
-      const textH = 20;
-      const textW = textMetrics.width + 10;
-      const labelY = sy - textH - 2;
-      const finalLabelY = labelY < offsetY ? sy : labelY;
+      const name = faceName(face);
+      const band = face.matched ? BAND_STAMP[bandFor(face.match_score)].word : '';
+      const nameW = ctx.measureText(name).width;
+      const textW = nameW + (band ? 4 + ctx.measureText(band).width : 0) + 8;
+      // The label hangs under the box; at the foot of the frame it moves above.
+      const below = sy + sh + 2;
+      const labelY = below + TEXT_H > offsetY + renderH ? sy - TEXT_H - 2 : below;
 
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.85;
-      ctx.fillRect(sx, finalLabelY, textW, textH);
-      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = selected ? stamp : ink;
+      ctx.fillRect(sx, labelY, textW, TEXT_H);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, sx + 5, finalLabelY + textH / 2);
+      ctx.fillStyle = paper;
+      ctx.fillText(name, sx + 4, labelY + TEXT_H / 2);
+      if (band) {
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(band, sx + 8 + nameW, labelY + TEXT_H / 2);
+        ctx.globalAlpha = 1;
+      }
     }
-  }, [canvasRef, videoRef, containerRef, faces, showAnnotations]);
+  }, [canvasRef, videoRef, containerRef, faces, showAnnotations, isSelected]);
 
   // Redraw on faces/annotations change
   useEffect(() => {

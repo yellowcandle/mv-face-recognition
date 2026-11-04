@@ -11,11 +11,11 @@ const paddingStyles: Record<string, string> = {
   lg: 'p-6',
 };
 
-/** A card is a slip of the same paper: a ruled edge, no shadow, no rounding. */
+/** A hairline panel on the page ground. No fill, no shadow: prefer plain rules where they work. */
 export function Card({ padding = 'md', className = '', children, ...props }: CardProps) {
   return (
     <div
-      className={`rounded-none border border-carbon/35 bg-paper-light ${paddingStyles[padding]} ${className}`}
+      className={`rounded-md border border-carbon-deep/13 ${paddingStyles[padding]} ${className}`}
       {...props}
     >
       {children}

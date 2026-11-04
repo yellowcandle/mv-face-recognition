@@ -198,7 +198,7 @@ function cacheCrop(key: string, dataUrl: string): void {
  *
  * Primary: the backend's pre-cropped JPEG (`/api/faces/crop`). Fallback: when that route
  * has no crop (the Worker has no crop bucket yet), seek the same-origin rendition, draw
- * the detection's box, and cache the result. Falls back to a neutral `NO CROP` slip when
+ * the detection's box, and cache the result. Falls back to a neutral `無裁切` slip when
  * neither path can produce pixels — it never throws for missing data.
  */
 export function FaceCrop({
@@ -296,7 +296,7 @@ export function FaceCrop({
       {primaryImgSrc && failedSrc !== primaryImgSrc ? (
         <img
           src={primaryImgSrc}
-          alt={alt ?? 'Face crop'}
+          alt={alt ?? '人臉裁切'}
           width={width}
           className="block h-auto w-full"
           onLoad={() => {
@@ -308,13 +308,13 @@ export function FaceCrop({
           }}
         />
       ) : image ? (
-        <img src={image} alt={alt ?? 'Face crop'} width={width} className="block h-auto w-full" />
+        <img src={image} alt={alt ?? '人臉裁切'} width={width} className="block h-auto w-full" />
       ) : (
         <div
-          className="flex items-center justify-center border border-dashed border-carbon/35 bg-paper-dark font-mono text-[11px] tracking-[0.12em] text-carbon-soft"
+          className="flex items-center justify-center rounded bg-tint font-kai text-[12px] text-ink-muted"
           style={{ width, height: placeholderHeight }}
         >
-          {fallbackFailed || !canFallback ? 'NO CROP' : ''}
+          {fallbackFailed || !canFallback ? '無裁切' : ''}
         </div>
       )}
     </div>

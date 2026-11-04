@@ -1,49 +1,115 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Masthead } from './Masthead';
+import { Stamp } from './Stamp';
+import { ledgerRows, spanPercent, type LedgerRow, type LedgerSort } from './ledgerRows';
+import { useContestants } from '../hooks/useContestants';
 import { useVideos } from '../hooks/useVideos';
 import { BAND_CUTOFFS, BAND_STAMP, bandFor, type Band } from '../lib/bands';
-import { formatMmSs } from '../lib/format';
+import { formatMmSs, videoShortName } from '../lib/format';
 import type { VideoMetadata } from '../types';
 
-interface ContestantStat {
-  id: string;
-  nickname: string;
-  name: string;
-  appearances: number;
-  avgMatchScore: number;
-  maxMatchScore: number;
-  firstSeen: number;
-  lastSeen: number;
+type Variant = 'admin' | 'viewer';
+
+const SORTS: Array<[LedgerSort, string]> = [
+  ['appearances', '出場次數'],
+  ['avgMatchScore', '平均分'],
+];
+
+const BAND_DOT: Record<Band, string> = {
+  high: 'bg-carbon',
+  medium: 'bg-stamp',
+  low: 'bg-ink-muted',
+};
+
+/** The two designs share one table; only these measures and words differ. */
+const LOOK = {
+  admin: {
+    root: 'px-8',
+    select: 'field field-select w-[260px]',
+    figures: 'border-b pb-4',
+    head: ['編號', '參賽者', '出場次數', '平均分', '最高分', '出場時段'],
+    widths: ['w-11', '', 'w-[88px]', 'w-28', 'w-28', 'w-61'],
+    row: 'h-10',
+    who: 'gap-2',
+    realName: 'text-[12px]',
+    count: 'text-[14px]',
+    score: 'text-carbon',
+    dash: '–',
+  },
+  viewer: {
+    root: 'px-14',
+    select: 'field field-select h-10 w-[260px] text-[14px] text-carbon-deep',
+    figures: 'border-y py-3',
+    head: ['編號', '參賽者', '出場', '平均', '最高', '出現時段'],
+    widths: ['w-13', '', 'w-25', 'w-35', 'w-35', 'w-45'],
+    row: 'h-9',
+    who: 'gap-2.5',
+    realName: 'text-[13px]',
+    count: 'text-[13px]',
+    score: 'text-carbon-soft',
+    dash: ' — ',
+  },
+} as const;
+
+function Score({ value, label, className }: { value: number; label: string; className: string }) {
+  return (
+    <span className="flex items-center justify-end gap-2" title={`${label} ${value.toFixed(3)}`}>
+      <span className={`font-mono text-[13px] tabular-nums ${className}`}>{value.toFixed(2)}</span>
+      <Stamp band={bandFor(value)} />
+    </span>
+  );
 }
 
-function BandStamp({ band, title }: { band: Band; title: string }) {
-  return (
-    <span
-      title={title}
-      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[11px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
-    >
-      {BAND_STAMP[band].word}
-    </span>
+/** Admin leads with this reel's own crop of the face; the public copy with the cast portrait. */
+function Face({
+  videoId,
+  row,
+  portrait,
+  variant,
+}: {
+  videoId: string;
+  row: LedgerRow;
+  portrait: string | null;
+  variant: Variant;
+}) {
+  const crop =
+    variant === 'admin' && row.crop
+      ? `/api/faces/crop?video_id=${encodeURIComponent(videoId)}&frame_number=${row.crop.frameNumber}&detection_index=${row.crop.detectionIndex}&width=64`
+      : null;
+  const [failed, setFailed] = useState<string | null>(null);
+  const src = crop && crop !== failed ? crop : portrait;
+  return src && src !== failed ? (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      className="size-7 shrink-0 rounded object-cover"
+      onError={() => setFailed(src)}
+    />
+  ) : (
+    <div className="size-7 shrink-0 rounded bg-tint" />
   );
 }
 
 /**
  * 紀錄 — the ledger of who was filed, per reel. Same data, read as a filing record.
- * Shared by the viewer (`/analytics`) and the back office; only the eyebrow differs.
+ * Shared by the back office and the viewer; `variant` picks which design it wears.
  */
-export function AnalyticsLedger({
-  eyebrow = 'MV FACE RECOGNITION · 全民造星 IV',
-}: {
-  eyebrow?: string;
-}) {
+export function AnalyticsLedger({ variant }: { variant: Variant }) {
+  const look = LOOK[variant];
   const { data: videos = [] } = useVideos();
+  const { data: contestants = [] } = useContestants();
   const [selectedVideoId, setSelectedVideoId] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'appearances' | 'avgMatchScore'>('appearances');
+  const [sortBy, setSortBy] = useState<LedgerSort>('appearances');
 
   const videoId = selectedVideoId || videos[0]?.id || '';
 
-  const { data: metadata, isLoading } = useQuery<VideoMetadata>({
+  const {
+    data: metadata,
+    isLoading,
+    isError,
+  } = useQuery<VideoMetadata>({
     queryKey: ['video-metadata', videoId],
     queryFn: async () => {
       const res = await fetch(`/api/videos/metadata/dense/${encodeURIComponent(videoId)}`);
@@ -54,187 +120,238 @@ export function AnalyticsLedger({
     staleTime: 5 * 60 * 1000,
   });
 
-  const stats = useMemo<ContestantStat[]>(() => {
-    if (!metadata?.contestant_timeline) return [];
-    return Object.entries(metadata.contestant_timeline)
-      .map(([key, info]) => ({
-        id: key,
-        nickname: info.contestant_info?.nickname ?? key,
-        name: info.contestant_info?.name ?? key,
-        appearances: info.total_appearances,
-        avgMatchScore: info.average_match_score,
-        maxMatchScore: Math.max(0, ...(info.appearances ?? []).map((a) => a.match_score)),
-        firstSeen: info.first_appearance,
-        lastSeen: info.last_appearance,
-      }))
-      .sort((a, b) =>
-        sortBy === 'appearances'
-          ? b.appearances - a.appearances
-          : b.avgMatchScore - a.avgMatchScore,
-      );
-  }, [metadata, sortBy]);
+  const rows = useMemo(
+    () => ledgerRows(metadata?.contestant_timeline, sortBy, metadata?.frame_data),
+    [metadata, sortBy],
+  );
+
+  const portraits = useMemo(
+    () =>
+      new Map(
+        (contestants as Array<{ id: string; portrait_url?: string | null }>).map((c) => [
+          String(c.id),
+          c.portrait_url ?? null,
+        ]),
+      ),
+    [contestants],
+  );
 
   const summary = metadata?.processing_summary;
+  const duration = metadata?.video_info?.duration;
+
+  const legend = (
+    [
+      ['high', `≥ ${BAND_CUTOFFS.high}`],
+      ['medium', `${BAND_CUTOFFS.medium}${look.dash}${BAND_CUTOFFS.high}`],
+      ['low', `< ${BAND_CUTOFFS.medium}`],
+    ] as const
+  ).map(([band, range]) => (
+    <span key={band} className={`flex items-center ${variant === 'viewer' ? 'gap-1.5' : 'gap-1'}`}>
+      {variant === 'viewer' ? <span className={`size-2 rounded-full ${BAND_DOT[band]}`} /> : null}
+      <span
+        className={`font-kai text-[12px] ${
+          variant === 'viewer' ? 'text-carbon-deep' : 'text-carbon-soft'
+        }`}
+      >
+        {BAND_STAMP[band].word}
+      </span>
+      <span className="font-mono text-[12px] tabular-nums text-ink-muted">{range}</span>
+    </span>
+  ));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
-      <Masthead eyebrow={eyebrow} title="紀錄" latin="RECOGNITION LEDGER">
-        <div className="flex flex-col items-end gap-1">
-          <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">REEL</span>
-          <select
-            aria-label="Reel"
-            className="min-w-[260px] border border-carbon/45 bg-paper-light px-2.5 py-1.5 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
-            value={selectedVideoId}
-            onChange={(e) => setSelectedVideoId(e.target.value)}
-          >
-            {videos.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className={`flex h-full min-h-0 flex-1 flex-col gap-4 pb-5 pt-8 ${look.root}`}>
+      <Masthead title="紀錄" hint="唯讀的辨識結果帳冊">
+        <select
+          aria-label="影片"
+          className={look.select}
+          value={videoId}
+          onChange={(e) => setSelectedVideoId(e.target.value)}
+        >
+          {videos.map((v) => (
+            <option key={v.id} value={v.id}>
+              {videoShortName(v.name)}
+            </option>
+          ))}
+        </select>
       </Masthead>
 
-      <div className="mt-4 h-px bg-carbon/45" />
-
       {summary && (
-        <div className="flex flex-row items-start gap-16 py-4">
+        <div className={`grid grid-cols-4 border-carbon-deep/13 ${look.figures}`}>
           {[
-            { label: 'FRAMES 影格', value: summary.frames_processed.toLocaleString() },
-            { label: 'DETECTED 偵測', value: summary.total_faces_detected.toLocaleString() },
-            { label: 'RECOGNISED 辨識', value: summary.total_recognitions.toLocaleString() },
-            { label: 'CONTESTANTS 出場', value: String(summary.unique_contestants) },
+            { label: '影格', value: summary.frames_processed.toLocaleString() },
+            { label: '偵測', value: summary.total_faces_detected.toLocaleString() },
+            { label: '辨識', value: summary.total_recognitions.toLocaleString() },
+            { label: '出場', value: summary.unique_contestants.toLocaleString() },
           ].map((s) => (
             <div key={s.label} className="flex flex-col gap-1">
-              <span className="font-serif text-[28px] font-bold leading-none text-carbon-deep">
+              <span className="font-kai text-[13px] text-carbon-soft">{s.label}</span>
+              <span className="font-mono text-[28px] leading-tight tabular-nums text-carbon-deep">
                 {s.value}
               </span>
-              <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">{s.label}</span>
             </div>
           ))}
         </div>
       )}
-      <div className="h-px bg-carbon/20" />
 
-      <div className="flex flex-row items-center gap-4 py-2.5">
-        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">SORT</span>
-        {(
-          [
-            ['appearances', '出場次數'],
-            ['avgMatchScore', '平均分'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setSortBy(key)}
-            className={`border px-2 py-0.5 font-kai text-[11px] tracking-[0.1em] ${
-              sortBy === key
-                ? '-rotate-1 border-stamp text-stamp'
-                : 'border-carbon/25 text-carbon-soft hover:border-carbon/50'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱紀錄…</div>
-      ) : stats.length === 0 ? (
-        <div className="mt-1 border border-dashed border-carbon/35 px-4 py-14 text-center font-kai text-[13px] text-carbon-soft">
-          這卷影片沒有可核對的紀錄。
+      {variant === 'admin' ? (
+        <div className="flex items-center gap-2">
+          <span className="font-kai text-[12px] text-ink-muted">排序</span>
+          {SORTS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={sortBy === key}
+              onClick={() => setSortBy(key)}
+              className={`h-8 rounded-md border px-3 font-kai text-[13px] transition-colors ${
+                sortBy === key
+                  ? 'border-carbon-deep/33 bg-tint font-bold text-carbon-deep'
+                  : 'border-carbon-deep/13 text-carbon-soft hover:bg-tint'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       ) : (
-        <div className="flex flex-col">
-          <div className="flex flex-row items-center border-b border-carbon/40 py-2.5">
-            <span className="w-[52px] font-mono text-[11px] tracking-[0.12em] text-ledger">
-              NO.
-            </span>
-            <span className="flex-1 font-mono text-[11px] tracking-[0.12em] text-ledger">
-              CONTESTANT
-            </span>
-            <span className="w-[110px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
-              APPEARANCES
-            </span>
-            <span className="w-[120px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
-              AVG
-            </span>
-            <span className="w-[120px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
-              MAX
-            </span>
-            <span className="w-[150px] text-right font-mono text-[11px] tracking-[0.12em] text-ledger">
-              SCREEN TIME
-            </span>
-          </div>
-
-          {stats.map((s) => {
-            const avgBand = bandFor(s.avgMatchScore);
-            const maxBand = bandFor(s.maxMatchScore);
-            return (
-              <div
-                key={s.id}
-                className="flex flex-row items-center border-b border-carbon/15 py-3 last:border-b-0 hover:bg-paper-light"
-              >
-                <span className="w-[52px] font-mono text-[11px] text-carbon-soft">
-                  {String(s.id).padStart(2, '0')}
-                </span>
-                <span className="flex flex-1 items-baseline gap-2">
-                  <span className="font-kai text-[15px] font-bold text-carbon-deep">
-                    {s.nickname}
-                  </span>
-                  <span className="font-mono text-[11px] text-ledger">#{s.id}</span>
-                </span>
-                <span className="w-[110px] text-right font-mono text-[12px] text-carbon">
-                  {s.appearances}
-                </span>
-                <span className="flex w-[120px] justify-end">
-                  <BandStamp
-                    band={avgBand}
-                    title={`${s.avgMatchScore.toFixed(2)} cosine average`}
-                  />
-                </span>
-                <span className="flex w-[120px] justify-end">
-                  <BandStamp band={maxBand} title={`${s.maxMatchScore.toFixed(2)} cosine max`} />
-                </span>
-                <span className="w-[150px] text-right font-mono text-[11px] text-carbon-soft">
-                  {formatMmSs(s.firstSeen)} — {formatMmSs(s.lastSeen)}
-                </span>
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-4">
+          <span className="font-kai text-[13px] text-carbon-soft">排序</span>
+          {SORTS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={sortBy === key}
+              onClick={() => setSortBy(key)}
+              className={`border-b-2 py-1 font-kai text-[14px] transition-colors ${
+                sortBy === key
+                  ? 'border-stamp font-bold text-carbon-deep'
+                  : 'border-transparent text-carbon-soft hover:text-carbon-deep'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="ml-auto font-kai text-[12px] text-ink-muted">
+            <span className="font-mono tabular-nums">{rows.length}</span> 位
+          </span>
         </div>
       )}
 
-      <div className="flex flex-row items-center gap-8 pt-4">
-        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">BANDS 分級</span>
-        {(
-          [
-            ['high', `≥ ${BAND_CUTOFFS.high}`],
-            ['medium', `${BAND_CUTOFFS.medium} — ${BAND_CUTOFFS.high}`],
-            ['low', `< ${BAND_CUTOFFS.medium}`],
-          ] as const
-        ).map(([band, range]) => (
-          <span key={band} className="flex flex-row items-center gap-2">
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                band === 'high' ? 'bg-carbon' : band === 'medium' ? 'bg-stamp' : 'bg-ledger'
-              }`}
-            />
-            <span className="font-kai text-[11px] text-carbon-deep">{BAND_STAMP[band].word}</span>
-            <span className="font-mono text-[11px] text-ledger">{range}</span>
-          </span>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="py-16 text-center font-kai text-[14px] text-carbon-soft">正在調閱紀錄…</div>
+      ) : isError ? (
+        <div className="py-16 text-center font-kai text-[14px] text-stamp">
+          讀不到這卷影片的紀錄。
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="py-16 text-center font-kai text-[14px] text-carbon-soft">
+          這卷影片沒有可核對的紀錄。
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <table className="w-full table-fixed border-separate border-spacing-0">
+            <thead className="sticky top-0 z-10 bg-ground">
+              <tr className="h-7">
+                {look.head.map((label, i) => (
+                  <th
+                    key={label}
+                    scope="col"
+                    className={`border-b border-carbon-deep/33 font-kai text-[12px] font-normal text-ink-muted ${
+                      look.widths[i]
+                    } ${i < 2 ? 'text-left' : 'text-right'}`}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const span =
+                  variant === 'admin' ? spanPercent(r.firstSeen, r.lastSeen, duration) : null;
+                const cell = 'border-b border-carbon-deep/13';
+                return (
+                  <tr key={r.id} className={`${look.row} hover:bg-tint`}>
+                    <td className={`${cell} font-mono text-[13px] tabular-nums text-carbon-soft`}>
+                      {r.id.padStart(2, '0')}
+                    </td>
+                    <td className={cell}>
+                      <span className={`flex min-w-0 items-center ${look.who}`}>
+                        <Face
+                          videoId={videoId}
+                          row={r}
+                          portrait={portraits.get(r.id) ?? null}
+                          variant={variant}
+                        />
+                        <span className="truncate font-kai text-[15px] text-carbon-deep">
+                          {r.nickname}
+                        </span>
+                        <span className={`truncate font-kai text-ink-muted ${look.realName}`}>
+                          {r.name}
+                        </span>
+                      </span>
+                    </td>
+                    <td
+                      className={`${cell} text-right font-mono tabular-nums text-carbon-deep ${look.count}`}
+                    >
+                      {r.appearances}
+                    </td>
+                    <td className={cell}>
+                      <Score value={r.avgMatchScore} label="平均" className={look.score} />
+                    </td>
+                    <td className={cell}>
+                      <Score value={r.maxMatchScore} label="最高" className={look.score} />
+                    </td>
+                    <td className={cell}>
+                      <span className="flex items-center justify-end gap-2">
+                        {span ? (
+                          <span className="relative h-2 w-[120px] shrink-0 overflow-hidden rounded-xs bg-tint">
+                            <span
+                              className="absolute top-0 h-full bg-carbon-soft"
+                              style={{ left: `${span.left}%`, width: `${span.width}%` }}
+                            />
+                          </span>
+                        ) : null}
+                        <span
+                          className={`font-mono tabular-nums text-carbon-soft ${
+                            variant === 'admin' ? 'text-[12px]' : 'text-[13px]'
+                          }`}
+                        >
+                          {formatMmSs(r.firstSeen)}
+                          {look.dash}
+                          {formatMmSs(r.lastSeen)}
+                        </span>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <div className="flex-1" />
-      <div className="flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
-        <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
-          分級為暫定值，依實測誤配率調整
-        </span>
-        <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>
-      </div>
+      {variant === 'viewer' ? (
+        <>
+          <div className="flex items-center gap-6">
+            <span className="font-kai text-[12px] text-ink-muted">分級</span>
+            {legend}
+          </div>
+          <div className="flex justify-between font-kai text-[12px] text-ink-muted">
+            <span>分級為暫定值，依實測誤配率調整</span>
+            <span>唯讀檢視 · 所有改動在後台</span>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-between gap-4 font-kai text-[12px] text-ink-muted">
+          <div className="flex items-center gap-4">
+            <span>分級</span>
+            {legend}
+            <span>分級為暫定值，依實測誤配率調整</span>
+          </div>
+          <span>唯讀檢視 · 所有改動在後台</span>
+        </div>
+      )}
     </div>
   );
 }

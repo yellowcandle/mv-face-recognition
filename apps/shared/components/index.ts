@@ -1,6 +1,7 @@
 export { Button } from './Button';
 export { Badge } from './Badge';
 export { Card } from './Card';
+export { Stamp } from './Stamp';
 export { Masthead } from './Masthead';
 export { FaceCrop } from './FaceCrop';
 export type { FaceCropProps } from './FaceCrop';
