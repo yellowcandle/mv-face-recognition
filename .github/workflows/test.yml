@@ -30,14 +30,15 @@ jobs:
   web:
     name: Web check + tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 12.14.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: pnpm
@@ -61,13 +62,14 @@ jobs:
   worker:
     name: Worker typecheck + tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: worker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -80,13 +82,14 @@ jobs:
   mvp-tests:
     name: mvp-processor tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: mvp-processor
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.3.3
 
       # 100/100 today, and verified to pass with the InsightFace model cache removed,
       # so this suite needs no weights, video files or network at test time.
@@ -96,10 +99,11 @@ jobs:
   python:
     name: Python baselines
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.3.3
 
       # The script shells out to pinned uvx mypy/ruff and compares the counts
       # against scripts/ci/baseline.json. No project install is needed: the
