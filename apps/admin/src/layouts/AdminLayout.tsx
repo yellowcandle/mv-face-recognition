@@ -1,47 +1,44 @@
 import { Outlet, NavLink } from 'react-router';
 import { useState, useEffect } from 'react';
+import {
+  BookOpen,
+  Cpu,
+  Inbox,
+  LayoutDashboard,
+  Play,
+  ScanFace,
+  Tag,
+  Users,
+  Wrench,
+} from 'lucide-react';
+import { useFlaggedFaces } from '@mv/shared';
 
-/**
- * 存根 — the office copy of the request slip. The punched spine carries the folio;
- * the cabinet beside it is the filing index: every section is a tab in the drawer.
- */
 const sections = [
   {
     group: '核對',
-    blurb: '審核與標註',
-    latin: 'TRIAGE',
     items: [
-      { to: '/', label: '儀表', hint: '待辦、數量與捷徑總覽', latin: 'DESK' },
-      { to: '/flagging', label: '待核', hint: '核對系統標記的人臉', latin: 'FLAGS' },
-      { to: '/labelling', label: '標註', hint: '替未認出的臉指定參賽者', latin: 'LABEL' },
+      { to: '/', label: '儀表', icon: LayoutDashboard },
+      { to: '/flagging', label: '待核', icon: Inbox },
+      { to: '/labelling', label: '標註', icon: Tag },
     ],
   },
   {
     group: '資料',
-    blurb: '查找與回看',
-    latin: 'RECORDS',
     items: [
-      { to: '/contestants', label: '參賽者', hint: '名冊、參考照與出場次數', latin: 'CAST' },
-      { to: '/player', label: '播放', hint: '播放影片並標記人臉', latin: 'PLAYER' },
-      { to: '/analytics', label: '紀錄', hint: '唯讀的辨識結果帳冊', latin: 'LEDGER' },
+      { to: '/contestants', label: '參賽者', icon: Users },
+      { to: '/player', label: '播放', icon: Play },
+      { to: '/analytics', label: '紀錄', icon: BookOpen },
     ],
   },
   {
     group: '生產',
-    blurb: '處理與維護',
-    latin: 'PIPELINE',
     items: [
-      { to: '/processing', label: '處理', hint: '觸發影片處理、查看進度', latin: 'PROCESS' },
-      {
-        to: '/embedding-workbench',
-        label: '向量',
-        hint: '檢查覆蓋率、重建參考向量',
-        latin: 'EMBED',
-      },
-      { to: '/admin', label: '管理', hint: '服務狀態與資料檢查', latin: 'ADMIN' },
+      { to: '/processing', label: '處理', icon: Cpu },
+      { to: '/embedding-workbench', label: '向量', icon: ScanFace },
+      { to: '/admin', label: '管理', icon: Wrench },
     ],
   },
-] as const;
+];
 
 type Status = 'online' | 'offline' | 'checking';
 type ApiMode = 'local' | 'edge';
@@ -49,6 +46,8 @@ type ApiMode = 'local' | 'edge';
 export function AdminLayout() {
   const [status, setStatus] = useState<Status>('checking');
   const [mode, setMode] = useState<ApiMode>('local');
+  const { data: flagged = [] } = useFlaggedFaces();
+  const pending = flagged.filter((f) => f.status === 'pending').length;
 
   useEffect(() => {
     const check = async () => {
@@ -75,45 +74,20 @@ export function AdminLayout() {
   }, []);
 
   return (
-    <div className="flex h-full flex-row bg-paper">
-      {/* Folio spine */}
-      <div className="flex w-[76px] shrink-0 flex-col items-center justify-between border-r border-carbon/30 bg-paper-dark py-8">
-        <div className="flex flex-col items-center gap-6">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="h-[22px] w-[22px] rounded-full border border-carbon/35 bg-paper-deep shadow-[inset_0_1px_2px_rgba(43,47,107,0.25)]"
-            />
-          ))}
-        </div>
-        <div className="flex flex-col items-center gap-2.5">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-carbon-soft">NO.</span>
-          <span className="font-mono text-[26px] text-carbon">02</span>
-          <span className="h-11 w-px bg-carbon/30" />
-          <span className="font-kai text-[12px] text-carbon-soft">存根</span>
-        </div>
-        <div className="font-mono text-[9px] tracking-[0.18em] text-carbon-soft">
-          {mode === 'edge' ? 'EDGE' : 'LOCAL'}
-        </div>
-      </div>
-
-      {/* Filing cabinet */}
-      <nav className="flex w-[216px] shrink-0 flex-col border-r border-carbon/30 bg-paper-dark/60 px-3 py-6">
-        <div className="flex flex-col gap-0.5 px-2 pb-4">
-          <span className="font-mono text-[8px] tracking-[0.26em] text-carbon-soft">
-            MV FACE RECOGNITION
+    <div className="flex h-full flex-row bg-ground">
+      <nav className="flex w-60 shrink-0 flex-col gap-6 border-r border-carbon-deep/13 bg-tint px-3 pb-4 pt-6">
+        <div className="flex flex-col gap-1 px-2.5">
+          <span className="font-kai text-[16px] font-bold leading-tight text-carbon-deep">
+            MV Face Recognition
           </span>
-          <span className="font-kai text-[13px] font-bold text-carbon">後台 · 存根</span>
+          <span className="font-kai text-[12px] leading-tight text-ink-muted">後台 · 存根</span>
         </div>
 
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
           {sections.map((section) => (
-            <div key={section.group} className="flex flex-col gap-1">
-              <div className="flex flex-row items-baseline justify-between px-2 pb-1">
-                <span className="font-kai text-[11px] text-carbon-soft">{section.group}</span>
-                <span className="font-mono text-[7px] tracking-[0.18em] text-ledger">
-                  {section.latin}
-                </span>
+            <div key={section.group} className="flex flex-col gap-0.5">
+              <div className="px-2.5 pb-1.5 font-kai text-[12px] leading-tight text-ink-muted">
+                {section.group}
               </div>
               {section.items.map((item) => (
                 <NavLink
@@ -121,51 +95,54 @@ export function AdminLayout() {
                   to={item.to}
                   end={item.to === '/'}
                   className={({ isActive }) =>
-                    `flex flex-row items-start justify-between gap-2 border-l-[3px] px-2 py-1.5 ${
+                    `flex h-9 shrink-0 flex-row items-center gap-2.5 rounded-md px-2.5 font-kai text-[14px] ${
                       isActive
-                        ? 'border-l-stamp bg-paper-light text-carbon-deep'
-                        : 'border-l-transparent text-carbon-soft hover:bg-paper-light/60 hover:text-carbon'
+                        ? 'bg-ground font-bold text-carbon-deep'
+                        : 'text-carbon hover:bg-ground/60'
                     }`
                   }
                 >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="font-kai text-[14px] font-bold leading-tight">
-                      {item.label}
-                    </span>
-                    <span className="font-kai text-[10px] leading-snug opacity-80">
-                      {item.hint}
-                    </span>
-                  </span>
-                  <span className="mt-[3px] shrink-0 font-mono text-[7px] tracking-[0.14em] opacity-60">
-                    {item.latin}
-                  </span>
+                  {({ isActive }) => (
+                    <>
+                      <item.icon
+                        size={16}
+                        className={isActive ? 'text-stamp' : 'text-carbon-soft'}
+                      />
+                      <span className="flex-1">{item.label}</span>
+                      {item.to === '/flagging' && pending > 0 ? (
+                        <span className="font-mono text-[12px] font-normal tabular-nums text-stamp">
+                          {pending}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>
           ))}
         </div>
 
-        <div className="mt-4 flex flex-row items-center gap-2 border-t border-carbon/25 px-2 pt-3">
+        <div className="flex flex-row items-center gap-2 border-t border-carbon-deep/13 px-2.5 pt-3">
           <span
-            className={`h-[7px] w-[7px] rounded-full ${
+            className={`h-2 w-2 shrink-0 rounded-full ${
               status === 'online'
                 ? 'bg-carbon'
                 : status === 'offline'
                   ? 'bg-stamp'
-                  : 'bg-ledger animate-pulse'
+                  : 'animate-pulse bg-ink-muted'
             }`}
           />
-          <div className="flex flex-col">
-            <span className="font-mono text-[8px] tracking-[0.14em] text-carbon">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="font-kai text-[12px] text-carbon">
               {status === 'online'
                 ? mode === 'edge'
-                  ? 'EDGE API ONLINE'
-                  : 'LOCAL API ONLINE'
+                  ? '雲端 API 連線中'
+                  : '本機 API 連線中'
                 : status === 'offline'
-                  ? 'API OFFLINE'
-                  : 'CHECKING'}
+                  ? 'API 離線'
+                  : '檢查連線中'}
             </span>
-            <span className="font-mono text-[7px] tracking-[0.1em] text-ledger">
+            <span className="truncate font-mono text-[12px] text-ink-muted">
               {mode === 'edge' ? window.location.host : '127.0.0.1:8000'}
             </span>
           </div>

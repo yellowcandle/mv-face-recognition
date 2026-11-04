@@ -6,9 +6,9 @@
  * Tailwind 4 discovers sources from the Vite root, which is each app. Utilities used only inside
  * `apps/shared` therefore do not exist unless that directory is declared with `@source`. The
  * failure is invisible: the class is simply absent, and the component renders in its default
- * state — a disabled button that looks enabled, a masthead with no gap.
+ * state — a disabled button that looks enabled, a decision stamp with no tilt.
  *
- * The apps build before this runs. These two sentinels are the ones that already bit us; add to
+ * The apps build before this runs. These two sentinels stand in for every shared-only utility; add to
  * the list when another shared-only utility matters.
  */
 
@@ -21,7 +21,7 @@ const ASSETS = process.argv[2] ? path.resolve(process.argv[2]) : path.join(REPO,
 
 const SENTINELS = [
   { css: 'disabled\\:opacity-45:disabled', why: 'Button disabled state (apps/shared/components/Button.tsx)' },
-  { css: '.gap-3\\.5', why: 'Masthead title/latin gap (apps/shared/components/Masthead.tsx)' },
+  { css: '.-rotate-\\[4deg\\]', why: 'Stamp decision tilt (apps/shared/components/Stamp.tsx)' },
 ];
 
 if (!fs.existsSync(ASSETS)) {

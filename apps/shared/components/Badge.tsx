@@ -5,17 +5,17 @@ interface BadgeProps extends PropsWithChildren<HTMLAttributes<HTMLSpanElement>> 
   size?: 'sm' | 'md';
 }
 
-/** A badge is a hand stamp: a bordered mark, never a coloured pill. */
+/** A hairline mark for plain status. For bands and human decisions, use `Stamp`. */
 const variantStyles: Record<string, string> = {
   success: 'text-carbon border-carbon',
   warning: 'text-stamp border-stamp',
-  error: 'text-ledger border-ledger',
-  neutral: 'text-carbon-soft border-carbon/40',
+  error: 'text-ink-muted border-ink-muted',
+  neutral: 'text-carbon-soft border-carbon-deep/33',
 };
 
 const sizeStyles: Record<string, string> = {
-  sm: 'px-1.5 py-0.5 text-[10px]',
-  md: 'px-2 py-0.5 text-[11px]',
+  sm: 'px-1.5 py-0.5',
+  md: 'px-2 py-0.5',
 };
 
 export function Badge({
@@ -27,7 +27,7 @@ export function Badge({
 }: BadgeProps) {
   return (
     <span
-      className={`inline-block -rotate-2 rounded-none border bg-transparent font-kai tracking-[0.1em] ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-block rounded-xs border font-kai text-[12px] leading-tight ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       {...props}
     >
       {children}

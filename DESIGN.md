@@ -1376,3 +1376,38 @@ cosines, `Noto Sans TC` for body.
   write lives in the admin.
 - Routes are folios: viewer `01 圖庫 · 02 播放 · 03 名冊 · 04 紀錄`; admin `02 存根` with a filing
   cabinet for 核對 / 資料 / 生產.
+
+## Sharpened 存根 redesign (2026-11)
+
+Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
+`source/photo/contestants/design_crops/` (gitignored, 73 MB). This section supersedes the
+2026-10 rules above wherever they conflict.
+
+- Spine, folio numbers and tracked Latin labels are gone. Page hints sit under the title.
+- Type sizes: 12, 13-14, 15, 18, 28, 32 (wordmark 16). Nothing under 12px.
+- `LXGW WenKai TC` for text and `JetBrains Mono` for figures. Weight 400; 700 for active
+  states, the primary button and the wordmark.
+- New tokens: ground `#fbf6e3`, tint `#f4edcf`, ink-muted `#68645a` (ledger grey fails
+  contrast on paper).
+- Radii: 6 on controls, 4 on faces, 2 on stamps. No shadows except modals.
+- The raw cosine sits beside the band stamp, not only in a tooltip.
+- Only 已核對 and human decisions tilt. Band and quality stamps are upright.
+- Red means action, selection or missing. 偏弱 is muted.
+- Icons: `lucide-react`. Stamp tones live on `BAND_STAMP` in `apps/shared/lib/bands.ts`.
+
+### TODO
+
+- [ ] Decide whether the public 首頁 should list the two `test-*` clips.
+- [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
+- [ ] Five of six live flags store confidence 0, so they show as `0.00 存疑`.
+- [ ] Flag write failures: 待核 only logs to the console; 播放 uses `alert()`.
+- [ ] 向量 詳情 「重新生成向量」 runs coverage-refresh, not an embedding rebuild.
+- [ ] `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200 with no
+      references, so 缺 contestants get an image. Serve real face crops.
+- [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
+- [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded;
+      boxes lag at shot cuts.
+- [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
+- [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
+      參賽者 read as 沒有出場; its roster has no loading or error state.
+- [ ] Draw and implement designs for states still only styled by analogy.

@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { bandFor } from '../../lib/bands';
+import { BAND_STAMP, bandFor } from '../../lib/bands';
 
 interface Appearance {
   timestamp: number;
@@ -29,8 +29,6 @@ interface Segment {
   end: number;
 }
 
-const SEGMENT_COLORS = ['#22C55E', '#FF8400', '#4363D8', '#E6194B', '#42D4F4', '#F032E6'];
-
 function buildSegments(appearances: Appearance[], gap = 1.0): Segment[] {
   if (appearances.length === 0) return [];
 
@@ -59,10 +57,9 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
   onSeek,
 }: ContestantTimelineProps) {
   const entries = useMemo(() => {
-    return Object.entries(contestantTimeline).map(([key, data], index) => ({
+    return Object.entries(contestantTimeline).map(([key, data]) => ({
       key,
       data,
-      color: SEGMENT_COLORS[index % SEGMENT_COLORS.length],
       segments: buildSegments(data.appearances),
     }));
   }, [contestantTimeline]);
@@ -80,38 +77,24 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
   const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="w-full rounded-none p-4" style={{ backgroundColor: '#1A1A1A' }}>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Contestant Timeline</h3>
-      </div>
+    <div className="flex w-full flex-col gap-2">
+      <h3 className="font-kai text-[18px] font-normal text-carbon-deep">參賽者時間軸</h3>
 
-      <div className="overflow-y-auto" style={{ maxHeight: `${5 * (36 + 8 * 2)}px` }}>
+      <div className="max-h-[180px] overflow-y-auto">
         {entries.map((entry) => (
           <div
             key={entry.key}
-            className="flex items-center"
-            style={{
-              height: '36px',
-              paddingTop: '8px',
-              paddingBottom: '8px',
-              borderBottom: '1px solid #2E2E2E',
-            }}
+            className="flex h-9 items-center gap-2 border-b border-carbon-deep/13"
           >
             <div
-              className="shrink-0 truncate pr-2 text-xs text-gray-300"
-              style={{
-                width: '60px',
-                fontFamily:
-                  'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", sans-serif',
-              }}
-              title={`${entry.data.contestant_info.nickname} · average ${entry.data.average_match_score.toFixed(2)} cosine (${bandFor(entry.data.average_match_score)} band)`}
+              className="w-16 shrink-0 truncate font-kai text-[12px] text-carbon-soft"
+              title={`${entry.data.contestant_info.nickname} · 平均 ${entry.data.average_match_score.toFixed(2)} ${BAND_STAMP[bandFor(entry.data.average_match_score)].word}`}
             >
               {entry.data.contestant_info.nickname}
             </div>
 
             <div
-              className="relative flex-1 cursor-pointer rounded-none"
-              style={{ backgroundColor: '#2E2E2E', height: '20px' }}
+              className="relative h-5 flex-1 cursor-pointer overflow-hidden rounded-xs bg-tint"
               onClick={(e) => handleBarClick(e, entry)}
             >
               {entry.segments.map((seg, i) => {
@@ -121,25 +104,15 @@ export const ContestantTimeline = React.memo(function ContestantTimeline({
                 return (
                   <div
                     key={i}
-                    className="absolute top-0 h-full rounded-none"
-                    style={{
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      backgroundColor: entry.color,
-                      opacity: 0.85,
-                    }}
+                    className="absolute top-0 h-full bg-carbon-soft"
+                    style={{ left: `${left}%`, width: `${width}%` }}
                   />
                 );
               })}
 
               <div
-                className="pointer-events-none absolute top-0 h-full"
-                style={{
-                  left: `${playheadPercent}%`,
-                  width: '2px',
-                  backgroundColor: '#FF8400',
-                  zIndex: 10,
-                }}
+                className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-stamp"
+                style={{ left: `${playheadPercent}%` }}
               />
             </div>
           </div>

@@ -1,50 +1,41 @@
 import { NavLink, Outlet } from 'react-router';
+import { BookOpen, House, Play, Users } from 'lucide-react';
 
 const NAV = [
-  { to: '/', label: '首頁', hint: '選片入口 · 點唱單', latin: 'HOME' },
-  { to: '/player', label: '播放', hint: '看片、人臉框與時間軸', latin: 'PLAYER' },
-  { to: '/analytics', label: '紀錄', hint: '唯讀的辨識結果帳冊', latin: 'LEDGER' },
-  { to: '/cast', label: '名冊', hint: '參賽者、參考照與出場次數', latin: 'CAST' },
+  { to: '/', label: '首頁', icon: House },
+  { to: '/player', label: '播放', icon: Play },
+  { to: '/analytics', label: '紀錄', icon: BookOpen },
+  { to: '/cast', label: '名冊', icon: Users },
 ];
 
-/**
- * One printed slip, read page by page: a hairline index across the top, the folio below.
- * The old punched spine took 76px of every page for four links.
- */
 export function ViewerLayout() {
   return (
-    <div className="flex h-full flex-col bg-paper">
-      <header className="flex shrink-0 flex-row items-center justify-between border-b border-carbon/30 px-14 py-3">
-        <span className="font-mono text-[9px] tracking-[0.3em] text-carbon-soft">MVFR</span>
-        <nav className="flex flex-row items-center gap-8">
+    <div className="flex h-full flex-col bg-ground">
+      <header className="flex h-14 shrink-0 flex-row items-center justify-between border-b border-carbon-deep/13 bg-tint px-14">
+        <div className="flex flex-row items-center gap-3">
+          <span className="font-kai text-[16px] font-bold text-carbon-deep">
+            MV Face Recognition
+          </span>
+          <span className="font-kai text-[12px] text-ink-muted">全民造星 IV</span>
+        </div>
+        <nav className="flex flex-row items-center gap-2">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex flex-col gap-0.5 ${isActive ? '' : 'opacity-60 hover:opacity-100'}`
+                `flex h-9 flex-row items-center gap-2 rounded-md px-3 font-kai text-[14px] ${
+                  isActive
+                    ? 'bg-ground font-bold text-carbon-deep'
+                    : 'text-carbon hover:bg-ground/60'
+                }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className="flex flex-row items-baseline gap-2">
-                    <span
-                      className={`font-serif text-[13px] font-bold ${
-                        isActive ? 'text-carbon-deep' : 'text-ledger'
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                    <span
-                      className={`font-mono text-[8px] tracking-[0.22em] ${
-                        isActive ? 'text-stamp' : 'text-ledger'
-                      }`}
-                    >
-                      {item.latin}
-                    </span>
-                  </span>
-                  <span className="font-kai text-[9px] leading-none text-ledger">{item.hint}</span>
+                  <item.icon size={16} className={isActive ? 'text-stamp' : 'text-carbon-soft'} />
+                  {item.label}
                 </>
               )}
             </NavLink>

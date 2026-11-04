@@ -22,6 +22,11 @@
   --color-carbon-soft: #4a4f8c;
   --color-stamp: #ae3b2c;
   --color-ledger: #8a857a;
+
+  /* Sharpened 存根: page ground, nav tint, and the muted ink that passes contrast on paper. */
+  --color-ground: #fbf6e3;
+  --color-tint: #f4edcf;
+  --color-ink-muted: #68645a;
 }
 
 html,
@@ -31,7 +36,7 @@ body,
 }
 
 body {
-  background-color: var(--color-paper);
+  background-color: var(--color-ground);
   color: var(--color-carbon-deep);
   -webkit-font-smoothing: antialiased;
 }
@@ -39,4 +44,34 @@ body {
 ::selection {
   background: var(--color-stamp);
   color: var(--color-paper-light);
+}
+
+/* Visible focus for every interactive element. Controls may restyle it, never remove it. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-stamp);
+    outline-offset: 2px;
+  }
+}
+
+/* Form controls: 32px, hairline, rounded-md. Add `field-select` to a native <select>. */
+@layer components {
+  .field {
+    height: 2rem;
+    border: 1px solid color-mix(in srgb, var(--color-carbon-deep) 33%, transparent);
+    border-radius: 0.375rem;
+    background-color: transparent;
+    padding-inline: 0.625rem;
+    font-family: var(--font-kai);
+    font-size: 13px;
+    color: var(--color-carbon);
+  }
+  .field-select {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a4f8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+  }
 }

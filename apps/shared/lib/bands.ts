@@ -38,11 +38,12 @@ export function bandFor(matchScore: number | null | undefined): Band {
 }
 
 /**
- * How a band is stamped: the word on the slip and its ink (text + border colour).
- * The single mapping — every surface that shows a band reads it from here.
+ * How a band is stamped: the word on the slip and the `Stamp` tone it takes.
+ * The single mapping — every surface that shows a band reads it from here. `low` is muted
+ * rather than ledger: ledger ink fails contrast on the ground.
  */
-export const BAND_STAMP: Record<Band, { word: string; ink: string }> = {
-  high: { word: '清楚', ink: 'text-carbon border-carbon' },
-  medium: { word: '尚可', ink: 'text-stamp border-stamp' },
-  low: { word: '存疑', ink: 'text-ledger border-ledger' },
+export const BAND_STAMP: Record<Band, { word: string; tone: 'carbon' | 'stamp' | 'muted' }> = {
+  high: { word: '清楚', tone: 'carbon' },
+  medium: { word: '尚可', tone: 'stamp' },
+  low: { word: '存疑', tone: 'muted' },
 };

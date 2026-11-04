@@ -6,6 +6,8 @@ interface VideoCanvasProps {
   videoSrc: string;
   faces: FaceDetection[];
   showAnnotations: boolean;
+  /** Faces drawn in stamp red: the ones selected for flagging. */
+  isSelected?: (face: FaceDetection) => boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onTimeUpdate?: (time: number) => void;
   onLoadedMetadata?: (duration: number) => void;
@@ -23,6 +25,7 @@ export const VideoCanvas = forwardRef<VideoCanvasHandle, VideoCanvasProps>(funct
     videoSrc,
     faces,
     showAnnotations,
+    isSelected,
     containerRef,
     onTimeUpdate,
     onLoadedMetadata,
@@ -41,7 +44,7 @@ export const VideoCanvas = forwardRef<VideoCanvasHandle, VideoCanvasProps>(funct
     },
   }));
 
-  useAnnotations(canvasRef, videoRef, containerRef, faces, showAnnotations);
+  useAnnotations(canvasRef, videoRef, containerRef, faces, showAnnotations, isSelected);
 
   // Sync video src changes while preserving position
   const prevSrcRef = useRef(videoSrc);
@@ -61,7 +64,7 @@ export const VideoCanvas = forwardRef<VideoCanvasHandle, VideoCanvasProps>(funct
       <video
         ref={videoRef}
         src={videoSrc}
-        className="w-full h-full object-contain"
+        className="h-full w-full object-contain"
         crossOrigin="anonymous"
         onTimeUpdate={() => {
           if (videoRef.current) onTimeUpdate?.(videoRef.current.currentTime);
@@ -75,7 +78,7 @@ export const VideoCanvas = forwardRef<VideoCanvasHandle, VideoCanvasProps>(funct
       />
       <canvas
         ref={canvasRef}
-        className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1]"
+        className="pointer-events-none absolute left-0 top-0 z-[1] h-full w-full"
       />
     </>
   );

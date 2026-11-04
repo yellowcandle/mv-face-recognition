@@ -1,3 +1,5 @@
+import { Button } from '../Button';
+
 interface DetectionBarProps {
   faceCount: number;
   /** Of `faceCount`, how many were matched to a contestant; the rest are unmatched detections. */
@@ -22,40 +24,38 @@ export function DetectionBar({
   onToggleAnnotations,
 }: DetectionBarProps) {
   return (
-    <div className="flex items-center gap-3 flex-wrap bg-paper-light/80 border border-paper-dark rounded-none px-4 py-2 text-sm">
-      <button
-        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-          showAnnotations
-            ? 'bg-stamp/20 text-stamp border border-stamp/40'
-            : 'bg-paper-dark text-carbon-soft border border-paper-deep hover:text-carbon-deep'
-        }`}
+    <div className="flex flex-wrap items-center gap-4 font-kai text-[13px]">
+      <Button
+        size="sm"
+        className={showAnnotations ? 'bg-tint font-bold text-carbon-deep' : ''}
+        aria-pressed={showAnnotations}
         onClick={onToggleAnnotations}
-        title={showAnnotations ? 'Hide face annotations' : 'Show face annotations'}
+        title={showAnnotations ? '隱藏人臉方框' : '顯示人臉方框'}
       >
-        {showAnnotations ? 'Boxes ON' : 'Boxes OFF'}
-      </button>
+        {showAnnotations ? '方框 開' : '方框 關'}
+      </Button>
 
-      <span className="text-carbon-soft">
-        Faces: <span className="text-carbon-deep font-medium">{faceCount}</span>
+      <span className="flex items-center gap-2 text-carbon-soft">
+        人臉
+        <span className="font-mono tabular-nums text-carbon-deep">{faceCount}</span>
         {faceCount > 0 && (
-          <span className="text-ledger">
-            {' ('}
-            <span className="text-carbon">{recognizedCount}</span> recognized,{' '}
-            <span className="text-carbon">{faceCount - recognizedCount}</span> unmatched{')'}
+          <span className="text-ink-muted">
+            認出 {recognizedCount} · 未認出 {faceCount - recognizedCount}
           </span>
         )}
       </span>
 
-      <span className="text-carbon-soft">
-        Frame: <span className="text-carbon-deep font-mono">{frameNumber}</span>
+      <span className="flex items-center gap-2 text-carbon-soft">
+        畫格
+        <span className="font-mono tabular-nums text-carbon-deep">{frameNumber}</span>
       </span>
 
       {faceCount > 0 &&
         canFlag &&
         (batchMode ? (
-          <span className="text-stamp font-medium">Selected: {selectedCount}</span>
+          <span className="font-bold text-stamp">已選 {selectedCount}</span>
         ) : (
-          <span className="text-ledger text-xs italic">Click a face to flag it</span>
+          <span className="text-[12px] text-ink-muted">點選人臉即可標記</span>
         ))}
     </div>
   );

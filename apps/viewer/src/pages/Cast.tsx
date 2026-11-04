@@ -1,23 +1,27 @@
-import { useMemo, useState } from 'react';
-import { Masthead, useContestants } from '@mv/shared';
+import { useId, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import { Masthead, Stamp, useContestants, useCoverage } from '@mv/shared';
+import { QUALITY_WORD } from '@mv/shared/lib/pipeline';
 import type { Contestant } from '@mv/shared';
-
-const QUALITY_WORD: Record<Contestant['quality'], string> = {
-  good: '齊全',
-  weak: '偏弱',
-  missing: '缺',
-};
 
 /**
  * 名冊 — the cast as a contact sheet. Every contestant is one frame with their number,
- * their name in hand, and a stamped note when the reference set is thin. No cards:
- * the frames butt against hairline rules, the way a proof sheet does.
+ * their name, and a stamped note when the reference set is thin. No cards: the frames
+ * butt against hairline rules, the way a proof sheet does.
  */
 export function Cast() {
   const { data: contestants = [], isLoading, error } = useContestants();
   const [query, setQuery] = useState('');
+  const searchId = useId();
+  const { data: coverage } = useCoverage();
 
   const all = contestants as Contestant[];
+
+  // The contestant list only ever says good or missing; coverage is what knows a set is weak.
+  const qualityById = useMemo(
+    () => new Map(coverage?.contestants.map((c) => [c.id, c.quality])),
+    [coverage],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -35,66 +39,63 @@ export function Cast() {
   const withPhoto = all.filter((c) => c.portrait_url || c.reference_count > 0).length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 pt-7">
-      <Masthead eyebrow="MV FACE RECOGNITION · 全民造星 IV" title="名冊" latin="CAST SHEET">
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">ON FILE</span>
-          <span className="font-mono text-[12px] text-carbon">
-            {all.length} 位 · {withPhoto} 有相
-          </span>
-        </div>
-        <div className="-rotate-[7deg] rounded-[4px] border-2 border-stamp px-3 py-1.5">
-          <div className="font-serif text-[15px] font-bold tracking-[0.14em] text-stamp">唯讀</div>
-          <div className="font-mono text-[7px] tracking-[0.18em] text-stamp">PUBLIC · COPY 2</div>
-        </div>
+    <div className="flex min-h-full flex-1 flex-col gap-4 px-14 pb-5 pt-8">
+      <Masthead title="名冊" hint="參賽者、參考照與出場次數">
+        <span className="tabular-nums text-carbon-soft">
+          {all.length} 位 · {withPhoto} 有相
+        </span>
+        <Stamp tone="muted">唯讀</Stamp>
       </Masthead>
 
-      <div className="mt-4 h-px bg-carbon/45" />
-
-      <div className="flex flex-row items-end justify-between gap-6 py-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-            SEARCH 編號 / 姓名 / 暱稱
-          </span>
+      <div className="flex flex-row items-center gap-3">
+        <div className="relative w-[420px]">
+          <Search
+            size={16}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-carbon-soft"
+          />
           <input
+            id={searchId}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜尋 96 位參賽者…"
-            className="w-full max-w-[420px] border-b border-carbon/45 bg-transparent pb-1.5 font-kai text-[15px] text-carbon-deep placeholder:text-ledger focus:border-stamp focus:outline-none"
+            placeholder={all.length ? `搜尋 ${all.length} 位參賽者…` : '搜尋參賽者…'}
+            className="h-10 w-full rounded-md border border-carbon-deep/33 bg-transparent pl-9 pr-3 font-kai text-[14px] text-carbon-deep placeholder:text-ink-muted"
           />
         </div>
-        <span className="font-mono text-[10px] text-carbon-soft">
+        <label htmlFor={searchId} className="font-kai text-[12px] text-ink-muted">
+          編號、姓名或暱稱
+        </label>
+        <span className="ml-auto font-mono text-[13px] tabular-nums text-carbon-soft">
           {filtered.length} / {all.length}
         </span>
       </div>
 
       {isLoading ? (
-        <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱名冊…</div>
+        <div className="py-16 text-center font-kai text-[13px] text-ink-muted">正在調閱名冊…</div>
       ) : error ? (
-        <div className="mt-1 border border-stamp/40 bg-stamp/5 px-4 py-10 text-center font-kai text-[13px] text-stamp">
+        <div className="rounded-md border border-stamp/40 px-4 py-10 text-center font-kai text-[13px] text-stamp">
           讀不到名冊 — API 未回應。
         </div>
       ) : filtered.length === 0 ? (
-        <div className="mt-1 border border-dashed border-carbon/35 px-4 py-14 text-center">
-          <div className="font-kai text-[15px] font-bold text-carbon-deep">名冊裡沒有這個人</div>
-          <div className="mt-1 font-kai text-[12px] text-carbon-soft">換個編號或名字試試。</div>
+        <div className="border-y border-carbon-deep/13 px-4 py-14 text-center">
+          <div className="font-kai text-[15px] text-carbon-deep">名冊裡沒有這個人</div>
+          <div className="mt-1 font-kai text-[13px] text-ink-muted">換個編號或名字試試。</div>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] border-l border-t border-carbon/25">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] border-l border-t border-carbon-deep/33">
           {filtered.map((c) => {
             // Only the cropped derivative is public; no portrait_url means the 缺相 stamp shows.
             const src = c.portrait_url ?? null;
+            const quality = qualityById.get(c.id) ?? c.quality;
             return (
               <figure
                 key={c.id}
-                className="group flex flex-col border-b border-r border-carbon/25 bg-paper"
+                className="flex min-w-0 flex-col border-b border-r border-carbon-deep/33"
               >
-                <div className="relative aspect-[3/4] overflow-hidden bg-paper-dark">
+                <div className="relative aspect-[83/76] overflow-hidden bg-tint">
                   {/* The stamp sits underneath; a loaded portrait covers it, a missing one shows it. */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="-rotate-6 border border-ledger px-2 py-1 font-kai text-[11px] tracking-[0.18em] text-ledger">
-                      缺相
-                    </span>
+                    <Stamp>缺相</Stamp>
                   </div>
 
                   {src ? (
@@ -103,30 +104,33 @@ export function Cast() {
                       alt={`${c.nickname} ${c.name}`}
                       loading="lazy"
                       decoding="async"
-                      className="relative h-full w-full object-cover object-[50%_22%] transition-transform duration-300 group-hover:scale-[1.03]"
+                      className="relative h-full w-full object-cover object-[50%_22%]"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.visibility = 'hidden';
+                        e.currentTarget.style.visibility = 'hidden';
                       }}
                     />
                   ) : null}
 
-                  {c.quality !== 'good' && c.reference_count > 0 && (
-                    <span className="absolute right-1.5 top-1.5 -rotate-2 border border-stamp bg-paper-light/85 px-1 py-0.5 font-kai text-[9px] tracking-[0.1em] text-stamp">
-                      {QUALITY_WORD[c.quality]}
-                    </span>
+                  {quality !== 'good' && c.reference_count > 0 && (
+                    <Stamp
+                      tone={quality === 'missing' ? 'stamp' : 'muted'}
+                      className="absolute right-1 top-1 bg-ground/93"
+                    >
+                      {QUALITY_WORD[quality]}
+                    </Stamp>
                   )}
                 </div>
 
-                <figcaption className="flex flex-col gap-0.5 border-t border-carbon/15 px-2 py-1.5">
-                  <div className="flex flex-row items-baseline gap-1.5">
-                    <span className="font-mono text-[10px] text-carbon-soft">
+                <figcaption className="flex flex-col gap-0.5 p-1">
+                  <span className="truncate font-kai text-[13px] leading-tight text-carbon-deep">
+                    {c.nickname}
+                  </span>
+                  <span className="flex flex-row items-center gap-1">
+                    <span className="font-mono text-[12px] tabular-nums text-carbon-soft">
                       {String(c.id).padStart(2, '0')}
                     </span>
-                    <span className="truncate font-kai text-[14px] font-bold leading-tight text-carbon-deep group-hover:text-stamp">
-                      {c.nickname}
-                    </span>
-                  </div>
-                  <span className="truncate font-kai text-[11px] text-carbon-soft">{c.name}</span>
+                    <span className="truncate font-kai text-[12px] text-ink-muted">{c.name}</span>
+                  </span>
                 </figcaption>
               </figure>
             );
@@ -134,12 +138,9 @@ export function Cast() {
         </div>
       )}
 
-      <div className="flex-1" />
-      <div className="mt-4 flex flex-row items-center justify-between border-t border-carbon/25 pt-3">
-        <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-          相片來源 精選歷史相片集 CURATED HISTORICAL SET · 臉部裁切為衍生縮圖
-        </span>
-        <span className="font-kai text-[11px] text-carbon-soft">唯讀檢視 · 所有改動在後台</span>
+      <div className="mt-auto flex flex-row items-center justify-between font-kai text-[12px] text-ink-muted">
+        <span>相片來源：精選歷史相片集 · 臉部裁切為衍生縮圖</span>
+        <span>唯讀檢視 · 所有改動在後台</span>
       </div>
     </div>
   );

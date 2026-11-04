@@ -175,4 +175,5 @@ export interface FlaggedFace {
   status: 'pending' | 'accepted' | 'rejected';
   user_label?: string;
   thumbnail?: string;
+  created_at?: string; // when the flag was filed; older records may lack it
 }

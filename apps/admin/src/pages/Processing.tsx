@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { LoaderCircle } from 'lucide-react';
+import { Button, Masthead, adminFetch, formatMmSs, LOCAL_API_OFFLINE_NOTICE } from '@mv/shared';
 import {
-  Card,
-  Badge,
-  Button,
-  Masthead,
-  adminFetch,
-  formatMmSs,
-  LOCAL_API_OFFLINE_NOTICE,
-} from '@mv/shared';
+  formatJobCreated,
+  jobModeLabel,
+  jobProgressLine,
+  jobStatusLabel,
+} from '@mv/shared/lib/pipeline';
 
 interface ProcessingJob {
   id: string;
@@ -73,33 +73,21 @@ async function failureMessage(res: Response, fallback: string): Promise<string> 
   return `${fallback} (HTTP ${res.status})`;
 }
 
-function getStatusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
-  switch (status) {
-    case 'completed':
-      return 'success';
-    case 'running':
-      return 'warning';
-    case 'failed':
-      return 'error';
-    default:
-      return 'neutral';
-  }
-}
+const STATUS_INK: Record<ProcessingJob['status'], string> = {
+  queued: 'text-carbon-soft',
+  running: 'text-carbon',
+  completed: 'text-ink-muted',
+  failed: 'text-stamp',
+  cancelled: 'text-ink-muted',
+};
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'completed':
-      return 'bg-carbon';
-    case 'running':
-      return 'bg-carbon';
-    case 'failed':
-      return 'bg-stamp';
-    case 'cancelled':
-      return 'bg-ledger';
-    default:
-      return 'bg-stamp';
-  }
-}
+const BAR_FILL: Record<ProcessingJob['status'], string> = {
+  queued: 'bg-carbon',
+  running: 'bg-carbon',
+  completed: 'bg-carbon',
+  failed: 'bg-stamp',
+  cancelled: 'bg-ink-muted',
+};
 
 function formatDuration(start?: number | null, end?: number | null): string {
   if (!start) return '--';
@@ -107,14 +95,44 @@ function formatDuration(start?: number | null, end?: number | null): string {
   return formatMmSs(Math.floor((endTime - start) / 1000));
 }
 
-function formatTimestamp(iso?: string): string {
-  if (!iso) return '--';
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function Banner({ children }: { children: ReactNode }) {
+  return (
+    <div role="alert" className="border-y border-stamp/33 py-2 font-kai text-[13px] text-stamp">
+      {children}
+    </div>
+  );
+}
+
+function ActionColumn({
+  className,
+  title,
+  description,
+  does,
+  controls,
+  note,
+}: {
+  className: string;
+  title: string;
+  description: string;
+  does: string[];
+  controls: ReactNode;
+  note?: ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col gap-3 ${className}`}>
+      <div className="flex h-[72px] flex-col gap-1">
+        <h2 className="font-kai text-[18px] font-normal text-carbon-deep">{title}</h2>
+        <p className="font-kai text-[14px] leading-[1.4] text-carbon-soft">{description}</p>
+      </div>
+      <div className="flex h-[60px] flex-row items-end gap-2">{controls}</div>
+      {note && <p className="font-kai text-[12px] leading-[1.4] text-ink-muted">{note}</p>}
+      <ul className="flex flex-col gap-1 font-kai text-[12px] text-ink-muted">
+        {does.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function Processing() {
@@ -246,7 +264,7 @@ export function Processing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(await failureMessage(res, 'Failed to start processing'));
+      if (!res.ok) throw new Error(await failureMessage(res, '無法開始處理'));
       const started = (await res.json()) as {
         job_id?: string;
         status?: ProcessingJob['status'];
@@ -270,7 +288,7 @@ export function Processing() {
       }
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start processing');
+      setError(e instanceof Error ? e.message : '無法開始處理');
     } finally {
       setIsProcessing(false);
     }
@@ -291,7 +309,7 @@ export function Processing() {
   async function cancelJob(jobId: string) {
     try {
       const res = await adminFetch(`/admin/api/processing/cancel/${jobId}`, { method: 'POST' });
-      if (!res.ok) throw new Error(await failureMessage(res, 'Failed to cancel job'));
+      if (!res.ok) throw new Error(await failureMessage(res, '無法取消工作'));
       // The list lags the write, so a row still pending locally must not keep saying `queued`.
       setPendingJobs((prev) =>
         prev.map((job) =>
@@ -302,274 +320,229 @@ export function Processing() {
       );
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel job');
+      setError(e instanceof Error ? e.message : '無法取消工作');
     }
   }
 
   async function clearCompleted() {
     try {
       const res = await adminFetch('/admin/api/processing/clear-completed', { method: 'POST' });
-      if (!res.ok) throw new Error(await failureMessage(res, 'Failed to clear completed jobs'));
+      if (!res.ok) throw new Error(await failureMessage(res, '無法清除已完成工作'));
       // The server drops every terminal record (completed, failed, cancelled); a local filter
       // would keep the rows it disagrees about until the next poll.
       await fetchJobs();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to clear completed jobs');
+      setError(e instanceof Error ? e.message : '無法清除已完成工作');
     }
   }
 
+  const unavailableBecauseProcessing = !jobsAvailable || isProcessing;
+  const startingLabel = '啟動中…';
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
-      <Masthead
-        eyebrow="BACK OFFICE · PIPELINE"
-        title="處理"
-        latin="VIDEO PROCESSING & CACHE"
-        size="md"
-      />
-
-      <div className="mt-4 h-px bg-carbon/45" />
-
-      <div className="flex min-h-0 flex-1 flex-col gap-6 pt-5">
-        {!jobsAvailable && (
-          <div className="border border-stamp/50 bg-stamp/5 px-4 py-3 font-kai text-[13px] text-stamp">
-            {LOCAL_API_OFFLINE_NOTICE}
-          </div>
-        )}
-
-        {/* Error Banner */}
-        {error && (
-          <div className="border border-stamp/50 bg-stamp/5 px-4 py-3 font-kai text-[13px] text-stamp">
-            {error}
-          </div>
-        )}
-
-        {/* Active Jobs Banner */}
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
+      <Masthead title="處理" hint="觸發影片處理、查看進度">
         {activeCount > 0 && (
-          <div className="flex items-center gap-2 border border-carbon/50 bg-carbon/5 px-4 py-3 font-kai text-[13px] text-carbon">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-carbon border-t-transparent" />
-            {activeCount} job{activeCount !== 1 ? 's' : ''} running
-          </div>
+          <span role="status" className="flex items-center gap-2 text-carbon">
+            <LoaderCircle aria-hidden className="size-4 animate-spin" />
+            <span>
+              <span className="font-mono tabular-nums">{activeCount}</span> 個工作執行中
+            </span>
+          </span>
         )}
+      </Masthead>
 
-        {/* Processing Action Cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <Card padding="lg">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-carbon-deep">Initial Processing</h2>
-              <span className="h-2 w-2 rounded-full bg-carbon" />
-            </div>
-            <p className="mb-4 text-sm leading-relaxed text-carbon-soft">
-              Process all videos on this machine with the local pipeline
-            </p>
-            <label className="mb-1 block font-mono text-[8px] tracking-[0.2em] text-ledger">
-              SOURCE REEL 來源影片
-            </label>
-            <select
-              value={selectedVideo}
-              onChange={(e) => setSelectedVideo(e.target.value)}
-              disabled={!jobsAvailable}
-              className="mb-4 w-full border border-carbon/45 bg-paper-light px-2.5 py-2 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none disabled:opacity-50"
-            >
-              <option value="">全部來源影片 (All Videos)</option>
-              {videoOptions.map((v) => (
-                <option key={v.filename} value={v.filename}>
-                  {v.filename} ({v.size_mb.toFixed(1)} MB)
-                </option>
-              ))}
-            </select>
-            <Button
-              variant="primary"
-              onClick={startInitialProcessing}
-              disabled={!jobsAvailable || isProcessing}
-              className="mb-4 w-full"
-            >
-              {isProcessing ? 'Starting...' : 'Start Processing'}
-            </Button>
-            <ul className="space-y-1.5 text-xs text-ledger">
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Process all unprocessed videos
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Detect and recognize faces
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Hardware acceleration when available
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Results written to local_output/
-              </li>
-            </ul>
-          </Card>
+      {!jobsAvailable && <Banner>{LOCAL_API_OFFLINE_NOTICE}</Banner>}
+      {error && <Banner>{error}</Banner>}
 
-          <Card padding="lg">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-carbon-deep">Embedding Update</h2>
-              <span className="h-2 w-2 rounded-full bg-carbon" />
-            </div>
-            <p className="mb-4 text-sm leading-relaxed text-carbon-soft">
-              Rebuild reference embeddings from the curated portraits on disk
-            </p>
+      <div className="flex flex-row border-y border-carbon-deep/13 py-5">
+        <ActionColumn
+          className="min-w-0 flex-1 border-r border-carbon-deep/13 pr-6"
+          title="首次處理"
+          description="用本機流程處理這台機器上的所有影片"
+          does={[
+            '處理所有未處理的影片',
+            '偵測並辨識人臉',
+            '可用時啟用硬件加速',
+            '結果寫入 local_output/',
+          ]}
+          controls={
+            <>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <label htmlFor="source-reel" className="font-kai text-[12px] text-ink-muted">
+                  來源影片
+                </label>
+                <select
+                  id="source-reel"
+                  value={selectedVideo}
+                  onChange={(e) => setSelectedVideo(e.target.value)}
+                  disabled={!jobsAvailable}
+                  className="field field-select h-10 w-full disabled:opacity-45"
+                >
+                  <option value="">全部來源影片</option>
+                  {videoOptions.map((v) => (
+                    <option key={v.filename} value={v.filename}>
+                      {v.filename} ({v.size_mb.toFixed(1)} MB)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                variant="primary"
+                onClick={startInitialProcessing}
+                disabled={unavailableBecauseProcessing}
+              >
+                {isProcessing ? startingLabel : '開始處理'}
+              </Button>
+            </>
+          }
+        />
+
+        <ActionColumn
+          className="w-[296px] shrink-0 border-r border-carbon-deep/13 px-6"
+          title="更新向量"
+          description="由硬碟上揀選好的參考相重建參考向量"
+          does={[
+            '提升人臉辨識準確度',
+            '重建 reference_embeddings.npz',
+            '快速重算向量',
+            '自動更新覆蓋率',
+          ]}
+          controls={
             <Button
-              variant="secondary"
+              className="w-full"
               onClick={startEmbeddingUpdate}
-              disabled={!jobsAvailable || isProcessing}
-              className="mb-4 w-full"
+              disabled={unavailableBecauseProcessing}
             >
-              {isProcessing ? 'Starting...' : 'Update Embeddings'}
+              {isProcessing ? startingLabel : '更新向量'}
             </Button>
-            <ul className="space-y-1.5 text-xs text-ledger">
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Improve face recognition accuracy
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Rebuild reference_embeddings.npz
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Fast embedding recalculation
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Automatic coverage refresh
-              </li>
-            </ul>
-          </Card>
+          }
+        />
 
-          <Card padding="lg">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-carbon-deep">
-                Coverage &amp; Similarity
-              </h2>
-              <span className="h-2 w-2 rounded-full bg-carbon" />
-            </div>
-            <p className="mb-4 text-sm leading-relaxed text-carbon-soft">
-              Recompute embedding coverage, the cosine matrix and the closest pairs
-            </p>
+        <ActionColumn
+          className="w-[296px] shrink-0 pl-6"
+          title="覆蓋率與相似度"
+          description="重新計算向量覆蓋率、餘弦矩陣與最相近的配對"
+          does={[
+            '重建 data/coverage.json',
+            '重建 similarity_matrix.json',
+            '重建 top_pairs.json',
+            '經 /api/embedding/* 提供',
+          ]}
+          controls={
             <Button
-              variant="secondary"
+              className="w-full"
               onClick={startCoverageRefresh}
-              disabled={!jobsAvailable || isProcessing || isEdge}
-              className="mb-4 w-full"
+              disabled={unavailableBecauseProcessing || isEdge}
             >
-              {isProcessing ? 'Starting...' : '重新計算覆蓋率與相似度'}
+              {isProcessing ? startingLabel : '重新計算覆蓋率與相似度'}
             </Button>
-            {isEdge && (
-              <p className="mb-4 text-xs leading-relaxed text-ledger">
-                Not available on the edge: coverage and similarity are published from the bucket
-                with <code>npm run publish:metadata</code>, not written by a job.
-              </p>
+          }
+          note={
+            isEdge ? (
+              <>
+                雲端環境不提供：覆蓋率與相似度由 bucket 經{' '}
+                <code className="font-mono">npm run publish:metadata</code> 發佈，不由工作寫入。
+              </>
+            ) : null
+          }
+        />
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <div className="flex flex-row items-center justify-between">
+          <h2 className="font-kai text-[18px] font-normal text-carbon-deep">處理工作</h2>
+          <div className="flex h-8 flex-row items-center gap-4 font-kai text-[13px] text-carbon-soft">
+            <span>
+              <span className="font-mono tabular-nums">{activeCount}</span> 進行中
+            </span>
+            <span>
+              <span className="font-mono tabular-nums">{completedCount}</span> 已完成
+            </span>
+            {completedCount > 0 && (
+              <Button size="sm" onClick={clearCompleted}>
+                清除已完成
+              </Button>
             )}
-            <ul className="space-y-1.5 text-xs text-ledger">
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Rebuild data/coverage.json
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Rebuild similarity_matrix.json
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Rebuild top_pairs.json
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-carbon">&#x2713;</span> Serve via /api/embedding/*
-              </li>
-            </ul>
-          </Card>
+          </div>
         </div>
 
-        {/* Jobs List */}
-        <Card padding="lg">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-carbon-deep">Processing Jobs</h2>
-            <div className="flex items-center gap-2">
-              <Badge variant="warning" size="sm">
-                {activeCount} Active
-              </Badge>
-              <Badge variant="success" size="sm">
-                {completedCount} Completed
-              </Badge>
-              {completedCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearCompleted}>
-                  Clear Completed
-                </Button>
-              )}
-            </div>
+        {visibleJobs.length === 0 ? (
+          <div className="border-t border-carbon-deep/13 py-10 text-center font-kai">
+            <p className="text-[14px] text-carbon-soft">還沒有處理工作</p>
+            <p className="mt-1 text-[12px] text-ink-muted">開始一項處理工作後，會在這裡顯示進度</p>
           </div>
-
-          {visibleJobs.length === 0 ? (
-            <div className="py-10 text-center text-ledger">
-              <p className="text-sm">No processing jobs yet</p>
-              <p className="mt-1 text-xs">Start a processing job to see it here</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {visibleJobs.map((job) => (
+        ) : (
+          <div className="flex flex-col">
+            {visibleJobs.map((job) => {
+              const progressLine = jobProgressLine(job);
+              const progress = job.progress || 0;
+              return (
                 <div
                   key={job.id}
-                  className="flex gap-4 border border-paper-dark bg-paper p-4 transition-colors hover:border-paper-deep"
+                  className="flex flex-row items-center gap-6 border-t border-carbon-deep/13 py-2"
                 >
-                  {/* Main Content */}
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex items-center gap-3">
-                      <h3 className="text-sm font-semibold text-carbon-deep">
-                        {job.mode ? job.mode.replace('-', ' ').toUpperCase() : 'Processing'}
+                  <div className="flex w-[280px] shrink-0 flex-col gap-0.5">
+                    <div className="flex flex-row items-end gap-2">
+                      <h3 className="font-kai text-[15px] font-normal text-carbon-deep">
+                        {jobModeLabel(job.mode)}
                       </h3>
-                      <Badge variant={getStatusVariant(job.status)} size="sm">
-                        {job.status}
-                      </Badge>
-                    </div>
-
-                    {job.current_video && (
-                      <p className="mb-1 text-xs font-medium text-carbon-soft">
-                        {job.current_video}
-                      </p>
-                    )}
-
-                    {job.videos_processed !== undefined && job.total_videos && (
-                      <p className="mb-1 text-xs font-medium text-carbon">
-                        {job.videos_processed} / {job.total_videos} videos
-                      </p>
-                    )}
-
-                    {/* Progress bar */}
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-paper-dark">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${getStatusColor(job.status)}`}
-                          style={{ width: `${job.progress || 0}%` }}
-                        />
-                      </div>
-                      <span className="min-w-[40px] text-xs font-semibold text-carbon">
-                        {job.progress || 0}%
+                      <span className={`font-kai text-[12px] ${STATUS_INK[job.status]}`}>
+                        {jobStatusLabel(job.status)}
                       </span>
                     </div>
-
-                    {job.error && <p className="mt-2 text-xs text-stamp">{job.error}</p>}
+                    {progressLine && (
+                      <p
+                        className="truncate font-kai text-[12px] text-ink-muted"
+                        title={job.current_video ?? undefined}
+                      >
+                        {progressLine}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Actions & Times */}
-                  <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex flex-row items-center gap-3">
+                      <div
+                        role="progressbar"
+                        aria-label={`${jobModeLabel(job.mode)}進度`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                        className="h-1 flex-1 bg-carbon-deep/13"
+                      >
+                        <div
+                          className={`h-full transition-[width] duration-300 ${BAR_FILL[job.status]}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right font-mono text-[12px] tabular-nums text-carbon-soft">
+                        {progress}%
+                      </span>
+                    </div>
+                    {job.error && <p className="font-kai text-[12px] text-stamp">{job.error}</p>}
+                  </div>
+
+                  <div className="flex w-[136px] shrink-0 flex-col items-end gap-0.5 whitespace-nowrap font-mono text-[12px] tabular-nums text-ink-muted">
+                    {job.created_at && <span>建立 {formatJobCreated(job.created_at)}</span>}
+                    {job.started_at && (
+                      <span>歷時 {formatDuration(job.started_at, job.completed_at)}</span>
+                    )}
+                  </div>
+
+                  <div className="flex h-8 w-16 shrink-0 flex-row justify-end">
                     {(job.status === 'queued' || job.status === 'running') && (
                       <Button variant="destructive" size="sm" onClick={() => cancelJob(job.id)}>
-                        Cancel
+                        取消
                       </Button>
                     )}
-                    <div className="space-y-0.5 text-right">
-                      {job.created_at && (
-                        <p className="text-[11px] text-ledger">
-                          Created: {formatTimestamp(job.created_at)}
-                        </p>
-                      )}
-                      {job.started_at && (
-                        <p className="text-[11px] text-ledger">
-                          Duration: {formatDuration(job.started_at, job.completed_at)}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

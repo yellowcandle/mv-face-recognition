@@ -1,40 +1,48 @@
-import type { PropsWithChildren, ButtonHTMLAttributes } from 'react';
+import type { PropsWithChildren, ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface ButtonProps extends PropsWithChildren<ButtonHTMLAttributes<HTMLButtonElement>> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
+  /** The keyboard shortcut shown after the label, e.g. `1` or `↓`. Display only: bind it yourself. */
+  keycap?: ReactNode;
 }
 
-/** A button is a rubber stamp: square, inked, and it leaves a mark. */
 const variantStyles: Record<string, string> = {
-  primary: 'bg-stamp text-paper-light border border-stamp hover:bg-stamp/90 font-bold',
-  secondary:
-    'bg-transparent text-carbon border border-carbon/60 hover:bg-carbon hover:text-paper-light',
-  ghost:
-    'bg-transparent text-carbon-soft border border-transparent hover:text-carbon hover:border-carbon/30',
-  destructive:
-    'bg-transparent text-stamp border border-stamp/70 hover:bg-stamp hover:text-paper-light',
+  primary: 'border border-stamp bg-stamp font-bold text-paper-light hover:bg-stamp/90',
+  secondary: 'border border-carbon-deep/33 text-carbon hover:bg-tint',
+  ghost: 'border border-transparent text-carbon hover:bg-tint',
+  destructive: 'border border-stamp text-stamp hover:bg-stamp hover:text-paper-light',
 };
 
 const sizeStyles: Record<string, string> = {
-  sm: 'px-2.5 py-1 text-[11px]',
-  md: 'px-3.5 py-1.5 text-[13px]',
-  lg: 'px-4 py-2.5 text-[15px]',
+  sm: 'h-8 px-3 text-[13px]',
+  md: 'h-10 px-4 text-[15px]',
+  lg: 'h-11 px-5 text-[15px]',
 };
 
 export function Button({
   variant = 'secondary',
   size = 'md',
+  keycap,
   className = '',
   children,
   ...props
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-1.5 rounded-none font-kai tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-kai transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       {...props}
     >
       {children}
+      {keycap != null ? (
+        <kbd
+          className={`font-mono text-[12px] font-normal ${
+            variant === 'primary' ? 'text-paper-light/80' : 'text-ink-muted'
+          }`}
+        >
+          {keycap}
+        </kbd>
+      ) : null}
     </button>
   );
 }

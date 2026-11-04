@@ -1,23 +1,24 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  BAND_CUTOFFS,
   BAND_STAMP,
+  Button,
   Masthead,
+  Stamp,
   adminFetch,
   bandFor,
   formatMmSs,
+  rulerPercent,
   useContestants,
   useFlaggedFaces,
   useVideos,
+  videoShortName,
 } from '@mv/shared';
 import type { Band, FlaggedFace, Contestant, FrameData, VideoMetadata } from '@mv/shared';
 
-/**
- * The pipeline's acceptance threshold, as a cosine. Source: the header of
- * apps/shared/lib/bands.ts ("The pipeline's acceptance threshold (0.45)"); each run also
- * stamps it into `recognition_config.acceptance_threshold`.
- */
-const ACCEPTANCE_THRESHOLD = 0.45;
+/** The pipeline's acceptance threshold: a score below it is not called a match. */
+const ACCEPTANCE_THRESHOLD = BAND_CUTOFFS.medium;
 
 /**
  * DET and the context strip for one flag. The flag record (`GET /api/faces/flagged`) carries
@@ -51,9 +52,11 @@ const STATUS_WORD: Record<FlaggedFace['status'], string> = {
   rejected: '作廢',
 };
 
+const STATUS_TABS: FlaggedFace['status'][] = ['pending', 'accepted', 'rejected'];
+
 /**
- * 存根 / 待核 — the flag queue as a tray of slips. Each row is one flag awaiting a human
- * decision; the right-hand sheet is the one being decided. Every state is a stamp.
+ * 待核 — the flag queue beside the sheet being decided: what the system saw against who it was
+ * filed as, then a stamp.
  */
 export function Flagging() {
   const queryClient = useQueryClient();
@@ -66,6 +69,7 @@ export function Flagging() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState<string>('');
+  const [reassignOpen, setReassignOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const uniqueVideos = useMemo(
@@ -94,6 +98,7 @@ export function Flagging() {
   const focusedKey = focused ? `${focused.id}:${focused.contestant_id}` : '';
   useEffect(() => {
     if (focused) setReassignTo(String(focused.contestant_id));
+    setReassignOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedKey]);
 
@@ -126,6 +131,16 @@ export function Flagging() {
     if (next) setFocusedId(next.id);
   }
 
+  function openReassign() {
+    setReassignOpen(true);
+    reassignRef.current?.focus();
+  }
+
+  // The picker mounts on open, so a first open has to focus it after the render.
+  useEffect(() => {
+    if (reassignOpen) reassignRef.current?.focus();
+  }, [reassignOpen]);
+
   async function decideFocused(status: 'accepted' | 'rejected') {
     if (!focused || focused.status !== 'pending') return;
     const i = filtered.findIndex((f) => f.id === focused.id);
@@ -154,7 +169,7 @@ export function Flagging() {
         void decideFocused(e.key === '1' ? 'accepted' : 'rejected');
       } else if (e.key === '3') {
         e.preventDefault();
-        reassignRef.current?.focus();
+        openReassign();
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         goNext();
@@ -206,7 +221,10 @@ export function Flagging() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face_id: focused.id, contestant_id: Number(reassignTo) }),
       });
-      if (res.ok) void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+      if (res.ok) {
+        void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] });
+        setReassignOpen(false);
+      }
     } catch (e) {
       console.error('Failed to reassign face:', e);
     }
@@ -221,373 +239,375 @@ export function Flagging() {
     });
   }
 
-  const pendingCount = flaggedFaces.filter((f) => f.status === 'pending').length;
-  const acceptedCount = flaggedFaces.filter((f) => f.status === 'accepted').length;
-  const rejectedCount = flaggedFaces.filter((f) => f.status === 'rejected').length;
+  const counts: Record<'all' | FlaggedFace['status'], number> = {
+    pending: flaggedFaces.filter((f) => f.status === 'pending').length,
+    accepted: flaggedFaces.filter((f) => f.status === 'accepted').length,
+    rejected: flaggedFaces.filter((f) => f.status === 'rejected').length,
+    all: flaggedFaces.length,
+  };
 
   const focusedContestant = focused ? contestantOf(focused.contestant_id) : undefined;
-  const focusedBand = focused ? bandFor(focused.confidence ?? 0) : null;
+  const lowEnd = rulerPercent(BAND_CUTOFFS.medium);
+  const midWidth = rulerPercent(BAND_CUTOFFS.high) - lowEnd;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-9 pb-6 pt-7">
-      <Masthead
-        eyebrow="BACK OFFICE · LOCAL ONLY · 127.0.0.1"
-        title="待核"
-        latin="OFFICE COPY · WRITABLE"
-        size="md"
-      >
-        <button
-          type="button"
-          onClick={() => void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
-          className="border border-carbon/45 px-3 py-1.5 font-kai text-[12px] tracking-[0.12em] text-carbon hover:border-stamp hover:text-stamp"
-        >
-          重新調閱
-        </button>
-        <div className="-rotate-[6deg] border-2 border-stamp px-3 py-1.5">
-          <div className="text-center font-serif text-[14px] font-bold tracking-[0.14em] text-stamp">
-            待核 {pendingCount}
-          </div>
-          <div className="text-center font-mono text-[7px] tracking-[0.16em] text-stamp">
-            PENDING FLAGS
-          </div>
-        </div>
-      </Masthead>
-
-      <div className="mt-4 h-px bg-carbon/45" />
-
-      {/* Counters */}
-      <div className="flex flex-row items-end gap-9 py-3">
-        {[
-          ['待核', pendingCount, 'text-carbon'],
-          ['已核對', acceptedCount, 'text-carbon'],
-          ['作廢', rejectedCount, 'text-stamp'],
-          ['全部', flaggedFaces.length, 'text-carbon'],
-        ].map(([label, value, ink]) => (
-          <div key={String(label)} className="flex flex-col gap-1">
-            <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">{label}</span>
-            <span className={`font-mono text-[22px] leading-none ${ink}`}>{value}</span>
-          </div>
-        ))}
-        {selected.size > 0 && (
-          <div className="flex flex-row items-center gap-2 pb-1">
-            <span className="font-kai text-[12px] text-carbon-soft">已選 {selected.size}</span>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => bulkUpdateStatus('accepted')}
-              className="border border-carbon px-2.5 py-1 font-kai text-[11px] text-carbon hover:bg-carbon hover:text-paper-light"
+    <div className="flex h-full min-h-0 flex-1 flex-row">
+      {/* Tray */}
+      <div className="flex w-[392px] shrink-0 flex-col border-r border-carbon-deep/13">
+        <div className="flex flex-col gap-4 px-5 pt-8">
+          <Masthead title="待核" hint="核對系統標記的人臉" align="center">
+            <Button
+              size="sm"
+              onClick={() => void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
             >
-              全部蓋印
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => bulkUpdateStatus('rejected')}
-              className="border border-stamp px-2.5 py-1 font-kai text-[11px] text-stamp hover:bg-stamp hover:text-paper-light"
-            >
-              全部作廢
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelected(new Set())}
-              className="px-2 py-1 font-kai text-[11px] text-carbon-soft"
-            >
-              取消
-            </button>
-          </div>
-        )}
-      </div>
+              重新調閱
+            </Button>
+          </Masthead>
 
-      <div className="h-px bg-carbon/20" />
-
-      <div className="flex min-h-0 flex-1 flex-row">
-        {/* Tray */}
-        <div className="flex min-w-0 flex-1 flex-col pt-3 pr-1">
-          <div className="flex flex-row items-baseline justify-between pb-2">
-            <div className="flex flex-row items-baseline gap-2.5">
-              <span className="font-kai text-[15px] font-bold text-carbon">待核</span>
-              <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-                {filtered.length} SLIPS
-              </span>
-            </div>
-            <div className="flex flex-row items-center gap-2.5">
-              <Filter
-                value={statusFilter}
-                onChange={(v) => setStatusFilter(v as typeof statusFilter)}
-                options={[
-                  ['pending', '待核'],
-                  ['accepted', '已核對'],
-                  ['rejected', '作廢'],
-                  ['all', '全部'],
-                ]}
-              />
-              <Filter
-                value={bandFilter}
-                onChange={(v) => setBandFilter(v as typeof bandFilter)}
-                options={[
-                  ['all', '全部分級'],
-                  ['high', '清楚'],
-                  ['medium', '尚可'],
-                  ['low', '存疑'],
-                ]}
-              />
-              <Filter
-                value={videoFilter}
-                onChange={setVideoFilter}
-                options={[['', '全部影片'], ...uniqueVideos.map((v) => [v, v] as [string, string])]}
-              />
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
-          ) : error ? (
-            <div className="mt-2 border border-stamp/40 bg-stamp/5 px-4 py-10 text-center font-kai text-[13px] text-stamp">
-              讀不到待核紀錄 — 後台 API 未啟動？
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="mt-2 border border-dashed border-carbon/35 px-4 py-14 text-center">
-              <div className="font-kai text-[15px] font-bold text-carbon-deep">這一疊是空的</div>
-              <div className="mt-1 font-kai text-[12px] text-carbon-soft">
-                沒有符合目前條件的待核紀錄。
-              </div>
-            </div>
-          ) : (
-            <div ref={trayRef} className="flex flex-col gap-1.5 overflow-y-auto pb-2">
-              {filtered.slice(0, 200).map((face) => {
-                const band = bandFor(face.confidence ?? 0);
-                const isFocused = focused?.id === face.id;
-                return (
-                  <div
-                    key={face.id}
-                    data-slip={face.id}
-                    onClick={() => setFocusedId(face.id)}
-                    className={`flex cursor-pointer flex-row items-center gap-3 border py-2 pl-3 pr-2 ${
-                      isFocused
-                        ? 'border-carbon/55 border-l-[3px] border-l-stamp bg-paper-light'
-                        : 'border-carbon/15 border-l-[3px] border-l-carbon/20'
+          <div className="flex flex-row gap-5 border-b border-carbon-deep/13">
+            {[...STATUS_TABS, 'all' as const].map((tab) => {
+              const active = statusFilter === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setStatusFilter(tab)}
+                  className={`-mb-px flex flex-row items-end gap-1 border-b-2 pb-2 font-kai text-[14px] ${
+                    active
+                      ? 'border-stamp font-bold text-carbon-deep'
+                      : 'border-transparent text-carbon-soft hover:text-carbon-deep'
+                  }`}
+                >
+                  {tab === 'all' ? '全部' : STATUS_WORD[tab]}
+                  <span
+                    className={`font-mono text-[12px] font-normal tabular-nums ${
+                      active ? 'text-stamp' : 'text-ink-muted'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(face.id)}
-                      onChange={() => toggleSelection(face.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-stamp"
-                      aria-label={`選取 ${face.id}`}
-                    />
-                    <div className="h-[46px] w-[38px] shrink-0 overflow-hidden border border-carbon/40 bg-[#191922]">
-                      {face.thumbnail && (
-                        <img src={face.thumbnail} alt="" className="h-full w-full object-cover" />
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-mono text-[11px] text-carbon-soft">
-                        {formatMmSs(face.timestamp)}
-                      </span>
-                      <span className="truncate font-mono text-[8px] tracking-[0.1em] text-ledger">
-                        {face.video_id}
-                      </span>
-                    </div>
-                    <div className="flex w-[96px] shrink-0 flex-col gap-0.5">
-                      <span className="truncate font-kai text-[15px] font-bold leading-tight text-carbon-deep">
-                        {contestantOf(face.contestant_id)?.nickname ?? `#${face.contestant_id}`}
-                      </span>
-                      <span className="font-mono text-[8px] tracking-[0.12em] text-carbon-soft">
-                        #{face.contestant_id}
-                      </span>
-                    </div>
-                    <div className="flex w-[54px] shrink-0 justify-center">
-                      <span
-                        className={`-rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${BAND_STAMP[band].ink}`}
-                      >
-                        {BAND_STAMP[band].word}
-                      </span>
-                    </div>
-                    <span
-                      title="被標記偵測的配對分數（標記本身不帶分數）"
-                      className="w-[36px] shrink-0 font-mono text-[11px] text-carbon-soft"
-                    >
-                      {face.confidence == null ? '—' : face.confidence.toFixed(2)}
-                    </span>
-                    <span className="flex-1" />
-                    {face.status === 'pending' ? (
-                      <div className="flex flex-row gap-1.5">
-                        <MiniStamp
-                          label="蓋印"
-                          tone="carbon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void updateFaceStatus(face.id, 'accepted');
-                          }}
-                        />
-                        <MiniStamp
-                          label="作廢"
-                          tone="stamp"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void updateFaceStatus(face.id, 'rejected');
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <span
-                        className={`border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.1em] ${
-                          face.status === 'accepted'
-                            ? 'border-carbon/50 text-carbon'
-                            : 'border-ledger text-ledger'
-                        }`}
-                      >
-                        {STATUS_WORD[face.status]}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                    {counts[tab]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-row gap-2">
+            <Filter
+              label="分級"
+              value={bandFilter}
+              onChange={(v) => setBandFilter(v as typeof bandFilter)}
+              options={[
+                ['all', '全部分級'],
+                ['high', BAND_STAMP.high.word],
+                ['medium', BAND_STAMP.medium.word],
+                ['low', BAND_STAMP.low.word],
+              ]}
+            />
+            <Filter
+              label="影片"
+              value={videoFilter}
+              onChange={setVideoFilter}
+              options={[
+                ['', '全部影片'],
+                ...uniqueVideos.map((v) => [v, videoShortName(v)] as [string, string]),
+              ]}
+            />
+          </div>
+
+          {selected.size > 0 && (
+            <div className="flex flex-row items-center gap-2">
+              <span className="flex-1 font-kai text-[13px] text-carbon-soft">
+                已選 <span className="font-mono tabular-nums">{selected.size}</span>
+              </span>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy}
+                onClick={() => bulkUpdateStatus('accepted')}
+              >
+                全部蓋印
+              </Button>
+              <Button size="sm" disabled={busy} onClick={() => bulkUpdateStatus('rejected')}>
+                全部作廢
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                取消
+              </Button>
             </div>
           )}
         </div>
 
-        {/* Review sheet */}
-        <div className="ml-6 flex w-[380px] shrink-0 flex-col border-l border-carbon/25 pl-6 pt-3">
-          {focused ? (
-            <>
-              <div className="flex flex-row items-baseline justify-between">
-                <span className="font-mono text-[9px] tracking-[0.2em] text-ledger">
-                  SLIP {String(focused.id).slice(-4).toUpperCase()} · REVIEW
-                </span>
-                <span className="font-mono text-[9px] tracking-[0.1em] text-stamp">
-                  {focusedBand ? BAND_STAMP[focusedBand].word : '未配對'}
-                  {focused.confidence == null ? '' : ` ${focused.confidence.toFixed(2)}`}
-                </span>
-              </div>
-
-              <div className="mt-3 flex flex-row gap-5">
-                <div className="flex flex-col gap-2">
-                  <div className="h-[210px] w-[186px] overflow-hidden border border-carbon bg-[#191922]">
-                    {focused.thumbnail ? (
-                      <img
-                        src={focused.thumbnail}
-                        alt="被標記的人臉"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <span className="font-mono text-[9px] tracking-[0.16em] text-paper/40">
-                          NO THUMBNAIL
-                        </span>
+        {isLoading ? (
+          <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
+        ) : error ? (
+          <div className="mx-5 mt-4 border-t border-stamp py-10 text-center font-kai text-[13px] text-stamp">
+            讀不到待核紀錄 — 後台 API 未啟動？
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-14 text-center">
+            <div className="font-kai text-[15px] text-carbon-deep">這一疊是空的</div>
+            <div className="mt-1 font-kai text-[13px] text-ink-muted">
+              沒有符合目前條件的待核紀錄。
+            </div>
+          </div>
+        ) : (
+          <div ref={trayRef} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3">
+            {filtered.slice(0, 200).map((face) => {
+              const isFocused = focused?.id === face.id;
+              const c = contestantOf(face.contestant_id);
+              const isPending = face.status === 'pending';
+              return (
+                <div
+                  key={face.id}
+                  data-slip={face.id}
+                  onClick={() => setFocusedId(face.id)}
+                  className={`group flex h-16 shrink-0 cursor-pointer flex-row items-center gap-2.5 rounded-md px-2 ${
+                    isFocused ? 'bg-tint' : 'hover:bg-tint/50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(face.id)}
+                    onChange={() => toggleSelection(face.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-stamp"
+                    aria-label={`選取 ${c?.nickname ?? `#${face.contestant_id}`} ${formatMmSs(face.timestamp)}`}
+                  />
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-tint">
+                    {face.thumbnail && (
+                      <img src={face.thumbnail} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span
+                        className={`truncate font-kai text-[15px] text-carbon-deep ${
+                          isFocused ? 'font-bold' : ''
+                        }`}
+                      >
+                        {c?.nickname ?? `#${face.contestant_id}`}
+                      </span>
+                      <span className="shrink-0 font-mono text-[12px] text-ink-muted">
+                        #{face.contestant_id}
+                      </span>
+                    </div>
+                    <span className="truncate font-mono text-[12px] text-ink-muted">
+                      {formatMmSs(face.timestamp)} · {videoShortName(face.video_id)}
+                    </span>
+                  </div>
+                  {!isPending && <Stamp tilt>{STATUS_WORD[face.status]}</Stamp>}
+                  {/* Score and actions share one grid cell, so swapping them never reflows the row. */}
+                  <div className="grid shrink-0 items-center justify-items-end">
+                    <div
+                      className={`col-start-1 row-start-1 flex flex-col items-end gap-1 ${
+                        !isPending
+                          ? ''
+                          : isFocused
+                            ? 'opacity-0'
+                            : 'group-focus-within:opacity-0 group-hover:opacity-0'
+                      }`}
+                    >
+                      <span
+                        title="被標記偵測的配對分數（標記本身不帶分數）"
+                        className="font-mono text-[14px] tabular-nums text-carbon-deep"
+                      >
+                        {face.confidence == null ? '—' : face.confidence.toFixed(2)}
+                      </span>
+                      <Stamp band={bandFor(face.confidence ?? 0)} />
+                    </div>
+                    {isPending && (
+                      // Opacity, not display:none, keeps these in the tab order. Hidden ones ignore
+                      // pointers, so a touch tap can't hit an invisible 蓋印.
+                      <div
+                        className={`col-start-1 row-start-1 flex flex-row gap-1 ${
+                          isFocused
+                            ? ''
+                            : 'pointer-events-none opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100'
+                        }`}
+                      >
+                        <RowAction
+                          label="蓋印"
+                          onClick={() => void updateFaceStatus(face.id, 'accepted')}
+                        />
+                        <RowAction
+                          label="作廢"
+                          onClick={() => void updateFaceStatus(face.id, 'rejected')}
+                        />
                       </div>
                     )}
                   </div>
-                  <span className="font-mono text-[9px] tracking-[0.14em] text-carbon-soft">
-                    DET {context.det == null ? '— 無資料' : context.det.toFixed(2)}
-                  </span>
-                  <span className="max-w-[186px] truncate font-mono text-[8px] tracking-[0.16em] text-ledger">
-                    {focused.video_id} · {formatMmSs(focused.timestamp)}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Review sheet */}
+      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pb-6 pt-8">
+        {focused ? (
+          <>
+            <div className="flex shrink-0 flex-col gap-1">
+              <div className="flex flex-row items-end justify-between gap-6">
+                <div className="flex min-w-0 flex-row items-end gap-2.5">
+                  <h2 className="truncate font-kai text-[32px] font-normal leading-tight text-carbon-deep">
+                    {focusedContestant?.nickname ?? `#${focused.contestant_id}`}
+                  </h2>
+                  <span className="shrink-0 pb-1 font-kai text-[14px] text-carbon-soft">
+                    {focusedContestant?.name ?? '—'} · 編號 {focused.contestant_id}
                   </span>
                 </div>
+                <span className="shrink-0 pb-1 font-mono text-[12px] text-ink-muted">
+                  {formatMmSs(focused.timestamp)} · {videoShortName(focused.video_id)}
+                  {context.strip[2] ? ` · 第 ${context.strip[2].frame_number} 格` : ''}
+                </span>
+              </div>
+              {focused.user_label && (
+                <p className="truncate font-kai text-[13px] text-ink-muted">{focused.user_label}</p>
+              )}
+            </div>
 
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-                    CURRENTLY FILED AS
-                  </span>
-                  <div className="flex flex-row items-baseline gap-2">
-                    <span className="font-kai text-[26px] font-bold leading-none text-carbon-deep">
-                      {focusedContestant?.nickname ?? `#${focused.contestant_id}`}
-                    </span>
-                    <span className="font-mono text-[10px] text-ledger">
-                      #{focused.contestant_id}
-                    </span>
-                  </div>
-                  {/* The flag asserts no score of its own (CONTEXT.md, "Flag"). `confidence` is the
-                      flagged detection's match score, carried as context for the claim. */}
-                  <span className="mt-1 font-mono text-[8px] tracking-[0.2em] text-ledger">
-                    DETECTION MATCH SCORE
-                  </span>
-                  <div className="relative h-[3px] w-full bg-carbon-deep/15">
-                    <div
-                      className="h-[3px] bg-stamp"
-                      style={{
-                        width: `${Math.max(0, Math.min(1, focused.confidence ?? 0)) * 100}%`,
-                      }}
+            {/* 畫面偵測 against 參考相. The only reference route serves the contestant's first
+                photo by filename: no endpoint ranks references for a flag, hence 未按相似度排序. */}
+            <div className="flex min-h-[260px] max-h-[428px] flex-[1_1_428px] flex-row gap-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded bg-carbon-deep">
+                  {focused.thumbnail ? (
+                    <img
+                      src={focused.thumbnail}
+                      alt="被標記的人臉"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
-                    <div
-                      className="absolute -top-[3px] h-[9px] w-px bg-carbon-deep"
-                      style={{ left: `${ACCEPTANCE_THRESHOLD * 100}%` }}
-                      title={`acceptance threshold ${ACCEPTANCE_THRESHOLD}`}
-                    />
-                  </div>
-                  <div className="flex flex-row justify-between font-mono text-[9px] text-carbon-soft">
-                    <span>
-                      {focused.confidence == null
-                        ? '無配對分數'
-                        : `${focused.confidence.toFixed(2)} cosine`}
-                    </span>
-                    <span className="text-ledger">門檻 {ACCEPTANCE_THRESHOLD.toFixed(2)}</span>
-                  </div>
-                  <span className="font-kai text-[11px] leading-snug text-carbon-soft">
-                    被標記偵測的配對分數，僅供參考；標記本身不帶分數。
-                  </span>
-
-                  <div className="mt-1 h-px bg-carbon/20" />
-
-                  {/* Three reference slots. The only reference-image route is
-                      GET /api/contestants/{id}/thumb/face (or the published `portrait_url`), which
-                      serves the contestant's FIRST photo by filename — not ranked by cosine: no
-                      endpoint returns per-reference embeddings or scores for a flag, so "nearest"
-                      cannot be computed here. Slot 1 is that real photo; slots 2–3 are marked
-                      unavailable rather than filled. `reference_count` (GET /api/contestants) is
-                      how many exist on file. */}
-                  <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-                    REFERENCES · {focusedContestant?.reference_count ?? 0} ON FILE
-                  </span>
-                  <div className="flex flex-row gap-1.5">
-                    <div className="h-[54px] w-[46px] overflow-hidden border border-carbon/45 bg-paper-dark">
-                      <img
-                        src={
-                          focusedContestant?.portrait_url ??
-                          `/api/contestants/${focused.contestant_id}/thumb/face`
-                        }
-                        alt={focusedContestant?.name ?? ''}
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.visibility = 'hidden';
-                        }}
-                      />
-                    </div>
-                    {[1, 2].map((k) => (
-                      <div
-                        key={k}
-                        className="flex h-[54px] w-[46px] items-center justify-center border border-dashed border-carbon/35"
-                      >
-                        <span className="font-kai text-[10px] text-ledger">未提供</span>
-                      </div>
-                    ))}
-                  </div>
-                  <span className="font-mono text-[8px] tracking-[0.1em] text-ledger">
-                    {focusedContestant?.name ?? '—'} · 編號 {focused.contestant_id} · 未按相似度排序
-                  </span>
-
-                  {focused.user_label && (
-                    <div className="mt-1 border-l-2 border-stamp/60 pl-2 font-kai text-[12px] text-carbon-soft">
-                      {focused.user_label}
+                  ) : (
+                    <div className="flex h-full items-center justify-center font-kai text-[13px] text-paper-light">
+                      沒有縮圖
                     </div>
                   )}
                 </div>
+                <div className="flex flex-row justify-between">
+                  <span className="font-kai text-[14px] text-carbon">畫面偵測</span>
+                  <span className="font-kai text-[12px] text-ink-muted">
+                    檢出分數{' '}
+                    <span className="font-mono tabular-nums">
+                      {context.det == null ? '無資料' : context.det.toFixed(2)}
+                    </span>
+                  </span>
+                </div>
               </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded bg-tint">
+                  <img
+                    key={focused.contestant_id}
+                    src={
+                      focusedContestant?.portrait_url ??
+                      `/api/contestants/${focused.contestant_id}/thumb/face`
+                    }
+                    alt={focusedContestant?.name ?? ''}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.visibility = 'hidden';
+                    }}
+                  />
+                </div>
+                <div className="flex flex-row justify-between">
+                  <span className="font-kai text-[14px] text-carbon">參考相</span>
+                  <span className="font-kai text-[12px] text-ink-muted">
+                    共 {focusedContestant?.reference_count ?? 0} 張 · 未按相似度排序
+                  </span>
+                </div>
+              </div>
+            </div>
 
-              <div className="mt-4 h-px bg-carbon/25" />
-
-              <div className="mt-3 flex flex-col gap-2">
-                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-                  REASSIGN TO
+            {/* The flag asserts no score of its own (CONTEXT.md, "Flag"). `confidence` is the
+                flagged detection's match score, carried as context for the claim. */}
+            <div className="flex shrink-0 flex-col gap-2">
+              <div className="flex flex-row items-end justify-between gap-6">
+                <div className="flex flex-row items-end gap-2">
+                  <span className="font-mono text-[28px] leading-none tabular-nums text-carbon-deep">
+                    {focused.confidence == null ? '—' : focused.confidence.toFixed(3)}
+                  </span>
+                  {focused.confidence == null ? (
+                    <Stamp tone="muted">未配對</Stamp>
+                  ) : (
+                    <Stamp band={bandFor(focused.confidence)} />
+                  )}
+                </div>
+                <span className="font-kai text-[12px] text-ink-muted">
+                  被標記偵測的配對分數，僅供參考；標記本身不帶分數
                 </span>
-                <div className="flex flex-row items-center gap-2">
+              </div>
+              <div className="relative flex h-2.5 flex-row gap-0.5">
+                <div
+                  className="h-full bg-ledger/27"
+                  style={{ width: `${lowEnd}%` }}
+                  title={`接受門檻 ${ACCEPTANCE_THRESHOLD}`}
+                />
+                <div className="h-full bg-stamp/33" style={{ width: `${midWidth}%` }} />
+                <div className="h-full flex-1 bg-carbon/20" />
+                {focused.confidence != null && (
+                  <div
+                    className="absolute -top-[3px] h-4 w-0.5 bg-carbon-deep"
+                    style={{ left: `${rulerPercent(focused.confidence)}%` }}
+                  />
+                )}
+              </div>
+              <div className="flex flex-row gap-0.5 font-kai text-[12px] text-ink-muted">
+                <span style={{ width: `${lowEnd}%` }}>
+                  {BAND_STAMP.low.word} &lt; {BAND_CUTOFFS.medium}
+                </span>
+                <span className="whitespace-nowrap" style={{ width: `${midWidth}%` }}>
+                  {BAND_STAMP.medium.word}
+                </span>
+                <span className="flex-1">
+                  {BAND_STAMP.high.word} ≥ {BAND_CUTOFFS.high}
+                </span>
+              </div>
+            </div>
+
+            {/* The two processed frames either side of the flag's floor frame, each a real frame
+                of the served rendition (`stream_url` seeked by a #t media fragment). */}
+            <div className="flex shrink-0 flex-col gap-2">
+              <span className="font-kai text-[14px] text-carbon">前後五格</span>
+              <div className="flex flex-row gap-2">
+                {context.strip.map((frame, k) => (
+                  <div
+                    key={k}
+                    className={`flex h-20 min-w-0 flex-1 items-center justify-center overflow-hidden rounded bg-carbon-deep ${
+                      k === 2 ? 'border-2 border-stamp' : ''
+                    }`}
+                  >
+                    {frame && streamUrl ? (
+                      <video
+                        src={`${streamUrl}#t=${frame.timestamp}`}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        title={formatMmSs(frame.timestamp)}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-mono text-[12px] text-paper-light">—</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {!streamUrl || context.strip.every((f) => f == null) ? (
+                <span className="font-kai text-[12px] text-ink-muted">此片段無前後影格可調閱。</span>
+              ) : null}
+            </div>
+
+            <div className="flex-1" />
+
+            {reassignOpen && (
+              <div className="flex shrink-0 flex-row items-center gap-2">
+                <label className="flex min-w-0 flex-1 flex-row items-center gap-2 font-kai text-[14px] text-carbon">
+                  <span className="shrink-0">改派給</span>
                   <select
                     ref={reassignRef}
                     value={reassignTo}
                     onChange={(e) => setReassignTo(e.target.value)}
-                    className="min-w-0 flex-1 border border-carbon/45 bg-paper-light px-2.5 py-2 font-kai text-[13px] text-carbon-deep focus:border-stamp focus:outline-none"
+                    className="field field-select min-w-0 flex-1"
                   >
                     {(contestants as Contestant[]).map((c) => (
                       <option key={c.id} value={c.id}>
@@ -595,150 +615,87 @@ export function Flagging() {
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => void reassignFace()}
-                    className="border border-carbon px-3 py-2 font-kai text-[12px] tracking-[0.1em] text-carbon hover:bg-carbon hover:text-paper-light"
-                  >
-                    改派
-                  </button>
-                </div>
+                </label>
+                <Button size="sm" onClick={() => void reassignFace()}>
+                  確定改派
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setReassignOpen(false)}>
+                  取消
+                </Button>
               </div>
+            )}
 
-              {/* Context: the two processed frames either side of the flag's floor frame, each a
-                  real frame of the served rendition (`stream_url` seeked by a #t media fragment).
-                  Slots with no frame — no dense metadata, or past either end — say so. */}
-              <div className="mt-4 flex flex-col gap-2">
-                <span className="font-mono text-[8px] tracking-[0.2em] text-ledger">
-                  CONTEXT · 前後五格
-                </span>
-                <div className="flex flex-row gap-1">
-                  {context.strip.map((frame, k) => (
-                    <div
-                      key={k}
-                      className={`flex aspect-video min-w-0 flex-1 items-center justify-center overflow-hidden border bg-[#191922] ${
-                        k === 2 ? 'border-stamp' : 'border-carbon/40'
-                      }`}
-                    >
-                      {frame && streamUrl ? (
-                        <video
-                          src={`${streamUrl}#t=${frame.timestamp}`}
-                          preload="metadata"
-                          muted
-                          playsInline
-                          title={formatMmSs(frame.timestamp)}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="font-mono text-[8px] text-paper/40">—</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {!streamUrl || context.strip.every((f) => f == null) ? (
-                  <span className="font-kai text-[11px] text-carbon-soft">
-                    此片段無前後影格可調閱。
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex-1" />
-
-              <div className="flex flex-row items-stretch gap-2 pb-1">
-                <button
-                  type="button"
-                  disabled={focused.status !== 'pending'}
-                  onClick={() => void updateFaceStatus(focused.id, 'accepted')}
-                  className="flex min-w-0 flex-1 flex-row items-center justify-between gap-2 bg-stamp px-3 py-3 disabled:opacity-40"
-                >
-                  <span className="whitespace-nowrap font-kai text-[15px] font-bold tracking-[0.12em] text-paper-light">
-                    蓋印確認
-                  </span>
-                  <span className="whitespace-nowrap font-mono text-[8px] tracking-[0.14em] text-paper-light/75">
-                    ACCEPT
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  disabled={focused.status !== 'pending'}
-                  onClick={() => void updateFaceStatus(focused.id, 'rejected')}
-                  className="shrink-0 border border-carbon/45 px-3 py-3 disabled:opacity-40"
-                >
-                  <span className="whitespace-nowrap font-kai text-[13px] tracking-[0.1em] text-carbon-soft">
-                    作廢
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="shrink-0 border border-carbon/45 px-3 py-3"
-                >
-                  <span className="whitespace-nowrap font-kai text-[13px] tracking-[0.1em] text-carbon-soft">
-                    下一張
-                  </span>
-                </button>
-              </div>
-
-              <div className="flex flex-row flex-wrap gap-x-4 gap-y-1 pt-2 font-mono text-[8px] tracking-[0.08em] text-carbon-soft">
-                <span className="whitespace-nowrap">1 蓋印</span>
-                <span className="whitespace-nowrap">2 作廢</span>
-                <span className="whitespace-nowrap">3 改派</span>
-                <span className="whitespace-nowrap">↓ 下一張</span>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-1 items-center justify-center font-kai text-[13px] text-carbon-soft">
-              從左邊的托盤挑一張來核對。
+            <div className="flex shrink-0 flex-row items-center gap-2">
+              <Button
+                variant="primary"
+                keycap="1"
+                disabled={focused.status !== 'pending'}
+                onClick={() => void updateFaceStatus(focused.id, 'accepted')}
+              >
+                蓋印確認
+              </Button>
+              <Button
+                keycap="2"
+                disabled={focused.status !== 'pending'}
+                onClick={() => void updateFaceStatus(focused.id, 'rejected')}
+              >
+                作廢
+              </Button>
+              <Button keycap="3" onClick={openReassign}>
+                改派給…
+              </Button>
+              <span className="flex-1" />
+              <Button variant="ghost" keycap="↓" onClick={goNext}>
+                下一張
+              </Button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="flex flex-1 items-center justify-center font-kai text-[13px] text-carbon-soft">
+            從左邊的托盤挑一張來核對。
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function Filter({
+  label,
   value,
   onChange,
   options,
 }: {
+  label: string;
   value: string;
   onChange: (v: string) => void;
   options: [string, string][];
 }) {
   return (
     <select
+      aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="max-w-[150px] border border-carbon/35 bg-paper-light px-2 py-1 font-kai text-[11px] text-carbon-deep focus:border-stamp focus:outline-none"
+      className="field field-select min-w-0 flex-1"
     >
-      {options.map(([v, label]) => (
+      {options.map(([v, text]) => (
         <option key={v} value={v}>
-          {label}
+          {text}
         </option>
       ))}
     </select>
   );
 }
 
-function MiniStamp({
-  label,
-  tone,
-  onClick,
-}: {
-  label: string;
-  tone: 'carbon' | 'stamp';
-  onClick: (e: React.MouseEvent) => void;
-}) {
+function RowAction({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      className={`border px-2 py-1 font-kai text-[10px] tracking-[0.08em] ${
-        tone === 'carbon'
-          ? 'border-carbon text-carbon hover:bg-carbon hover:text-paper-light'
-          : 'border-stamp/70 text-stamp hover:bg-stamp hover:text-paper-light'
-      }`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="h-7 rounded-md border border-carbon-deep/33 bg-ground px-2 font-kai text-[12px] text-carbon hover:bg-tint"
     >
       {label}
     </button>

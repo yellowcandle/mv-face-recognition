@@ -1,17 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { ArrowLeft, Pause, Play } from 'lucide-react';
 import {
   BAND_STAMP,
+  Button,
+  FaceCrop,
+  Masthead,
+  Stamp,
   VideoCanvas,
   bandFor,
   formatMmSs,
   getVideoRenderRect,
+  reelHeading,
+  renditionLabel,
   type VideoCanvasHandle,
   useContestants,
   useVideos,
   useViewerMetadata,
 } from '@mv/shared';
-import type { Band, FaceDetection } from '@mv/shared';
+import type { Band, FaceDetection, Video } from '@mv/shared';
+
+/** The list route also sends this; `Video` doesn't declare it. */
+type FiledVideo = Video & { height?: number };
 
 function nameOf(face: FaceDetection): string {
   return face.contestant_nickname || face.contestant_name || '—';
@@ -30,7 +40,7 @@ export function PlayerPage() {
   const { data: contestants = [] } = useContestants();
 
   const requested = searchParams.get('video');
-  const video = useMemo(
+  const video = useMemo<FiledVideo | null>(
     () => videos.find((v) => v.id === requested) ?? videos[0] ?? null,
     [videos, requested],
   );
@@ -47,6 +57,7 @@ export function PlayerPage() {
   const faces = useMemo(() => (meta.metadata ? meta.getFacesAtTime(time) : []), [meta, time]);
 
   const matched = faces.filter((f) => f.matched && f.contestant_id != null);
+  const frame = meta.metadata ? meta.getFrameAtTime(time) : null;
 
   /** Every time a contestant enters after being absent — the queue reads from this. */
   const entries = useMemo<QueueEntry[]>(() => {
@@ -122,34 +133,34 @@ export function PlayerPage() {
 
   const total = Math.max(96, contestants.length);
   const summary = meta.metadata?.processing_summary;
-  const reel = video ? (video.name.split('：').pop() ?? video.name) : '—';
+  const played = duration ? (time / duration) * 100 : 0;
+  const rendition = renditionLabel(video?.height);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-row">
-      <div className="flex min-w-0 flex-1 flex-col px-14 pb-6 pt-7">
-        <div className="flex flex-row items-center justify-between pb-4">
-          <div className="flex flex-row items-baseline gap-4">
-            <Link to="/" className="font-mono text-[14px] text-ledger hover:text-stamp">
-              ←
-            </Link>
-            <h1 className="font-serif text-[26px] font-black leading-none text-carbon-deep">
-              播放
-            </h1>
-            <span className="font-mono text-[10px] tracking-[0.2em] text-ledger">
-              REEL {video?.id.split('-')[0] ?? '—'} · {reel}
-            </span>
-          </div>
-          <div className="flex flex-row items-baseline gap-2">
-            <span className="font-mono text-[13px] text-carbon-deep">{formatMmSs(time)}</span>
-            <span className="font-mono text-[11px] text-ledger">/ {formatMmSs(duration)}</span>
+    <div className="flex min-h-full flex-1 flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 pb-5 pl-14 pr-8 pt-8">
+        <div className="flex flex-row items-center gap-3">
+          <Link to="/" aria-label="返回點唱單" className="rounded-md text-ink-muted hover:text-stamp">
+            <ArrowLeft size={20} aria-hidden="true" />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <Masthead title="播放" hint="看片、人臉框與時間軸">
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-carbon-soft">{video ? reelHeading(video.name) : '—'}</span>
+                <span className="flex flex-row items-end gap-2 font-mono tabular-nums">
+                  <span className="text-[18px] leading-tight text-carbon-deep">
+                    {formatMmSs(time)}
+                  </span>
+                  <span className="text-[13px] text-ink-muted">/ {formatMmSs(duration)}</span>
+                </span>
+              </div>
+            </Masthead>
           </div>
         </div>
 
-        <div className="h-px bg-carbon/45" />
-
         <div
           ref={containerRef}
-          className="relative mt-5 aspect-video w-full max-h-[calc(100vh-330px)] overflow-hidden border border-carbon bg-[#111116]"
+          className="relative aspect-[12/5] max-h-[calc(100vh-330px)] w-full overflow-hidden rounded bg-carbon-deep"
         >
           {video && (
             <VideoCanvas
@@ -170,62 +181,31 @@ export function PlayerPage() {
           {matched.map((face, i) => (
             <div
               key={i}
-              className="pointer-events-none absolute border-[1.5px] border-paper"
+              className="pointer-events-none absolute border-[1.5px] border-paper-light"
               style={place(face.bbox)}
             >
-              <div className="absolute -top-[30px] left-[-1px] flex flex-row items-center gap-1.5 border border-carbon bg-paper-light px-[7px] py-1 whitespace-nowrap">
-                <span className="h-[7px] w-[7px] bg-carbon" />
-                <span className="font-kai text-[14px] font-bold leading-none text-carbon-deep">
+              <div className="absolute -left-[1.5px] -top-7 flex h-6 flex-row items-center gap-1.5 whitespace-nowrap rounded-xs bg-paper-light px-1.5">
+                <span className="h-2 w-2 bg-carbon" />
+                <span className="font-kai text-[14px] leading-none text-carbon-deep">
                   {nameOf(face)}
                 </span>
-                <span className="font-mono text-[8px] text-carbon-soft">{formatMmSs(time)}</span>
               </div>
             </div>
           ))}
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-row items-end justify-between bg-gradient-to-t from-[#0a0a0e]/85 to-transparent px-4 pb-4 pt-10">
-            <div className="flex flex-row items-center gap-3.5">
-              <button
-                type="button"
-                onClick={togglePlay}
-                className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-full border-[1.5px] border-stamp bg-stamp/20"
-                aria-label={playing ? '暫停' : '播放'}
-              >
-                {playing ? (
-                  <svg width="14" height="16" viewBox="0 0 14 16" fill="none" aria-hidden="true">
-                    <rect x="1" y="1" width="4" height="14" fill="#efe4b4" />
-                    <rect x="9" y="1" width="4" height="14" fill="#efe4b4" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="18" viewBox="0 0 16 18" fill="none" aria-hidden="true">
-                    <path d="M1 1.4L15 9L1 16.6V1.4Z" fill="#efe4b4" />
-                  </svg>
-                )}
-              </button>
-              <div className="flex flex-col gap-0.5">
-                <span className="font-mono text-[15px] tracking-[0.04em] text-paper">
-                  {formatMmSs(time)}
-                </span>
-                <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
-                  OF {formatMmSs(duration)}
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-row items-center gap-4 pb-0.5">
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="font-mono text-[11px] text-paper">
-                  {faces.length} · {matched.length}
-                </span>
-                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
-                  DETECT / MATCH
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div className="flex flex-row items-center gap-3 pt-3">
-          <span className="font-mono text-[10px] text-carbon-soft">{formatMmSs(time)}</span>
+        <div className="flex flex-row items-center gap-4">
+          <Button
+            variant="primary"
+            onClick={togglePlay}
+            aria-label={playing ? '暫停' : '播放'}
+            className="w-10 shrink-0 px-0!"
+          >
+            {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+          </Button>
+          <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
+            {formatMmSs(time)}
+          </span>
           <input
             type="range"
             min={0}
@@ -233,126 +213,135 @@ export function PlayerPage() {
             step={0.1}
             value={time}
             onChange={(e) => seek(parseFloat(e.target.value))}
-            className="h-1 flex-1 cursor-pointer appearance-none bg-carbon/20 accent-stamp [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-stamp [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-stamp"
+            style={{
+              background: `linear-gradient(to right, var(--color-stamp) ${played}%, color-mix(in srgb, var(--color-carbon-deep) 13%, transparent) ${played}%)`,
+            }}
+            className="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-full [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-stamp [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-stamp"
             aria-label="播放位置"
+            aria-valuetext={formatMmSs(time)}
           />
-          <span className="font-mono text-[10px] text-ledger">{formatMmSs(duration)}</span>
+          <span className="font-mono text-[13px] tabular-nums text-ink-muted">
+            {formatMmSs(duration)}
+          </span>
+          <span className="flex flex-row items-center gap-1.5">
+            <span className="font-mono text-[13px] tabular-nums text-carbon-deep">
+              {faces.length} · {matched.length}
+            </span>
+            <span className="font-kai text-[12px] text-ink-muted">偵測 / 配對</span>
+          </span>
         </div>
 
-        <div className="flex flex-row flex-wrap items-center gap-2 pt-4">
-          {matched.map((face, i) => {
-            const band = bandFor(face.match_score);
-            return (
-              <span
-                key={i}
-                className="flex flex-row items-center gap-2 border border-carbon/35 px-2.5 py-1"
-              >
-                <span className="font-kai text-[11px] text-carbon-deep">{nameOf(face)}</span>
-                <span className="font-mono text-[9px] text-ledger">
-                  {face.match_score == null ? '—' : face.match_score.toFixed(2)}
+        <div className="grid grid-cols-5 gap-4 border-t border-carbon-deep/13 pt-4">
+          {matched.map((face, i) => (
+            <div key={i} className="flex min-w-0 flex-row items-center gap-2.5">
+              <div className="h-20 w-[60px] shrink-0 overflow-hidden rounded bg-tint">
+                {/* ponytail: frames arrive 6 times a second and a first crop costs 1.5s, so crops
+                    load only while paused. Add a throttle if they're wanted during playback. */}
+                {video && frame && !playing ? (
+                  <FaceCrop
+                    videoId={video.id}
+                    frameNumber={frame.frame_number}
+                    detectionIndex={faces.indexOf(face)}
+                    timestamp={frame.timestamp}
+                    bbox={face.bbox}
+                    streamUrl={video.stream_url}
+                    alt={nameOf(face)}
+                    className="h-full w-full! [&>div]:hidden [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
+                  />
+                ) : null}
+              </div>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="truncate font-kai text-[15px] leading-tight text-carbon-deep">
+                  {nameOf(face)}
                 </span>
-                <span
-                  className={`border px-1 font-kai text-[9px] tracking-[0.1em] ${BAND_STAMP[band].ink}`}
-                >
-                  {BAND_STAMP[band].word}
+                <span className="flex flex-row items-center gap-1.5">
+                  <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
+                    {face.match_score == null ? '—' : face.match_score.toFixed(2)}
+                  </span>
+                  <Stamp band={bandFor(face.match_score)} />
                 </span>
-              </span>
-            );
-          })}
+              </div>
+            </div>
+          ))}
           {matched.length === 0 && (
-            <span className="font-kai text-[12px] text-carbon-soft">這一格沒有已核對的人臉</span>
+            <span className="col-span-5 font-kai text-[13px] text-ink-muted">
+              這一格沒有已核對的人臉
+            </span>
           )}
         </div>
 
-        <div className="mt-auto flex flex-row items-center justify-between border-t border-carbon/30 pt-3">
-          <span className="font-mono text-[9px] tracking-[0.16em] text-ledger">
-            FRAMES {summary?.frames_processed.toLocaleString() ?? '—'} · DETECTIONS{' '}
-            {summary?.total_faces_detected.toLocaleString() ?? '—'} · RECOGNISED{' '}
-            {summary?.total_recognitions.toLocaleString() ?? '—'}
+        <div className="mt-auto flex flex-row items-center justify-between font-kai text-[12px] tabular-nums text-ink-muted">
+          <span>
+            影格 {summary?.frames_processed.toLocaleString('en-US') ?? '—'} · 偵測{' '}
+            {summary?.total_faces_detected.toLocaleString('en-US') ?? '—'} · 辨識{' '}
+            {summary?.total_recognitions.toLocaleString('en-US') ?? '—'}
           </span>
-          <span className="font-mono text-[9px] tracking-[0.16em] text-carbon-soft">
-            {video?.id.split('-')[0] ?? '—'} · R2 · 1080P
+          <span>
+            {[video?.id.split('-')[0] ?? '—', 'R2', rendition].filter(Boolean).join(' · ')}
           </span>
         </div>
       </div>
 
       {/* 第二聯 — the carbon copy carries the queue, never a write. */}
-      <aside className="flex w-[330px] shrink-0 flex-col border-l border-carbon bg-copy px-6 pb-5 pt-6">
-        <div className="font-mono text-[8px] tracking-[0.26em] text-carbon-soft">
-          本卷出場 · IN THIS REEL
+      <aside className="flex w-[330px] shrink-0 flex-col gap-4 border-l border-carbon-deep/13 bg-tint px-6 pb-5 pt-8">
+        <div className="flex flex-col gap-1">
+          <span className="font-kai text-[13px] text-carbon-soft">本卷出場</span>
+          <div className="flex flex-row items-end gap-2">
+            <span className="font-mono text-[28px] leading-tight tabular-nums text-carbon-deep">
+              {coverage}
+            </span>
+            <span className="pb-1 font-kai text-[13px] text-carbon-soft">位參賽者被辨識</span>
+          </div>
         </div>
 
-        <div className="flex flex-row items-baseline gap-2.5 pt-2">
-          <span className="font-serif text-[36px] font-black leading-none text-carbon-deep">
-            {coverage}
-          </span>
-          <span className="font-kai text-[12px] text-carbon-soft">位參賽者被辨識</span>
-        </div>
-
-        <div className="flex flex-row items-baseline justify-between pt-4">
-          <h2 className="font-kai text-[13px] font-bold text-carbon-deep">待播</h2>
-          <span className="font-mono text-[9px] tracking-[0.22em] text-carbon-soft">QUEUE</span>
-        </div>
-        <div className="mt-2 h-px bg-carbon/40" />
-
-        <div className="flex flex-col pt-1">
+        <div className="flex flex-col">
+          <h2 className="border-b border-carbon-deep/33 pb-2 font-kai text-[18px] font-normal text-carbon-deep">
+            待播
+          </h2>
           {queue.map((entry) => (
             <button
               type="button"
               key={`${entry.contestantId}-${entry.at}`}
               onClick={() => seek(entry.at)}
-              className="flex flex-row items-center gap-3 border-b border-carbon/20 py-2.5 text-left"
+              className="flex h-14 flex-row items-center gap-3 border-b border-carbon-deep/13 text-left transition-colors hover:bg-ground/60"
             >
-              <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
+              <span className="font-mono text-[13px] tabular-nums text-carbon-soft">
                 {formatMmSs(entry.at)}
               </span>
-              <span className="flex flex-1 flex-col gap-0.5">
-                <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate font-kai text-[15px] leading-tight text-carbon-deep">
                   {entry.name}
                 </span>
-                <span className="font-mono text-[8px] tracking-[0.14em] text-carbon-soft">
+                <span className="font-kai text-[12px] tabular-nums text-ink-muted">
                   #{entry.contestantId} · {BAND_STAMP[entry.band].word}
                 </span>
               </span>
-              <span className="h-[7px] w-[7px] bg-carbon-deep" />
             </button>
           ))}
           {queue.length === 0 && (
-            <div className="py-6 font-kai text-[13px] leading-relaxed text-carbon-soft">
+            <div className="py-6 font-kai text-[13px] leading-relaxed text-ink-muted">
               本片再無新的出場紀錄。
             </div>
           )}
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-5">
-          <div className="-rotate-[8deg] border-[1.5px] border-carbon-deep/50 px-4 py-2.5">
-            <div className="text-center font-serif text-[14px] font-bold tracking-[0.3em] text-carbon-deep/70">
-              唯讀
-            </div>
-            <div className="text-center font-mono text-[7px] tracking-[0.2em] text-carbon-deep/60">
-              PUBLIC · READ ONLY
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-carbon/40 pt-3.5">
-          <div className="flex flex-row items-baseline justify-between">
-            <span className="font-mono text-[9px] tracking-[0.18em] text-carbon-soft">
-              COVERAGE
-            </span>
-            <span className="font-mono text-[12px] text-carbon-deep">
+        <div className="mt-auto flex flex-col gap-2 border-t border-carbon-deep/13 pt-3">
+          <div className="flex flex-row items-end justify-between">
+            <span className="font-kai text-[13px] text-carbon-soft">覆蓋</span>
+            <span className="font-mono text-[13px] tabular-nums text-carbon-deep">
               {coverage} / {total}
             </span>
           </div>
-          <div className="h-[3px] w-full bg-carbon-deep/20">
+          <div className="h-1 w-full rounded-full bg-carbon-deep/13">
             <div
-              className="h-[3px] bg-carbon-deep"
+              className="h-1 rounded-full bg-carbon-deep"
               style={{ width: `${Math.min(100, (coverage / total) * 100)}%` }}
             />
           </div>
-          <span className="pt-1 font-kai text-[11px] leading-relaxed text-carbon-soft">
-            唯讀檢視 · 所有改動在後台
-          </span>
+          <div className="flex flex-row items-center justify-between pt-1">
+            <span className="font-kai text-[12px] text-ink-muted">唯讀檢視 · 所有改動在後台</span>
+            <Stamp tone="muted">唯讀</Stamp>
+          </div>
         </div>
       </aside>
     </div>
