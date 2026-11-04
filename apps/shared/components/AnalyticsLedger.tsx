@@ -53,7 +53,20 @@ const LOOK = {
   },
 } as const;
 
-function Score({ value, label, className }: { value: number; label: string; className: string }) {
+function Score({
+  value,
+  label,
+  className,
+}: {
+  value: number | null;
+  label: string;
+  className: string;
+}) {
+  if (value == null) {
+    return (
+      <span className={`block text-right font-mono text-[13px] tabular-nums ${className}`}>—</span>
+    );
+  }
   return (
     <span className="flex items-center justify-end gap-2" title={`${label} ${value.toFixed(3)}`}>
       <span className={`font-mono text-[13px] tabular-nums ${className}`}>{value.toFixed(2)}</span>

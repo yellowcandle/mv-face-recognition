@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { FaceDetection, FlaggedFace, Video, VideoMetadata } from '../../types';
-import { bandFor } from '../../lib/bands';
 import { adminFetch, assertOk, isSessionExpired } from '../../lib/adminApi';
 import { AdminErrorNotice } from '../AdminErrorNotice';
 import { useVideos } from '../../hooks/useVideos';
@@ -16,7 +15,7 @@ import { formatMmSs, videoShortName } from '../../lib/format';
 import { X } from 'lucide-react';
 import { Button } from '../Button';
 import { Masthead } from '../Masthead';
-import { Stamp } from '../Stamp';
+import { DetectionStamp, Stamp } from '../Stamp';
 import { FrameFace } from './FrameFace';
 import { faceName, tickPercent } from './faceView';
 import { useViewerMetadata } from '../../hooks/useViewerMetadata';
@@ -898,7 +897,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
                         {face.match_score.toFixed(2)}
                       </span>
                     )}
-                    <Stamp band={bandFor(face.match_score)} />
+                    <DetectionStamp detection={face} />
                   </>
                 )}
               </button>

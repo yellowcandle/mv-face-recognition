@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import type { FaceDetection } from '../../types';
-import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { BAND_STAMP, bandFor, detectionWord, isFlagDecision } from '../../lib/bands';
 import { faceName } from './faceView';
 import type { VideoRenderRect } from './useAnnotations';
 
@@ -51,8 +51,9 @@ export function FaceOverlay({
         // percentage — and an unmatched detection has no contestant and no cosine, only
         // the detector's own score.
         const name = faceName(face);
-        const score =
-          face.matched && face.match_score != null
+        const score = isFlagDecision(face)
+          ? detectionWord(face)
+          : face.matched && face.match_score != null
             ? `${face.match_score.toFixed(2)} ${BAND_STAMP[bandFor(face.match_score)].word}`
             : `未認出 · 偵測分 ${face.det_score.toFixed(2)}`;
         const action = !canFlag ? null : batchMode ? '點選以選取或取消' : '點選以標記這張臉';

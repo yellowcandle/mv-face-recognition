@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FaceDetection } from '../../types';
-import { bandFor } from '../../lib/bands';
+import { bandFor, isFlagDecision } from '../../lib/bands';
 import { AdminErrorNotice } from '../AdminErrorNotice';
 import { Button } from '../Button';
-import { Stamp } from '../Stamp';
+import { DetectionStamp, Stamp } from '../Stamp';
 import { FrameFace } from './FrameFace';
 import { faceName } from './faceView';
 
@@ -132,7 +132,9 @@ export function FlagDialog({
                 <span className="truncate font-mono text-[12px] text-ink-muted">{where}</span>
               ) : null}
             </div>
-            {face.matched && face.match_score != null ? (
+            {isFlagDecision(face) ? (
+              <DetectionStamp detection={face} />
+            ) : face.matched && face.match_score != null ? (
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[14px] tabular-nums text-carbon">
                   {face.match_score.toFixed(3)}

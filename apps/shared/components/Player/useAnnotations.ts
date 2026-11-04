@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { FaceDetection } from '../../types';
-import { BAND_STAMP, bandFor } from '../../lib/bands';
+import { detectionWord } from '../../lib/bands';
 import { faceName } from './faceView';
 
 export interface VideoRenderRect {
@@ -105,7 +105,7 @@ export function useAnnotations(
       // Band, not a percentage: 0.51 is a cosine, and "51%" would read as certainty.
       // The raw cosine lives in the overlay button's tooltip.
       const name = faceName(face);
-      const band = face.matched ? BAND_STAMP[bandFor(face.match_score)].word : '';
+      const band = face.matched ? detectionWord(face) : '';
       const nameW = ctx.measureText(name).width;
       const textW = nameW + (band ? 4 + ctx.measureText(band).width : 0) + 8;
       // The label hangs under the box; at the foot of the frame it moves above.

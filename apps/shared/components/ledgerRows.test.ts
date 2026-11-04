@@ -33,6 +33,31 @@ const timeline = {
 };
 
 describe('ledgerRows', () => {
+  it('keeps a missing score null instead of treating it as 0, and sorts it last', () => {
+    const rows = ledgerRows(
+      {
+        '1': entry({ average_match_score: null as unknown as number }),
+        '2': entry({
+          average_match_score: 0.2,
+          appearances: [
+            {
+              timestamp: 1,
+              frame_number: 1,
+              match_score: null as unknown as number,
+              bbox: [0, 0, 1, 1],
+            },
+            { timestamp: 2, frame_number: 2, match_score: 0.2, bbox: [0, 0, 1, 1] },
+          ],
+        }),
+      },
+      'avgMatchScore',
+    );
+    expect(rows.map((r) => r.id)).toEqual(['2', '1']);
+    expect(rows[0].maxMatchScore).toBe(0.2);
+    expect(rows[1].avgMatchScore).toBeNull();
+    expect(rows[1].maxMatchScore).toBeNull();
+  });
+
   it('ranks by appearances, highest first', () => {
     expect(ledgerRows(timeline, 'appearances').map((r) => r.nickname)).toEqual([
       'Catrina',
@@ -54,7 +79,7 @@ describe('ledgerRows', () => {
   it('falls back to the key when a contestant has no info', () => {
     const row = ledgerRows({ '9': entry({ contestant_info: undefined }) }, 'appearances')[0];
     expect(row.nickname).toBe('9');
-    expect(row.maxMatchScore).toBe(0);
+    expect(row.maxMatchScore).toBeNull();
   });
 
   it('points at the crop of the best-scoring appearance', () => {

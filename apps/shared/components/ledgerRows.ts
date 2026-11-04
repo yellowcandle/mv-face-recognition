@@ -7,8 +7,9 @@ export interface LedgerRow {
   nickname: string;
   name: string;
   appearances: number;
-  avgMatchScore: number;
-  maxMatchScore: number;
+  /** Null means no score to show, never 0: 0 would stamp 存疑 and pull a sort down as a score. */
+  avgMatchScore: number | null;
+  maxMatchScore: number | null;
   firstSeen: number;
   lastSeen: number;
   /** Where `/api/faces/crop` finds this contestant's best face in the reel. */
@@ -27,7 +28,10 @@ export function ledgerRows(
     .map(([id, info]) => {
       const best = (info.appearances ?? []).reduce<
         ContestantTimelineEntry['appearances'][number] | null
-      >((top, a) => (top && top.match_score >= a.match_score ? top : a), null);
+      >((top, a) => {
+        if (a.match_score == null) return top;
+        return top && top.match_score >= a.match_score ? top : a;
+      }, null);
       const detections = best ? (frameByNumber.get(best.frame_number)?.detections ?? []) : [];
       const detectionIndex = detections.reduce((top, d, i) => {
         if (String(d.contestant_id) !== id) return top;
@@ -38,8 +42,8 @@ export function ledgerRows(
         nickname: info.contestant_info?.nickname ?? id,
         name: info.contestant_info?.name ?? id,
         appearances: info.total_appearances,
-        avgMatchScore: info.average_match_score,
-        maxMatchScore: best?.match_score ?? 0,
+        avgMatchScore: info.average_match_score ?? null,
+        maxMatchScore: best?.match_score ?? null,
         firstSeen: info.first_appearance,
         lastSeen: info.last_appearance,
         crop:
@@ -47,7 +51,9 @@ export function ledgerRows(
       };
     })
     .sort((a, b) =>
-      sortBy === 'appearances' ? b.appearances - a.appearances : b.avgMatchScore - a.avgMatchScore,
+      sortBy === 'appearances'
+        ? b.appearances - a.appearances
+        : (b.avgMatchScore ?? -Infinity) - (a.avgMatchScore ?? -Infinity),
     );
 }
 

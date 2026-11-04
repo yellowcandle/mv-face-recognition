@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from 'react';
-import { BAND_STAMP } from '../lib/bands';
+import { BAND_STAMP, bandFor, detectionWord, isFlagDecision } from '../lib/bands';
 import type { Band } from '../lib/bands';
 
 type Tone = 'stamp' | 'carbon' | 'muted';
@@ -37,5 +37,20 @@ export function Stamp({
     >
       {children ?? (band ? BAND_STAMP[band].word : null)}
     </span>
+  );
+}
+
+/** A detection's stamp: tilted 已核對 if an accepted flag named it, else its match-score band. */
+export function DetectionStamp({
+  detection,
+}: {
+  detection: { match_source?: string | null; match_score: number | null };
+}) {
+  return isFlagDecision(detection) ? (
+    <Stamp tone="carbon" tilt>
+      {detectionWord(detection)}
+    </Stamp>
+  ) : (
+    <Stamp band={bandFor(detection.match_score)} />
   );
 }
