@@ -1430,12 +1430,28 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       fetched only if listed. No or malformed metadata means read the flag; the value still decides.
       Every public read still costs one KV list per 1000 flag keys. Upgrade: one accepted-flags
       document per reel, so a read is one get and no list.
-- [ ] Follow-up: the production flags written before this (4 at last count) have no metadata until
-      a decision rewrites them. The fallback keeps them applied, and each is read on every request
-      until then. Reads never backfill: the public surface stays read-only.
+- [x] The 4 production flags written before this got their metadata by a one-off rewrite on
+      2026-11-05, contents unchanged. The fallback stays for any key without metadata. Reads never
+      backfill: the public surface stays read-only.
 - [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
       bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
       count videos correctly. A new reference set changes nothing until a reel is reprocessed.
+- [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
+      Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
+      `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:
+  - [ ] 1. Finish the reel 4 comparison on the rebuilt references (job `6aeb804ac78863f9c632de85`):
+        accuracy against the old results, and whether its accepted flags still match.
+  - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`; confirm one reel gives the same results.
+  - [ ] 3. Test `raccoon_l` and PersonAnalysis (face plus body matching) on one reel against the
+        標註 labels. Adopting one means new references, all 5 reels reprocessed, score bands
+        recalibrated, and accepted flags re-checked, because they match on exact boxes.
+  - [ ] Bump supervision and lap: small, can go any time.
+  - [ ] Check whether Ultralytics and PyTorch can go: no import in `src`, `scripts/hf` or
+        `scripts/publish`; tests and other scripts not checked.
+  - [ ] Run `pip-audit`: security advisories not checked.
+  - [ ] Licence: InsightFace code is MIT, but its pretrained models are non-commercial research
+        only, and its README says `buffalo_l` now needs contacting them for licensing. Applies today,
+        upgraded or not. Get it checked if the public site is or may become commercial.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.
