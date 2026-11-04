@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { BAND_STAMP, Masthead, bandFor, useCoverage, useVideos } from '@mv/shared';
+import { BAND_STAMP, Masthead, bandFor, useContestants, useCoverage, useVideos } from '@mv/shared';
+import type { Contestant } from '@mv/shared';
 
 /**
  * 點唱單 — the request slip. Five reels filed on the left, the current tally on the
@@ -8,9 +10,17 @@ import { BAND_STAMP, Masthead, bandFor, useCoverage, useVideos } from '@mv/share
 export function Home() {
   const { data: videos = [], isLoading } = useVideos();
   const { data: coverage } = useCoverage();
+  const { data: rosterData = [] } = useContestants();
 
   const summary = coverage?.summary;
   const contestants = coverage?.contestants ?? [];
+
+  // Coverage carries the counts; the roster carries the portrait. Join them by id.
+  const roster = rosterData as Contestant[];
+  const portraitById = useMemo(
+    () => new Map(roster.map((r) => [String(r.id), r.portrait_url ?? null] as const)),
+    [roster],
+  );
 
   // "Most seen" is a count, not a recency: the read model has no cross-reel timeline.
   const mostSeen = [...contestants]
@@ -26,10 +36,10 @@ export function Home() {
       <div className="flex flex-row gap-14 pt-7">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-row items-baseline justify-between pb-4">
-            <span className="font-mono text-[10px] tracking-[0.28em] text-ledger">
+            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
               REEL 01 — {String(videos.length).padStart(2, '0')}
             </span>
-            <span className="font-mono text-[10px] tracking-[0.14em] text-ledger">
+            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
               {summary
                 ? `${summary.total} 位 · ${summary.total_faces_recognized.toLocaleString('en-US')} 辨識`
                 : '—'}
@@ -58,7 +68,7 @@ export function Home() {
                   <span className="w-6 shrink-0 font-mono text-[11px] text-carbon-soft">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  <span className="truncate font-serif text-[22px] font-bold leading-tight text-carbon-deep">
+                  <span className="truncate font-serif text-[24px] font-bold leading-tight text-carbon-deep">
                     {video.name
                       .replace(/^\d+-/, '')
                       .replace(/^《全民造星IV》/, '')
@@ -66,9 +76,7 @@ export function Home() {
                   </span>
                 </div>
                 <div className="flex shrink-0 flex-row items-center gap-4">
-                  <span className="border border-stamp/50 px-2 py-1 font-mono text-[8px] tracking-[0.16em] text-stamp transition-colors group-hover:border-stamp group-hover:bg-stamp group-hover:text-paper-light">
-                    1080P
-                  </span>
+                  <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">1080P</span>
                 </div>
               </Link>
             ))
@@ -77,11 +85,11 @@ export function Home() {
 
         <aside className="flex w-[360px] shrink-0 flex-col gap-4">
           <div className="flex flex-col gap-3 border border-carbon/25 bg-paper-light p-6">
-            <span className="font-mono text-[9px] tracking-[0.26em] text-ledger">此刻 / NOW</span>
+            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">此刻 / NOW</span>
             <span className="font-serif text-[52px] font-bold leading-none text-carbon-deep">
               {summary ? summary.total_faces_recognized.toLocaleString('en-US') : '—'}
             </span>
-            <span className="font-kai text-[12px] text-carbon-soft">五卷合計的辨識次數</span>
+            <span className="font-kai text-[13px] text-carbon-soft">五卷合計的辨識次數</span>
             <div className="h-px bg-carbon/20" />
             {[
               ['平均配對分數', summary ? summary.avg_match_score.toFixed(2) : '—'],
@@ -89,7 +97,7 @@ export function Home() {
               ['辨識率', summary ? `${(summary.recognition_rate * 100).toFixed(1)}%` : '—'],
             ].map(([label, value]) => (
               <div key={label} className="flex flex-row items-baseline justify-between py-1">
-                <span className="font-kai text-[12px] text-carbon-soft">{label}</span>
+                <span className="font-kai text-[13px] text-carbon-soft">{label}</span>
                 <span className="font-mono text-[11px] text-carbon-deep">{value}</span>
               </div>
             ))}
@@ -102,9 +110,7 @@ export function Home() {
             <span className="font-kai text-[14px] tracking-[0.12em] text-paper-light">
               進入播放
             </span>
-            <span className="font-mono text-[10px] tracking-[0.24em] text-paper-light/70">
-              PLAY
-            </span>
+            <span className="font-mono text-[11px] tracking-[0.12em] text-paper-light">PLAY</span>
           </Link>
         </aside>
       </div>
@@ -113,34 +119,58 @@ export function Home() {
         <div className="flex flex-col gap-4 pt-10">
           <div className="flex flex-row items-baseline justify-between">
             <span className="font-serif text-[16px] font-bold text-carbon-deep">常駐面孔</span>
-            <span className="font-mono text-[9px] tracking-[0.24em] text-ledger">
+            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
               MOST SEEN · ACROSS FIVE REELS
             </span>
           </div>
           <div className="flex flex-row gap-4">
             {mostSeen.map((c) => {
               const band = bandFor(c.avg_match_score);
+              const portrait = portraitById.get(String(c.id)) ?? null;
               return (
                 <div
                   key={c.id}
-                  className="flex min-w-0 flex-1 flex-col gap-2.5 border border-carbon/25 bg-paper-light px-5 py-4"
+                  className="group flex min-w-0 flex-1 flex-col border border-carbon/25 bg-paper-light transition-colors group-hover:border-carbon/50"
                 >
-                  <span className="truncate font-serif text-[18px] font-bold leading-tight text-carbon-deep">
-                    {c.nickname || c.name}
-                  </span>
-                  <span className="font-kai text-[11px] text-carbon-soft">{c.name}</span>
-                  <span className="font-mono text-[9px] tracking-[0.14em] text-ledger">
-                    {c.detection_count} 次 · {c.videos_seen_in} 卷
-                  </span>
-                  <div className="flex flex-row items-center justify-between pt-1.5">
-                    <span className="font-mono text-[10px] text-carbon-soft">
-                      {c.avg_match_score.toFixed(2)}
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-paper-dark">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="-rotate-6 border border-ledger px-2 py-1 font-kai text-[11px] tracking-[0.12em] text-ledger">
+                        缺相
+                      </span>
+                    </div>
+                    {portrait ? (
+                      <img
+                        src={portrait}
+                        alt={`${c.nickname || c.name} ${c.name}`}
+                        decoding="async"
+                        className="relative h-full w-full object-cover object-[50%_22%]"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.visibility = 'hidden';
+                        }}
+                      />
+                    ) : null}
+                    <span className="absolute right-2 top-2 -rotate-2 border border-carbon/40 bg-paper-light/85 px-2 py-0.5 font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
+                      #{c.id}
                     </span>
-                    <span
-                      className={`inline-block -rotate-2 border px-1.5 py-0.5 font-kai text-[10px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
-                    >
-                      {BAND_STAMP[band].word}
+                  </div>
+                  <div className="flex flex-col gap-2 px-5 py-4">
+                    <span className="truncate font-serif text-[16px] font-bold leading-tight text-carbon-deep">
+                      {c.nickname || c.name}
                     </span>
+                    <span className="font-kai text-[11px] text-carbon-soft">{c.name}</span>
+                    <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
+                      {c.detection_count} 次 · {c.videos_seen_in} 卷
+                    </span>
+                    <div className="flex flex-row items-center justify-between pt-1">
+                      <span className="font-mono text-[11px] text-carbon-soft">
+                        {c.avg_match_score.toFixed(2)}
+                      </span>
+                      <span
+                        className={`inline-block -rotate-2 border px-2 py-0.5 font-kai text-[11px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
+                      >
+                        {BAND_STAMP[band].word}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );

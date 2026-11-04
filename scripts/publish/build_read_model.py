@@ -616,13 +616,23 @@ def main() -> int:
         # writes. Use the 1080p encode when the pipeline produced one; a reel with no
         # local encode keeps its source filename (its R2 object predates the rule).
         encoded = f"{stem}_1080p.mp4"
-        published = (
-            encoded
-            if os.path.exists(
-                os.path.join(REPO, "local_output/processed_videos", encoded)
+        encoded_path = os.path.join(REPO, "local_output/processed_videos", encoded)
+        if os.path.exists(encoded_path):
+            published = encoded
+            published_path = encoded_path
+        else:
+            published = f"{stem}.mp4"
+            published_path = os.path.join(REPO, "source/videos", published)
+        # Cache-bust when an encode is replaced: the Worker serves video with a 24 h
+        # Cache-Control, so a new file behind the same URL would stay stale.
+        try:
+            stat = os.stat(published_path)
+            stream_url = (
+                f"/videos/processed_videos/{published}"
+                f"?v={stat.st_size:x}-{int(stat.st_mtime):x}"
             )
-            else f"{stem}.mp4"
-        )
+        except OSError:
+            stream_url = f"/videos/processed_videos/{published}"
         out = os.path.join(STAGE, f"metadata_{video_id}.json")
         try:
             with open(out, "w", encoding="utf-8") as f:
@@ -638,7 +648,7 @@ def main() -> int:
                 "id": video_id,
                 "name": stem,
                 "filename": published,
-                "stream_url": f"/videos/processed_videos/{published}",
+                "stream_url": stream_url,
                 "has_metadata": True,
             }
         )

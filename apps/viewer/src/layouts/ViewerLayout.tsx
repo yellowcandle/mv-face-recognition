@@ -15,16 +15,14 @@ export function ViewerLayout() {
   return (
     <div className="flex h-full flex-col bg-paper">
       <header className="flex shrink-0 flex-row items-center justify-between border-b border-carbon/30 px-14 py-3">
-        <span className="font-mono text-[9px] tracking-[0.3em] text-carbon-soft">MVFR</span>
+        <span className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">MVFR</span>
         <nav className="flex flex-row items-center gap-8">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex flex-col gap-0.5 ${isActive ? '' : 'opacity-60 hover:opacity-100'}`
-              }
+              className="flex flex-col gap-0.5"
             >
               {({ isActive }) => (
                 <>
@@ -37,14 +35,14 @@ export function ViewerLayout() {
                       {item.label}
                     </span>
                     <span
-                      className={`font-mono text-[8px] tracking-[0.22em] ${
+                      className={`font-mono text-[11px] tracking-[0.12em] ${
                         isActive ? 'text-stamp' : 'text-ledger'
                       }`}
                     >
                       {item.latin}
                     </span>
                   </span>
-                  <span className="font-kai text-[9px] leading-none text-ledger">{item.hint}</span>
+                  <span className="font-kai text-[11px] leading-none text-ledger">{item.hint}</span>
                 </>
               )}
             </NavLink>

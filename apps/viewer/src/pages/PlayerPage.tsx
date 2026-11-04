@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   BAND_STAMP,
+  FaceCrop,
   VideoCanvas,
   bandFor,
   formatMmSs,
@@ -22,6 +23,10 @@ interface QueueEntry {
   contestantId: number;
   name: string;
   band: Band;
+  /** Enough of the source detection to crop the face from the reel. */
+  frameNumber: number;
+  detectionIndex: number;
+  bbox: [number, number, number, number];
 }
 
 export function PlayerPage() {
@@ -57,8 +62,8 @@ export function PlayerPage() {
     let previous = new Set<number>();
     for (const frame of sorted) {
       const now = new Set<number>();
-      for (const d of frame.detections ?? []) {
-        if (d.contestant_id == null) continue;
+      (frame.detections ?? []).forEach((d, detectionIndex) => {
+        if (d.contestant_id == null) return;
         const id = Number(d.contestant_id);
         now.add(id);
         if (!previous.has(id) && d.match_score != null) {
@@ -67,9 +72,12 @@ export function PlayerPage() {
             contestantId: id,
             name: d.contestant_nickname || d.contestant_name || `#${id}`,
             band: bandFor(d.match_score),
+            frameNumber: frame.frame_number,
+            detectionIndex,
+            bbox: d.bbox,
           });
         }
-      }
+      });
       previous = now;
       if (out.length > 600) break;
     }
@@ -135,7 +143,7 @@ export function PlayerPage() {
             <h1 className="font-serif text-[26px] font-black leading-none text-carbon-deep">
               播放
             </h1>
-            <span className="font-mono text-[10px] tracking-[0.2em] text-ledger">
+            <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
               REEL {video?.id.split('-')[0] ?? '—'} · {reel}
             </span>
           </div>
@@ -178,7 +186,7 @@ export function PlayerPage() {
                 <span className="font-kai text-[14px] font-bold leading-none text-carbon-deep">
                   {nameOf(face)}
                 </span>
-                <span className="font-mono text-[8px] text-carbon-soft">{formatMmSs(time)}</span>
+                <span className="font-mono text-[11px] text-carbon-soft">{formatMmSs(time)}</span>
               </div>
             </div>
           ))}
@@ -206,7 +214,7 @@ export function PlayerPage() {
                 <span className="font-mono text-[15px] tracking-[0.04em] text-paper">
                   {formatMmSs(time)}
                 </span>
-                <span className="font-mono text-[9px] tracking-[0.18em] text-ledger">
+                <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
                   OF {formatMmSs(duration)}
                 </span>
               </div>
@@ -216,7 +224,7 @@ export function PlayerPage() {
                 <span className="font-mono text-[11px] text-paper">
                   {faces.length} · {matched.length}
                 </span>
-                <span className="font-mono text-[8px] tracking-[0.16em] text-ledger">
+                <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
                   DETECT / MATCH
                 </span>
               </div>
@@ -225,7 +233,7 @@ export function PlayerPage() {
         </div>
 
         <div className="flex flex-row items-center gap-3 pt-3">
-          <span className="font-mono text-[10px] text-carbon-soft">{formatMmSs(time)}</span>
+          <span className="font-mono text-[11px] text-carbon-soft">{formatMmSs(time)}</span>
           <input
             type="range"
             min={0}
@@ -236,7 +244,7 @@ export function PlayerPage() {
             className="h-1 flex-1 cursor-pointer appearance-none bg-carbon/20 accent-stamp [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-stamp [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-stamp"
             aria-label="播放位置"
           />
-          <span className="font-mono text-[10px] text-ledger">{formatMmSs(duration)}</span>
+          <span className="font-mono text-[11px] text-ledger">{formatMmSs(duration)}</span>
         </div>
 
         <div className="flex flex-row flex-wrap items-center gap-2 pt-4">
@@ -248,11 +256,11 @@ export function PlayerPage() {
                 className="flex flex-row items-center gap-2 border border-carbon/35 px-2.5 py-1"
               >
                 <span className="font-kai text-[11px] text-carbon-deep">{nameOf(face)}</span>
-                <span className="font-mono text-[9px] text-ledger">
+                <span className="font-mono text-[11px] text-ledger">
                   {face.match_score == null ? '—' : face.match_score.toFixed(2)}
                 </span>
                 <span
-                  className={`border px-1 font-kai text-[9px] tracking-[0.1em] ${BAND_STAMP[band].ink}`}
+                  className={`border px-2 font-kai text-[11px] tracking-[0.12em] ${BAND_STAMP[band].ink}`}
                 >
                   {BAND_STAMP[band].word}
                 </span>
@@ -265,12 +273,12 @@ export function PlayerPage() {
         </div>
 
         <div className="mt-auto flex flex-row items-center justify-between border-t border-carbon/30 pt-3">
-          <span className="font-mono text-[9px] tracking-[0.16em] text-ledger">
+          <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
             FRAMES {summary?.frames_processed.toLocaleString() ?? '—'} · DETECTIONS{' '}
             {summary?.total_faces_detected.toLocaleString() ?? '—'} · RECOGNISED{' '}
             {summary?.total_recognitions.toLocaleString() ?? '—'}
           </span>
-          <span className="font-mono text-[9px] tracking-[0.16em] text-carbon-soft">
+          <span className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
             {video?.id.split('-')[0] ?? '—'} · R2 · 1080P
           </span>
         </div>
@@ -278,7 +286,7 @@ export function PlayerPage() {
 
       {/* 第二聯 — the carbon copy carries the queue, never a write. */}
       <aside className="flex w-[330px] shrink-0 flex-col border-l border-carbon bg-copy px-6 pb-5 pt-6">
-        <div className="font-mono text-[8px] tracking-[0.26em] text-carbon-soft">
+        <div className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
           本卷出場 · IN THIS REEL
         </div>
 
@@ -286,12 +294,12 @@ export function PlayerPage() {
           <span className="font-serif text-[36px] font-black leading-none text-carbon-deep">
             {coverage}
           </span>
-          <span className="font-kai text-[12px] text-carbon-soft">位參賽者被辨識</span>
+          <span className="font-kai text-[13px] text-carbon-soft">位參賽者被辨識</span>
         </div>
 
         <div className="flex flex-row items-baseline justify-between pt-4">
           <h2 className="font-kai text-[13px] font-bold text-carbon-deep">待播</h2>
-          <span className="font-mono text-[9px] tracking-[0.22em] text-carbon-soft">QUEUE</span>
+          <span className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">QUEUE</span>
         </div>
         <div className="mt-2 h-px bg-carbon/40" />
 
@@ -301,20 +309,33 @@ export function PlayerPage() {
               type="button"
               key={`${entry.contestantId}-${entry.at}`}
               onClick={() => seek(entry.at)}
-              className="flex flex-row items-center gap-3 border-b border-carbon/20 py-2.5 text-left"
+              className="group flex flex-row items-center gap-3 border-b border-carbon/20 py-2 text-left transition-colors hover:bg-paper-light/40"
             >
-              <span className="w-[46px] font-mono text-[11px] text-carbon-soft">
-                {formatMmSs(entry.at)}
-              </span>
+              <FaceCrop
+                videoId={video?.id ?? ''}
+                frameNumber={entry.frameNumber}
+                detectionIndex={entry.detectionIndex}
+                timestamp={entry.at}
+                bbox={entry.bbox}
+                streamUrl={video?.stream_url}
+                width={64}
+                alt={entry.name}
+                className="h-16 w-16 shrink-0 overflow-hidden border border-carbon/45 bg-carbon-deep/10 [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
+              />
               <span className="flex flex-1 flex-col gap-0.5">
-                <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
-                  {entry.name}
+                <span className="flex flex-row items-baseline justify-between gap-2">
+                  <span className="font-kai text-[16px] font-bold leading-[1.1] text-carbon-deep">
+                    {entry.name}
+                  </span>
+                  <span className="font-mono text-[11px] text-carbon-soft">
+                    {formatMmSs(entry.at)}
+                  </span>
                 </span>
-                <span className="font-mono text-[8px] tracking-[0.14em] text-carbon-soft">
+                <span className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
                   #{entry.contestantId} · {BAND_STAMP[entry.band].word}
                 </span>
               </span>
-              <span className="h-[7px] w-[7px] bg-carbon-deep" />
+              <span className="h-[7px] w-[7px] shrink-0 bg-carbon-deep group-hover:bg-stamp" />
             </button>
           ))}
           {queue.length === 0 && (
@@ -326,10 +347,10 @@ export function PlayerPage() {
 
         <div className="flex flex-1 items-center justify-center py-5">
           <div className="-rotate-[8deg] border-[1.5px] border-carbon-deep/50 px-4 py-2.5">
-            <div className="text-center font-serif text-[14px] font-bold tracking-[0.3em] text-carbon-deep/70">
+            <div className="text-center font-serif text-[14px] font-bold tracking-[0.12em] text-carbon-deep/70">
               唯讀
             </div>
-            <div className="text-center font-mono text-[7px] tracking-[0.2em] text-carbon-deep/60">
+            <div className="text-center font-mono text-[11px] tracking-[0.12em] text-carbon-deep">
               PUBLIC · READ ONLY
             </div>
           </div>
@@ -337,7 +358,7 @@ export function PlayerPage() {
 
         <div className="flex flex-col gap-2 border-t border-carbon/40 pt-3.5">
           <div className="flex flex-row items-baseline justify-between">
-            <span className="font-mono text-[9px] tracking-[0.18em] text-carbon-soft">
+            <span className="font-mono text-[11px] tracking-[0.12em] text-carbon-soft">
               COVERAGE
             </span>
             <span className="font-mono text-[12px] text-carbon-deep">

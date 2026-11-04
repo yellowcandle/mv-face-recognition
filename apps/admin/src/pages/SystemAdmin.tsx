@@ -86,6 +86,11 @@ export function SystemAdmin() {
   const labels = labelsQuery.data?.labels ?? [];
 
   const withEmbeddings = contestants.filter((c) => c.has_embedding).length;
+  // The roster is the source of truth once it loads; the status count is only a fallback
+  // (the edge Worker still reports a hardcoded 96).
+  const rosterTotal: number | '—' = contestantsQuery.data
+    ? contestants.length
+    : (status?.contestant_count ?? '—');
   const pendingFlags = flags.filter((f) => f.status === 'pending').length;
   const labelsByVideo = new Map(labels.map((l) => [l.video_id, l]));
 
@@ -119,7 +124,7 @@ export function SystemAdmin() {
     {
       cn: '向量名冊',
       latin: 'CAST WITH EMBEDDINGS',
-      value: contestantsQuery.isError ? '—' : `${withEmbeddings} / 96`,
+      value: contestantsQuery.isError ? '—' : `${withEmbeddings} / ${rosterTotal}`,
     },
     {
       cn: '待核',
@@ -231,7 +236,10 @@ export function SystemAdmin() {
                       播放
                     </Link>
                     <span className="px-1.5 text-carbon/30">·</span>
-                    <Link to="/labelling" className="text-stamp hover:text-carbon">
+                    <Link
+                      to={`/labelling?video=${encodeURIComponent(v.id)}`}
+                      className="text-stamp hover:text-carbon"
+                    >
                       標註
                     </Link>
                   </td>

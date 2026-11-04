@@ -719,11 +719,12 @@ test('embedding documents, portraits, crops and recognition boxes are served', a
     JOB_STORE: memoryKv(),
   };
 
-  for (const [path, expected] of [
-    ['/api/embedding/coverage', { summary: { total: 96 } }],
-    ['/api/embedding/similarity', { contestants: [] }],
-    ['/api/embedding/top-pairs', { pairs: [] }],
-  ]) {
+  const embeddingCases = [
+    { path: '/api/embedding/coverage', expected: { summary: { total: 96 } } },
+    { path: '/api/embedding/similarity', expected: { contestants: [] } },
+    { path: '/api/embedding/top-pairs', expected: { pairs: [] } },
+  ];
+  for (const { path, expected } of embeddingCases) {
     const response = await worker.fetch(new Request(`https://worker.test${path}`), env, ctx);
     assert.equal(response.status, 200, path);
     assert.deepEqual(await response.json(), expected, path);
