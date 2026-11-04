@@ -149,7 +149,9 @@ export function AnalyticsLedger({
       ) : (
         <div className="flex flex-col">
           <div className="flex flex-row items-center border-b border-carbon/40 py-2.5">
-            <span className="w-[52px] font-mono text-[11px] tracking-[0.12em] text-ledger">NO.</span>
+            <span className="w-[52px] font-mono text-[11px] tracking-[0.12em] text-ledger">
+              NO.
+            </span>
             <span className="flex-1 font-mono text-[11px] tracking-[0.12em] text-ledger">
               CONTESTANT
             </span>

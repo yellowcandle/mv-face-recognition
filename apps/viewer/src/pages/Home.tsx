@@ -76,9 +76,7 @@ export function Home() {
                   </span>
                 </div>
                 <div className="flex shrink-0 flex-row items-center gap-4">
-                  <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">
-                    1080P
-                  </span>
+                  <span className="font-mono text-[11px] tracking-[0.12em] text-ledger">1080P</span>
                 </div>
               </Link>
             ))
@@ -112,9 +110,7 @@ export function Home() {
             <span className="font-kai text-[14px] tracking-[0.12em] text-paper-light">
               進入播放
             </span>
-            <span className="font-mono text-[11px] tracking-[0.12em] text-paper-light">
-              PLAY
-            </span>
+            <span className="font-mono text-[11px] tracking-[0.12em] text-paper-light">PLAY</span>
           </Link>
         </aside>
       </div>

@@ -5,10 +5,7 @@ import type { Video } from '../types';
  * `test-*` clips are fixtures, not reels: the Viewer never lists them. The Admin
  * labeller passes `includeTests` because it still has to open them.
  */
-export function useVideos(
-  apiBase = '',
-  { includeTests = false }: { includeTests?: boolean } = {},
-) {
+export function useVideos(apiBase = '', { includeTests = false }: { includeTests?: boolean } = {}) {
   return useQuery<Video[]>({
     queryKey: ['videos', includeTests],
     queryFn: async () => {
