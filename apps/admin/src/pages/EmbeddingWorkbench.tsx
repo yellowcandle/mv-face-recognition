@@ -14,6 +14,7 @@ import {
   useVideos,
   videoShortName,
 } from '@mv/shared';
+import { useIsEdge } from '../useIsEdge';
 import type { Contestant, ConfusionPair } from '@mv/shared';
 import { QUALITY_WORD, coverageFigures, isPair } from '@mv/shared/lib/pipeline';
 
@@ -202,6 +203,7 @@ export function EmbeddingWorkbench() {
     y: number;
     text: string;
   } | null>(null);
+  const isEdge = useIsEdge() === true;
   const [running, setRunning] = useState<RefreshMode | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   // The polled job, not a fixed label: percent and the reel being worked on come from it.
@@ -466,12 +468,19 @@ export function EmbeddingWorkbench() {
           <Button
             variant="primary"
             onClick={() => void runRefresh('coverage-refresh')}
-            disabled={running !== null}
+            disabled={running !== null || isEdge}
           >
             {refreshLabel('coverage-refresh', '更新覆蓋率 / 相似度')}
           </Button>
         </div>
       </Masthead>
+
+      {isEdge && (
+        <p className="font-kai text-[12px] text-ink-muted">
+          雲端環境不提供覆蓋率與相似度重算：兩者由 bucket 經{' '}
+          <code className="font-mono">npm run publish:metadata</code> 發佈，不由工作寫入。
+        </p>
+      )}
 
       {notice && (
         <div
@@ -629,8 +638,12 @@ export function EmbeddingWorkbench() {
                     variant="primary"
                     size="sm"
                     onClick={() => void runRefresh('coverage-refresh')}
-                    disabled={running !== null}
-                    title="重新計算全站覆蓋率與相似度（不是單一參賽者的向量）"
+                    disabled={running !== null || isEdge}
+                    title={
+                      isEdge
+                        ? '雲端環境不提供：覆蓋率與相似度由 bucket 經 npm run publish:metadata 發佈'
+                        : '重新計算全站覆蓋率與相似度（不是單一參賽者的向量）'
+                    }
                   >
                     {refreshLabel('coverage-refresh', '重新計算覆蓋率與相似度')}
                   </Button>
