@@ -53,27 +53,69 @@ const unmatched = (bbox, tracker_id = 7) => ({
   det_score: 0.81,
   bbox,
 });
+const recognised = (bbox, contestant_id, match_score) => ({
+  ...unmatched(bbox, 8),
+  match_source: 'frame',
+  contestant_id,
+  contestant_name: `名${contestant_id}`,
+  contestant_nickname: `Nick${contestant_id}`,
+  match_score,
+});
 const STORED = {
   video_info: { processing_date: '2026-01-02T03:04:05' },
-  contestant_timeline: { 5: { total_appearances: 1, average_match_score: 0.5 } },
+  processing_summary: {
+    frames_processed: 3,
+    total_faces_detected: 5,
+    total_recognitions: 3,
+    unique_contestants: 2,
+    recognition_rate: 0.6,
+  },
+  contestant_timeline: {
+    2: {
+      contestant_info: { id: '2', name: '名2', nickname: 'Nick2' },
+      appearances: [{ timestamp: 10.32, frame_number: 62, match_score: 0.6, bbox: BOX_A }],
+      total_appearances: 1,
+      average_match_score: 0.6,
+      max_match_score: 0.6,
+      first_appearance: 10.32,
+      last_appearance: 10.32,
+    },
+    5: {
+      contestant_info: { id: '5', name: '名5', nickname: 'Nick5' },
+      appearances: [
+        { timestamp: 10, frame_number: 60, match_score: 0.5, bbox: BOX_B },
+        { timestamp: 10.32, frame_number: 62, match_score: 0.7, bbox: BOX_B },
+      ],
+      total_appearances: 2,
+      average_match_score: 0.6,
+      max_match_score: 0.7,
+      first_appearance: 10,
+      last_appearance: 10.32,
+    },
+  },
   frame_data: [
     {
       frame_number: 60,
       timestamp: 10,
-      detections: [
-        unmatched(BOX_A),
-        {
-          ...unmatched(BOX_B, 8),
-          match_source: 'frame',
-          contestant_id: '5',
-          contestant_name: '錯的',
-          contestant_nickname: 'Wrong',
-          match_score: 0.5,
-        },
-      ],
+      detections_count: 2,
+      recognitions_count: 1,
+      detections: [unmatched(BOX_A), recognised(BOX_B, '5', 0.5)],
     },
     // Same track, same box a frame later: a flag covers one detection, never the track.
-    { frame_number: 61, timestamp: 10.16, detections: [unmatched(BOX_A)] },
+    {
+      frame_number: 61,
+      timestamp: 10.16,
+      detections_count: 1,
+      recognitions_count: 0,
+      detections: [unmatched(BOX_A)],
+    },
+    {
+      frame_number: 62,
+      timestamp: 10.32,
+      detections_count: 2,
+      recognitions_count: 2,
+      detections: [recognised(BOX_B, '5', 0.7), recognised(BOX_A, '2', 0.6)],
+    },
   ],
 };
 
@@ -277,14 +319,162 @@ test('private flag fields never reach a public read', async () => {
   }
 });
 
-test('a read writes nothing, and stored metadata and the timeline stay as they were', async () => {
+test('a read writes nothing, and stored metadata stays as it was', async () => {
   const env = makeEnv([flag()]);
   const before = env.store.get(`metadata_${VIDEO}`);
-  const metadata = await dense(env);
+  await dense(env);
   await facesAt(env, 10.03);
+  await get(env, `/api/recognition/results?contestant_id=1`);
   assert.deepEqual(env.log.puts, []);
   assert.equal(env.store.get(`metadata_${VIDEO}`), before);
+});
+
+test('a flag on an unrecognised face adds an appearance and removes none', async () => {
+  const {
+    contestant_timeline: timeline,
+    processing_summary: summary,
+    frame_data: frames,
+  } = await dense(makeEnv([flag()]));
+
+  assert.deepEqual(timeline['1'], {
+    contestant_info: { id: '1', name: '蘇雅琳', nickname: 'Ivy So' },
+    appearances: [
+      { timestamp: 10, frame_number: 60, match_score: null, bbox: BOX_A, match_source: 'flag' },
+    ],
+    total_appearances: 1,
+    average_match_score: null,
+    max_match_score: null,
+    first_appearance: 10,
+    last_appearance: 10,
+  });
+  assert.deepEqual(timeline['5'], STORED.contestant_timeline['5']);
+  assert.deepEqual(timeline['2'], STORED.contestant_timeline['2']);
+  assert.equal(summary.total_recognitions, 4);
+  assert.equal(summary.unique_contestants, 3);
+  assert.equal(summary.recognition_rate, 0.8);
+  assert.equal(summary.total_faces_detected, 5);
+  assert.equal(frames[0].recognitions_count, 2);
+  assert.equal(frames[1].recognitions_count, 0);
+});
+
+test('a flag on a recognition moves that appearance from the old contestant to the new', async () => {
+  const {
+    contestant_timeline: timeline,
+    processing_summary: summary,
+    frame_data: frames,
+  } = await dense(makeEnv([flag({ contestant_id: 2, bbox: BOX_B })]));
+
+  // The old contestant is recounted from what remains: only the 0.7 at 10.32.
+  assert.equal(timeline['5'].total_appearances, 1);
+  assert.equal(timeline['5'].average_match_score, 0.7);
+  assert.equal(timeline['5'].max_match_score, 0.7);
+  assert.equal(timeline['5'].first_appearance, 10.32);
+  assert.equal(timeline['5'].appearances[0].match_score, 0.7);
+
+  // The new one's average skips the null rather than counting it as 0, and stays time-ordered.
+  assert.equal(timeline['2'].total_appearances, 2);
+  assert.equal(timeline['2'].average_match_score, 0.6);
+  assert.equal(timeline['2'].max_match_score, 0.6);
+  assert.equal(timeline['2'].first_appearance, 10);
+  assert.equal(timeline['2'].last_appearance, 10.32);
+  assert.deepEqual(
+    timeline['2'].appearances.map((a) => a.match_score),
+    [null, 0.6],
+  );
+
+  // A recognition stayed a recognition.
+  assert.equal(summary.total_recognitions, 3);
+  assert.equal(summary.unique_contestants, 2);
+  assert.equal(summary.recognition_rate, 0.6);
+  assert.equal(frames[0].recognitions_count, 1);
+});
+
+test('a contestant left with no appearances leaves the timeline', async () => {
+  const flags = [
+    flag({ id: 'a', contestant_id: 1, bbox: BOX_B }),
+    flag({ id: 'b', contestant_id: 1, bbox: BOX_B, timestamp: 10.33 }),
+  ];
+  const { contestant_timeline: timeline, processing_summary: summary } = await dense(
+    makeEnv(flags),
+  );
+  assert.equal(timeline['5'], undefined);
+  assert.equal(timeline['1'].total_appearances, 2);
+  assert.equal(summary.unique_contestants, 2);
+  assert.equal(summary.total_recognitions, 3);
+});
+
+test('a flag confirming the same contestant keeps the count and drops the cosine', async () => {
+  const roster = [...ROSTER, { id: '5', name: '名5', nickname: 'Nick5' }];
+  const { contestant_timeline: timeline, processing_summary: summary } = await dense(
+    makeEnv([flag({ contestant_id: 5, bbox: BOX_B })], { roster }),
+  );
+  assert.equal(timeline['5'].total_appearances, 2);
+  assert.equal(timeline['5'].average_match_score, 0.7);
+  assert.equal(summary.total_recognitions, 3);
+});
+
+test('re-pending a flag restores the stored timeline and summary', async () => {
+  const env = makeEnv([flag({ contestant_id: 2, bbox: BOX_B })]);
+  await dense(env);
+  env.store.set(
+    'flag_f1',
+    JSON.stringify(flag({ contestant_id: 2, bbox: BOX_B, status: 'pending' })),
+  );
+  const metadata = await dense(env);
   assert.deepEqual(metadata.contestant_timeline, STORED.contestant_timeline);
+  assert.deepEqual(metadata.processing_summary, STORED.processing_summary);
+});
+
+const results = async (env, contestant, video = VIDEO) =>
+  (
+    await (
+      await get(env, `/api/recognition/results?contestant_id=${contestant}&video_id=${video}`)
+    ).json()
+  ).results;
+
+test('/api/recognition/results follows the moved appearance', async () => {
+  const env = makeEnv([flag({ contestant_id: 2, bbox: BOX_B })]);
+
+  assert.deepEqual(
+    (await results(env, 5)).map((r) => r.timestamp),
+    [10.32],
+  );
+  const [moved, own] = await results(env, 2);
+  assert.deepEqual(moved, {
+    video_id: VIDEO,
+    timestamp: 10,
+    match_score: null,
+    match_source: 'flag',
+    frame_number: 60,
+    bbox: BOX_B,
+    detection_index: 1,
+  });
+  assert.equal(own.match_score, 0.6);
+  assert.equal(own.match_source, undefined);
+});
+
+test('/api/recognition/results finds a contestant only a flag names', async () => {
+  const env = makeEnv([flag()]);
+  const [only] = await results(env, 1);
+  assert.equal(only.match_score, null, 'a flag has no cosine, and null must not become 0');
+  assert.equal(only.detection_index, 0);
+});
+
+test('/api/recognition/results reads flags once across reels, leaks nothing, is not reused', async () => {
+  const env = makeEnv([flag()], {
+    extra: { 'metadata_reel-2': JSON.stringify(STORED) },
+  });
+  const response = await get(env, '/api/recognition/results?contestant_id=1');
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  const text = await response.text();
+  assert.ok(!text.includes('SECRET'));
+  // Only reel-1's flag applies, so reel-2 gains nothing.
+  assert.deepEqual(
+    JSON.parse(text).results.map((r) => r.video_id),
+    [VIDEO],
+  );
+  assert.equal(env.log.gets.filter((key) => key === 'flag_f1').length, 1);
+  assert.equal(env.log.gets.filter((key) => key === 'contestants_structured').length, 1);
 });
 
 test('re-pending a flag undoes it on the next read', async () => {

@@ -639,16 +639,87 @@ def _same_bbox(left: Any, right: Any) -> bool:
     return all(abs(a - b) < 1e-6 for a, b in zip(left, right))
 
 
-def _overlay_accepted_flags(frame_data: list[dict], flags: list[dict], roster: dict) -> list[dict]:
-    """Accepted flags laid over stored frames.
+def _recount_entry(base: dict, appearances: list[dict]) -> dict:
+    """A timeline entry recounted from its appearances, as `build_timeline` derives it.
+
+    A flagged appearance counts but has no score, so it stays out of the average and maximum, and
+    an entry with only those has neither.
+    """
+    ordered = sorted(appearances, key=lambda a: a.get("timestamp") or 0)
+    scores = [a["match_score"] for a in ordered if a.get("match_score") is not None]
+    return {
+        **base,
+        "appearances": ordered,
+        "total_appearances": len(ordered),
+        "average_match_score": round(sum(scores) / len(scores), 4) if scores else None,
+        "max_match_score": round(max(scores), 4) if scores else None,
+        "first_appearance": ordered[0].get("timestamp"),
+        "last_appearance": ordered[-1].get("timestamp"),
+    }
+
+
+def _move_appearance(timeline: dict, frame: dict, detection: dict, person: dict) -> None:
+    """Take one detection's appearance from whoever held it and give it to `person`."""
+    old_id = detection.get("contestant_id")
+    old = None if old_id is None else timeline.get(str(old_id))
+    if old:
+        appearances = old.get("appearances") or []
+        position = next(
+            (
+                i
+                for i, a in enumerate(appearances)
+                if a.get("frame_number") == frame.get("frame_number")
+                and _same_bbox(a.get("bbox"), detection.get("bbox"))
+            ),
+            None,
+        )
+        if position is not None:
+            rest = appearances[:position] + appearances[position + 1 :]
+            if rest:
+                timeline[str(old_id)] = _recount_entry(old, rest)
+            else:
+                del timeline[str(old_id)]
+
+    new_id = person["contestant_id"]
+    current = timeline.get(new_id) or {
+        "contestant_info": {
+            "id": new_id,
+            "name": person["contestant_name"],
+            "nickname": person["contestant_nickname"],
+        }
+    }
+    timeline[new_id] = _recount_entry(
+        current,
+        [
+            *(current.get("appearances") or []),
+            {
+                "timestamp": frame.get("timestamp"),
+                "frame_number": frame.get("frame_number"),
+                "match_score": None,
+                "bbox": detection.get("bbox"),
+                "match_source": "flag",
+            },
+        ],
+    )
+
+
+def _overlay_accepted_flags(data: dict, flags: list[dict], roster: dict) -> dict:
+    """Accepted flags laid over a stored reel.
 
     Each flag names one detection by floor frame and exact box, and the newest wins. Nothing is
     guessed by proximity, and only named fields are copied, so a flag's private fields cannot
-    reach a read. Returns `frame_data` itself when no flag lands, and never mutates it: it is the
-    shared `_load_json_cached` dict. Same rule as `overlayAcceptedFlags` in the Worker.
+    reach a read.
+
+    The reel's own aggregates follow: every appearance is in its `contestant_timeline`, so moving
+    one and recounting the two entries it touches is exact, with no other reel read.
+    `timeline_markers` and `match_score_stats` are left as stored: nothing reads them.
+
+    Returns `data` itself when no flag lands, and never mutates it: it is the shared
+    `_load_json_cached` dict. Same rule as `overlayAcceptedFlags` in the Worker.
     """
     import bisect
 
+    frame_data = data["frame_data"]
     frames = sorted(frame_data, key=lambda fd: fd["timestamp"])
     timestamps = [fd["timestamp"] for fd in frames]
     named: dict[int, dict] = {}
@@ -665,32 +736,55 @@ def _overlay_accepted_flags(frame_data: list[dict], flags: list[dict], roster: d
                 named[id(detection)] = contestant
                 break
     if not named:
-        return frame_data
+        return data
 
-    def laid_over(detection: dict) -> dict:
-        contestant = named.get(id(detection))
-        if contestant is None:
-            return detection
-        # match_score: a cosine belongs to the old identity, and a flag carries none.
-        return {
-            **detection,
-            **contestant,
-            "matched": True,
-            "match_source": "flag",
-            "match_score": None,
+    timeline = dict(data.get("contestant_timeline") or {})
+    gained = 0
+    overlaid = []
+    for frame in frame_data:
+        detections = []
+        frame_gained = 0
+        for detection in frame.get("detections") or []:
+            contestant = named.get(id(detection))
+            if contestant is None:
+                detections.append(detection)
+                continue
+            _move_appearance(timeline, frame, detection, contestant)
+            if detection.get("contestant_id") is None:
+                frame_gained += 1
+            # match_score: a cosine belongs to the old identity, and a flag carries none.
+            detections.append(
+                {
+                    **detection,
+                    **contestant,
+                    "matched": True,
+                    "match_source": "flag",
+                    "match_score": None,
+                }
+            )
+        gained += frame_gained
+        overlaid.append({**frame, "detections": detections})
+        if frame_gained:
+            overlaid[-1]["recognitions_count"] = (frame.get("recognitions_count") or 0) + frame_gained
+
+    result = {**data, "frame_data": overlaid, "contestant_timeline": timeline}
+    summary = data.get("processing_summary")
+    if summary:
+        recognitions = (summary.get("total_recognitions") or 0) + gained
+        faces = summary.get("total_faces_detected")
+        result["processing_summary"] = {
+            **summary,
+            "total_recognitions": recognitions,
+            "unique_contestants": len(timeline),
+            "recognition_rate": (
+                round(recognitions / faces, 4) if faces else summary.get("recognition_rate")
+            ),
         }
-
-    return [
-        {**frame, "detections": [laid_over(d) for d in frame.get("detections") or []]}
-        for frame in frame_data
-    ]
+    return result
 
 
 def _with_accepted_flags(data: dict, video_id: str, meta_path: Path) -> dict:
-    """`data` with this reel's accepted flags applied; `data` itself when none land.
-
-    `contestant_timeline` and the summaries are stored, so they stay as the pipeline wrote them.
-    """
+    """`data` with this reel's accepted flags applied; `data` itself when none land."""
     # ponytail: re-reads the whole flag file per request, thumbnails included. Fine for a local
     # tool with few flags; cache by mtime if flags ever number in the thousands.
     # A bare-number request still reaches flags filed on the reel's full stem.
@@ -700,11 +794,9 @@ def _with_accepted_flags(data: dict, video_id: str, meta_path: Path) -> dict:
         for flag in _load_flags()
         if flag.get("status") == "accepted" and flag.get("video_id") in names
     ]
-    frame_data = data.get("frame_data")
-    if not flags or not frame_data:
+    if not flags or not data.get("frame_data"):
         return data
-    frames = _overlay_accepted_flags(frame_data, flags, _contestant_roster())
-    return data if frames is frame_data else {**data, "frame_data": frames}
+    return _overlay_accepted_flags(data, flags, _contestant_roster())
 
 
 @app.get("/api/recognition/results")
@@ -726,7 +818,7 @@ async def recognition_results(contestant_id: str, video_id: Optional[str] = None
         if not path.exists():
             continue
         try:
-            data = _load_json_cached(path)
+            data = _with_accepted_flags(_load_json_cached(path), vid, path)
         except (json.JSONDecodeError, OSError):
             continue
         entry = data.get("contestant_timeline", {}).get(str(contestant_id))
@@ -765,6 +857,7 @@ async def recognition_results(contestant_id: str, video_id: Optional[str] = None
                 "video_id": vid,
                 "timestamp": appearance.get("timestamp", 0),
                 "match_score": appearance.get("match_score"),
+                **({"match_source": "flag"} if appearance.get("match_source") == "flag" else {}),
                 "frame_number": appearance.get("frame_number"),
                 "bbox": appearance.get("bbox"),
                 "detection_index": index,

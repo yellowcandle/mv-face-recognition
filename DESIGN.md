@@ -1416,10 +1416,15 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       `local_api.py`, overlay them on detections as served, and the face stamps a tilted 已核對
       with no cosine or band. Stored metadata is untouched, so rejecting or re-pending undoes it.
       Both routes are `no-store`; KV itself can lag a decision by up to about 60s.
-- [ ] Accepted-flag limits: a flag covers one detection, not its track. `contestant_timeline`,
-      `timeline_markers`, `processing_summary` and `recognitions_count` are stored and stay as
-      found, so 紀錄 rows, `/api/recognition/results` and the player's timeline keep the old name
-      until a reprocess. The Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
+      The overlay also moves the appearance: `contestant_timeline`, `processing_summary`,
+      `recognitions_count` and `/api/recognition/results` are recounted per reel as served, so
+      紀錄 and the player agree. Appearances are complete in the timeline, so this is exact and reads
+      no other reel; a reel with no flag landing is served verbatim, with no parse.
+- [ ] Accepted-flag limits: a flag covers one detection, not its track. Cross-reel figures
+      (`contestants_structured`, `embedding_coverage`: 首頁, 名冊, 儀表, 工作台) stay as published
+      until the next publish, since an exact average needs every reel per read. `timeline_markers`
+      and `match_score_stats` exist only in local runs, have no reader, and stay as stored. The
+      Worker reads at most 200 flags per request (`FLAG_READ_CEILING`).
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.

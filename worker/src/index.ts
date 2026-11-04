@@ -311,11 +311,12 @@ export default {
     // Identity-dependent responses must never be reused. Without this, the browser heuristically
     // caches `GET /admin/api/faces/flagged` (no validator, no Cache-Control), so accepting a flag
     // writes to KV but the review queue keeps showing it and never asks again.
-    // The two detection reads carry accepted flags, so they must not be reused either.
+    // The detection reads carry accepted flags, so they must not be reused either.
     const routeHeaders: CorsHeaders =
       pathname.startsWith('/api/faces/flag') ||
       pathname.startsWith('/api/faces/detect') ||
       pathname.startsWith('/api/videos/metadata/') ||
+      pathname.startsWith('/api/recognition/results') ||
       pathname.startsWith('/api/labels') ||
       pathname.startsWith('/api/processing')
         ? { ...corsHeaders, 'Cache-Control': 'no-store' }
@@ -1959,7 +1960,39 @@ interface StoredDetection {
 interface StoredFrame {
   timestamp: number;
   frame_number?: number;
+  recognitions_count?: number;
   detections?: StoredDetection[];
+}
+
+interface StoredAppearance {
+  timestamp?: number;
+  frame_number?: number;
+  /** Null when an accepted flag named this appearance: a flag carries no cosine. */
+  match_score?: number | null;
+  match_source?: 'flag';
+  bbox?: number[];
+  detection_index?: number;
+}
+
+interface StoredTimelineEntry {
+  contestant_info?: { id: string; name: string | null; nickname: string | null };
+  appearances?: StoredAppearance[];
+  total_appearances?: number;
+  average_match_score?: number | null;
+  max_match_score?: number | null;
+  first_appearance?: number;
+  last_appearance?: number;
+}
+
+interface StoredMetadata {
+  frame_data?: StoredFrame[];
+  contestant_timeline?: Record<string, StoredTimelineEntry>;
+  processing_summary?: {
+    total_faces_detected?: number;
+    total_recognitions?: number;
+    unique_contestants?: number;
+    recognition_rate?: number;
+  };
 }
 
 /** This reel's accepted flags and the roster that names them. */
@@ -1978,16 +2011,80 @@ function floorFrame(frames: StoredFrame[], timestamp: number): StoredFrame | nul
   return found;
 }
 
+const round4 = (value: number): number => Math.round(value * 1e4) / 1e4;
+
 /**
- * Accepted flags laid over stored frames. Each flag names one detection by floor frame and exact
- * box, and the newest wins. Nothing is guessed by proximity, and only named fields are copied, so
- * a flag's private fields cannot reach a public read. Returns `frames` itself when no flag lands.
- * Same rule as `_overlay_accepted_flags` in local_api.py.
+ * A timeline entry recounted from its appearances, the way `build_timeline` in
+ * scripts/publish/build_read_model.py derives it. A flagged appearance counts but has no score, so
+ * it stays out of the average and maximum, and an entry with only those has neither.
  */
-function overlayAcceptedFlags(
-  frames: StoredFrame[],
-  { flags, roster }: FlagOverlay,
-): StoredFrame[] {
+function recountEntry(
+  base: StoredTimelineEntry,
+  appearances: StoredAppearance[],
+): StoredTimelineEntry {
+  const ordered = [...appearances].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  const scores = ordered.flatMap((a) => (typeof a.match_score === 'number' ? [a.match_score] : []));
+  return {
+    ...base,
+    appearances: ordered,
+    total_appearances: ordered.length,
+    average_match_score: scores.length
+      ? round4(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : null,
+    max_match_score: scores.length ? round4(Math.max(...scores)) : null,
+    first_appearance: ordered[0]?.timestamp,
+    last_appearance: ordered[ordered.length - 1]?.timestamp,
+  };
+}
+
+/** Take one detection's appearance from whoever held it and give it to the contestant now named. */
+function moveAppearance(
+  timeline: Record<string, StoredTimelineEntry>,
+  frame: StoredFrame,
+  detection: StoredDetection,
+  id: string,
+  person: Pick<Contestant, 'name' | 'nickname'> | undefined,
+): void {
+  const oldId = detection.contestant_id == null ? null : String(detection.contestant_id);
+  const old = oldId === null ? undefined : timeline[oldId];
+  const position = (old?.appearances ?? []).findIndex(
+    (a) => a.frame_number === frame.frame_number && sameBbox(a.bbox, detection.bbox),
+  );
+  if (old?.appearances && oldId !== null && position >= 0) {
+    const rest = old.appearances.filter((_, i) => i !== position);
+    if (rest.length > 0) timeline[oldId] = recountEntry(old, rest);
+    else delete timeline[oldId];
+  }
+
+  const current = timeline[id] ?? {
+    contestant_info: { id, name: person?.name ?? null, nickname: person?.nickname ?? null },
+  };
+  timeline[id] = recountEntry(current, [
+    ...(current.appearances ?? []),
+    {
+      timestamp: frame.timestamp,
+      frame_number: frame.frame_number,
+      match_score: null,
+      bbox: detection.bbox,
+      match_source: 'flag',
+    },
+  ]);
+}
+
+/**
+ * Accepted flags laid over a stored reel. Each flag names one detection by floor frame and exact
+ * box, and the newest wins. Nothing is guessed by proximity, and only named fields are copied, so
+ * a flag's private fields cannot reach a public read.
+ *
+ * The reel's own aggregates follow: every appearance is in its `contestant_timeline`, so moving one
+ * and recounting the two entries it touches is exact, with no other reel read. `timeline_markers`
+ * and `match_score_stats` are left as stored: only local runs have them, and nothing reads them.
+ *
+ * Returns `doc` itself when no flag lands. Same rule as `_overlay_accepted_flags` in local_api.py.
+ */
+function overlayAcceptedFlags(doc: StoredMetadata, { flags, roster }: FlagOverlay): StoredMetadata {
+  const frames = doc.frame_data;
+  if (!Array.isArray(frames)) return doc;
   const sorted = frames
     .filter((frame) => typeof frame.timestamp === 'number')
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -2002,14 +2099,18 @@ function overlayAcceptedFlags(
     );
     if (detection && roster.has(id)) named.set(detection, id);
   }
-  if (named.size === 0) return frames;
+  if (named.size === 0) return doc;
 
-  return frames.map((frame) => ({
-    ...frame,
-    detections: frame.detections?.map((detection) => {
+  const timeline = { ...doc.contestant_timeline };
+  let gained = 0;
+  const frame_data = frames.map((frame) => {
+    let frameGained = 0;
+    const detections = frame.detections?.map((detection) => {
       const id = named.get(detection);
       if (id === undefined) return detection;
       const contestant = roster.get(id);
+      moveAppearance(timeline, frame, detection, id, contestant);
+      if (detection.contestant_id == null) frameGained += 1;
       return {
         ...detection,
         contestant_id: id,
@@ -2019,18 +2120,42 @@ function overlayAcceptedFlags(
         match_source: 'flag' as const,
         match_score: null, // A cosine belongs to the old identity; a flag carries none.
       };
-    }),
-  }));
+    });
+    gained += frameGained;
+    return frameGained > 0
+      ? {
+          ...frame,
+          detections,
+          recognitions_count: (frame.recognitions_count ?? 0) + frameGained,
+        }
+      : { ...frame, detections };
+  });
+
+  const summary = doc.processing_summary;
+  const recognitions = (summary?.total_recognitions ?? 0) + gained;
+  const faces = summary?.total_faces_detected;
+  return {
+    ...doc,
+    frame_data,
+    contestant_timeline: timeline,
+    processing_summary: summary && {
+      ...summary,
+      total_recognitions: recognitions,
+      unique_contestants: Object.keys(timeline).length,
+      recognition_rate: faces ? round4(recognitions / faces) : summary.recognition_rate,
+    },
+  };
 }
 
 /**
- * What to lay over this reel, or null when it has no accepted flags, which spends no roster read.
+ * What to lay over this reel, or over any reel when `videoId` is null (narrow it with
+ * `overlayForReel`). Null when there are no accepted flags, which spends no roster read.
  * A public read must survive a flag or roster failure, so that serves the frames as stored.
  */
-async function readFlagOverlay(env: Env, videoId: string): Promise<FlagOverlay | null> {
+async function readFlagOverlay(env: Env, videoId: string | null): Promise<FlagOverlay | null> {
   try {
     const flags = (await readFlags(env, FLAG_READ_CEILING)).filter(
-      (flag) => flag.status === 'accepted' && flag.video_id === videoId,
+      (flag) => flag.status === 'accepted' && (videoId === null || flag.video_id === videoId),
     );
     if (flags.length === 0) return null;
     const stored = await env.METADATA_KV.get('contestants_structured');
@@ -2044,6 +2169,10 @@ async function readFlagOverlay(env: Env, videoId: string): Promise<FlagOverlay |
     });
     return null;
   }
+}
+
+function overlayForReel(overlay: FlagOverlay, videoId: string): FlagOverlay {
+  return { ...overlay, flags: overlay.flags.filter((flag) => flag.video_id === videoId) };
 }
 
 /** Move the legacy array into per-flag keys, then drop it. Safe to call on every mutation. */
@@ -2907,7 +3036,7 @@ async function handleFaceDetection(
   const denseMetadata = await env.METADATA_KV.get(`metadata_${videoId}`);
 
   if (denseMetadata) {
-    let parsed: { frame_data?: StoredFrame[] };
+    let parsed: StoredMetadata;
     try {
       parsed = JSON.parse(denseMetadata) as typeof parsed;
     } catch (error) {
@@ -2924,8 +3053,7 @@ async function handleFaceDetection(
     // Floor match: most recent frame at or before the timestamp, so boxes
     // never appear ahead of the face (same convention as local_api.py).
     const overlay = await readFlagOverlay(env, videoId);
-    const stored = parsed.frame_data || [];
-    const frames = (overlay ? overlayAcceptedFlags(stored, overlay) : stored)
+    const frames = ((overlay ? overlayAcceptedFlags(parsed, overlay) : parsed).frame_data || [])
       .filter((fd) => typeof fd.timestamp === 'number')
       .sort((a, b) => a.timestamp - b.timestamp);
     let frame = floorFrame(frames, timestamp);
@@ -3040,33 +3168,30 @@ async function handleRecognitionResults(
     metadataKeys = listing.keys.map((k) => k.name);
   }
 
-  type Appearance = {
-    timestamp?: number;
-    match_score?: number;
-    frame_number?: number;
-    bbox?: number[];
-    detection_index?: number;
-  };
   const results: Array<{
     video_id: string;
     timestamp: number;
-    match_score: number;
+    match_score: number | null;
+    match_source?: 'flag';
     frame_number?: number;
     bbox?: number[];
     detection_index?: number;
   }> = [];
 
+  // Read on the first stored reel, then shared: flags cost the same however many reels there are.
+  let overlayRead: Promise<FlagOverlay | null> | undefined;
+
   for (const key of metadataKeys) {
     const stored = await env.METADATA_KV.get(key);
     if (!stored) continue;
     try {
-      const parsed = JSON.parse(stored) as {
-        contestant_timeline?: Record<string, { appearances?: Appearance[] }>;
-        frame_data?: FrameDetections[];
-      };
+      const videoId = videoIdFilter || key.replace('metadata_', '');
+      overlayRead ??= readFlagOverlay(env, videoIdFilter);
+      const overlay = await overlayRead;
+      const reel = JSON.parse(stored) as StoredMetadata;
+      const parsed = overlay ? overlayAcceptedFlags(reel, overlayForReel(overlay, videoId)) : reel;
       const entry = parsed.contestant_timeline?.[contestantIdFilter];
       if (!entry?.appearances) continue;
-      const videoId = videoIdFilter || key.replace('metadata_', '');
 
       // Built on first use: `frame_data` is the bulk of a 1–3 MB document, and a contestant with
       // no appearances should not pay to index it.
@@ -3075,7 +3200,7 @@ async function handleRecognitionResults(
         if (frameNumber === undefined) return undefined;
         if (!framesByNumber) {
           framesByNumber = new Map();
-          for (const frame of parsed.frame_data ?? []) {
+          for (const frame of (parsed.frame_data ?? []) as FrameDetections[]) {
             if (typeof frame.frame_number === 'number') {
               framesByNumber.set(frame.frame_number, frame.detections ?? []);
             }
@@ -3092,7 +3217,8 @@ async function handleRecognitionResults(
         results.push({
           video_id: videoId,
           timestamp: appearance.timestamp ?? 0,
-          match_score: appearance.match_score ?? 0,
+          match_score: appearance.match_score ?? null,
+          ...(appearance.match_source ? { match_source: appearance.match_source } : {}),
           frame_number: appearance.frame_number,
           bbox: appearance.bbox,
           detection_index: detectionIndex,
@@ -3127,12 +3253,9 @@ async function withAcceptedFlags(env: Env, videoId: string, stored: string): Pro
   const overlay = await readFlagOverlay(env, videoId);
   if (!overlay) return stored;
   try {
-    const parsed = JSON.parse(stored) as { frame_data?: StoredFrame[] };
-    if (!Array.isArray(parsed.frame_data)) return stored;
-    const frames = overlayAcceptedFlags(parsed.frame_data, overlay);
-    return frames === parsed.frame_data
-      ? stored
-      : JSON.stringify({ ...parsed, frame_data: frames });
+    const parsed = JSON.parse(stored) as StoredMetadata;
+    const overlaid = overlayAcceptedFlags(parsed, overlay);
+    return overlaid === parsed ? stored : JSON.stringify(overlaid);
   } catch (error) {
     logger.warn('Serving metadata without accepted flags', {
       message: (error as Error).message,
@@ -3145,7 +3268,6 @@ async function withAcceptedFlags(env: Env, videoId: string, stored: string): Pro
 /**
  * `/videos/metadata/{id}` and `/videos/metadata/dense/{id}` are one read: both return
  * the `metadata_{id}` blob, verbatim unless an accepted flag lands on one of its detections.
- * `contestant_timeline` and the summaries are stored, so they stay as the pipeline wrote them.
  * A single handler strips either prefix, so the two routes cannot drift apart.
  */
 async function handleVideoMetadata(

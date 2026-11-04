@@ -74,8 +74,11 @@ evidence once accepted.
 What the server does as it serves a **detection**: an accepted **flag** names that one detection
 for its **contestant**, found by the frame it was filed against and its exact **bounding box**.
 The served detection has `match_source: 'flag'`, no **match score** and no **band**, and shows
-已核對. Stored metadata is never written, so rejecting or re-pending the flag undoes it. It covers
-one detection, never the track, and stored summaries such as `contestant_timeline` do not change.
+已核對. Its appearance moves with it: the reel's `contestant_timeline`, summary and frame counts
+are recounted as served, so the player and 紀錄 agree. A flagged appearance counts but has no score,
+so it stays out of averages. Stored metadata is never written, so rejecting or re-pending the flag
+undoes it. It covers one detection, never the track, and only that reel: the published cross-reel
+figures in `contestants_structured` and `embedding_coverage` wait for the next publish.
 _Avoid_: correcting the metadata, relabelling, propagating — nothing is rewritten, and a label is
 a verdict on a whole track.
 

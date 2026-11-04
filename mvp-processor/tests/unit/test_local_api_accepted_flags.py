@@ -31,26 +31,73 @@ def unmatched(bbox: list[float], tracker_id: int = 7) -> dict:
     }
 
 
+def recognised(bbox: list[float], contestant_id: str, score: float) -> dict:
+    return {
+        **unmatched(bbox, 8),
+        "match_source": "frame",
+        "contestant_id": contestant_id,
+        "contestant_name": f"名{contestant_id}",
+        "contestant_nickname": f"Nick{contestant_id}",
+        "match_score": score,
+    }
+
+
 STORED = {
-    "contestant_timeline": {"5": {"total_appearances": 1}},
+    "processing_summary": {
+        "frames_processed": 3,
+        "total_faces_detected": 5,
+        "total_recognitions": 3,
+        "unique_contestants": 2,
+        "recognition_rate": 0.6,
+    },
+    "contestant_timeline": {
+        "2": {
+            "contestant_info": {"id": "2", "name": "名2", "nickname": "Nick2"},
+            "appearances": [
+                {"timestamp": 10.32, "frame_number": 62, "match_score": 0.6, "bbox": BOX_A}
+            ],
+            "total_appearances": 1,
+            "average_match_score": 0.6,
+            "max_match_score": 0.6,
+            "first_appearance": 10.32,
+            "last_appearance": 10.32,
+        },
+        "5": {
+            "contestant_info": {"id": "5", "name": "名5", "nickname": "Nick5"},
+            "appearances": [
+                {"timestamp": 10, "frame_number": 60, "match_score": 0.5, "bbox": BOX_B},
+                {"timestamp": 10.32, "frame_number": 62, "match_score": 0.7, "bbox": BOX_B},
+            ],
+            "total_appearances": 2,
+            "average_match_score": 0.6,
+            "max_match_score": 0.7,
+            "first_appearance": 10,
+            "last_appearance": 10.32,
+        },
+    },
     "frame_data": [
         {
             "frame_number": 60,
             "timestamp": 10,
-            "detections": [
-                unmatched(BOX_A),
-                {
-                    **unmatched(BOX_B, 8),
-                    "match_source": "frame",
-                    "contestant_id": "5",
-                    "contestant_name": "錯的",
-                    "contestant_nickname": "Wrong",
-                    "match_score": 0.5,
-                },
-            ],
+            "detections_count": 2,
+            "recognitions_count": 1,
+            "detections": [unmatched(BOX_A), recognised(BOX_B, "5", 0.5)],
         },
         # Same track, same box a frame later: a flag covers one detection, never the track.
-        {"frame_number": 61, "timestamp": 10.16, "detections": [unmatched(BOX_A)]},
+        {
+            "frame_number": 61,
+            "timestamp": 10.16,
+            "detections_count": 1,
+            "recognitions_count": 0,
+            "detections": [unmatched(BOX_A)],
+        },
+        {
+            "frame_number": 62,
+            "timestamp": 10.32,
+            "detections_count": 2,
+            "recognitions_count": 2,
+            "detections": [recognised(BOX_B, "5", 0.7), recognised(BOX_A, "2", 0.6)],
+        },
     ],
 }
 
@@ -187,12 +234,106 @@ def test_private_flag_fields_never_reach_a_read(reel):
     assert "SECRET" not in json.dumps(faces_at(10.03))
 
 
-def test_stored_metadata_and_timeline_stay_as_they_were_and_undo_works(reel):
+def results(contestant: str, video_id: str | None = "reel") -> list[dict]:
+    return asyncio.run(local_api.recognition_results(contestant, video_id))["results"]
+
+
+def test_a_flag_on_an_unrecognised_face_adds_an_appearance_and_removes_none(reel):
+    reel(flag())
+    metadata = dense()
+    timeline = metadata["contestant_timeline"]
+    assert timeline["1"] == {
+        "contestant_info": {"id": "1", "name": "蘇雅琳", "nickname": "Ivy So"},
+        "appearances": [
+            {
+                "timestamp": 10,
+                "frame_number": 60,
+                "match_score": None,
+                "bbox": BOX_A,
+                "match_source": "flag",
+            }
+        ],
+        "total_appearances": 1,
+        "average_match_score": None,
+        "max_match_score": None,
+        "first_appearance": 10,
+        "last_appearance": 10,
+    }
+    assert timeline["5"] == STORED["contestant_timeline"]["5"]
+    assert timeline["2"] == STORED["contestant_timeline"]["2"]
+    summary = metadata["processing_summary"]
+    assert summary["total_recognitions"] == 4
+    assert summary["unique_contestants"] == 3
+    assert summary["recognition_rate"] == 0.8
+    assert metadata["frame_data"][0]["recognitions_count"] == 2
+    assert metadata["frame_data"][1]["recognitions_count"] == 0
+
+
+def test_a_flag_on_a_recognition_moves_that_appearance(reel):
+    reel(flag(contestant_id=2, bbox=BOX_B))
+    metadata = dense()
+    timeline = metadata["contestant_timeline"]
+
+    # The old contestant is recounted from what remains: only the 0.7 at 10.32.
+    assert timeline["5"]["total_appearances"] == 1
+    assert timeline["5"]["average_match_score"] == 0.7
+    assert timeline["5"]["max_match_score"] == 0.7
+    assert timeline["5"]["first_appearance"] == 10.32
+
+    # The new one's average skips the null rather than counting it as 0, and stays time-ordered.
+    assert timeline["2"]["total_appearances"] == 2
+    assert timeline["2"]["average_match_score"] == 0.6
+    assert timeline["2"]["first_appearance"] == 10
+    assert timeline["2"]["last_appearance"] == 10.32
+    assert [a["match_score"] for a in timeline["2"]["appearances"]] == [None, 0.6]
+
+    # A recognition stayed a recognition.
+    assert metadata["processing_summary"]["total_recognitions"] == 3
+    assert metadata["processing_summary"]["unique_contestants"] == 2
+    assert metadata["frame_data"][0]["recognitions_count"] == 1
+
+
+def test_a_contestant_left_with_no_appearances_leaves_the_timeline(reel):
+    reel(
+        flag(id="a", contestant_id=1, bbox=BOX_B),
+        flag(id="b", contestant_id=1, bbox=BOX_B, timestamp=10.33),
+    )
+    metadata = dense()
+    assert "5" not in metadata["contestant_timeline"]
+    assert metadata["contestant_timeline"]["1"]["total_appearances"] == 2
+    assert metadata["processing_summary"]["unique_contestants"] == 2
+
+
+def test_results_follow_the_moved_appearance(reel):
+    reel(flag(contestant_id=2, bbox=BOX_B))
+    assert [r["timestamp"] for r in results("5")] == [10.32]
+    moved, own = results("2")
+    assert moved == {
+        "video_id": "reel",
+        "timestamp": 10,
+        "match_score": None,
+        "match_source": "flag",
+        "frame_number": 60,
+        "bbox": BOX_B,
+        "detection_index": 1,
+    }
+    assert own["match_score"] == 0.6
+    assert "match_source" not in own
+
+
+def test_results_find_a_contestant_only_a_flag_names_and_leak_nothing(reel):
+    reel(flag())
+    found = results("1", None)
+    assert [r["match_score"] for r in found] == [None]
+    assert "SECRET" not in json.dumps(found)
+
+
+def test_stored_metadata_stays_as_it_was_and_undo_works(reel):
     reel(flag())
     before = copy.deepcopy(local_api._load_json_cached(local_api._metadata_path("reel")))
-    corrected = dense()
+    dense()
     faces_at(10.03)
-    assert corrected["contestant_timeline"] == STORED["contestant_timeline"]
+    results("1")
     assert local_api._load_json_cached(local_api._metadata_path("reel")) == before
 
     reel(flag(status="pending"))
