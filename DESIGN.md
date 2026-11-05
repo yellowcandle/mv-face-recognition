@@ -1440,9 +1440,16 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
       Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
       `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:
-  - [ ] 1. Finish the reel 4 comparison on the rebuilt references (job `6aeb804ac78863f9c632de85`):
-        accuracy against the old results, and whether its accepted flags still match.
-  - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`; confirm one reel gives the same results.
+  - [x] 1. Reel 4 comparison on the rebuilt references (job `6aeb804ac78863f9c632de85`): no gain.
+        Named faces 1,793 to 1,783, none reassigned; 19 right / 2 unnamed / 1 wrong of 22 labelled
+        contestant tracks in both runs. The 23 October run also loaded 831 references, so the
+        rebuild probably added nothing. Not published: a new `processing_date` makes the Worker
+        refuse the reel's labels with a 409 (41 live, 92 in the local file; difference unexplained).
+  - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`. Checked on 120 reel 4 frames on CPU
+        against 0.7.3: all 251 faces have identical boxes and detection scores, embedding cosine
+        at least 0.99999. Still to do: one full reel, and one GPU job. 2.1 no longer brings in
+        scikit-learn (`cluster_unmatched.py` needs it, now direct) or `opencv-python-headless`,
+        so OpenCV is 4.11 only; it decoded those frames the same as the 4.13 it was shadowed by.
         Accepted flags match on exact boxes, and a rerun moves some boxes even with no upgrade (85
         of 6,339 on reel 4), so after each reprocess and publish check that every accepted flag
         still shows its correction in 播放. Today: Marf on reel 1, 榛綦 and Alice on reel 3.
