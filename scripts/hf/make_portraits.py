@@ -25,7 +25,7 @@ try:
 except ImportError as exc:  # pragma: no cover - numpy is a hard dependency
     raise SystemExit(f"numpy is required: {exc}") from exc
 
-import onnxruntime as ort
+import onnxruntime as ort  # type: ignore[import-not-found]
 from insightface.app import FaceAnalysis
 
 logger = logging.getLogger(__name__)
