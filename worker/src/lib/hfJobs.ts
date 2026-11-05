@@ -237,10 +237,24 @@ export async function submitHfJob(
   return { ok: true, value: { id: body.id, stage } };
 }
 
+/** Epoch ms from a Hub timestamp, or null when it is missing or unreadable. */
+function hubTime(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+}
+
 export async function fetchHfStage(
   env: HfJobsEnv,
   hubJobId: string,
-): Promise<HubResult<{ stage: string; message: string | null }>> {
+): Promise<
+  HubResult<{
+    stage: string;
+    message: string | null;
+    startedAt: number | null;
+    finishedAt: number | null;
+  }>
+> {
   if (!env.HF_TOKEN) return { ok: false, detail: 'HF_TOKEN is not configured' };
   let response: Response;
   try {
@@ -251,10 +265,22 @@ export async function fetchHfStage(
     return { ok: false, detail: `HF Jobs unreachable: ${(error as Error).message}` };
   }
   if (!response.ok) return { ok: false, detail: await readDetail(response) };
-  const body = (await response.json()) as { status?: { stage?: unknown; message?: unknown } };
+  const body = (await response.json()) as {
+    status?: { stage?: unknown; message?: unknown };
+    startedAt?: unknown;
+    finishedAt?: unknown;
+  };
   const stage = typeof body.status?.stage === 'string' ? body.status.stage : 'UNKNOWN';
   const message = typeof body.status?.message === 'string' ? body.status.message : null;
-  return { ok: true, value: { stage, message } };
+  return {
+    ok: true,
+    value: {
+      stage,
+      message,
+      startedAt: hubTime(body.startedAt),
+      finishedAt: hubTime(body.finishedAt),
+    },
+  };
 }
 
 export async function cancelHfJob(env: HfJobsEnv, hubJobId: string): Promise<HubResult<null>> {
