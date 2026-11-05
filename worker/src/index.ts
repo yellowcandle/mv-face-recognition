@@ -2517,8 +2517,14 @@ async function refreshJob(env: Env, job: ProcessingJob): Promise<ProcessingJob> 
     status: mapped.status,
     progress: mapped.progress,
     videos_processed: mapped.status === 'completed' ? job.total_videos : job.videos_processed,
-    started_at: job.started_at ?? (mapped.status === 'running' ? Date.now() : job.started_at),
-    completed_at: isTerminal(mapped.status) ? (job.completed_at ?? Date.now()) : job.completed_at,
+    // The Hub's own times: nothing polls an unattended job, so "now" could be hours after it ended.
+    started_at:
+      upstream.value.startedAt ??
+      job.started_at ??
+      (mapped.status === 'running' ? Date.now() : job.started_at),
+    completed_at: isTerminal(mapped.status)
+      ? (job.completed_at ?? upstream.value.finishedAt ?? Date.now())
+      : job.completed_at,
     ...(mapped.detail !== undefined ? { error: mapped.detail } : {}),
   };
   if (next.status !== job.status || next.progress !== job.progress || next.error !== job.error) {

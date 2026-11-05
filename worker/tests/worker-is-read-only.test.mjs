@@ -846,7 +846,12 @@ test('processing jobs dispatch to HF Jobs and read back through the gated prefix
       return new Response(null, { status: 200 });
     }
     if (url === `${hub}/hub-job-1`) {
-      return Response.json({ id: 'hub-job-1', status: { stage } });
+      return Response.json({
+        id: 'hub-job-1',
+        status: { stage },
+        startedAt: '2026-11-04T18:58:22.896Z',
+        finishedAt: stage === 'COMPLETED' ? '2026-11-04T20:48:51.826Z' : null,
+      });
     }
     return new Response('not found', { status: 404 });
   };
@@ -923,7 +928,9 @@ test('processing jobs dispatch to HF Jobs and read back through the gated prefix
     const job = await one.json();
     assert.equal(job.status, 'completed');
     assert.equal(job.progress, 100);
-    assert.equal(typeof job.completed_at, 'number');
+    // The job's real run, however long after it ended this first poll happens.
+    assert.equal(job.started_at, Date.parse('2026-11-04T18:58:22.896Z'));
+    assert.equal(job.completed_at, Date.parse('2026-11-04T20:48:51.826Z'));
 
     const missing = await callWorker(worker, env, ctx, 'GET', '/admin/api/processing/jobs/nope', {
       token,

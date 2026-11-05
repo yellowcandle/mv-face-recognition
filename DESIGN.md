@@ -1443,6 +1443,9 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
   - [ ] 1. Finish the reel 4 comparison on the rebuilt references (job `6aeb804ac78863f9c632de85`):
         accuracy against the old results, and whether its accepted flags still match.
   - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`; confirm one reel gives the same results.
+        Accepted flags match on exact boxes, and a rerun moves some boxes even with no upgrade (85
+        of 6,339 on reel 4), so after each reprocess and publish check that every accepted flag
+        still shows its correction in 播放. Today: Marf on reel 1, 榛綦 and Alice on reel 3.
   - [ ] 3. Test `raccoon_l` and PersonAnalysis (face plus body matching) on one reel against the
         標註 labels. Adopting one means new references, all 5 reels reprocessed, score bands
         recalibrated, and accepted flags re-checked, because they match on exact boxes.
