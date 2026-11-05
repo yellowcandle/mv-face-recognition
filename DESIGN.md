@@ -1456,7 +1456,8 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
   - [ ] 3. Test `raccoon_l` and PersonAnalysis (face plus body matching) on one reel against the
         標註 labels. Adopting one means new references, all 5 reels reprocessed, score bands
         recalibrated, and accepted flags re-checked, because they match on exact boxes.
-  - [ ] Bump supervision and lap: small, can go any time.
+  - [x] Bump supervision to 0.31.4 and lap to 0.5.14: replaying all 5 reels' stored detections
+        through ByteTrack gives identical tracks (26,795 faces).
   - [ ] Check whether Ultralytics and PyTorch can go: no import in `src`, `scripts/hf` or
         `scripts/publish`; tests and other scripts not checked.
   - [ ] Run `pip-audit`: security advisories not checked.
