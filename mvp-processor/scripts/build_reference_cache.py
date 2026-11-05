@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import os
 import json
+import sys
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -89,13 +90,13 @@ def curate_references(
 
 
 def build(photos_dir: Path, out_dir: Path) -> dict:
-    from insightface.app import FaceAnalysis
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from face_detector import create_face_app
 
     providers = os.environ.get(
         "INSIGHTFACE_PROVIDERS", "CoreMLExecutionProvider,CPUExecutionProvider"
     ).split(",")
-    app = FaceAnalysis(name="buffalo_l", providers=providers)
-    app.prepare(ctx_id=0, det_size=(640, 640))
+    app = create_face_app(providers)
 
     entries = list(iter_contestant_photos(photos_dir))
     if not entries:

@@ -23,6 +23,30 @@ _insightface_app = None
 _insightface_lock = threading.Lock()
 
 
+def create_face_app(providers: List[str]):
+    """A prepared buffalo_l FaceAnalysis, set up for the fields this project reads.
+
+    Only boxes, detection scores and embeddings are used, so landmarks and gender/age are not
+    loaded. ONNX Runtime's default thread count does not follow a job's CPU limit: on
+    `cpu-upgrade` (8 of 64 visible CPUs) it made 282 threads. These settings ran 14x faster
+    there on 60 frames, with identical boxes and detection scores.
+    """
+    import onnxruntime as ort
+    from insightface.app import FaceAnalysis
+
+    options = ort.SessionOptions()
+    # ponytail: fixed for cpu-upgrade; set INSIGHTFACE_THREADS on a different flavor.
+    options.intra_op_num_threads = int(os.environ.get("INSIGHTFACE_THREADS", "8"))
+    app = FaceAnalysis(
+        name="buffalo_l",
+        providers=providers,
+        allowed_modules=["detection", "recognition"],
+        sess_options=options,
+    )
+    app.prepare(ctx_id=0, det_size=(640, 640))
+    return app
+
+
 def _get_insightface_app():
     """Get or initialize the InsightFace FaceAnalysis singleton."""
     global _insightface_app
@@ -30,15 +54,11 @@ def _get_insightface_app():
         return _insightface_app
     with _insightface_lock:
         if _insightface_app is None:
-            from insightface.app import FaceAnalysis
-
             # ponytail: env override so a run can skip CoreML (per-shape compile fails on video frames)
             providers = os.environ.get(
                 "INSIGHTFACE_PROVIDERS", "CoreMLExecutionProvider,CPUExecutionProvider"
             ).split(",")
-            app = FaceAnalysis(name="buffalo_l", providers=providers)
-            app.prepare(ctx_id=0, det_size=(640, 640))
-            _insightface_app = app
+            _insightface_app = create_face_app(providers)
             logger.info("InsightFace buffalo_l model initialized")
     return _insightface_app
 

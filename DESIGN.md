@@ -1437,6 +1437,10 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
       bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
       count videos correctly. A new reference set changes nothing until a reel is reprocessed.
+- [x] Face detection speed on `cpu-upgrade`: ONNX Runtime's default made 282 threads under an 8-CPU
+      cap. `create_face_app` now sets 8 threads and loads only detection and recognition: 14x faster
+      `app.get()` on 60 reel 4 frames (195s to 14s), with identical boxes and detection scores.
+      `INSIGHTFACE_THREADS` overrides the count for another flavor. Full-reel gain not yet measured.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
       Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
       `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:
