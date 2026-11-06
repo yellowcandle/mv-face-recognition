@@ -1445,8 +1445,13 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       runs, with all 6,339 boxes, scores, tracks and names identical to the 5 November run.
 - [x] Every detection's embedding is kept in `<reel>_embeddings.npz` next to the metadata
       (`frame_number`, `detection_index`, `embeddings`), so reference and threshold experiments can
-      re-score without re-detecting, keeping boxes and track ids. About 13 MB a reel. On reel 4,
-      re-scoring from the file gave the same contestant for all 1,340 frame matches. The re-score
+      re-score without re-detecting, keeping boxes and track ids. 7 to 17 MB a reel. On all 5 reels,
+      re-scoring from the file gave the same contestant for every frame match. Reels 1, 2, 3 and 5
+      are in the bucket at `runs/2026-11-06-embeddings/` (reel 4 is in `output/4`), not published.
+      Against the runs the labels are tied to: each of the 181 labelled tracks maps whole onto one
+      new track and no labelled track's claim changes. Reels 2 to 5 keep over 99% of boxes and
+      their labelled track ids; reel 1 keeps 61% of boxes and renumbers 12 of its 22 labelled
+      tracks, and gains 322 recognitions. Labels are not carried over yet, and flags not checked. The re-score
       script is not written yet. Unmatched embeddings still go to `../data/unmatched_faces`, which
       on HF Jobs is lost with the job's temporary checkout.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
