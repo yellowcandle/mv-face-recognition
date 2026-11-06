@@ -17,34 +17,60 @@ import argparse
 import json
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 import numpy as np
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from track_smoothing import smooth_track_identities  # noqa: E402
+from track_smoothing import MATCH_SOURCE_FRAME, smooth_track_identities  # noqa: E402
+
+MIN_BOX_IOU = 0.5
 
 
-def rescore(doc: dict, embeddings: dict, ref_embeddings, ref_ids, threshold: float) -> None:
-    """Replace every detection's identity in `doc`, in place, using the pipeline's rule."""
-    by_key = {
-        (int(f), int(i)): row
-        for f, i, row in zip(
-            embeddings["frame_number"], embeddings["detection_index"], range(len(embeddings["embeddings"]))
+def run_source(doc: dict) -> dict:
+    """A run's identity. Same as `_metadata_source` in local_api.py and the Worker's label check."""
+    return {
+        "processing_date": doc["video_info"]["processing_date"],
+        "detections": sum(len(f["detections"]) for f in doc["frame_data"]),
+    }
+
+
+def is_tracked(tracker_id: object) -> bool:
+    """False for -1 and None, which both mean the tracker gave this box no track."""
+    return isinstance(tracker_id, int) and tracker_id >= 0
+
+
+def rescore(
+    doc: dict, embeddings: Mapping, ref_embeddings: np.ndarray, ref_ids: np.ndarray, threshold: float
+) -> None:
+    """Replace every detection's identity in `doc`, in place, using the pipeline's rule.
+
+    Sets ids and match scores only. Names are cleared, so this result is for measuring, not for
+    writing back as metadata.
+    """
+    rows = {
+        (int(frame), int(index)): row
+        for row, (frame, index) in enumerate(
+            zip(embeddings["frame_number"], embeddings["detection_index"])
         )
     }
-    sims = np.asarray(embeddings["embeddings"]) @ np.asarray(ref_embeddings).T
-    best = sims.argmax(axis=1) if len(sims) else np.array([], dtype=int)
+    detections = sum(len(f["detections"]) for f in doc["frame_data"])
+    if len(rows) != detections:
+        raise SystemExit(f"Embedding file has {len(rows)} rows for {detections} detections")
+    match_scores = np.asarray(embeddings["embeddings"]) @ np.asarray(ref_embeddings).T
+    best = match_scores.argmax(axis=1) if len(match_scores) else np.array([], dtype=int)
 
     for frame in doc["frame_data"]:
         for i, det in enumerate(frame["detections"]):
-            row = by_key[(int(frame["frame_number"]), i)]
-            score = float(sims[row, best[row]])
-            accepted = score > threshold
+            row = rows[(int(frame["frame_number"]), i)]
+            match_score = float(match_scores[row, best[row]])
+            accepted = match_score > threshold
             det["contestant_id"] = str(ref_ids[best[row]]) if accepted else None
-            det["match_score"] = score if accepted else None
-            det["match_source"] = None
+            det["contestant_name"] = det["contestant_nickname"] = None
+            det["match_score"] = match_score if accepted else None
+            det["match_source"] = MATCH_SOURCE_FRAME if accepted else None
     smooth_track_identities(doc["frame_data"])
 
 
@@ -53,12 +79,13 @@ def track_claims(frames: list[dict]) -> dict[int, str]:
     votes: dict[int, Counter] = defaultdict(Counter)
     for frame in frames:
         for det in frame["detections"]:
-            if det["contestant_id"] is not None:
+            if det["contestant_id"] is not None and is_tracked(det["tracker_id"]):
                 votes[det["tracker_id"]][det["contestant_id"]] += 1
     return {track: c.most_common(1)[0][0] for track, c in votes.items()}
 
 
 def iou(a: list[float], b: list[float]) -> float:
+    """Intersection over union of two [x1, y1, x2, y2] boxes."""
     w = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
     h = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = w * h
@@ -66,16 +93,22 @@ def iou(a: list[float], b: list[float]) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def score_labels(labels: list[dict], labelled_frames: list[dict], frames: list[dict]) -> Counter:
-    """Outcome counts for labelled tracks. `unsure` labels have no truth and are left out."""
-    new_by_frame = {f["frame_number"]: f["detections"] for f in frames}
-    mapped: dict[int, list[dict]] = defaultdict(list)
-    for frame in labelled_frames:
+def pair_boxes(old_frames: list[dict], new_frames: list[dict]) -> Iterator[tuple[dict, dict]]:
+    """Yield (old detection, new detection) for boxes in the same frame at IoU >= MIN_BOX_IOU."""
+    new_by_frame = {f["frame_number"]: f["detections"] for f in new_frames}
+    for frame in old_frames:
         for det in frame["detections"]:
             options = new_by_frame.get(frame["frame_number"], [])
-            match = max(options, key=lambda o: iou(det["bbox"], o["bbox"]), default=None)
-            if match is not None and iou(det["bbox"], match["bbox"]) >= 0.5:
-                mapped[det["tracker_id"]].append(match)
+            paired = max(options, key=lambda o: iou(det["bbox"], o["bbox"]), default=None)
+            if paired is not None and iou(det["bbox"], paired["bbox"]) >= MIN_BOX_IOU:
+                yield det, paired
+
+
+def score_labels(labels: list[dict], labelled_frames: list[dict], frames: list[dict]) -> Counter:
+    """Outcome counts for labelled tracks. `unsure` labels have no truth and are left out."""
+    mapped: dict[int, list[dict]] = defaultdict(list)
+    for old_det, new_det in pair_boxes(labelled_frames, frames):
+        mapped[old_det["tracker_id"]].append(new_det)
 
     claims = track_claims(frames)
     out: Counter = Counter()
@@ -102,6 +135,7 @@ def score_labels(labels: list[dict], labelled_frames: list[dict], frames: list[d
 
 
 def main() -> None:
+    """Re-score every run under --run and print a row per reel."""
     root = Path(__file__).resolve().parents[1]
     default = yaml.safe_load((root / "config/processing_config.yaml").read_text())
     ap = argparse.ArgumentParser(description=__doc__)
@@ -113,6 +147,8 @@ def main() -> None:
     ap.add_argument("--labels", type=Path)
     ap.add_argument("--labelled-metadata", type=Path)
     args = ap.parse_args()
+    if bool(args.labels) != bool(args.labelled_metadata):
+        ap.error("--labels and --labelled-metadata go together")
 
     refs = np.load(args.references)
     print(f"{len(refs['embeddings'])} references, threshold {args.threshold}")
@@ -136,8 +172,10 @@ def main() -> None:
             old = json.loads(
                 (args.labelled_metadata / f"{stem}_metadata.json").read_text(encoding="utf-8")
             )
+            if labels["source"] != run_source(old):
+                raise SystemExit(f"{stem}: labels are not tied to --labelled-metadata")
             row += score_labels(labels["labels"], old["frame_data"], doc["frame_data"])
-        print(stem[:2].rstrip("-"), dict(sorted(row.items())))
+        print(stem.split("-")[0], dict(sorted(row.items())))
         total += row
     print("all", dict(sorted(total.items())))
 

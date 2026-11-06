@@ -5,8 +5,8 @@ labels from another run. This maps each labelled track by box (same frame, IoU >
 a label set bound to the new run, keeping only labels whose track survives whole:
 
   - coverage: share of the old track's boxes found on one new track
-  - extra:    share of that new track's boxes that were on a *different* old track. Boxes the old
-              run left untracked don't count, since they carry no other identity.
+  - extra:    of the new track's boxes the old run also had, the share on a *different* old track.
+              Boxes the old run left untracked don't count, since they carry no other identity.
 
 Two labels landing on one new track are kept only when they agree. Anything refused is listed with
 its reason so it can be labelled again by hand; nothing is guessed.
@@ -25,97 +25,88 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from rescore_run import iou
+from rescore_run import is_tracked, pair_boxes, run_source
 
+LABELS_SCHEMA = "labels/v2"
 MIN_COVERAGE = 0.9
 MAX_EXTRA = 0.1
+LABELS_DISAGREE = "two labels disagree on one new track"
 
 
-def run_source(doc: dict) -> dict:
-    """Same identity as `_metadata_source` in local_api.py and the Worker's label check."""
-    return {
-        "processing_date": doc["video_info"]["processing_date"],
-        "detections": sum(len(f["detections"]) for f in doc["frame_data"]),
-    }
+def label_identity(label: dict) -> tuple:
+    """What a label says about its track."""
+    return label["verdict"], label.get("contestant_id")
 
 
 def merge_labels(label_sets: list[list[dict]]) -> list[dict]:
-    """Union of label sets, or SystemExit when two of them say different things about a track."""
+    """Union of label sets, or SystemExit listing every track they disagree on."""
     merged: dict[int, dict] = {}
+    conflicts = []
     for labels in label_sets:
         for label in labels:
-            track = label["tracker_id"]
-            first = merged.setdefault(track, label)
-            if (first["verdict"], first.get("contestant_id")) != (
-                label["verdict"],
-                label.get("contestant_id"),
-            ):
-                raise SystemExit(f"Label stores disagree on track {track}: {first} vs {label}")
+            first = merged.setdefault(label["tracker_id"], label)
+            if label_identity(first) != label_identity(label):
+                conflicts.append((first, label))
+    if conflicts:
+        raise SystemExit(f"Label stores disagree on {len(conflicts)} tracks: {conflicts}")
     return list(merged.values())
 
 
 def carry(labels: list[dict], old: dict, new: dict) -> tuple[list[dict], list[dict]]:
-    """Return (carried labels, refused labels with `reason`, plus stats on both)."""
-    new_by_frame = {f["frame_number"]: f["detections"] for f in new["frame_data"]}
-    old_track_size: Counter = Counter()
-    pairs: Counter = Counter()  # (old track, new track) -> boxes in common
-    for frame in old["frame_data"]:
-        for det in frame["detections"]:
-            old_track_size[det["tracker_id"]] += 1
-            options = new_by_frame.get(frame["frame_number"], [])
-            match = max(options, key=lambda o: iou(det["bbox"], o["bbox"]), default=None)
-            if match is not None and iou(det["bbox"], match["bbox"]) >= 0.5:
-                pairs[(det["tracker_id"], match["tracker_id"])] += 1
-
-    new_track_size = Counter(
-        d["tracker_id"] for f in new["frame_data"] for d in f["detections"]
-    )
-    onto: dict[int, Counter] = defaultdict(Counter)
-    into: dict[int, Counter] = defaultdict(Counter)
-    for (o, n), boxes in pairs.items():
-        onto[o][n] += boxes
-        into[n][o] += boxes
+    """Return (carried labels, refused labels each with a `reason`)."""
+    old_track_size = Counter(d["tracker_id"] for f in old["frame_data"] for d in f["detections"])
+    onto: dict[object, Counter] = defaultdict(Counter)  # old track -> new track -> shared boxes
+    into: dict[object, Counter] = defaultdict(Counter)  # new track -> old track -> shared boxes
+    for old_det, new_det in pair_boxes(old["frame_data"], new["frame_data"]):
+        onto[old_det["tracker_id"]][new_det["tracker_id"]] += 1
+        into[new_det["tracker_id"]][old_det["tracker_id"]] += 1
 
     kept: dict[int, dict] = {}
+    disputed: set[int] = set()
     refused: list[dict] = []
     for label in labels:
-        o = label["tracker_id"]
-
-        def refuse(reason: str, **stats) -> None:
-            refused.append({**label, "reason": reason, **stats})
-
-        if not onto[o]:
-            refuse("no box in the new run")
+        old_track = label["tracker_id"]
+        if not onto[old_track]:
+            refused.append({**label, "reason": "no box in the new run"})
             continue
-        n, shared = onto[o].most_common(1)[0]
-        others = sum(b for t, b in into[n].items() if t not in (o, -1))
+        new_track, shared = onto[old_track].most_common(1)[0]
+        from_others = sum(
+            boxes
+            for track, boxes in into[new_track].items()
+            if is_tracked(track) and track != old_track
+        )
         stats = {
-            "new_tracker_id": n,
-            "coverage": round(shared / old_track_size[o], 3),
-            "extra": round(others / new_track_size[n], 3),
+            "new_tracker_id": new_track,
+            "coverage": round(shared / old_track_size[old_track], 3),
+            "extra": round(from_others / sum(into[new_track].values()), 3),
         }
-        if n < 0:
-            refuse("new run left it untracked", **stats)
+        reason = None
+        if not is_tracked(new_track):
+            reason = "new run left it untracked"
         elif stats["coverage"] < MIN_COVERAGE:
-            refuse("track split in the new run", **stats)
+            reason = "track split or lost boxes in the new run"
         elif stats["extra"] > MAX_EXTRA:
-            refuse("new track also holds another track's boxes", **stats)
-        elif n in kept:
-            first = kept[n]
-            if (first["verdict"], first.get("contestant_id")) != (
-                label["verdict"],
-                label.get("contestant_id"),
-            ):
-                refuse("two labels disagree on one new track", **stats)
-                refused.append({**first, "reason": "two labels disagree on one new track"})
-                first["_drop"] = True
-        else:
-            kept[n] = {**label, "tracker_id": n}
+            reason = "new track also holds another track's boxes"
+        elif new_track in disputed:
+            reason = LABELS_DISAGREE
+        elif new_track in kept:
+            if label_identity(kept[new_track]) == label_identity(label):
+                reason = "agrees with another label on this new track, merged into it"
+            else:
+                reason = LABELS_DISAGREE
+                refused.append({**kept.pop(new_track), "reason": reason})
+                disputed.add(new_track)
 
-    return [l for l in kept.values() if not l.get("_drop")], refused
+        if reason:
+            refused.append({**label, "reason": reason, **stats})
+        else:
+            kept[new_track] = label
+
+    return [{**label, "tracker_id": track} for track, label in kept.items()], refused
 
 
 def main() -> None:
+    """Write the carried label set, and list whatever could not be carried."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--labels", type=Path, required=True, nargs="+")
     for name in ("--old", "--new", "--out"):
@@ -127,8 +118,14 @@ def main() -> None:
     old = json.loads(args.old.read_text(encoding="utf-8"))
     new = json.loads(args.new.read_text(encoding="utf-8"))
     for path, rec in zip(args.labels, records):
+        if rec.get("schema") != LABELS_SCHEMA:
+            raise SystemExit(f"{path.name} is not {LABELS_SCHEMA}: {rec.get('schema')}")
         if rec["source"] != run_source(old):
             raise SystemExit(f"{path.name} is not tied to {args.old.name}: {rec['source']}")
+    if Path(old["video_info"]["filename"]).name != Path(new["video_info"]["filename"]).name:
+        raise SystemExit("--old and --new are different reels")
+    if new["video_info"]["processing_date"] <= old["video_info"]["processing_date"]:
+        raise SystemExit("--new is not newer than --old")
 
     labels = merge_labels([rec["labels"] for rec in records])
     carried, refused = carry(labels, old, new)
@@ -142,7 +139,7 @@ def main() -> None:
         out["refused"] = refused
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"{args.out.name[:2]} {len(carried)} carried, {len(refused)} refused of {len(labels)}")
+    print(f"{args.out.name.split('-')[0]} {len(carried)} carried, {len(refused)} refused of {len(labels)}")
     for r in refused:
         print(" ", {k: r.get(k) for k in ("tracker_id", "verdict", "contestant_id", "reason", "coverage", "extra")})
 

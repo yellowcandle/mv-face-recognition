@@ -1,15 +1,13 @@
 """Re-scoring applies the pipeline's rule, and label outcomes count the right tracks."""
 
-import importlib.util
+import sys
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 
-_path = Path(__file__).resolve().parents[2] / "scripts/rescore_run.py"
-_spec = importlib.util.spec_from_file_location("rescore_run", _path)
-rescore_run = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(rescore_run)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import rescore_run  # noqa: E402
 
 BOX = [0.1, 0.1, 0.2, 0.2]
 
@@ -35,6 +33,12 @@ def test_rescore_accepts_above_threshold_then_fills_the_track():
     assert [d["contestant_id"] for d in dets] == ["5", "5", "5"]
     assert dets[2]["match_source"] == "track"
     assert dets[0]["match_score"] == 1.0
+    assert dets[0]["match_source"] == "frame"
+
+
+def test_untracked_boxes_are_not_one_track():
+    frames = [{"frame_number": 0, "detections": [det(-1, "5"), det(None, "6"), det(2, "7")]}]
+    assert rescore_run.track_claims(frames) == {2: "7"}
 
 
 def test_score_labels_outcomes():

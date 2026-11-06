@@ -1461,8 +1461,8 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       photos, take the one face that matches its contestant's references, by cosine and margin
       over other contestants. Three rules added 94, 146 and 159 references (925 to 990). Every
       labelled track outcome stayed the same; one labelled box gained a correct name. Recognitions
-      rose from 8,475 to 8,570, 8,616 and 8,630, and named tracks from 1,257 to 1,270, 1,281 and
-      1,283, none of the extra tracks labelled. The thin contestants barely moved (60: 2 to 3 refs;
+      rose from 8,475 to 8,570, 8,616 and 8,630, and named tracks from 1,252 to 1,265, 1,276 and
+      1,278, none of the extra tracks labelled. The thin contestants barely moved (60: 2 to 3 refs;
       67 and 77: 2), because a face must match references they barely have. The labels can't show
       much gain: only 5 misnamed and 4 missed tracks are in the sample.
 - [x] Bucket 720p for reels 1 to 3 had no `moov` atom. Replaced from local copies and verified by
