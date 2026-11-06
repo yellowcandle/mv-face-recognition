@@ -1451,7 +1451,7 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       Against the runs the labels are tied to: each of the 181 labelled tracks maps whole onto one
       new track and no labelled track's claim changes. Reels 2 to 5 keep over 99% of boxes and
       their labelled track ids; reel 1 keeps 61% of boxes and renumbers 12 of its 22 labelled
-      tracks, and gains 322 recognitions. Labels are not carried over yet, and flags not checked. Unmatched embeddings still go to `../data/unmatched_faces`, which
+      tracks, and gains 322 recognitions. Unmatched embeddings still go to `../data/unmatched_faces`, which
       on HF Jobs is lost with the job's temporary checkout.
 - [x] `mvp-processor/scripts/rescore_run.py` re-scores a run from its embedding file. Control with
       the same 831 references: 0 of 26,798 detections change, smoothing included. Of the 181
@@ -1467,6 +1467,21 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       much gain: only 5 misnamed and 4 missed tracks are in the sample.
 - [x] Bucket 720p for reels 1 to 3 had no `moov` atom. Replaced from local copies and verified by
       hash; originals in `local_output/snapshots/pre-720p-fix-20261106`.
+- [x] `mvp-processor/scripts/carry_labels.py` moves a label set onto a newer run by box (same frame,
+      IoU >= 0.5), refusing a track that split or took another track's boxes. Labels exist in two
+      stores: local files hold 181 and Worker KV holds 26 more, tied to the same runs with no
+      conflicts. All 207 carried, 0 refused; every labelled track has coverage 1.0 and no boxes from
+      another track. On the new runs: 120 right, 6 misnamed, 9 missed, 68 strangers unnamed,
+      4 `unsure`. All 9 accepted flags (6 local, 3 KV) land on exact boxes; the local reel 1 flag
+      missed the 1 November run and lands again here.
+- [x] Reels 1, 2, 3 and 5 promoted to bucket `output/` (metadata, embeddings, thumbnails, galleries)
+      with carried labels at `output/<id>/labels/`, reel 4's labels too. Renditions untouched.
+      Before: `runs/pre-promote-20261106` and `local_output/snapshots/pre-promote-20261106`.
+      Only the bucket moved: `local_output/` and Worker KV still hold the old runs and labels, so
+      labelling there would not reach the carried sets.
+- [ ] Ticket 020: claimed tracks labelled per reel are now 27, 40, 11, 28, 20, about 34 short of 30
+      a reel. Needs the new runs in `local_output/` first. Sample reel 1's extra names on purpose:
+      its labels predate them.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
       Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
       `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:

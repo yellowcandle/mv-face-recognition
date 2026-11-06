@@ -15,6 +15,7 @@ photos/historical/<id>/*.jpg                   extra appearances, merged into th
 models/home/.insightface/models/buffalo_l/     uploaded once (326 MB)
 models/reference/                              job writes reference_embeddings.npz + manifest
 output/<video_id>/                             job writes metadata, renditions, thumbnails, galleries
+output/<video_id>/labels/                      labels carried onto that run (mvp-processor/scripts/carry_labels.py)
 ```
 
 Upload the two one-off inputs:
