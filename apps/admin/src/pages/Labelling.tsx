@@ -345,6 +345,8 @@ export function Labelling() {
   // to its usual first-labelable walk.
   const [searchParams] = useSearchParams();
   const requestedVideoId = searchParams.get('video');
+  // `&tracks=1,2,3` narrows that reel to a prepared sample (ticket 020). Other reels ignore it.
+  const requestedTracks = searchParams.get('tracks');
 
   const [videoId, setVideoId] = useState<string | null>(null);
   const streamUrl = videos.find((v) => v.id === videoId)?.stream_url;
@@ -792,8 +794,13 @@ export function Labelling() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const sample =
+      requestedTracks && videoId === requestedVideoId
+        ? new Set(requestedTracks.split(',').map(Number))
+        : null;
     const rows = tracks.filter((track) => {
       const label = labels[track.key];
+      if (sample && !sample.has(track.tracker_id)) return false;
       if (claimedOnly && !track.claim) return false;
       if (unlabelledOnly && label) return false;
       if (verdictFilter !== 'all' && label?.verdict !== verdictFilter) return false;
@@ -817,7 +824,17 @@ export function Labelling() {
       });
     }
     return rows;
-  }, [tracks, labels, query, unlabelledOnly, claimedOnly, verdictFilter]);
+  }, [
+    tracks,
+    labels,
+    query,
+    unlabelledOnly,
+    claimedOnly,
+    verdictFilter,
+    requestedTracks,
+    requestedVideoId,
+    videoId,
+  ]);
 
   // ---- the sheet ---------------------------------------------------------
 
