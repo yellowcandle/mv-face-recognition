@@ -1440,10 +1440,13 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
 - [x] Face detection speed on `cpu-upgrade`: ONNX Runtime's default made 282 threads under an 8-CPU
       cap. `create_face_app` now sets 8 threads and loads only detection and recognition: 14x faster
       `app.get()` on 60 reel 4 frames (195s to 14s), with identical boxes and detection scores.
-      `INSIGHTFACE_THREADS` overrides the count for another flavor. Full-reel gain not yet measured.
+      `INSIGHTFACE_THREADS` overrides the count for another flavor. Full reel 4 (job
+      `6aed1ae70e0338d1bb80cab3`): detection 526s against 5,911s and 9,001s in the two earlier
+      runs, with all 6,339 boxes, scores, tracks and names identical to the 5 November run.
 - [x] Every detection's embedding is kept in `<reel>_embeddings.npz` next to the metadata
       (`frame_number`, `detection_index`, `embeddings`), so reference and threshold experiments can
-      re-score without re-detecting, keeping boxes and track ids. About 13 MB a reel. The re-score
+      re-score without re-detecting, keeping boxes and track ids. About 13 MB a reel. On reel 4,
+      re-scoring from the file gave the same contestant for all 1,340 frame matches. The re-score
       script is not written yet. Unmatched embeddings still go to `../data/unmatched_faces`, which
       on HF Jobs is lost with the job's temporary checkout.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
@@ -1456,7 +1459,8 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
         refuse the reel's labels with a 409 (41 live, 92 in the local file; difference unexplained).
   - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`. Checked on 120 reel 4 frames on CPU
         against 0.7.3: all 251 faces have identical boxes and detection scores, embedding cosine
-        at least 0.99999. Still to do: one full reel, and one GPU job. 2.1 no longer brings in
+        at least 0.99999. A full reel 4 against the labelled 21 October run: 6,248 of 6,339 boxes,
+        6,333 tracks and 6,327 names the same by position. Still to do: one GPU job. 2.1 no longer brings in
         scikit-learn (`cluster_unmatched.py` needs it, now direct) or `opencv-python-headless`,
         so OpenCV is 4.11 only; it decoded those frames the same as the 4.13 it was shadowed by.
         Accepted flags match on exact boxes, and a rerun moves some boxes even with no upgrade (85
