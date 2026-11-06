@@ -3,7 +3,11 @@ Video Processing Module
 Handles video frame extraction, preprocessing, and format conversion
 """
 
+import os
+import subprocess
+
 import cv2
+import imageio_ffmpeg
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Generator, List
@@ -495,51 +499,39 @@ class VideoProcessor:
         """
         Convert video to specified format and quality
 
+        Written to a temporary name and renamed on success, so a failed encode never leaves a
+        truncated file under the rendition's real name.
+
         Args:
             input_path: Input video path
             output_path: Output video path
             format_config: Format configuration (resolution, quality, etc.)
         """
+        res_map = {"360p": 360, "480p": 480, "720p": 720, "1080p": 1080}
+        bitrate_map = {"low": "1000k", "medium": "3000k", "high": "6000k"}
+        target_height = res_map.get(format_config.get("resolution"), 720)
+        bitrate = bitrate_map.get(format_config.get("quality", "medium"), "3000k")
+
+        partial = Path(output_path).with_suffix(f".part{Path(output_path).suffix}")
+        command = [
+            imageio_ffmpeg.get_ffmpeg_exe(),
+            "-nostdin", "-y", "-v", "error",
+            "-i", input_path,
+            "-vf", f"scale=-2:{target_height}:flags=lanczos",
+            "-c:v", "libx264", "-preset", "medium", "-b:v", bitrate, "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-sn", "-dn",
+            str(partial),
+        ]
         try:
-            from moviepy import VideoFileClip
-            
-            res_map = {
-                "360p": 360,
-                "480p": 480,
-                "720p": 720,
-                "1080p": 1080
-            }
-            
-            target_height = res_map.get(format_config.get("resolution"), 720)
-            
-            with VideoFileClip(input_path) as clip:
-                if clip.h != target_height:
-                    clip = clip.resized(height=target_height)
-                
-                bitrate_map = {
-                    "low": "1000k",
-                    "medium": "3000k",
-                    "high": "6000k"
-                }
-                bitrate = bitrate_map.get(format_config.get("quality", "medium"), "3000k")
-                
-                clip.write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    bitrate=bitrate,
-                    logger=None
-                )
-                
-            logger.info(f"Converted video: {output_path}")
-            
-        except ImportError:
-            logger.warning("MoviePy not found - falling back to simple file copy")
-            import shutil
-            shutil.copy2(input_path, output_path)
-        except Exception as e:
-            logger.error(f"Failed to convert video format: {e}")
-            raise VideoProcessingError(f"Conversion failed: {e}")
+            result = subprocess.run(command, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise VideoProcessingError(f"Conversion failed: {result.stderr[-500:]}")
+            os.replace(partial, output_path)
+        finally:
+            partial.unlink(missing_ok=True)
+
+        logger.info(f"Converted video: {output_path}")
 
 
 class FrameProcessor:

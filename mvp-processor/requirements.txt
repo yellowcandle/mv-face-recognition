@@ -1,14 +1,14 @@
 # Core video processing
 opencv-python>=4.8.0
 numpy>=1.24.0
-Pillow>=10.0.0
+Pillow>=13.0.0
 
 # Face detection and recognition
 face-recognition>=1.3.0
 dlib>=19.24.0
 
 # Video processing
-moviepy>=1.0.3
+imageio-ffmpeg>=0.5.1
 
 # Cloudflare integration
 requests>=2.31.0
@@ -24,4 +24,3 @@ tqdm>=4.65.0
 
 # Security: Explicitly pin for CVE fixes
 urllib3>=2.6.0  # Fix CVE-2024-37891, CVE-2025-43859, GHSA-gm62-xv2j-4w53, GHSA-2xpw-w6gg-jr37
-Pillow>=11.0.0  # Security updates

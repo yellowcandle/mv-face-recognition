@@ -27,7 +27,7 @@ Pillow>=11.3.0  # Updated to latest secure version (CVE fixes)
 
 # Video Processing & Media
 ffmpeg-python>=0.2.0
-moviepy>=1.0.3
+imageio-ffmpeg>=0.5.1
 
 # Core Python Libraries
 tqdm>=4.67.0  # Updated for security fixes

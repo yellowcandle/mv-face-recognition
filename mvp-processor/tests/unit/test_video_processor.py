@@ -2,13 +2,15 @@
 Unit tests for VideoProcessor class
 """
 
+import subprocess
+
+import imageio_ffmpeg
 import pytest
 import numpy as np
 import cv2
 from pathlib import Path
-from unittest.mock import patch, Mock
 
-from src.video_processor import VideoProcessor, FrameProcessor
+from src.video_processor import FrameProcessor, VideoProcessingError, VideoProcessor
 
 
 @pytest.mark.unit
@@ -100,47 +102,47 @@ class TestVideoProcessor:
 
         assert not Path(thumbnail_path).exists()
 
-    @patch("moviepy.VideoFileClip")
-    def test_convert_video_format(self, mock_video_clip, sample_config, temp_dir):
+    def test_convert_video_format_keeps_timing_shape_and_audio(self, sample_config, temp_dir):
+        """A real encode: overlays are placed by timestamp, so timing has to survive."""
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        source = temp_dir / "source.mp4"
+        subprocess.run(
+            [
+                ffmpeg, "-nostdin", "-y", "-v", "error",
+                "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=2",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                "-c:v", "libx264", "-c:a", "aac", "-shortest", str(source),
+            ],
+            check=True,
+        )
+        output_path = temp_dir / "output.mp4"
 
-        """Test video format conversion"""
-        mock_clip = Mock()
-        mock_clip.resize.return_value = mock_clip
-        mock_clip.__enter__ = Mock(return_value=mock_clip)
-        mock_clip.__exit__ = Mock(return_value=None)
-        mock_video_clip.return_value = mock_clip
+        VideoProcessor(sample_config).convert_video_format(
+            str(source), str(output_path), {"resolution": "720p", "quality": "high"}
+        )
 
+        rendition = cv2.VideoCapture(str(output_path))
+        assert rendition.get(cv2.CAP_PROP_FRAME_HEIGHT) == 720
+        assert rendition.get(cv2.CAP_PROP_FRAME_WIDTH) == 1280
+        assert rendition.get(cv2.CAP_PROP_FRAME_COUNT) == 50
+        assert rendition.get(cv2.CAP_PROP_FPS) == 25
+        rendition.release()
+        probe = subprocess.run([ffmpeg, "-i", str(output_path)], capture_output=True, text=True)
+        assert "Audio: aac" in probe.stderr
+        assert "yuv420p" in probe.stderr
+        assert sorted(p.name for p in temp_dir.glob("output*")) == ["output.mp4"]
+
+    def test_convert_video_format_failure_leaves_no_file(self, sample_config, temp_dir):
+        """A failed encode raises instead of leaving a partial file or a copy of the source."""
         processor = VideoProcessor(sample_config)
-        input_path = str(temp_dir / "input.mp4")
-        output_path = str(temp_dir / "output.mp4")
-        Path(input_path).touch()
+        bad_input = temp_dir / "not_a_video.mp4"
+        bad_input.write_text("not a video")
+        output_path = temp_dir / "output.mp4"
 
-        format_config = {
-            "resolution": "720p",
-            "quality": "high",
-            "format": "mp4",
-            "codec": "h264",
-        }
+        with pytest.raises(VideoProcessingError):
+            processor.convert_video_format(str(bad_input), str(output_path), {"resolution": "720p"})
 
-        processor.convert_video_format(input_path, output_path, format_config)
-
-    def test_convert_video_format_1080p(self, sample_config, temp_dir):
-        """Test 1080p video conversion"""
-        with patch("moviepy.VideoFileClip") as mock_video_clip:
-            mock_clip = Mock()
-            mock_clip.resize.return_value = mock_clip
-            mock_clip.__enter__ = Mock(return_value=mock_clip)
-            mock_clip.__exit__ = Mock(return_value=None)
-            mock_video_clip.return_value = mock_clip
-
-            processor = VideoProcessor(sample_config)
-            input_path = str(temp_dir / "input.mp4")
-            output_path = str(temp_dir / "output.mp4")
-            Path(input_path).touch()
-
-            format_config = {"resolution": "1080p", "quality": "medium"}
-
-            processor.convert_video_format(input_path, output_path, format_config)
+        assert list(temp_dir.glob("output*")) == []
 
 
 @pytest.mark.unit
