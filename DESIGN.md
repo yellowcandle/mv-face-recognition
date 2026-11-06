@@ -1441,6 +1441,11 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       cap. `create_face_app` now sets 8 threads and loads only detection and recognition: 14x faster
       `app.get()` on 60 reel 4 frames (195s to 14s), with identical boxes and detection scores.
       `INSIGHTFACE_THREADS` overrides the count for another flavor. Full-reel gain not yet measured.
+- [x] Every detection's embedding is kept in `<reel>_embeddings.npz` next to the metadata
+      (`frame_number`, `detection_index`, `embeddings`), so reference and threshold experiments can
+      re-score without re-detecting, keeping boxes and track ids. About 13 MB a reel. The re-score
+      script is not written yet. Unmatched embeddings still go to `../data/unmatched_faces`, which
+      on HF Jobs is lost with the job's temporary checkout.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
       Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
       `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:

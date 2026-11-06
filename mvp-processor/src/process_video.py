@@ -34,6 +34,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def save_detection_embeddings(path: Path, detections_by_frame: List[tuple]) -> None:
+    """Keep every detection's embedding, so a matching experiment need not re-detect.
+
+    Rows align with the metadata: `frame_data[...]` with this `frame_number`, then
+    `detections[detection_index]`. A later re-score therefore keeps boxes and track ids.
+    """
+    frame_numbers, indexes, embeddings = [], [], []
+    for frame_number, detections in detections_by_frame:
+        for index, detection in enumerate(detections):
+            frame_numbers.append(frame_number)
+            indexes.append(index)
+            embeddings.append(np.asarray(detection.encoding, dtype=np.float32))
+    np.savez(
+        path,
+        frame_number=np.array(frame_numbers, dtype=np.int32),
+        detection_index=np.array(indexes, dtype=np.int32),
+        embeddings=np.stack(embeddings) if embeddings else np.empty((0, 512), np.float32),
+    )
+
+
 class StageClock:
     """Writes the elapsed time of each pipeline stage to `<output>_progress.json`.
 
@@ -245,6 +265,7 @@ class VideoProcessingPipeline:
         logger.info(f"Processing {len(frames_list)} frames...")
 
         unmatched_faces = []
+        detections_by_frame = []
 
         # Initialize ByteTrack for persistent face tracking
         tracker = _create_tracker(self.config["video"]["fps_sample_rate"])
@@ -259,6 +280,8 @@ class VideoProcessingPipeline:
             )
 
             if detections:
+                detections_by_frame.append((int(frame_idx), detections))
+
                 # Recognize faces
                 recognitions = self.face_recognizer.recognize_faces(detections)
                 all_recognitions.extend(recognitions)
@@ -349,6 +372,12 @@ class VideoProcessingPipeline:
         if unmatched_faces:
             self._save_unmatched_embeddings(unmatched_faces, output_name)
         clock.mark("unmatched_embeddings")
+
+        save_detection_embeddings(
+            Path(self.config["output"]["metadata_dir"]) / f"{output_name}_embeddings.npz",
+            detections_by_frame,
+        )
+        clock.mark("detection_embeddings")
 
         # `acceptance_threshold` in processing_config.yaml is the single acceptance gate, and it is
         # a cosine, in the same direction as the match score. There is deliberately no second
