@@ -1451,9 +1451,22 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
       Against the runs the labels are tied to: each of the 181 labelled tracks maps whole onto one
       new track and no labelled track's claim changes. Reels 2 to 5 keep over 99% of boxes and
       their labelled track ids; reel 1 keeps 61% of boxes and renumbers 12 of its 22 labelled
-      tracks, and gains 322 recognitions. Labels are not carried over yet, and flags not checked. The re-score
-      script is not written yet. Unmatched embeddings still go to `../data/unmatched_faces`, which
+      tracks, and gains 322 recognitions. Labels are not carried over yet, and flags not checked. Unmatched embeddings still go to `../data/unmatched_faces`, which
       on HF Jobs is lost with the job's temporary checkout.
+- [x] `mvp-processor/scripts/rescore_run.py` re-scores a run from its embedding file. Control with
+      the same 831 references: 0 of 26,798 detections change, smoothing included. Of the 181
+      labelled tracks: 102 right, 5 misnamed, 4 missed, 66 strangers left unnamed, 4 `unsure`
+      (excluded).
+- [x] Rescuing group photos does not help, so it was not adopted. From each of the 232 multi-face
+      photos, take the one face that matches its contestant's references, by cosine and margin
+      over other contestants. Three rules added 94, 146 and 159 references (925 to 990). Every
+      labelled track outcome stayed the same; one labelled box gained a correct name. Recognitions
+      rose from 8,475 to 8,570, 8,616 and 8,630, and named tracks from 1,257 to 1,270, 1,281 and
+      1,283, none of the extra tracks labelled. The thin contestants barely moved (60: 2 to 3 refs;
+      67 and 77: 2), because a face must match references they barely have. The labels can't show
+      much gain: only 5 misnamed and 4 missed tracks are in the sample.
+- [x] Bucket 720p for reels 1 to 3 had no `moov` atom. Replaced from local copies and verified by
+      hash; originals in `local_output/snapshots/pre-720p-fix-20261106`.
 - [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
       Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
       `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:
