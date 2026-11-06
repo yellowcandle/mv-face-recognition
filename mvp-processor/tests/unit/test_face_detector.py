@@ -7,7 +7,7 @@ import sys
 import json
 import pytest
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import ANY, patch, MagicMock
 
 sys.path.insert(0, "mvp-processor")
 
@@ -172,6 +172,8 @@ class TestSingleton:
             mock_fa_cls.assert_called_once_with(
                 name="buffalo_l",
                 providers=["CoreMLExecutionProvider", "CPUExecutionProvider"],
+                allowed_modules=["detection", "recognition"],
+                sess_options=ANY,
             )
         # Cleanup
         fd._insightface_app = None
@@ -546,3 +548,28 @@ class TestEmbeddingValidation:
 
         with pytest.raises(ValueError, match="zero reference embeddings"):
             db.build_face_encodings()
+
+
+class TestCreateFaceApp:
+    def test_limits_threads_and_loads_only_the_models_we_read(self, monkeypatch):
+        import src.face_detector as fd
+
+        monkeypatch.delenv("INSIGHTFACE_THREADS", raising=False)
+        with patch("insightface.app.FaceAnalysis") as analysis:
+            fd.create_face_app(["CPUExecutionProvider"])
+
+        kwargs = analysis.call_args.kwargs
+        assert kwargs["sess_options"].intra_op_num_threads == 8
+        assert kwargs["allowed_modules"] == ["detection", "recognition"]
+        analysis.return_value.prepare.assert_called_once_with(
+            ctx_id=0, det_size=(640, 640)
+        )
+
+    def test_thread_count_can_be_overridden(self, monkeypatch):
+        import src.face_detector as fd
+
+        monkeypatch.setenv("INSIGHTFACE_THREADS", "4")
+        with patch("insightface.app.FaceAnalysis") as analysis:
+            fd.create_face_app(["CPUExecutionProvider"])
+
+        assert analysis.call_args.kwargs["sess_options"].intra_op_num_threads == 4

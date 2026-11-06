@@ -25,6 +25,7 @@ try:
 except ImportError as exc:  # pragma: no cover - numpy is a hard dependency
     raise SystemExit(f"numpy is required: {exc}") from exc
 
+import onnxruntime as ort  # type: ignore[import-not-found]
 from insightface.app import FaceAnalysis
 
 logger = logging.getLogger(__name__)
@@ -243,7 +244,15 @@ def main() -> int:
         return 1
 
     embeddings = load_embeddings()
-    app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+    # Same setup as mvp-processor's create_face_app: see it for why.
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = int(os.environ.get("INSIGHTFACE_THREADS", "8"))
+    app = FaceAnalysis(
+        name="buffalo_l",
+        providers=["CPUExecutionProvider"],
+        allowed_modules=["detection", "recognition"],
+        sess_options=options,
+    )
     app.prepare(ctx_id=0, det_size=(640, 640))
 
     manifest: dict[str, Portrait] = {}
