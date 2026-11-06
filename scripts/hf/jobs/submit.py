@@ -32,6 +32,7 @@ def submit(
     *,
     gpu: bool = False,
     metadata_only: bool = False,
+    output_prefix: str = "output",
 ) -> str:
     url = (
         f"https://raw.githubusercontent.com/yellowcandle/mv-face-recognition/{ref}"
@@ -51,6 +52,7 @@ def submit(
         name=name,
         env={
             "REPO_REF": ref,
+            "OUTPUT_PREFIX": output_prefix,
             **({"ONNXRUNTIME_GPU": "1", "INSIGHTFACE_PROVIDERS": "CUDAExecutionProvider"} if gpu else {}),
             **({"METADATA_ONLY": "1"} if metadata_only else {}),
         },
@@ -76,6 +78,11 @@ def main() -> None:
         action="store_true",
         help="skip rendition transcoding (pair with a CPU runner or existing videos)",
     )
+    parser.add_argument(
+        "--output-prefix",
+        default="output",
+        help="bucket folder for the video jobs' outputs; use another to keep output/ untouched",
+    )
     parser.add_argument("--skip-cache", action="store_true")
     parser.add_argument("--only", type=int, action="append", help="restrict to these video ids")
     args = parser.parse_args()
@@ -98,6 +105,7 @@ def main() -> None:
             ["video", "--video-id", str(i)],
             gpu=args.gpu,
             metadata_only=args.metadata_only,
+            output_prefix=args.output_prefix,
         )
         for i in ids
     ]
@@ -106,7 +114,7 @@ def main() -> None:
     else:
         for job in jobs:
             wait(job)
-    print(f"outputs: hf://buckets/{args.bucket}/output/")
+    print(f"outputs: hf://buckets/{args.bucket}/{args.output_prefix}/")
 
 
 if __name__ == "__main__":

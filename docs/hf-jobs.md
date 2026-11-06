@@ -36,7 +36,8 @@ uv run --with "huggingface_hub>=1.8" python scripts/hf/jobs/submit.py
 
 It submits one `cache` job, waits for the reference embeddings to land in
 `models/reference/`, then submits five `video` jobs in parallel. Defaults: `cpu-upgrade`
-(8 vCPU / 32 GB, $0.03/h). Use `--ref <commit>`, `--only 3` or `--skip-cache` as needed.
+(8 vCPU / 32 GB, $0.03/h). Use `--ref <commit>`, `--only 3`, `--skip-cache` or
+`--output-prefix runs/<name>` (keeps `output/` untouched) as needed.
 
 The Python submitter exists because `hf jobs uv run` first uploads the script to the
 `jobs-artifacts` bucket; a token with `job.write` but no bucket write fails there. It also avoids

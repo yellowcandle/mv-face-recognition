@@ -209,7 +209,8 @@ def video_stage(video_id: str) -> None:
     python = install(repo)
     stage_common(repo)
     video = stage_video(video_id)
-    out = BUCKET / "output" / video_id
+    # ponytail: OUTPUT_PREFIX keeps a trial run away from the outputs a publish reads.
+    out = BUCKET / os.environ.get("OUTPUT_PREFIX", "output") / video_id
     run(
         [
             str(python),
