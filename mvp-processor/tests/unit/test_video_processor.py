@@ -6,9 +6,8 @@ import pytest
 import numpy as np
 import cv2
 from pathlib import Path
-from unittest.mock import patch, Mock
 
-from src.video_processor import VideoProcessor, FrameProcessor
+from src.video_processor import FrameProcessor, VideoProcessingError, VideoProcessor
 
 
 @pytest.mark.unit
@@ -100,47 +99,37 @@ class TestVideoProcessor:
 
         assert not Path(thumbnail_path).exists()
 
-    @patch("moviepy.VideoFileClip")
-    def test_convert_video_format(self, mock_video_clip, sample_config, temp_dir):
-
-        """Test video format conversion"""
-        mock_clip = Mock()
-        mock_clip.resize.return_value = mock_clip
-        mock_clip.__enter__ = Mock(return_value=mock_clip)
-        mock_clip.__exit__ = Mock(return_value=None)
-        mock_video_clip.return_value = mock_clip
-
+    def test_convert_video_format_encodes_a_playable_rendition(
+        self, sample_config, sample_video, temp_dir
+    ):
+        """A real encode: right height, same frame count, nothing left behind."""
         processor = VideoProcessor(sample_config)
-        input_path = str(temp_dir / "input.mp4")
-        output_path = str(temp_dir / "output.mp4")
-        Path(input_path).touch()
+        output_path = temp_dir / "output.mp4"
+        source = cv2.VideoCapture(sample_video)
+        source_frames = int(source.get(cv2.CAP_PROP_FRAME_COUNT))
+        source.release()
 
-        format_config = {
-            "resolution": "720p",
-            "quality": "high",
-            "format": "mp4",
-            "codec": "h264",
-        }
+        processor.convert_video_format(
+            sample_video, str(output_path), {"resolution": "720p", "quality": "high"}
+        )
 
-        processor.convert_video_format(input_path, output_path, format_config)
+        rendition = cv2.VideoCapture(str(output_path))
+        assert rendition.get(cv2.CAP_PROP_FRAME_HEIGHT) == 720
+        assert rendition.get(cv2.CAP_PROP_FRAME_COUNT) == source_frames
+        rendition.release()
+        assert sorted(p.name for p in temp_dir.glob("output*")) == ["output.mp4"]
 
-    def test_convert_video_format_1080p(self, sample_config, temp_dir):
-        """Test 1080p video conversion"""
-        with patch("moviepy.VideoFileClip") as mock_video_clip:
-            mock_clip = Mock()
-            mock_clip.resize.return_value = mock_clip
-            mock_clip.__enter__ = Mock(return_value=mock_clip)
-            mock_clip.__exit__ = Mock(return_value=None)
-            mock_video_clip.return_value = mock_clip
+    def test_convert_video_format_failure_leaves_no_file(self, sample_config, temp_dir):
+        """A failed encode raises instead of leaving a partial file or a copy of the source."""
+        processor = VideoProcessor(sample_config)
+        bad_input = temp_dir / "not_a_video.mp4"
+        bad_input.write_text("not a video")
+        output_path = temp_dir / "output.mp4"
 
-            processor = VideoProcessor(sample_config)
-            input_path = str(temp_dir / "input.mp4")
-            output_path = str(temp_dir / "output.mp4")
-            Path(input_path).touch()
+        with pytest.raises(VideoProcessingError):
+            processor.convert_video_format(str(bad_input), str(output_path), {"resolution": "720p"})
 
-            format_config = {"resolution": "1080p", "quality": "medium"}
-
-            processor.convert_video_format(input_path, output_path, format_config)
+        assert list(temp_dir.glob("output*")) == []
 
 
 @pytest.mark.unit
