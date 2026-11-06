@@ -133,7 +133,7 @@ def main() -> None:
         **{k: v for k, v in record.items() if k != "labelled_by"},
         "source": run_source(new),
         "carried_from": record["source"],
-        "labels": sorted(carried, key=lambda l: l["tracker_id"]),
+        "labels": sorted(carried, key=lambda label: label["tracker_id"]),
     }
     if refused:
         out["refused"] = refused
