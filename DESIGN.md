@@ -1510,6 +1510,18 @@ Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
   - [ ] Licence: InsightFace code is MIT, but its pretrained models are non-commercial research
         only, and its README says `buffalo_l` now needs contacting them for licensing. Applies today,
         upgraded or not. Get it checked if the public site is or may become commercial.
+- [x] Renditions encode with the `imageio-ffmpeg` binary, not moviepy (its `pillow<12` cap blocked
+      the Pillow fixes). Pillow 13 needs Python 3.11, so `mvp-processor` requires it. A failed encode
+      now raises and leaves nothing. Full reel 4 job: all 6,339 detections match the promoted run.
+      Reel 4 720p against source: 8,699 frames, mean PSNR 47.95 dB (moviepy 41.58). Renditions
+      already in the bucket were not re-encoded.
+- [ ] Variable frame rate sources: overlay time is `frame_count / fps` (`video_processor.py`), but
+      the encode keeps the source timestamps, so overlays would drift on a VFR reel (1.4s on a
+      synthetic clip; moviepy was off too, by less). Five of six library videos are 25/25 fps, and
+      the sixth, `test-video-mv2`, averages 25.03 with no timing change. Check `r_frame_rate` against
+      `avg_frame_rate` before adding a new reel.
+- [ ] Root `requirements.txt` keeps Pillow below 13 because `gradio` caps it. Only
+      `DEPLOYMENT_GUIDE.md` mentions that file and CI does not install it; retire it or drop gradio.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.

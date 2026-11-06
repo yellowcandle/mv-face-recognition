@@ -2,6 +2,9 @@
 Unit tests for VideoProcessor class
 """
 
+import subprocess
+
+import imageio_ffmpeg
 import pytest
 import numpy as np
 import cv2
@@ -99,24 +102,34 @@ class TestVideoProcessor:
 
         assert not Path(thumbnail_path).exists()
 
-    def test_convert_video_format_encodes_a_playable_rendition(
-        self, sample_config, sample_video, temp_dir
-    ):
-        """A real encode: right height, same frame count, nothing left behind."""
-        processor = VideoProcessor(sample_config)
+    def test_convert_video_format_keeps_timing_shape_and_audio(self, sample_config, temp_dir):
+        """A real encode: overlays are placed by timestamp, so timing has to survive."""
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        source = temp_dir / "source.mp4"
+        subprocess.run(
+            [
+                ffmpeg, "-nostdin", "-y", "-v", "error",
+                "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=2",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                "-c:v", "libx264", "-c:a", "aac", "-shortest", str(source),
+            ],
+            check=True,
+        )
         output_path = temp_dir / "output.mp4"
-        source = cv2.VideoCapture(sample_video)
-        source_frames = int(source.get(cv2.CAP_PROP_FRAME_COUNT))
-        source.release()
 
-        processor.convert_video_format(
-            sample_video, str(output_path), {"resolution": "720p", "quality": "high"}
+        VideoProcessor(sample_config).convert_video_format(
+            str(source), str(output_path), {"resolution": "720p", "quality": "high"}
         )
 
         rendition = cv2.VideoCapture(str(output_path))
         assert rendition.get(cv2.CAP_PROP_FRAME_HEIGHT) == 720
-        assert rendition.get(cv2.CAP_PROP_FRAME_COUNT) == source_frames
+        assert rendition.get(cv2.CAP_PROP_FRAME_WIDTH) == 1280
+        assert rendition.get(cv2.CAP_PROP_FRAME_COUNT) == 50
+        assert rendition.get(cv2.CAP_PROP_FPS) == 25
         rendition.release()
+        probe = subprocess.run([ffmpeg, "-i", str(output_path)], capture_output=True, text=True)
+        assert "Audio: aac" in probe.stderr
+        assert "yuv420p" in probe.stderr
         assert sorted(p.name for p in temp_dir.glob("output*")) == ["output.mp4"]
 
     def test_convert_video_format_failure_leaves_no_file(self, sample_config, temp_dir):

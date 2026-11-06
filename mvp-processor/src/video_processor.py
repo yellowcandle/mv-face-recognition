@@ -512,7 +512,7 @@ class VideoProcessor:
         target_height = res_map.get(format_config.get("resolution"), 720)
         bitrate = bitrate_map.get(format_config.get("quality", "medium"), "3000k")
 
-        partial = Path(output_path).with_suffix(".part.mp4")
+        partial = Path(output_path).with_suffix(f".part{Path(output_path).suffix}")
         command = [
             imageio_ffmpeg.get_ffmpeg_exe(),
             "-nostdin", "-y", "-v", "error",
