@@ -33,7 +33,30 @@ above 0.2** passes; a miss is a reference/threshold problem, an impostor is the 
 - A reprocess invalidates labels (`labels/v2` pins `source.processing_date`); if an MV is
   reprocessed, its sample is void and must be redone.
 
-## Current sample (2026-11-01)
+## Current sample (2026-11-06)
+
+This replaces the 2026-11-01 table below. All five MVs were reprocessed. The sample is not void:
+`carry_labels.py` moved every label onto the new runs, and each labelled track came across whole
+(coverage 1.0, no boxes from another track). The local files and Worker KV held different labels,
+now merged: 207 in total, 126 of them on claimed tracks with a verdict.
+
+| MV | claimed | sampled | correct | misnamed | impostor | precision |
+|---|---:|---:|---:|---:|---:|---:|
+| #1 | 238 | 27 | 25 | 2 | 0 | 93% |
+| #2 | 189 | 40 | 37 | 3 | 0 | 93% |
+| #3 | 465 | 11 | 11 | 0 | 0 | 100% |
+| #4 | 193 | 28 | 27 | 1 | 0 | 96% |
+| #5 | 167 | 20 | 20 | 0 | 0 | 100% |
+| all | 1,252 | 126 | 120 | 6 | 0 | 95.2% |
+
+Wilson 95% CI [90.0%, 97.8%], so the 95% bar is still not resolved.
+
+Top-up: 54 tracks in `local_output/labelling/ticket-020-sample.json`: cosine-first to ~30 a reel
+(MV #1 +3, MV #3 +19, MV #4 +2, MV #5 +10), plus 20 tracks drawn at random (seed 20261106) from the
+57 unlabelled MV #1 tracks whose name differs from the 2026-11-01 run. Those 20 say what the new
+names on MV #1 are worth, so report them on their own. Each reel's `url` opens its tracks.
+
+## Earlier sample (2026-11-01)
 
 92 claimed tracks sampled across the five MVs: **87 correct, 5 misnamed, 0 impostors** → 94.6%
 (Wilson 95% CI [87.9%, 97.7%], so the 95% bar is not yet resolvable). Four MVs are under the ~30
