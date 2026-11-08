@@ -40,9 +40,10 @@ _Avoid_: confidence, min_confidence — that name has meant a detection score, a
 a filter threshold in three different files at once.
 
 **Band**:
-The coarse quality label shown for a **recognition** — derived from **match score** against
+The coarse quality mark shown on a **detection**; the lowest band also covers a detection with no match score — derived from **match score** against
 cutoffs set by measured false-match rate, not by dividing up an observed distribution. Bands
-are provisional until ground-truth labels exist.
+are provisional: a ticket 020 pass confirms precision on the top-scoring claims, and 0.412 stays
+provisional until the random draw is reported and is not clearly worse.
 _Avoid_: showing a match score as a percentage — 0.64 rendered as "64%" reads as *64% certain*,
 which it is not.
 
@@ -57,7 +58,7 @@ A face found in a video frame, whether or not it was identified.
 _Avoid_: face, recognition
 
 **Recognition**:
-A detection that has been matched to a contestant above the acceptance threshold. Every
+A detection that has been matched to a contestant at or above the acceptance threshold. Every
 recognition is a detection; most detections are not recognitions.
 _Avoid_: match, identification
 
@@ -81,6 +82,19 @@ undoes it. It covers one detection, never the track, and only that reel: the pub
 figures in `contestants_structured` and `embedding_coverage` wait for the next publish.
 _Avoid_: correcting the metadata, relabelling, propagating — nothing is rewritten, and a label is
 a verdict on a whole track.
+
+**Label**:
+A human verdict on a whole **track** — every detection ByteTrack linked under one `tracker_id` —
+used as ground truth to measure how often the pipeline is right. The verdict is `contestant`
+(naming which one), `not_a_contestant`, `unsure` or `box_wrong`; an unlabelled track has no
+entry, never a default verdict. Labelling is an **admin** act.
+_Avoid_: flag, correction, annotation — a flag changes what is *shown* for one detection; a label
+changes nothing shown and only *measures*.
+
+**Label set**:
+All the labels for one reel, stamped with the metadata run they were made on (`processing_date`
+and detection count). A reprocess renumbers tracks, so a label set is refused against any other
+run until `carry_labels.py` moves it across by box.
 
 ### Data
 

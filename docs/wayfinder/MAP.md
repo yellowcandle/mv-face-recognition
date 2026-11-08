@@ -17,7 +17,7 @@ The map does **not** deploy. It ends at deploy-ready.
 ## Notes
 
 **Domain**: InsightFace `buffalo_l` (512-d) + supervision/ByteTrack; Python pipeline in
-`mvp-processor/`; React pnpm monorepo (`apps/admin` local, `apps/viewer` → Cloudflare Worker,
+`mvp-processor/`; React pnpm monorepo (`apps/admin` (deployed `/admin` in use), `apps/viewer` → Cloudflare Worker,
 `apps/shared` Player); Cloudflare Worker + R2 (`mv-face-recognition-videos`) + KV (`METADATA_KV`).
 
 **Skills every session should consult**: `grilling` + `domain-modeling` by default.
@@ -28,8 +28,9 @@ The map does **not** deploy. It ends at deploy-ready.
   explicit confirmation. One confirmation point, at the end.
 - CJK text rendered onto frames MUST use PIL + `/System/Library/Fonts/PingFang.ttc`.
   Never `cv2.putText` — it cannot render CJK.
-- **`CLAUDE.md` and `DESIGN.md` are stale wherever they describe the frontend** (they still
-  document the deleted SvelteKit app in `mvp-processor/`). `TODO.md` is accurate. Trust code.
+- **`CLAUDE.md` is stale wherever it describes the frontend** (it still documents the deleted
+  SvelteKit app in `mvp-processor/`). `DESIGN.md` was cut to the current state on 2026-11-09 and
+  is the single TODO list; `TODO.md` and `TODOS.md` were merged into it. Trust code.
 - No webcam work. Only files in `source/videos/`.
 - Never delete `metadata/contestant_info.csv`.
 - The PIL/PingFang rule above is now historical: nothing renders text onto frames (ticket 014
@@ -49,7 +50,9 @@ The map does **not** deploy. It ends at deploy-ready.
 - Nothing from 014 is committed; the tree also carries the user's own in-flight edits.
 
 **State after tickets 015 + 016 (2026-09-17/20)** — the deployed Worker is read-only, and that is
-enforced, not just intended:
+enforced, not just intended. *Later superseded in part:* ADR 0005 re-allowed admin writes (flags,
+label sets, processing jobs) under `/admin` behind Cloudflare Access, and ADR 0006 put processing
+jobs on the Worker. Public reads stay read-only.
 - Every flagging route and every admin/settings/upload route is **deleted** (404); the API switch
   is **8 routes, all reads**. `worker/tests/worker-is-read-only.test.mjs` (`npm test` in `worker/`)
   drives every route × every method × two bodies and fails on any KV write, R2 write or outbound
@@ -59,7 +62,7 @@ enforced, not just intended:
   viewer does not fetch the flag route at all. The "show original" toggle is gone (it pointed at
   `/source/videos/`, served by nothing).
 - `worker/embedded-assets.js` embeds the current viewer build, so the deploy bundle is not pre-014.
-- **One action outstanding for the user: `wrangler secret delete HF_TOKEN`** — the route that used
+- **One action outstanding for the user: `wrangler secret delete HF_TOKEN`** (superseded 2026-11-09: ADR 0006 dispatch uses this secret — do not delete) — the route that used
   it is gone, so the secret is dead weight. Flagged, deliberately not run.
 - **Tracks are usable but not truth** (ticket 017): `minimum_matching_threshold` 0.3 → 0.8 puts ids
   on 237 of the 399 detections as 42 tracks (longest 19), but 162 detections still carry none,
@@ -200,7 +203,7 @@ enforced, not just intended:
   without exception, and the guard is a new `worker-is-read-only.test.mjs` that drives every route
   × every method × two bodies and asserts no KV write, no R2 write, **no outbound fetch** — the
   depth being the fix for the 015 version, which missed the upload route and `/settings` because it
-  only sent GET/POST with `{}`. `HF_TOKEN` is flagged for `wrangler secret delete` at the
+  only sent GET/POST with `{}`. `HF_TOKEN` is flagged for `wrangler secret delete` (superseded 2026-11-09: ADR 0006 dispatch uses this secret — do not delete) at the
   confirmation point.
 - [Fix the tracker's inverted matching threshold](tickets/017-fix-the-trackers-inverted-matching-threshold.md):
   `minimum_matching_threshold` 0.3 → **0.8** (the library default). The value is a *cost ceiling on
@@ -265,20 +268,21 @@ enforced, not just intended:
 - The deploy handoff itself: the exact command and the verification checklist handed to the user.
   One trap already retired: `scripts/update-worker-assets.js` embeds `apps/viewer/dist`, and both
   were rebuilt and re-embedded while verifying ticket 015 — the embedded bundle is current. One
-  item still rides with it: `wrangler secret delete HF_TOKEN` (ticket 016), plus deciding whether
+  item still rides with it: `wrangler secret delete HF_TOKEN` (superseded 2026-11-09: ADR 0006 dispatch uses this secret — do not delete) (ticket 016), plus deciding whether
   the `MODAL_JOBS` binding and Modal secrets should come out of `wrangler.toml`.
 - **Whether the local-only artifacts need to outlive the Mac they are made on.**
   `metadata/contestant_info.csv` aside, everything valuable here lives in `local_output/`: the 964
   reference photos' source images, `flagged_faces.json`, and now
   `local_output/labels/<video_id>_labels.json` — the ground truth *Choose the ground-truth
   labelling means* settled on, which took a human pass over the video to produce and which a
-  reprocess invalidates. ADR 0003 makes local-only the permanent shape rather than an accident, so
+  reprocess invalidates. ADR 0003 made local-only the permanent shape rather than an accident (superseded by ADR 0005,
+  which allows admin writes on the Worker), so
   this is the same unanswered backup question as the reference photos, one entry up.
 
 ## Out of scope
 
 - **`wrangler deploy`** — ruled out by the user. The map produces a command; the user runs it.
-- The ~12 code-quality cleanups in `TODO.md` "Next" (shared `formatTime`, `useInterval`,
+- The ~12 code-quality cleanups once in `TODO.md` "Next", now in `DESIGN.md` TODO where still live (shared `formatTime`, `useInterval`,
   capability props beyond what flagging removal needs, `Contestants.tsx` memoisation, …).
   Real, but past this destination.
 - Restoring `scripts/modal_youtube_processor.py` cookie support and webhook progress, and
