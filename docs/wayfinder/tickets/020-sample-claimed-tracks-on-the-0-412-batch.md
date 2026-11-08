@@ -61,8 +61,11 @@ Top-up: 54 tracks in `local_output/labelling/ticket-020-sample.json`: cosine-fir
 57 unlabelled MV #1 tracks whose name differs from the 2026-11-01 run. Those 20 say what the new
 names on MV #1 are worth, so report them on their own. Each reel's `url` opens its tracks.
 
-Planned: a random draw of ~10 claimed tracks per reel over all claimed tracks (fixed seed, excluding
-labelled tracks), reported separately; it measures the 0.412 threshold.
+Random draw (2026-11-09, seed 20261109): 10 claimed tracks per reel, drawn over all claimed tracks,
+in `random_draw` per reel in the same file. 8 of the 50 already have labels, which are reused; 42
+are left to label (reel 1: 9, reel 2: 7, reel 3: 10, reel 4: 9, reel 5: 7). Reel 5's track 411
+is also in its top-up. Each reel's `random_draw_url` opens the unlabelled ones on the deployed
+admin. Reported separately; it measures the 0.412 threshold.
 
 ## Earlier sample (2026-11-01)
 
