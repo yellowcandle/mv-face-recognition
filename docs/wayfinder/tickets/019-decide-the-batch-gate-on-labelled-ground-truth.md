@@ -73,7 +73,7 @@ unmeasured.
 1. **Gate rule replaced.** The ≥3-impostor rule is a sampling proxy a clean matcher cannot satisfy.
    Measure precision over **claimed** tracks instead: label **~30 claimed tracks per MV, highest
    cosine first**, and pass at **≥95% correct claims** with no impostor above the 0.2 cross-person
-   line. The *Accept matcher's claim* button makes the true ones one click.
+   line. The *Accept matcher's claim* button makes the true ones one click. Revised 2026-11-09 (ticket 020): the bar is the point estimate; the 0.2 impostor clause is dropped.
 2. **test-video-mv2 retired as the gate** — a 30 s clip at the old threshold; its 35 labels stay on
    disk and remain valid for their run.
 3. **MV #1 stale labels cleared.** It was reprocessed 2026-11-01T00:03; its 11 labels pinned the

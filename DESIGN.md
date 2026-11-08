@@ -1,1535 +1,388 @@
-# MV Face Recognition - Design Document
+# MV Face Recognition — Design
 
-## Overview
+Identify which of the 96 *King Maker* contestants appears when in a set of music videos, and
+publish those results to a read-only viewer.
 
-This document describes the architecture and design decisions for the MV Face Recognition system. The system is a **pre-processing and annotation platform** with **dense metadata generation** for optimal video player synchronization.
+This file holds the terms it defines (Track, Reel, Coverage, screen names, marks), the system,
+decisions, the visual language, the known state and the open TODOs. History is in git, the
+glossary is [`CONTEXT.md`](CONTEXT.md), decisions are in `docs/adr/` (linked below), and the
+active effort is [`docs/wayfinder/MAP.md`](docs/wayfinder/MAP.md).
 
-**Production URL**: https://mv-face-recognition-api.herballemon.workers.dev/
+## Terms
 
----
+Summaries. `CONTEXT.md` is authoritative for Detection, Recognition, Match score, Band, Flag and
+Label; Track, Claimed track (with misnamed and impostor), label set, Reel, Coverage and the screen
+names are defined only in this file.
+
+- **Detection**: a face found in a frame. A **recognition** is a detection matched to a contestant.
+- **Track**: one face followed across frames by ByteTrack (`tracker_id`).
+- **Match score**: raw cosine between a detection and a contestant's closest reference
+  embedding. At or above the acceptance threshold (0.412) it is a recognition.
+- **Band**: the coarse quality stamp shown on a detection, from its match score (`bandFor()`):
+  清楚 (≥ 0.445) and 尚可 (≥ 0.412) are recognitions; 存疑 is everything below the threshold,
+  including a detection with no score. A detection with an accepted flag shows 已核對 instead and
+  has no band. Cut-offs are `band_cutoffs` in `processing_config.yaml`; where they come from is
+  under Decisions.
+- **Reel**: one music video, identified by its `video_id`. The five source MVs are numbered 1–5
+  by their filename prefix ("reel 4" is `4-《全民造星IV》極限拍MV.mp4`); test clips are extra reels.
+- **Coverage**: how well each contestant's reference set works, from `generate_coverage.py`:
+  齊全 (good), 偏弱 (weak), 缺 (missing, no references); `classify_quality` in that file sets the
+  criteria. 有相 means the contestant has references. This is a quality of the references, not a
+  band.
+- **Flag**: an admin's proposed correction of one detection's contestant, with a pending /
+  accepted / rejected lifecycle. An accepted flag is laid over that detection when it is served;
+  stored metadata is never rewritten.
+- **Label**: a human verdict on a whole track, used as ground truth to measure accuracy:
+  `contestant` (which one), `not_a_contestant`, `unsure` or `box_wrong`. A **label set** (defined
+  here) is all the labels for one reel, tied to the metadata run they were made on. Flags correct what is
+  shown; labels measure how often the pipeline is right. A label is one verdict per track, but
+  on test-video-mv2 (ticket 017) 2 of 42 tracks mixed two contestants. A mixed track is labelled
+  `unsure`, which leaves it out of precision; ticket 020 must report their count.
+- **Claimed track**: a track the matcher named. It is **misnamed** when its label names a
+  different contestant, and an **impostor** when its label is `not_a_contestant` (ticket 019).
+
+Screen names (viewer: 首頁, 播放, 紀錄, 名冊; admin adds the rest):
+
+| Name | Screen | Name | Screen |
+|---|---|---|---|
+| 首頁 | home, the reel list | 標註 | labelling (track verdicts) |
+| 播放 | player with face overlays | 待核 | flag review queue |
+| 紀錄 | per-reel appearance record | 參賽者 | contestant detail |
+| 名冊 | cast roster | 處理 | processing jobs |
+| 儀表 | admin dashboard | 向量 | embedding workbench |
+| 管理 | system admin | | |
+
+播放 also has an up-next queue, 待播. The 待核 screen is named for the mark on the flags it lists.
+
+Marks: 待核 pending, 已核對 verified by a person, 作廢 void, 唯讀 read-only.
+
+## System
+
+```text
+                                                      local runs (mvp-processor)
+                                                                   │
+                                                                   ▼
+HF Jobs ──> HF bucket output/<video_id>/ ── copied by hand ──> local_output/ ──> local_api.py
+                                                                   │
+                                                                   ├─ publish:metadata:remote ──> KV METADATA_KV
+                                                                   └─ upload-to-r2.js ──> R2 mv-face-recognition-videos
+
+local_output/labels/   merged label store; nothing copies it to KV yet
+
+worker/src/index.ts reads KV and R2 and serves:
+  ├──> apps/viewer (public, read-only)
+  └──> /admin (Cloudflare Access) ──> writes flags, label sets, jobs to KV;
+                                      a job is dispatched to HF Jobs
+```
+
+- **Pipeline** (`mvp-processor/`): entry `src/process_video.py`, matching in
+  `src/face_detector.py`, overlay timing in `src/video_processor.py`. Faces are 512-d
+  InsightFace `buffalo_l` embeddings, tracked with supervision/ByteTrack. Matching is max-cosine
+  over per-photo reference embeddings
+  ([ADR 0001](docs/adr/0001-reference-embeddings-are-a-derived-cache.md)). Reference photos are
+  read from `source/photo/contestants/ig_photos/contestant_{id}/`.
+- **HF Jobs**: a 處理 job on the deployed admin, or `scripts/hf/jobs/submit.py` locally, runs
+  `hf_pipeline.py` on Hugging Face. It reads sources, photos and model weights from the HF bucket
+  `yellowcandle/mv-face-recognition` and writes metadata, embeddings and renditions to that
+  bucket's `output/<video_id>/`. Nothing brings that output back: the Worker does not read it, and
+  no script copies it into `local_output/`. A finished job is not live until someone copies it
+  down and publishes.
+- **Outputs per reel**: metadata (boxes as frame fractions `[x1,y1,x2,y2]`, `match_score` is the
+  raw cosine; [ADR 0002](docs/adr/0002-face-boxes-are-frame-fractions.md)),
+  `<reel>_embeddings.npz` with per-detection embeddings (not published yet), and renditions `_1080p` and
+  `_720p` encoded with the imageio-ffmpeg binary.
+- **Local serving**: `mvp-processor/src/local_api.py` reads `local_output/`.
+- **Publish** has two separate steps, both reading `local_output/`. `publish:metadata:remote` and
+  `upload-to-r2.js` push to production KV and R2. Get the user's confirmation before running either.
+  - `npm run publish:metadata` is a dry run; `publish:metadata:remote` writes the
+    `metadata_<video_id>`, `processed_videos_list`, `contestants_structured` and `embedding_*` KV
+    keys that the Worker reads. It names the renditions' R2 objects but does not upload them.
+  - `node scripts/upload-to-r2.js` (`--dry-run` to preview) uploads `_1080p` and `_720p` from
+    `local_output/processed_videos/` to R2 `processed_videos/`.
+  - Neither step writes labels or flags.
+- **Admin**: one app, `apps/admin`, with two backends. The deployed `/admin` on the Worker is the
+  default: flags, label sets and processing jobs are written to Worker KV there. The same app run locally with Vite talks to
+  `local_api.py` and is needed for work that reads local files directly (the 向量 page's
+  coverage and similarity rebuilds). It asks `/admin/api/system/status` which backend it is on (`useIsEdge`).
+- **Worker** (`worker/src/index.ts`): public reads are read-only, enforced by
+  `worker/tests/worker-is-read-only.test.mjs`. Admin writes (flags, label sets, processing jobs)
+  live under `/admin` behind Cloudflare Access
+  ([ADR 0005](docs/adr/0005-admin-writes-are-gated-on-the-worker.md)).
+  The gate fails closed: 503 when Access is not configured, 401 without a token. Deployed
+  processing jobs dispatch to HF Jobs ([ADR 0006](docs/adr/0006-admin-jobs-run-on-the-worker.md)),
+  which needs the Worker secret `HF_TOKEN` (`wrangler secret put HF_TOKEN`; do not delete it).
+- **Frontend**: pnpm monorepo with `apps/viewer` (public, read-only), `apps/admin` and
+  `apps/shared`. Build with `npm run build:frontend`. Router:
+  [ADR 0004](docs/adr/0004-keep-declarative-react-router.md).
+- **Deploying is the user's call.** Do not run `wrangler deploy` (standing constraint in
+  [`docs/wayfinder/MAP.md`](docs/wayfinder/MAP.md)).
+
+## Decisions
+
+Each ADR records its alternatives.
+
+- [ADR 0001](docs/adr/0001-reference-embeddings-are-a-derived-cache.md): reference embeddings are a
+  derived cache, keyed by contestant number.
+- [ADR 0002](docs/adr/0002-face-boxes-are-frame-fractions.md): face boxes are frame fractions in
+  `[x1,y1,x2,y2]` order.
+- [ADR 0004](docs/adr/0004-keep-declarative-react-router.md): the viewer and admin keep declarative
+  React Router.
+- [ADR 0005](docs/adr/0005-admin-writes-are-gated-on-the-worker.md): admin writes are allowed on
+  the Worker, behind Access (supersedes
+  [0003](docs/adr/0003-the-deployed-worker-is-read-only.md), which made the whole Worker
+  read-only).
+- [ADR 0006](docs/adr/0006-admin-jobs-run-on-the-worker.md): admin processing jobs run on the
+  Worker, gated, dispatched to HF Jobs.
+- Accepted flags show at read time as an overlay rather than by rewriting metadata, so rejecting a
+  flag undoes it. See [`CONTEXT.md`](CONTEXT.md) "Accepted-flag overlay".
+- `putFlag` keeps `video_id` and `status` in KV key metadata, so a public read lists keys and
+  fetches only the flags accepted for that reel. This was chosen over a per-reel document, which
+  would need its own write path (see the TODO "One accepted-flags document per reel"). If a flag's
+  key metadata is missing or malformed, the Worker reads the flag anyway.
+- Band cut-offs (`band_cutoffs`, commit `757741c7`,
+  [ticket 019](docs/wayfinder/tickets/019-decide-the-batch-gate-on-labelled-ground-truth.md)):
+  清楚 0.445 and 尚可 0.412, the latter also the acceptance threshold. They come from a
+  leave-one-out sweep over the 638-reference cache after curation (`scripts/band_cutoffs.py`):
+  p99 impostor 0.412, max impostor 0.445, genuine p05 0.377. So 清楚 clears every impostor pair
+  observed and 尚可 is the 1% false-match boundary. This supersedes ticket 014's 0.585/0.451,
+  measured before curation. Both stay provisional (see the ticket 020 gate below).
+- Every detection's embedding is kept in `<reel>_embeddings.npz` (`frame_number`,
+  `detection_index`, `embeddings`), so references and thresholds can be re-scored without
+  re-detecting. The alternative, discarding them after matching, forces a paid re-detect for any
+  reference or threshold change.
+- `mvp-processor/scripts/rescore_run.py` re-scores a run from that file, keeping boxes and track
+  ids. `run_source` copies `processing_date`, so labels and flags stay attached, but the run
+  identity no longer says which references scored it (see the `rescore_run.py` caveat in Known
+  state).
+- `mvp-processor/scripts/carry_labels.py` moves a label set onto a newer run by box (same frame,
+  IoU >= 0.5), because a reprocess renumbers tracker ids, and refuses a track that split or took
+  another track's boxes.
+- Face detection sets ONNX Runtime to 8 threads and loads only detection and recognition
+  (`INSIGHTFACE_THREADS` overrides). ONNX Runtime's default thread count made 282 threads under
+  the 8-CPU cap on HF `cpu-upgrade`; the fix cut 60 reel 4 frames there from 195s to 14s, with the same boxes and
+  detection scores.
+- scikit-learn is a direct dependency, for `cluster_unmatched.py`.
+- Toolchain is locked at InsightFace 0.7.3, ONNX Runtime 1.23.0, OpenCV 4.11, supervision 0.31.4,
+  lap 0.5.14, `trackers` 2.6.1, Pillow 13, rather than upgrading together, so a change in output
+  can be traced to one package. Pillow 13 requires Python 3.11, so `mvp-processor` requires Python 3.11 or later.
+- Ticket 020 gate (decided 2026-11-09): pooled precision >= 95% across the five reels, point
+  estimate; precision = correct / (correct + misnamed + impostor). A pass confirms precision on the
+  top-scoring claims; 0.412 stays provisional until the random draw is reported and is not clearly
+  worse. A fail triggers the curation order under Pipeline and data. Rejected: a Wilson lower
+  bound, a per-reel bar, the 0.2 impostor clause. Counts, tolerance and reporting are in
+  [ticket 020](docs/wayfinder/tickets/020-sample-claimed-tracks-on-the-0-412-batch.md).
+- Portraits are requested through `/cdn-cgi/image` at 64/256/512px via `portraitSrc`
+  (`apps/shared/lib/portrait.ts`). Cloudflare Stream stays parked until viewers report playback
+  problems.
+
+## Visual language — 點唱單 / 存根
+
+The viewer and the admin share one look: a carbonless request slip. The product
+files a name against a timestamp, and a radio dedication slip is that object. The viewer is the
+**第二聯 (copy 2)**, public and read-only. The admin is the **存根 (office copy)**, the writable
+stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css`) and in
+`apps/*/.impeccable/surfaces/`; designs are in `webui.pen` (gitignored).
+
+- Type: `LXGW WenKai TC` for text, `JetBrains Mono` for figures. Weight 400; 700 for active states,
+  the primary button and the wordmark. Sizes 12, 13, 14, 15, 18, 28, 32 px (wordmark 16 px).
+  Nothing under 12 px.
+- Muted text uses ink-muted, not the `--color-ledger` token, which fails contrast on paper.
+- Radii: 6 px on controls, 4 px on faces, 2 px on stamps. No shadows except modals. Flat 1 px rules.
+- A band is a stamp, not a colour: `bandFor()` maps to 清楚 / 尚可 / 存疑. Tones live on
+  `BAND_STAMP` in `apps/shared/lib/bands.ts`. The raw cosine sits beside the stamp, not only in a
+  tooltip.
+- States are the marks listed under Terms. 已核對 and 作廢 (human decisions) tilt; band and
+  quality stamps are upright (`Stamp.tsx`).
+- Red means action, selection or missing. 偏弱 is muted.
+- The viewer is read-only: it carries a 唯讀 stamp, and `worker/tests/worker-is-read-only.test.mjs`
+  fails on any public write.
+- No spine, folio numbers or tracked Latin labels. Page hints sit under the title.
+- Icons: `lucide-react`.
+- The 標註 sheet is docked, so it is a labelled region, not a modal: no focus trap, and closing it
+  moves focus nowhere, so that Esc then Backspace can't clear a tile's label.
+
+## Known state
+
+- Test clips are hidden from the viewer; the admin shows them (`useVideos` / `isTestClip`).
+- On the deployed admin, local-only actions (the 向量 rebuild buttons, which read local files; the
+  local write footer) are disabled (`useIsEdge`).
+- Labels: `local_output/labels/<video_id>_labels.json` holds 207 labels (reels 1-5: 29, 44, 11,
+  101, 22), all bound to the 2026-11-06 runs. It is the merged set from ticket 020 (local plus KV,
+  carried by `carry_labels.py`). No script writes label sets to KV yet, and publish writes no
+  `labels_<video_id>` KV key. Until the publish-first step 2, the deployed admin's labels bind to
+  the older runs.
+- A label set records the metadata run it was made on (`processing_date` plus detection count).
+  When either differs from the reel's current metadata, the Worker refuses the labels with a 409,
+  on both load and save, because a reprocess renumbers tracks and the labels would land on the
+  wrong faces.
+- `rescore_run.py` does not record which references scored the run. Do not run it on a labelled
+  run until it writes its own run identity: precision measured after a rescore cannot name the
+  references it used.
+- Accepted flags match on exact boxes, so a reprocess can detach them silently. As of 2026-11-09
+  the flags to re-check are Marf on reel 1, 榛綦 and Alice on reel 3. Labels already have a
+  carrier (`carry_labels.py`); flags do not yet (see the TODO "Carry accepted flags onto a new
+  run").
+- Reel 1's local `_1080p.mp4` was rebuilt on 2026-11-01 and reads its full duration (264.5 s). Whether the R2 copy
+  is the rebuilt file is unchecked until the next `upload-to-r2`.
+- The published reel list carries `duration` and `height`. `height` is the served rendition's
+  (1080 for `_1080p` encodes), so the public 首頁 reads "1080P" while local dev reads the source's.
+- A 處理 job on the deployed admin has a mode: `initial` (process a reel, on CPU),
+  `embedding-update` (rebuild the reference cache, on GPU) or `coverage-refresh` (refused on the
+  deployed Worker). An `initial` job must name a reel. The Worker refuses it: coverage reaches KV only
+  `publish:metadata`. Every job is a paid HF run
+  ([ADR 0006](docs/adr/0006-admin-jobs-run-on-the-worker.md)). A deployed `initial` or
+  `embedding-update` job cannot go live without a manual copy until the pull-back script exists.
+  A new reference set changes nothing until a reel is re-scored (`rescore_run.py`, see its caveat) or reprocessed.
+- Accepted-flag limits: a flag covers one detection, not its track. Cross-reel figures
+  (`contestants_structured`, `embedding_coverage`) stay as published until the next publish.
+  The Worker reads at most 200 flags per request (`FLAG_READ_CEILING`). Past 200, the remaining
+  flags are not read: a warning is logged and those corrections are missing from what is served.
+  The 200 is not per reel: an unfiltered read (`readFlagOverlay(env, null)`) counts accepted
+  flags across all reels, plus flags with missing key metadata, and which flags fall past 200
+  depends on KV key order. Every public read costs one KV list per 1000 flag keys.
+- Admin playback polls `/api/faces/detect` every 200 ms while playing (`startPolling` in
+  `Player.tsx`, admin mode only). Each call runs `readFlagOverlay`, at least one KV list per poll.
+  On any error it serves detections without the accepted flags and only logs a warning, so a
+  failed read looks like flags missing.
+- Licence: InsightFace's README says its pretrained models, including `buffalo_l`, are for
+  non-commercial research, and commercial use needs a licence from InsightFace (its code is MIT).
+- Privacy: the reference photos are public (contestants' public Instagram), and the people named
+  are contestants on a broadcast show. A misidentification is corrected with a flag; there is no
+  separate takedown route. The public `/embedding/coverage`, `/embedding/similarity` and
+  `/embedding/top-pairs` routes serve only aggregates (`embedding_coverage`,
+  `embedding_similarity_matrix`, `embedding_top_pairs`); no per-photo vectors are served.
+- Cloudflare runs on the herballemon account (the `herballemon.workers.dev` subdomain). The plan is
+  not readable with wrangler's token (billing scope), but KV analytics show 2,838-2,848 list calls a
+  day from 2026-10-31 to 2026-11-03, all HTTP 200. The Free plan caps lists at 1,000 a day, so KV
+  is on a paid allowance (Workers Paid: 1M lists a month included). Checked 2026-11-09. A steady
+  ~2,840 a day is one list every ~30 s, which matches a page left open and polling; normal days run
+  0-50.
+- The reference photos, `local_output/` (the only publish source) and the merged label sets exist
+  on one Mac with no backup; the HF bucket holds copies of photos and promoted runs only. After
+  step 2 above, KV holds a second copy of the labels, which reduces the risk for them only.
+- Group-photo rescue was tried and not adopted: it added references but changed no labelled track
+  outcome.
 
 ## TODO
 
-> **Active effort (2026-09-07): [Wayfinder map](docs/wayfinder/MAP.md)** — run the face
-> recognition pipeline, visualize the results, and get them publish-ready on Cloudflare.
-> Destination, scope boundaries and 10 open decision tickets live there; ticket bodies are in
-> `docs/wayfinder/tickets/`. Two findings from charting that contradict this document:
-> (1) the frontend sections below are stale — the SvelteKit app in `mvp-processor/` was
-> deleted; the real build is `pnpm --filter @mv/viewer build` → `apps/viewer/dist/`.
-> (2) The publish path is broken in the middle: the worker reads KV keys
-> `metadata_dense_<numeric>` and `processed_videos_list` that **no script in the repo writes**,
-> so a deploy today would serve hardcoded fallback videos and mock metadata.
-
-### Pending
-
-#### Admin UI Component Library (January 2025)
-- [x] Create design tokens CSS file (`mvp-processor/src/lib/styles/design-tokens.css`)
-- [x] Create Card component with variants (default, elevated, outlined, bordered, surface)
-- [ ] Create Button component (5 variants: primary, secondary, success, danger, ghost)
-- [ ] Create Badge component (5 color variants with optional status dot)
-- [ ] Create Input component (text, email, url, password, number types)
-- [ ] Create StatusIndicator component (online, offline, checking, error states)
-- [ ] Create NavigationLink component (active state styling with icon support)
-- [ ] Create IconButton component (circular icon-only buttons)
-- [ ] Create barrel export index.ts for component imports
-- [ ] Update root layout (+layout.svelte) to load design tokens globally
-- [ ] Test admin UI in browser (verify all pages render correctly)
-
-**Context**: Admin pages (`/admin`, `/admin/youtube`) are architecturally complete but reference 7 non-existent components. Building custom component library with dark theme to match existing admin page usage patterns.
-
-#### System Improvements
-- [ ] Implement automatic reprocessing after embedding updates (webhook/scheduled job)
-
-### Completed (June 2026) — deploy-ui-rewrite shippability pass
-
-- [x] `scripts/update-worker-assets.js` embeds `apps/viewer/dist/` (React) instead of the deleted SvelteKit build; binary assets base64-encoded via a `BINARY_ASSETS` manifest the worker decodes; fixed unreachable `main()` and `logger.*` TypeError
-- [x] `local_api.py`: video streaming with HTTP Range, flag persistence (`local_output/flagged_faces.json`), recognition results, contestant photos, `has_embedding` on contestants; `fastapi`/`uvicorn` added to deps (were missing entirely)
-- [x] Video IDs: CJK/space IDs round-trip end-to-end (traversal-checked instead of regex-rejected; Player no longer strips numeric prefixes); all metadata reads unified on `local_output/metadata/`
-- [x] Bbox contract: stored `face_location` stays `[top,right,bottom,left]`, every serving path emits canonical `[x1,y1,x2,y2]`; worker face-detect/recognition-results handlers rewritten off mock shapes onto real `frame_data`/`contestant_timeline`
-- [x] Pipeline: `bbox_scale` covers upscaled sources; tracker IDs stored per-recognition (ByteTrack in-place assignment) so traces can't land on the wrong contestant; effective on next reprocess
-- [x] Admin Ingestion page disabled until its backend exists (routes deleted from worker; never in local_api)
-
-### Completed (January 2026)
-
-#### Automatic Embedding Regeneration System
-- [x] `scripts/validate_embeddings.py` - Validation script for checking embedding compatibility
-- [x] `scripts/upload_embeddings_to_hf.py` - Upload regenerated embeddings to HuggingFace XET storage
-- [x] `scripts/modal_hf_processor.py` - Add `validate_and_regenerate_embeddings()` for Modal container startup
-- [x] `mvp-processor/src/face_detector.py` - Export `regenerate_embeddings_from_contestant_photos()` function
-- [x] `mvp-processor/config/processing_config.yaml` - Add `embedding:` configuration section
-- [x] `DESIGN.md` - Document automatic embedding regeneration system
-
-**System Status**: Embeddings are already 512-dim and compatible with current face_recognition library. The automatic regeneration system is implemented and ready for use when needed.
-
-**Important Notes**:
-- Embeddings are stored at `source/photo/contestants/{nickname}_embedding.npy`
-- Photos are organized by contestant number in `source/photo/contestants/{number}/`
-- Fallback photo location is `source/photo/contestants/photos/contestant_{number}/` (may contain LFS pointers)
-- System handles dimension mismatch via cosine similarity fallback (128-dim → 512-dim compatibility)
-
-### Completed (December 2025 - Continued)
-- [x] **Video Processing Pipeline Optimization** (Phase 1)
-  - [x] Frame difference detection (3 methods: histogram, MSE, structural)
-  - [x] Face tracking across frames (IoU-based matching)
-  - [x] Batch face recognition module
-  - [x] Metadata compression (delta encoding + gzip)
-  - [x] Confidence-based filtering
-  - [x] Frame optimizer utility
-
-### Completed (December 2025 - Frontend)
-- [x] Complete design system refactoring (7 components, 112 spacing tokens)
-- [x] All TypeScript/svelte-check errors resolved (0 errors)
-- [x] Reusable component library with design tokens
-
-### Completed (December 2025 - Initial)
-- [x] Implement Cloudflare Zero Trust for Admin UI
-- [x] Admin UI: YouTube video ingestion
-- [x] Batch flagging for multiple faces
-- [x] Face thumbnail extraction for flagged faces
-- [x] Embedding comparison visualization
-- [x] Flagging approval workflow for admins
-- [x] Face flagging system and HuggingFace XET integration
-- [x] Modal cloud processing with HuggingFace sync
-- [x] Pipeline documentation
-- [x] Worker: migrate to TypeScript entrypoint (wrangler main=src/index.ts)
-- [x] Backend: replace remaining print() usage with logging
-- [x] Repo cleanup: archive/move legacy root scripts (gradio, debug, benchmarks, legacy video_processor)
-- [x] Python: rename src/logging.py -> src/secure_logging.py (avoid shadowing stdlib logging; enable ty)
-
-### Completed (July 2025)
-- [x] Comprehensive video player with face recognition overlays
-- [x] SvelteKit migration with proper routing
-- [x] Critical deployment fixes (SvelteKit vs legacy Vite conflicts)
-- [x] All frontend routes working (/, /video-player, /face-recognition, /analytics, /settings)
-- [x] 21 API endpoints functional
-
----
-
-## Architecture
-
-### Core Requirements
-- **Pre-processing Focus**: Batch process videos beforehand, no real-time processing
-- **Annotated Video Generation**: Enhanced videos with face recognition overlays
-- **Metadata Extraction**: Comprehensive contestant appearance timelines
-- **Preserve existing data**: Keep `/source/photo/contestants/` with photos and embeddings
-- **Use ChromaDB**: Vector database for fast similarity search (95 contestants)
-
-### System Components
-
-```
-├── src/                          # Python backend
-│   ├── core/
-│   │   ├── face_detector.py      # InsightFace detection
-│   │   ├── face_matcher.py       # ChromaDB similarity search
-│   │   └── hardware_acceleration.py
-│   ├── services/
-│   │   ├── enhanced_video_processor.py
-│   │   └── realtime_video_processor.py
-│   ├── database/
-│   │   └── chroma_setup.py
-│   └── integrations/
-│       └── huggingface_xet.py    # HuggingFace sync
-│
-├── mvp-processor/                 # SvelteKit frontend (PRIMARY)
-│   └── src/
-│       ├── routes/
-│       │   ├── +page.svelte       # Dashboard
-│       │   ├── video-player/      # Video player with face overlay
-│       │   ├── face-recognition/  # Recognition results
-│       │   ├── analytics/
-│       │   └── settings/
-│       └── lib/
-│           ├── stores/            # State management
-│           └── utils/             # API utilities
-│
-├── worker/                        # Cloudflare Workers API
-│   ├── embedded-assets.js         # Generated SvelteKit asset bundle
-│   └── src/
-│       ├── index.ts               # API endpoints (TypeScript)
-│       ├── types.ts               # TypeScript definitions
-│       └── lib/
-│           ├── logger.ts
-│           └── errors.ts
-│
-└── scripts/                       # Automation
-    ├── modal_*.py                 # Modal cloud processing
-    ├── upload-*.js                # Cloudflare deployment
-    └── update-worker-assets.js    # SvelteKit asset embedding
-```
-
-### Generated Output
-```
-├── processed_videos/              # Annotated MP4 files
-├── metadata/                      # JSON timelines
-│   └── *_dense_metadata.json
-├── thumbnails/                    # Video thumbnails
-└── embeddings/                    # Face embeddings
-```
-
----
-
-## Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| Frontend | SvelteKit 2.x, TypeScript |
-| API | Cloudflare Workers |
-| Video Storage | Cloudflare R2 |
-| Metadata Storage | Cloudflare KV |
-| Face Detection | InsightFace (buffalo_l model) |
-| Face Matching | ChromaDB (vector database) |
-| Video Processing | OpenCV, FFmpeg |
-| Cloud GPU | Modal.com |
-| Data Sync | HuggingFace XET |
-
----
-
-## Video Processing Pipeline Optimizations (January 2025)
-
-### Performance Optimization Modules
-
-**New optimization modules added to improve video processing efficiency:**
-
-#### 1. Frame Optimizer (`frame_optimizer.py`)
-**Purpose**: Reduce redundant frame processing through smart frame skipping
-
-**Features**:
-- **FrameDifferenceDetector**: Three detection methods:
-  - Histogram-based (fastest, HSV color space)
-  - MSE-based (moderate speed, pixel-level diff)
-  - Structural (most accurate, edge-based)
-- **FaceTracker**: Track faces across frames using IoU-based matching
-  - Reduces recognition queries by 30-50%
-  - Configurable track persistence (max skip frames)
-  - Memory-efficient tracking
-
-**Usage**:
-```python
-# Detect frame differences
-detector = FrameDifferenceDetector(threshold=0.05, method="histogram")
-metrics = detector.should_process_frame(frame, frame_num, timestamp)
-if metrics.should_process:
-    # Process frame
-```
-
-#### 2. Batch Recognizer (`batch_recognizer.py`)
-**Purpose**: Optimize ChromaDB queries through batching and caching
-
-**Features**:
-- **BatchFaceRecognizer**: 
-  - Batch processing (configurable batch size)
-  - Parallel recognition using ThreadPoolExecutor
-  - Recognition result caching
-  - Confidence filtering
-- **ConfidenceFilter**:
-  - Static threshold filtering
-  - Adaptive threshold calculation
-  - Low-confidence detection removal
-
-**Performance Impact**:
-- Batch processing: ~40% reduction in query overhead
-- Caching: 60-80% hit rate on repeated faces
-- Parallel processing: 2-4x speedup with 4 workers
-
-#### 3. Metadata Compressor (`metadata_compressor.py`)
-**Purpose**: Reduce metadata file sizes through compression
-
-**Features**:
-- **MetadataCompressor**:
-  - Delta encoding (only store changes)
-  - Gzip compression (configurable level 1-9)
-  - Statistics calculation
-- **MetadataOptimizer**:
-  - Key abbreviation (frame_number → f)
-  - Low-confidence pruning
-  - Spatial data optimization
-
-**Compression Results**:
-- Delta encoding: 40-60% size reduction
-- Gzip compression: 70-85% additional reduction
-- Combined: 5-10x smaller metadata files
-- Example: 10MB metadata → 1-2MB compressed
-
-### Performance Impact
-
-| Optimization | Impact | Implementation |
-|---|---|---|
-| Frame diff detection | Skip 20-40% of frames | FrameDifferenceDetector |
-| Face tracking | Reduce queries by 30-50% | FaceTracker |
-| Batch recognition | 40% query overhead reduction | BatchFaceRecognizer |
-| Result caching | 60-80% cache hit rate | Recognition cache |
-| Metadata compression | 5-10x file size reduction | MetadataCompressor |
-| **Combined Effect** | **2-3x overall speedup** | All modules together |
-
-### Integration Points
-
-**These modules integrate with existing pipeline**:
-1. VideoProcessor → Use FrameDifferenceDetector for smart frame skip
-2. FaceDetector → Feed detections to FaceTracker
-3. FaceRecognizer → Use BatchFaceRecognizer for queries
-4. MetadataGenerator → Use MetadataCompressor for output
-
-### Configuration
-
-**Recommended settings for optimal performance**:
-```yaml
-frame_optimization:
-  diff_detector:
-    threshold: 0.05          # Sensitivity (lower = more sensitive)
-    method: "histogram"      # Fast, accurate for video
-  
-  face_tracker:
-    max_iou_distance: 0.3    # IoU threshold for matching
-    max_frames_skip: 5       # Max frames without detection
-  
-  batch_recognizer:
-    batch_size: 16           # Faces per batch
-    max_workers: 4           # Parallel threads
-    cache_enabled: true      # Enable result caching
-  
-  metadata_compression:
-    compression_level: 9     # Gzip level (1-9)
-    prune_confidence: 0.1    # Remove faces below threshold
-```
-
----
-
-## Processing Pipeline
-
-### Workflow Overview
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    COMPLETE PIPELINE                              │
-├──────────────────────────────────────────────────────────────────┤
-│  PHASE 1         PHASE 2           PHASE 3          PHASE 4      │
-│  Data Prep  ───► Video Process ───► Deploy     ───► Improve      │
-│                                                                   │
-│  • Photos        • Modal GPU        • Cloudflare    • Flag faces  │
-│  • Embeddings    • Face detect      • R2 videos     • Sync HF     │
-│  • HuggingFace   • Annotate         • KV metadata   • Retrain     │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Quick Start Commands
-
-```bash
-# Process new videos (full pipeline)
-modal run scripts/modal_hf_processor.py --full-pipeline
-
-# Deploy to Cloudflare
-cd mvp-processor && npm run build && cd ..
-node scripts/update-worker-assets.js
-cd worker && npx wrangler deploy
-
-# Improve accuracy (after flagging faces)
-modal run scripts/modal_hf_processor.py --update-embeddings
-modal run scripts/modal_hf_processor.py --process-videos
-```
-
-### Dense Metadata Format
-
-```json
-{
-  "video_info": {
-    "filename": "video.mp4",
-    "duration": 240.5,
-    "fps": 30,
-    "total_frames": 7215
-  },
-  "processing_info": {
-    "processing_interval": 5,
-    "interpolation_enabled": true
-  },
-  "timeline": [
-    {
-      "frame_number": 0,
-      "timestamp": 0.0,
-      "contestants": [
-        {
-          "name": "張三",
-          "bbox": [100, 100, 200, 200],
-          "confidence": 0.95,
-          "interpolated": false
-        }
-      ]
-    }
-  ]
-}
-```
-
-### YouTube Video Ingestion Pipeline (January 2025)
-
-**NEW**: Automated pipeline for processing YouTube videos with face validation and embedding bootstrap.
-
-#### Architecture
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│          YOUTUBE VIDEO INGESTION PIPELINE                      │
-├───────────────────────────────────────────────────────────────┤
-│   STAGE 1           STAGE 2               STAGE 3             │
-│   Download      ──► Sample & Detect   ──► Bootstrap           │
-│                                                                │
-│   • yt-dlp          • Frame sampling      • User validation   │
-│   • Metadata        • Face detection      • Combine w/ photos │
-│   • Modal GPU       • Recognition         • Update ChromaDB   │
-└───────────────────────────────────────────────────────────────┘
-```
-
-#### Stage 1: YouTube Download
-- **Script**: `scripts/modal_youtube_processor.py`
-- **Function**: `download_video(youtube_url, queue_id)`
-- **Process**:
-  1. Download video using yt-dlp (best quality MP4)
-  2. Extract metadata (title, duration, uploader, etc.)
-  3. Store in Modal volume at `/data/youtube_downloads/{queue_id}/`
-- **Output**: Video file + metadata JSON
-
-#### Stage 2: Frame Sampling & Face Detection
-- **Function**: `sample_and_detect_faces(video_path, queue_id)`
-- **Process**:
-  1. Sample frames every 2 seconds (max 100 frames)
-  2. Run InsightFace detection on each frame
-  3. Extract face crops and embeddings
-  4. Save face images to `/data/youtube_samples/{queue_id}/`
-  5. Store detections with bboxes, confidence, embeddings
-- **Function**: `recognize_faces(queue_id)` [optional]
-  - Query ChromaDB for existing contestant matches
-  - Add preliminary recognition results with confidence scores
-- **Output**: Detections JSON + face crop images
-
-#### Stage 3: User Validation & Embedding Bootstrap
-- **Validation UI**: Admin panel face review interface
-- **API Endpoints**:
-  - `GET /api/admin/youtube/samples?queue_id=...` - Retrieve face samples
-  - `POST /api/admin/youtube/validate` - Flag faces as correct/incorrect
-  - `POST /api/admin/youtube/bootstrap` - Queue embedding update job
-- **Function**: `bootstrap_embeddings(queue_id, use_supplied_photos)`
-- **Process**:
-  1. Load validated faces from YouTube samples
-  2. Optionally include supplied contestant photos
-  3. Generate embeddings using InsightFace
-  4. Average multiple embeddings per contestant
-  5. Update ChromaDB collection with new/improved embeddings
-- **Output**: Updated ChromaDB collection
-
-#### Usage Examples
-
-```bash
-# Setup Modal (first time only)
-modal setup
-modal volume create mv-face-recognition-data
-
-# Process a YouTube video
-modal run scripts/modal_youtube_processor.py \
-  --url "https://www.youtube.com/watch?v=..." \
-  --queue-id yt_video123_1234567890
-
-# Sample only (no recognition)
-modal run scripts/modal_youtube_processor.py \
-  --url "https://www.youtube.com/watch?v=..." \
-  --sample-only
-```
-
-#### Data Flow
-
-1. **Admin UI** → Submit YouTube URL → **Cloudflare KV** (queue entry)
-2. **Modal Script** → Download & process → **Modal Volume** (samples)
-3. **Admin UI** → Review faces → **Cloudflare KV** (validations)
-4. **Modal Script** → Bootstrap embeddings → **Modal Volume** (ChromaDB)
-5. **Video Processing** → Run with new embeddings → **R2 Storage** (processed videos)
-
-#### KV Storage Schema
-
-```typescript
-// Queue entry
-youtube_queue_{queueId}: {
-  id: string
-  youtube_url: string
-  youtube_video_id: string
-  title: string
-  priority: 'low' | 'normal' | 'high'
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  submitted_by: string  // email
-  submitted_at: string  // ISO timestamp
-}
-
-// Detections (uploaded from Modal)
-youtube_detections_{queueId}: Array<{
-  frame_number: number
-  timestamp: number
-  bbox: [number, number, number, number]
-  confidence: number
-  recognition_result?: string  // contestant ID
-  recognition_confidence?: number
-  embedding: number[]
-  frame_path: string
-}>
-
-// Validations (from admin UI)
-youtube_validations_{queueId}: {
-  [sampleIndex: string]: {
-    is_correct: boolean
-    correct_contestant_id?: string
-    notes?: string
-    validated_by: string  // email
-    validated_at: string  // ISO timestamp
-  }
-}
-
-// Bootstrap job
-bootstrap_job_{jobId}: {
-  id: string
-  queue_id: string
-  use_supplied_photos: boolean
-  validated_samples: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  created_by: string
-  created_at: string
-}
-```
-
-#### Dependencies
-
-Added to `pyproject.toml`:
-- `yt-dlp>=2024.8.6` - YouTube video downloader
-- `modal>=0.64.0` - Cloud GPU processing
-
----
-
-## Automatic Embedding Regeneration (January 2026)
-
-**NEW**: Automated embedding dimension validation and regeneration at Modal container startup to handle `face_recognition` library updates.
-
-### Problem
-
-The `face_recognition` library may change embedding dimensions between versions:
-- Older versions: 128-dimensional embeddings
-- Current version: 512-dimensional embeddings
-
-When embeddings stored on HuggingFace don't match the current library version, face recognition produces very low confidence scores (~0.01-0.02).
-
-### Solution
-
-```
-Modal Container Startup
-    │
-    ▼
-┌─────────────────────────────────────┐
-│  validate_embeddings.py             │
-│  • Check embedding dimensions       │
-│  • Detect missing files             │
-│  • Compare photo timestamps         │
-│  • Return validation result         │
-└─────────────────────────────────────┘
-    │
-    ▼ (if needs regeneration)
-┌─────────────────────────────────────┐
-│  face_detector.py                   │
-│  regenerate_embeddings_from_        │
-│  contestant_photos()                │
-│  • Load contestant photos           │
-│  • Generate 512-dim encodings       │
-│  • Save to embeddings directory     │
-└─────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────┐
-│  upload_embeddings_to_hf.py         │
-│  • Upload regenerated .npy files    │
-│  • Create embedding_manifest.json   │
-│  • Commit to HuggingFace            │
-└─────────────────────────────────────┘
-    │
-    ▼
-Continue with video processing
-```
-
-### Components
-
-#### 1. Validation Script (`scripts/validate_embeddings.py`)
-
-Validates embeddings and determines if regeneration is needed:
-
-```python
-from scripts.validate_embeddings import validate_all_embeddings
-
-result = validate_all_embeddings(
-    photo_base_dir=Path("source/photo/contestants"),
-    embeddings_dir=Path("source/photo/contestants"),
-    contestants_csv_path=Path("metadata/contestant_info.csv"),
-    expected_dim=512,
-)
-# Returns: EmbeddingValidationResult with all_valid, needs_regeneration, counts, etc.
-```
-
-**Validation checks:**
-- Embedding dimension matches expected (512)
-- All contestants have embeddings
-- Photos haven't changed since embedding creation
-
-#### 2. Regeneration Function (`mvp-processor/src/face_detector.py`)
-
-Regenerates embeddings from contestant photos:
-
-```python
-from src.face_detector import regenerate_embeddings_from_contestant_photos
-
-result = regenerate_embeddings_from_contestant_photos(
-    photo_base_dir=Path("source/photo/contestants"),
-    embeddings_output_dir=Path("source/photo/contestants"),
-    contestants_csv_path=Path("metadata/contestant_info.csv"),
-    expected_dim=512,
-)
-# Returns: RegenerationResult with success, count, failures, duration
-```
-
-**Output format:**
-- File: `{nickname}_embedding.npy` (e.g., `Michelle_embedding.npy`)
-- Dimension: 512 (current face_recognition standard)
-- Location: Same directory as source photos
-
-#### 3. HuggingFace Upload Script (`scripts/upload_embeddings_to_hf.py`)
-
-Uploads regenerated embeddings to HuggingFace XET storage:
-
-```bash
-python scripts/upload_embeddings_to_hf.py \
-  --dir source/photo/contestants \
-  --repo-id yellowcandle/mv-face-recognition-data \
-  --dimension 512
-```
-
-**Features:**
-- Batch upload using `upload_folder()` (rate-limit optimized)
-- Creates `embedding_manifest.json` tracking dimensions and timestamps
-- Verification option to download and check uploaded files
-
-#### 4. Modal Integration (`scripts/modal_hf_processor.py`)
-
-Automatic validation and regeneration at container startup:
-
-```python
-from scripts.modal_hf_processor import validate_and_regenerate_embeddings
-
-result = validate_and_regenerate_embeddings(
-    volume_path=VOL_MOUNT_PATH,
-    embeddings_subdir="source/photo/contestants",
-    photos_subdir="source/photo/contestants/photos",
-    metadata_subdir="metadata",
-    expected_dim=512,
-    upload_to_hf=True,
-)
-```
-
-### Configuration (`mvp-processor/config/processing_config.yaml`)
-
-```yaml
-embedding:
-  required_dimension: 512
-  
-  regenerate_on_dimension_mismatch: true
-  regenerate_on_photo_change: true
-  
-  photo_base_dir: "../source/photo/contestants"
-  photo_subdir: "photos"
-  embeddings_dir: "../source/photo/contestants"
-  
-  contestants_csv: "../metadata/contestant_info.csv"
-  
-  huggingface:
-    sync_embeddings_to_hf: true
-    repo_id: "yellowcandle/mv-face-recognition-data"
-    upload_on_regeneration: true
-    create_manifest: true
-  
-  fallback_on_regeneration_failure: true
-```
-
-### Usage
-
-**Manual validation:**
-```bash
-# Check embeddings without regenerating
-python scripts/validate_embeddings.py --dir source/photo/contestants --json
-
-# Check and show details
-python scripts/validate_embeddings.py --dir source/photo/contestants
-```
-
-**Manual regeneration:**
-```bash
-# Regenerate and upload to HuggingFace
-python -c "
-from scripts.validate_embeddings import validate_all_embeddings
-from src.face_detector import regenerate_embeddings_from_contestant_photos
-from pathlib import Path
-
-result = validate_all_embeddings(
-    photo_base_dir=Path('source/photo/contestants'),
-    embeddings_dir=Path('source/photo/contestants'),
-    contestants_csv_path=Path('metadata/contestant_info.csv'),
-)
-if result.needs_regeneration:
-    regen = regenerate_embeddings_from_contestant_photos(
-        photo_base_dir=Path('source/photo/contestants'),
-        embeddings_output_dir=Path('source/photo/contestants'),
-        contestants_csv_path=Path('metadata/contestant_info.csv'),
-    )
-    print(f'Regenerated: {regen.regenerated_count}, Failed: {regen.failed_count}')
-"
-```
-
-**Modal container (automatic):**
-```bash
-# Regeneration happens automatically at container startup
-modal run scripts/modal_hf_processor.py --full-pipeline
-```
-
-### Error Handling
-
-| Scenario | Handling |
-|----------|----------|
-| HuggingFace upload fails | Log warning, continue with local embeddings |
-| Partial regeneration failure | Continue with valid embeddings, log failures |
-| No photos available | Exit with clear error message |
-| Timeout during regeneration | Set timeout, log partial results |
-| HF_TOKEN not set | Skip upload, continue processing |
-
-### Files Created/Modified
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `scripts/validate_embeddings.py` | Create | Embedding validation logic |
-| `scripts/upload_embeddings_to_hf.py` | Create | HuggingFace upload for embeddings |
-| `scripts/modal_hf_processor.py` | Modify | Add `validate_and_regenerate_embeddings()` |
-| `mvp-processor/src/face_detector.py` | Modify | Export `regenerate_embeddings_from_contestant_photos()` |
-| `mvp-processor/config/processing_config.yaml` | Modify | Add `embedding:` section |
-| `DESIGN.md` | Modify | Add documentation |
-
-### Testing
-
-```bash
-# Test validation script
-python scripts/validate_embeddings.py --dir source/photo/contestants
-
-# Test regeneration
-python -c "
-from src.face_detector import regenerate_embeddings_from_contestant_photos
-from pathlib import Path
-
-result = regenerate_embeddings_from_contestant_photos(
-    photo_base_dir=Path('source/photo/contestants'),
-    embeddings_output_dir=Path('/tmp/test_embeddings'),
-    contestants_csv_path=Path('metadata/contestant_info.csv'),
-)
-print(f'Success: {result.success}')
-print(f'Regenerated: {result.regenerated_count}')
-print(f'Dimension: {result.dimension}')
-"
-
-# Test HuggingFace upload (dry run)
-python scripts/upload_embeddings_to_hf.py --dir /tmp/test_embeddings --dry-run
-```
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/system/status` | GET | System health |
-| `/api/videos` | GET | List videos |
-| `/api/videos/{id}` | GET | Stream video |
-| `/api/videos/{id}/timeline` | GET | Face detection timeline |
-| `/api/contestants` | GET | List contestants |
-| `/api/faces/detect` | GET | Get faces at timestamp |
-| `/api/faces/flag` | POST | Flag incorrect face |
-| `/api/faces/flagged` | GET | List flagged faces |
-| `/api/recognition/results` | GET | Recognition results |
-| `/api/embeddings/sync` | POST | Trigger embedding update |
-
----
-
-## Performance Optimizations (January 2025)
-
-### Face Detection
-- **Batch Person Segmentation**: 15-25% speedup with batch ONNX inference
-- **Face Size Pre-filtering**: 10-20% speedup by skipping tiny faces (<20px)
-- **Frame Similarity Detection**: Up to 30% speedup for static scenes (experimental)
-
-### Face Recognition
-- **Batch Processing**: 20-35% speedup with vectorized NumPy operations
-- **Early Termination**: 5-10% speedup when confidence >85%
-- **ChromaDB HNSW Optimization**: 10-15% faster similarity search
-
-### Overall Impact
-- **Before**: ~180 seconds for 4-minute video
-- **After**: ~95 seconds (47% improvement)
-
-### Configuration (`mvp-processor/config/processing_config.yaml`)
-```yaml
-face_detection:
-  min_face_size: 20
-  enable_frame_similarity_skip: false
-
-face_recognition:
-  high_confidence_threshold: 0.85
-  enable_batch_processing: true
-
-processing:
-  segmentation_batch_size: 4
-  recognition_batch_size: 8
-```
-
----
-
-## Face Flagging & HuggingFace Integration (December 2025)
-
-### Face Flagging System
-
-Users can flag incorrectly identified faces to improve recognition accuracy.
-
-**Frontend Flow:**
-1. Click on face bounding box in video player
-2. Select correct contestant from dropdown
-3. Submit flag (syncs to HuggingFace)
-
-**API:**
-```yaml
-POST /api/faces/flag
-  body:
-    contestant_id: number
-    video_id: string
-    timestamp: number
-    bbox: [x, y, w, h]
-    confidence: number
-    user_label: string (optional)
-```
-
-### HuggingFace XET Integration
-
-**Repository Structure:**
-```
-yellowcandle/mv-face-recognition-data/
-├── metadata/
-│   └── contestant_info.csv
-├── embeddings/
-│   └── contestant_{id}/base_embedding.npy
-├── flagged_faces/
-│   └── contestant_{id}/flag_{id}/
-│       ├── face.jpg
-│       ├── embedding.npy
-│       └── metadata.json
-└── videos/
-```
-
-**Usage:**
-```python
-from src.integrations.huggingface_xet import HuggingFaceDataset
-
-dataset = HuggingFaceDataset("yellowcandle/mv-face-recognition-data")
-dataset.upload_contestant_data()
-dataset.sync_embeddings_to_cloud()
-```
-
-### Modal Cloud Processing
-
-```bash
-# Full pipeline
-modal run scripts/modal_hf_processor.py --full-pipeline
-
-# Individual steps
-modal run scripts/modal_hf_processor.py --sync-from-hf
-modal run scripts/modal_hf_processor.py --process-videos
-modal run scripts/modal_hf_processor.py --upload-results
-```
-
----
-
-## Deployment
-
-### Cloudflare Workers Architecture
-
-```toml
-# wrangler.toml
-name = "mv-face-recognition-api"
-main = "worker/index.js"
-
-routes = [
-  { pattern = "mv.herballemon.dev", custom_domain = true }
-]
-
-[[r2_buckets]]
-binding = "VIDEOS_BUCKET"
-bucket_name = "mv-face-recognition-videos"
-
-[[kv_namespaces]]
-binding = "METADATA_KV"
-id = "890d77e11bfc4623ac4ef56db6b9a4ab"
-```
-
-### Deployment Commands
-
-```bash
-# 1. Build frontend
-cd mvp-processor && npm run build
-
-# 2. Update worker assets (embeds SvelteKit build)
-cd .. && node scripts/update-worker-assets.js
-
-# 3. Upload videos to R2
-npx wrangler r2 object put mv-face-recognition-videos/video.mp4 \
-  --file processed_videos/video_annotated.mp4 --content-type video/mp4
-
-# 4. Upload metadata to KV
-npx wrangler kv:key put --binding=METADATA_KV \
-  "timeline:video" "$(cat metadata/video_timeline.json)"
-
-# 5. Deploy worker
-cd worker && npx wrangler deploy
-```
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `HF_TOKEN` | HuggingFace API token |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token |
-| `MODAL_TOKEN_ID` | Modal.com token ID |
-| `MODAL_TOKEN_SECRET` | Modal.com token secret |
-
----
-
-## Refactoring Status (December 2025)
-
-### Completed Phases
-
-**Phase 1: Critical Fixes** ✅
-- Git merge conflict resolved
-- Structured logging implemented (`worker/src/lib/logger.ts`)
-- Frontend API connection established
-
-**Phase 2: Error Handling** ✅
-- Custom exception classes (`src/exceptions.py`)
-- SQL sanitization deprecated (uses ChromaDB, no SQL)
-
-**Phase 3: TypeScript Migration** 🔄 In Progress
-- TypeScript config created (`worker/tsconfig.json`)
-- Type definitions added (`worker/src/types.ts`)
-- Logger and error modules converted
-- Main worker file conversion pending
-
-### Quality Metrics
-
-| Metric | Current | Target |
-|--------|---------|--------|
-| Test Coverage | 75-85% | 90%+ |
-| Security Score | A+ | A+ |
-| Type Safety | 70% | 95% |
-
----
-
-## Video Player Features (July 2025)
-
-### Components
-- **VideoPlayer.svelte**: Main player with face recognition overlay
-- **AnnotationOverlay.svelte**: Canvas-based 60fps face tracking
-- **FaceRecognitionSidebar.svelte**: Live face gallery with filtering
-- **VideoTimeline.svelte**: Color-coded contestant tracks
-
-### Features
-- Real-time bounding boxes with confidence indicators
-- Click-to-flag interface for corrections
-- Face gallery with search and sort
-- Interactive timeline with contestant tracks
-- Responsive design with mobile support
-
-### Performance
-- 60fps canvas rendering
-- Face tracking with 1-second tolerance
-- Video player bundle: 57KB
-
----
-
-## Frontend Design System (January 2025)
-
-### ✅ Design System Implementation Status
-
-**COMPLETION**: Phase 7 of design system refactoring completed (January 9, 2025)
-
-**All 7 Phases Complete**:
-1. ✅ **Phase 1**: Created 7 reusable components (Badge, Button, Card, IconButton, Input, NavigationLink, StatusIndicator)
-2. ✅ **Phase 2**: Refactored +layout.svelte with design tokens and new navigation
-3. ✅ **Phase 3**: Refactored dashboard page with Card components and Badge styling
-4. ✅ **Phase 4**: Refactored video-player with comprehensive color/spacing tokens
-5. ✅ **Phase 5**: Refactored processing & analytics pages with component integration
-6. ✅ **Phase 6**: Refactored admin pages with standardized layouts
-7. ✅ **Phase 7**: Added global utility classes and fixed all TypeScript/svelte-check errors
-
-**Build Status**: ✅ SUCCESS
-- svelte-check: 0 errors, 70 warnings (CSS unused selectors only)
-- npm run build: ✅ Built successfully in 2.19s
-- npm test: ✅ Tests pass (0 failures)
-
-**Component System**: Production-Ready
-- 7 core components with full TypeScript support
-- Conditional attribute handling for semantic HTML (button vs. a elements)
-- Complete design token integration (16 colors, 112 spacing tokens)
-- Proper svelte:element type safety with conditional attributes
-
-### Design Philosophy
-
-**UX-First Approach**: Prioritize user experience and usability through:
-- Consistent visual language across all components
-- Clear information hierarchy and cognitive load reduction
-- Accessible, WCAG 2.1 AA compliant design
-- Responsive layouts optimized for all screen sizes
-- Fast, intuitive interactions with appropriate feedback
-
-### Design Tokens
-
-#### Color System
-
-**Semantic Colors** (purpose-driven):
-```css
-/* Primary Actions & Brand */
---color-primary-50:  #eff6ff;
---color-primary-100: #dbeafe;
---color-primary-500: #3b82f6;  /* Primary action color */
---color-primary-600: #2563eb;  /* Primary hover */
---color-primary-700: #1d4ed8;  /* Primary active */
-
-/* Success States */
---color-success-50:  #f0fdf4;
---color-success-500: #22c55e;  /* Success indicators */
---color-success-600: #16a34a;
-
-/* Warning States */
---color-warning-50:  #fefce8;
---color-warning-500: #eab308;  /* Warning indicators */
---color-warning-600: #ca8a04;
-
-/* Error States */
---color-error-50:  #fef2f2;
---color-error-500: #ef4444;  /* Error indicators */
---color-error-600: #dc2626;
-
-/* Neutral/Surface Colors */
---color-neutral-50:  #f8fafc;
---color-neutral-100: #f1f5f9;
---color-neutral-200: #e2e8f0;
---color-neutral-300: #cbd5e1;
---color-neutral-400: #94a3b8;
---color-neutral-500: #64748b;
---color-neutral-600: #475569;
---color-neutral-700: #334155;
---color-neutral-800: #1e293b;
---color-neutral-900: #0f172a;
-```
-
-**Dark Theme Palette**:
-```css
---dark-bg-primary:   #0f172a;  /* Main background */
---dark-bg-secondary: #1e293b;  /* Cards, panels */
---dark-bg-tertiary:  #334155;  /* Elevated surfaces */
---dark-border:       #475569;  /* Borders, dividers */
---dark-text-primary:   #f1f5f9;  /* Main text */
---dark-text-secondary: #cbd5e1;  /* Secondary text */
---dark-text-tertiary:  #94a3b8;  /* Muted text */
-```
-
-#### Typography System
-
-**Font Stack**:
-```css
---font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-             'Helvetica Neue', Arial, sans-serif;
---font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
-```
-
-**Type Scale** (optimized for readability):
-```css
-/* Display - Hero sections */
---text-display-size: 3rem;      /* 48px */
---text-display-weight: 700;
---text-display-line: 1.1;
-
-/* Headings */
---text-h1-size: 2.25rem;        /* 36px */
---text-h1-weight: 700;
---text-h1-line: 1.2;
-
---text-h2-size: 1.875rem;       /* 30px */
---text-h2-weight: 600;
---text-h2-line: 1.3;
-
---text-h3-size: 1.5rem;         /* 24px */
---text-h3-weight: 600;
---text-h3-line: 1.4;
-
---text-h4-size: 1.25rem;        /* 20px */
---text-h4-weight: 600;
---text-h4-line: 1.4;
-
-/* Body Text */
---text-body-lg-size: 1.125rem;  /* 18px */
---text-body-size: 1rem;         /* 16px */
---text-body-sm-size: 0.875rem;  /* 14px */
---text-body-xs-size: 0.75rem;   /* 12px */
---text-body-line: 1.6;
-
-/* Labels & UI */
---text-label-size: 0.875rem;    /* 14px */
---text-label-weight: 500;
---text-caption-size: 0.75rem;   /* 12px */
---text-caption-weight: 400;
-```
-
-#### Spacing Scale
-
-**8px Grid System** (consistent rhythm):
-```css
---space-0:  0;
---space-1:  0.25rem;  /* 4px  - Minimal spacing */
---space-2:  0.5rem;   /* 8px  - Tight spacing */
---space-3:  0.75rem;  /* 12px - Comfortable spacing */
---space-4:  1rem;     /* 16px - Default spacing */
---space-5:  1.25rem;  /* 20px - Medium spacing */
---space-6:  1.5rem;   /* 24px - Large spacing */
---space-8:  2rem;     /* 32px - Section spacing */
---space-10: 2.5rem;   /* 40px - Large section spacing */
---space-12: 3rem;     /* 48px - Major section spacing */
---space-16: 4rem;     /* 64px - Page section spacing */
-```
-
-#### Border Radius
-
-```css
---radius-sm:   0.25rem;  /* 4px  - Subtle rounding */
---radius-md:   0.375rem; /* 6px  - Default rounding */
---radius-lg:   0.5rem;   /* 8px  - Prominent rounding */
---radius-xl:   0.75rem;  /* 12px - Large cards */
---radius-2xl:  1rem;     /* 16px - Modal, panels */
---radius-full: 9999px;   /* Circular */
-```
-
-#### Shadows & Elevation
-
-```css
-/* Subtle depth */
---shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
---shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1),
-             0 1px 2px -1px rgba(0, 0, 0, 0.1);
-
-/* Standard elevation */
---shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-             0 2px 4px -2px rgba(0, 0, 0, 0.1);
-
-/* Prominent elevation */
---shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-             0 4px 6px -4px rgba(0, 0, 0, 0.1);
-
-/* Maximum elevation */
---shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-             0 8px 10px -6px rgba(0, 0, 0, 0.1);
-
-/* Dark theme shadows (stronger) */
---shadow-dark-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
---shadow-dark-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
---shadow-dark-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-```
-
-#### Animation & Transitions
-
-```css
-/* Duration */
---duration-fast:   150ms;  /* Quick feedback */
---duration-normal: 200ms;  /* Default transitions */
---duration-slow:   300ms;  /* Deliberate animations */
-
-/* Easing Functions */
---ease-in:     cubic-bezier(0.4, 0, 1, 1);
---ease-out:    cubic-bezier(0, 0, 0.2, 1);
---ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
---ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-/* Common Transitions */
---transition-colors: color var(--duration-fast) var(--ease-in-out),
-                     background-color var(--duration-fast) var(--ease-in-out),
-                     border-color var(--duration-fast) var(--ease-in-out);
---transition-transform: transform var(--duration-normal) var(--ease-out);
---transition-all: all var(--duration-normal) var(--ease-in-out);
-```
-
-### Component Library
-
-#### Button Components
-
-**Variants**:
-- `primary` - Main actions (blue)
-- `secondary` - Secondary actions (gray)
-- `success` - Positive actions (green)
-- `danger` - Destructive actions (red)
-- `ghost` - Minimal styling
-
-**Sizes**:
-- `sm` - Compact buttons (32px height)
-- `md` - Default buttons (40px height)
-- `lg` - Prominent buttons (48px height)
-
-**States**:
-- Default, Hover, Active, Focus, Disabled, Loading
-
-#### Card Components
-
-**Types**:
-- `surface` - Basic container
-- `elevated` - With shadow
-- `interactive` - Hover effects for clickable cards
-- `bordered` - With border instead of shadow
-
-#### Input Components
-
-**Types**:
-- Text input, Textarea, Select, Checkbox, Radio, Toggle
-- **States**: Default, Hover, Focus, Error, Disabled
-- **Features**: Label, Helper text, Error message, Icon support
-
-#### Navigation Components
-
-**Types**:
-- Header bar with status indicators
-- Tab navigation
-- Breadcrumbs
-- Side navigation
-
-#### Feedback Components
-
-**Types**:
-- Toast notifications (4 variants: success, warning, error, info)
-- Modal dialogs
-- Loading spinners
-- Progress bars
-- Skeleton loaders
-
-### Layout Patterns
-
-#### Responsive Breakpoints
-
-```css
---breakpoint-sm:  640px;   /* Mobile landscape */
---breakpoint-md:  768px;   /* Tablet */
---breakpoint-lg:  1024px;  /* Desktop */
---breakpoint-xl:  1280px;  /* Large desktop */
---breakpoint-2xl: 1536px;  /* Ultra-wide */
-```
-
-#### Grid System
-
-- 12-column responsive grid
-- Flexible gap spacing (using spacing scale)
-- Auto-responsive columns with `minmax()`
-
-### Accessibility Standards
-
-**WCAG 2.1 AA Compliance**:
-- Minimum 4.5:1 contrast ratio for normal text
-- Minimum 3:1 contrast ratio for large text (18px+)
-- All interactive elements keyboard accessible
-- Proper ARIA labels and roles
-- Focus indicators on all interactive elements
-- Semantic HTML structure
-
-**Focus Management**:
-```css
---focus-ring: 0 0 0 3px var(--color-primary-500);
---focus-ring-offset: 2px;
-```
-
-### Usage Guidelines
-
-**Component Implementation**:
-1. Use design tokens for ALL styling (no hardcoded values)
-2. Follow spacing scale for margins/padding
-3. Use semantic colors (e.g., `--color-error-500` not `#ef4444`)
-4. Apply consistent border radius from token system
-5. Use shadow tokens for elevation
-
-**Responsive Design**:
-1. Mobile-first approach
-2. Test at all breakpoints
-3. Touch targets minimum 44x44px
-4. Consider different orientations
-
-**Performance**:
-1. Minimize DOM depth in components
-2. Use CSS animations over JavaScript when possible
-3. Lazy load components below the fold
-4. Optimize images and assets
-
----
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        User Interface                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Video     │  │   Face      │  │   Contestant            │  │
-│  │   Player    │  │   Overlay   │  │   Selector              │  │
-│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
-└─────────┼────────────────┼─────────────────────┼────────────────┘
-          │                │                     │
-          ▼                ▼                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Cloudflare Worker API                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ /api/videos  │  │ /api/faces   │  │ /api/embeddings      │  │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬──────────┘  │
-└─────────┼────────────────┼───────────────────────┼──────────────┘
-          │                │                       │
-          ▼                ▼                       ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
-│   R2 Bucket     │ │   KV Store      │ │   HuggingFace XET       │
-│   (Videos)      │ │   (Metadata)    │ │   (Embeddings/Data)     │
-└─────────────────┘ └─────────────────┘ └─────────────────────────┘
-                                                  │
-                                                  ▼
-                           ┌─────────────────────────────────────┐
-                           │          Modal.com GPU               │
-                           │   • Face Detection                   │
-                           │   • Embedding Generation             │
-                           │   • Video Annotation                 │
-                           └─────────────────────────────────────┘
-```
-
----
-
-## Verification Commands
-
-```bash
-# Check deployed videos
-curl -s "https://mv.herballemon.dev/api/videos" | jq .
-
-# Check recognition timeline
-curl -s "https://mv.herballemon.dev/api/videos/{id}/timeline" | jq .
-
-# Check flagged faces
-curl -s "https://mv.herballemon.dev/api/faces/flagged" | jq .
-
-# Check system status
-curl -s "https://mv.herballemon.dev/api/system/status" | jq .
-```
-
----
-
-## Critical Files
-
-**DO NOT DELETE:**
-- `metadata/contestant_info.csv` - Essential contestant database (96 records)
-- `source/photo/contestants/` - Face photos and embeddings
-- `mvp-processor/` - Primary frontend (SvelteKit)
-
-**See CLAUDE.md for detailed warnings about file preservation.**
-
----
-
-## Visual language — 點唱單 / 存根 (2026-10)
-
-The public viewer and the local back office share one visual world: a **carbonless
-request slip**. The product's mechanism is "a name filed against a timestamp", and a
-radio dedication slip is exactly that object, so the UI is the form rather than a
-dashboard. The viewer is the **第二聯 (copy 2)** — public, read-only. The admin is the
-**存根 (office copy)** — the writable retained stub.
-
-Recorded in `apps/viewer/.impeccable/surfaces/` and `apps/admin/.impeccable/surfaces/`;
-the Paper comps are `MV Face Recognition — Redesign (點唱單)`.
-
-### Tokens
-
-| Token | Viewer | Admin | Role |
-|---|---|---|---|
-| `--color-paper` | `#f2e8bc` | `#ede3b6` | the form ground (canary NCR paper) |
-| `--color-paper-light` | `#faf3d7` | `#faf3d7` | a slip laid on top; selected row |
-| `--color-paper-dark` | `#ede3b6` | `#e7dbab` | the spine, table headers |
-| `--color-paper-deep` | `#e7dbab` | `#dccd96` | punched-hole shadow, pressed state |
-| `--color-copy` | `#c6dae9` | `#c6dae9` | the carbon copy (viewer queue rail) |
-| `--color-carbon` | `#2b2f6b` | `#2b2f6b` | carbon ink: rules, labels, secondary type |
-| `--color-carbon-deep` | `#1f2455` | `#1f2455` | filled-in handwriting, headings |
-| `--color-carbon-soft` | `#4a4f8c` | `#4a4f8c` | tertiary text |
-| `--color-stamp` | `#ae3b2c` | `#ae3b2c` | rubber-stamp red: active, destructive, primary action |
-| `--color-ledger` | `#8a857a` | `#8a857a` | ledger grey: metadata, low confidence |
-
-Faces: `Noto Serif TC` 900 for printed form headings, `LXGW WenKai TC` 700 for
-handwriting (every name, every filled field), `JetBrains Mono` for timecodes, counts and
-cosines, `Noto Sans TC` for body.
-
-### Rules
-
-- **No rounding, no shadows, no pills, with two deliberate exceptions.** 1px carbon rules; rubber stamps get a 2px border (and a 4px corner radius) because a stamp is a raised object; punched holes are round (22px circles with an inset shadow) because a hole is round. Holes are the only intended shadow-like inset; everything else stays square and flat.
-- **A band is a stamp, not a colour.** `bandFor()` maps to 清楚 / 尚可 / 存疑, struck at
-  −2° with a bordered mark. Never a percentage: the raw cosine is the tooltip.
-- **States are marks on paper**: 待核 / 已核對 / 作廢 / 需重算 / 唯讀.
-- **The viewer is provably read-only.** It carries a 唯讀 stamp and writes nothing; every
-  write lives in the admin.
-- Routes are folios: viewer `01 圖庫 · 02 播放 · 03 名冊 · 04 紀錄`; admin `02 存根` with a filing
-  cabinet for 核對 / 資料 / 生產.
-
-## Sharpened 存根 redesign (2026-11)
-
-Implemented in `apps/`; designs are in `webui.pen` (gitignored), with images in
-`source/photo/contestants/design_crops/` (gitignored, 73 MB). This section supersedes the
-2026-10 rules above wherever they conflict.
-
-- Spine, folio numbers and tracked Latin labels are gone. Page hints sit under the title.
-- Type sizes: 12, 13-14, 15, 18, 28, 32 (wordmark 16). Nothing under 12px.
-- `LXGW WenKai TC` for text and `JetBrains Mono` for figures. Weight 400; 700 for active
-  states, the primary button and the wordmark.
-- New tokens: ground `#fbf6e3`, tint `#f4edcf`, ink-muted `#68645a` (ledger grey fails
-  contrast on paper).
-- Radii: 6 on controls, 4 on faces, 2 on stamps. No shadows except modals.
-- The raw cosine sits beside the band stamp, not only in a tooltip.
-- Only 已核對 and human decisions tilt. Band and quality stamps are upright.
-- Red means action, selection or missing. 偏弱 is muted.
-- Icons: `lucide-react`. Stamp tones live on `BAND_STAMP` in `apps/shared/lib/bands.ts`.
-- Merged with #99 by one rule: the look comes from this redesign, the behaviour from #99. The
-  12px floor stands; #99's 11px floor does not.
-- The 標註 sheet is docked, so it is a labelled region, not a modal dialog: no focus trap, and
-  closing it moves focus nowhere, so Esc then Backspace can't clear a tile's label.
-- 2026-11 Admin edge polish: on `mode: edge` (`useIsEdge`) the 向量 coverage buttons are disabled, the local-only write footer is hidden, the 處理 reel picker stacks above its button, and a flag with confidence 0/null shows no score. Gates (shared/admin/viewer check, vp check, vp test, builds, check-shared-css) pass.
-- Test clips: `useVideos` hides them through `isTestClip` unless a caller passes `includeTests`.
-  The viewer never does; admin 儀表, 待核, 標註, 播放 and 管理 do.
-
-### TODO
-
-- [ ] Store a decision time on flags: 最近核對 can only sort by filing time.
-- [x] Flags with confidence 0 or null (unrecognised faces) show no score, stamp or ruler (`flagScore`, 2026-11).
-- [ ] The local API's `/api/contestants/N/thumb/face` returns full 2048px stills, slowly, and 200
-      with no references, so 缺 contestants get an image (the deployed copy is a 512px WebP crop).
-- [ ] 名冊 counts Sarah and TABI as 有相 although they have no references.
+### Flags and admin UI
+
+- [ ] Store a decision time on flags; 最近核對 (the dashboard's recently-decided list) can only
+      sort by filing time.
+- [ ] Add a warning to the deployed 處理 screen that job output stays in the HF bucket until the
+      pull-back script exists.
+- [ ] One accepted-flags document per reel, so a read is one get instead of a list per 200 ms
+      poll, and the 200 limit stops being a global count (see Known state, `FLAG_READ_CEILING`).
+      KV has no compare-and-swap, so concurrent accepts can race.
+- [ ] The local API's `/api/contestants/N/thumb/face` returns full 2048 px stills, and returns
+      HTTP 200 even for a contestant with no references, so 缺 contestants get an image (the
+      deployed copy is a 512px WebP crop).
+- [ ] 名冊 counts 67 (Sarah) and 77 (TABI) as 有相 although they have no references.
 - [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
-- [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on
-      參賽者 read as 沒有出場.
-- [x] Accepted flags show at read time: `/api/faces/detect` and dense metadata, in the Worker and
-      `local_api.py`, overlay them on detections as served, and the face stamps a tilted 已核對
-      with no cosine or band. Stored metadata is untouched, so rejecting or re-pending undoes it.
-      These reads are `no-store`; KV itself can lag a decision by up to about 60s.
-      The overlay also moves the appearance: `contestant_timeline`, `processing_summary`,
-      `recognitions_count` and `/api/recognition/results` are recounted per reel as served, so
-      紀錄 and the player agree. Appearances are complete in the timeline, so this is exact and reads
-      no other reel; a reel with no flag landing is served verbatim, with no parse.
-- [ ] Accepted-flag limits: a flag covers one detection, not its track. Cross-reel figures
-      (`contestants_structured`, `embedding_coverage`: 首頁, 名冊, 儀表, 工作台) stay as published
-      until the next publish, since an exact average needs every reel per read. `timeline_markers`
-      and `match_score_stats` exist only in local runs, have no reader, and stay as stored. The
-      Worker gets at most 200 flags per request (`FLAG_READ_CEILING`).
-- [x] Public reads get only the flags they need: `putFlag` keeps `video_id` and `status` in KV key
-      metadata, so the list rules out everything not accepted for the reel, and the legacy array is
-      fetched only if listed. No or malformed metadata means read the flag; the value still decides.
-      Every public read still costs one KV list per 1000 flag keys. Upgrade: one accepted-flags
-      document per reel, so a read is one get and no list.
-- [x] The 4 production flags written before this got their metadata by a one-off rewrite on
-      2026-11-05, contents unchanged. The fallback stays for any key without metadata. Reads never
-      backfill: the public surface stays read-only.
-- [x] 處理 on the deployed Admin must name a reel: each one is a paid run and the Worker refuses a
-      bare `initial` (ADR 0006). The copy there no longer describes the local machine, and job rows
-      count videos correctly. A new reference set changes nothing until a reel is reprocessed.
-- [x] Face detection speed on `cpu-upgrade`: ONNX Runtime's default made 282 threads under an 8-CPU
-      cap. `create_face_app` now sets 8 threads and loads only detection and recognition: 14x faster
-      `app.get()` on 60 reel 4 frames (195s to 14s), with identical boxes and detection scores.
-      `INSIGHTFACE_THREADS` overrides the count for another flavor. Full reel 4 (job
-      `6aed1ae70e0338d1bb80cab3`): detection 526s against 5,911s and 9,001s in the two earlier
-      runs, with all 6,339 boxes, scores, tracks and names identical to the 5 November run.
-- [x] Every detection's embedding is kept in `<reel>_embeddings.npz` next to the metadata
-      (`frame_number`, `detection_index`, `embeddings`), so reference and threshold experiments can
-      re-score without re-detecting, keeping boxes and track ids. 7 to 17 MB a reel. On all 5 reels,
-      re-scoring from the file gave the same contestant for every frame match. Reels 1, 2, 3 and 5
-      are in the bucket at `runs/2026-11-06-embeddings/` (reel 4 is in `output/4`), not published.
-      Against the runs the labels are tied to: each of the 181 labelled tracks maps whole onto one
-      new track and no labelled track's claim changes. Reels 2 to 5 keep over 99% of boxes and
-      their labelled track ids; reel 1 keeps 61% of boxes and renumbers 12 of its 22 labelled
-      tracks, and gains 322 recognitions. Unmatched embeddings still go to `../data/unmatched_faces`, which
-      on HF Jobs is lost with the job's temporary checkout.
-- [x] `mvp-processor/scripts/rescore_run.py` re-scores a run from its embedding file. Control with
-      the same 831 references: 0 of 26,798 detections change, smoothing included. Of the 181
-      labelled tracks: 102 right, 5 misnamed, 4 missed, 66 strangers left unnamed, 4 `unsure`
-      (excluded).
-- [x] Rescuing group photos does not help, so it was not adopted. From each of the 232 multi-face
-      photos, take the one face that matches its contestant's references, by cosine and margin
-      over other contestants. Three rules added 94, 146 and 159 references (925 to 990). Every
-      labelled track outcome stayed the same; one labelled box gained a correct name. Recognitions
-      rose from 8,475 to 8,570, 8,616 and 8,630, and named tracks from 1,252 to 1,265, 1,276 and
-      1,278, none of the extra tracks labelled. The thin contestants barely moved (60: 2 to 3 refs;
-      67 and 77: 2), because a face must match references they barely have. The labels can't show
-      much gain: only 5 misnamed and 4 missed tracks are in the sample.
-- [x] Bucket 720p for reels 1 to 3 had no `moov` atom. Replaced from local copies and verified by
-      hash; originals in `local_output/snapshots/pre-720p-fix-20261106`.
-- [x] `mvp-processor/scripts/carry_labels.py` moves a label set onto a newer run by box (same frame,
-      IoU >= 0.5), refusing a track that split or took another track's boxes. Labels exist in two
-      stores: local files hold 181 and Worker KV holds 26 more, tied to the same runs with no
-      conflicts. All 207 carried, 0 refused; every labelled track has coverage 1.0 and no boxes from
-      another track. On the new runs: 120 right, 6 misnamed, 9 missed, 67 strangers unnamed, 1 wrong box,
-      4 `unsure`. All 9 accepted flags (6 local, 3 KV) land on exact boxes; the local reel 1 flag
-      missed the 1 November run and lands again here.
-- [x] Reels 1, 2, 3 and 5 promoted to bucket `output/` (metadata, embeddings, thumbnails, galleries)
-      with carried labels at `output/<id>/labels/`, reel 4's labels too. Renditions untouched.
-      Before: `runs/pre-promote-20261106` and `local_output/snapshots/pre-promote-20261106`.
-      Only the bucket moved: `local_output/` and Worker KV still hold the old runs and labels, so
-      labelling there would not reach the carried sets.
-- [x] New runs and carried labels copied into `local_output/`; old files in
-      `local_output/snapshots/pre-local-sync-20261106`. The local API serves all 207 labels without a
-      409. Worker KV still holds the old runs and labels, so label locally until a publish.
-- [ ] Ticket 020: 54 tracks to label, listed in `local_output/labelling/ticket-020-sample.json`. See
-      the ticket for current precision. `/admin/labelling?video=<id>&tracks=1,2,3` opens a sample.
-- [ ] Face toolchain review, checked 2026-11-05. Locked: InsightFace 0.7.3 (latest 2.1), ONNX
-      Runtime 1.23.0 (1.31.1), OpenCV 4.11 (5.0), supervision 0.31.1 (0.31.4), lap 0.5.13 (0.5.14);
-      `trackers` 2.6.1 is current. No upgrade until step 1 is done, so one change moves at a time:
-  - [x] 1. Reel 4 comparison on the rebuilt references (job `6aeb804ac78863f9c632de85`): no gain.
-        Named faces 1,793 to 1,783, none reassigned; 19 right / 2 unnamed / 1 wrong of 22 labelled
-        contestant tracks in both runs. The 23 October run also loaded 831 references, so the
-        rebuild probably added nothing. Not published: a new `processing_date` makes the Worker
-        refuse the reel's labels with a 409 (41 live, 92 in the local file; difference unexplained).
-  - [ ] 2. Upgrade to InsightFace 2.1, keeping `buffalo_l`. Checked on 120 reel 4 frames on CPU
-        against 0.7.3: all 251 faces have identical boxes and detection scores, embedding cosine
-        at least 0.99999. A full reel 4 against the labelled 21 October run: 6,248 of 6,339 boxes,
-        6,333 tracks and 6,327 names the same by position. Still to do: one GPU job. 2.1 no longer brings in
-        scikit-learn (`cluster_unmatched.py` needs it, now direct) or `opencv-python-headless`,
-        so OpenCV is 4.11 only; it decoded those frames the same as the 4.13 it was shadowed by.
-        Accepted flags match on exact boxes, and a rerun moves some boxes even with no upgrade (85
-        of 6,339 on reel 4), so after each reprocess and publish check that every accepted flag
-        still shows its correction in 播放. Today: Marf on reel 1, 榛綦 and Alice on reel 3.
-  - [ ] 3. Test `raccoon_l` and PersonAnalysis (face plus body matching) on one reel against the
-        標註 labels. Adopting one means new references, all 5 reels reprocessed, score bands
-        recalibrated, and accepted flags re-checked, because they match on exact boxes.
-  - [x] Bump supervision to 0.31.4 and lap to 0.5.14: replaying all 5 reels' stored detections
-        through ByteTrack gives identical tracks (26,795 faces).
-  - [ ] Check whether Ultralytics and PyTorch can go: no import in `src`, `scripts/hf` or
-        `scripts/publish`; tests and other scripts not checked.
-  - [ ] Run `pip-audit`: security advisories not checked.
-  - [ ] Licence: InsightFace code is MIT, but its pretrained models are non-commercial research
-        only, and its README says `buffalo_l` now needs contacting them for licensing. Applies today,
-        upgraded or not. Get it checked if the public site is or may become commercial.
-- [x] Renditions encode with the `imageio-ffmpeg` binary, not moviepy (its `pillow<12` cap blocked
-      the Pillow fixes). Pillow 13 needs Python 3.11, so `mvp-processor` requires it. A failed encode
-      now raises and leaves nothing. Full reel 4 job: all 6,339 detections match the promoted run.
-      Reel 4 720p against source: 8,699 frames, mean PSNR 47.95 dB (moviepy 41.58). Renditions
-      already in the bucket were not re-encoded.
-- [ ] Variable frame rate sources: overlay time is `frame_count / fps` (`video_processor.py`), but
-      the encode keeps the source timestamps, so overlays would drift on a VFR reel (1.4s on a
-      synthetic clip; moviepy was off too, by less). Five of six library videos are 25/25 fps, and
-      the sixth, `test-video-mv2`, averages 25.03 with no timing change. Check `r_frame_rate` against
-      `avg_frame_rate` before adding a new reel.
-- [ ] Root `requirements.txt` keeps Pillow below 13 because `gradio` caps it. Only
-      `DEPLOYMENT_GUIDE.md` mentions that file and CI does not install it; retire it or drop gradio.
+- [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on 參賽者 read
+      as 沒有出場.
 - [ ] Draw and implement designs for states still only styled by analogy.
 - [ ] Viewer 播放 `待播` thumbnails seek the video one at a time: pre-make crops into R2 at
       publish, which `/api/faces/crop` already serves.
-- [x] Portraits are requested through `/cdn-cgi/image` at 64/256/512px via `portraitSrc`
-      (`apps/shared/lib/portrait.ts`, deployed host only, falls back to the original on error).
-      Stream stays parked until viewers report playback problems.
 
-The published reel list now carries `duration` and `height`. `height` is the served rendition's
-(1080 for `_1080p` encodes), so the public 首頁 reads 1080P while local dev reads the source's.
+### Pipeline and data
+
+Publish first, in order: (1) with the user's go, publish the 2026-11-06 runs
+(`publish:metadata:remote` + `upload-to-r2.js`); (2) write the 207 merged labels to KV, one
+`labels_<video_id>` per reel (about 5 `wrangler kv key put` calls, no script yet); (3) re-check
+Marf (reel 1), and 榛綦 and Alice (reel 3), in 播放; (4) label ticket 020 on the deployed admin.
+After that, KV is the only label writer.
+
+If pooled precision is below 95% (ticket 020), these run in order: photo sync -> HF output
+pull-back (only when the reprocess ran on HF Jobs; `rescore_run.py` runs locally) -> rescore or
+reprocess -> carry labels (`carry_labels.py`) and flags -> publish. On a fail:
+
+- [ ] Reference photos exist both locally and in the HF bucket, with no sync. A local reference
+      change does not reach a deployed 處理 run.
+- [ ] Bring HF Jobs output back: a script that copies `output/<video_id>/` from the HF bucket into
+      `local_output/`, so a deployed 處理 run can be published.
+- [ ] After a reference-set or threshold change, re-score with `rescore_run.py` instead of a paid
+      reprocess; keep reprocessing for detector or tracker changes. Needs: the `_embeddings.npz`
+      present for every reel, a model-version stamp pairing it with the references, and a run
+      identity for a rescore so the `processing_date` 409 can tell it from a reprocess.
+- [ ] Carry accepted flags onto a new run the way `carry_labels.py` carries labels (same frame,
+      IoU >= 0.5, refuse when ambiguous). Report flags that don't carry in the `publish:metadata`
+      dry run, and have `:remote` refuse to publish until they are resolved. Needed on the
+      reprocess path (curation, InsightFace upgrade), not for the 2026-11-06 publish, where
+      re-checking the 3 flags in 播放 is enough.
+
+Not conditional on a fail:
+
+- [ ] Publish the 2026-11-06 runs and write the merged 207 labels to KV (steps 1 and 2 above).
+      Publishing detaches accepted flags whose boxes moved, hence step 3. Before any later
+      reprocess, export KV labels, carry them with `carry_labels.py`, and write them back.
+- [ ] Copy `local_output/labels/` to the HF bucket. No longer urgent once the labels are in KV,
+      which then holds a second copy; the full backup is the TODO below.
+- [ ] Ticket 020: label the sample in `local_output/labelling/ticket-020-sample.json`, extended
+      with ~10 randomly drawn claimed tracks per reel (fixed seed, reusing existing labels), on
+      the deployed admin after the publish, and record the result against the gate. See
+      [ticket 020](docs/wayfinder/tickets/020-sample-claimed-tracks-on-the-0-412-batch.md).
+- [ ] Variable frame rate sources: overlay time is `frame_count / fps` (`video_processor.py`) but
+      the encode keeps source timestamps, so a VFR reel would drift (1.4s on a synthetic clip).
+      Check `r_frame_rate` against `avg_frame_rate` before adding a reel.
+- [ ] Root `requirements.txt` keeps Pillow below 13 because `gradio` caps it. Only
+      `DEPLOYMENT_GUIDE.md` mentions that file and CI does not install it; retire it or drop gradio.
+- [ ] Unmatched embeddings still go to `../data/unmatched_faces`, which is lost with an HF Job's
+      temporary checkout.
+- [ ] Back up the reference photos and local-only artifacts (`local_output/`, local label files).
+
+### Face toolchain review
+
+Checked 2026-11-05; latest: InsightFace 2.1, ONNX Runtime 1.31.1, OpenCV 5.0.
+
+- [ ] Upgrade to InsightFace 2.1, keeping `buffalo_l`. On 120 reel 4 frames on CPU all 251 faces
+      match 0.7.3 in boxes and scores, embedding cosine >= 0.99999. Full reel 4 against the
+      labelled 21 October run (historical: made before the 2026-11-06 runs): of 6,339 detections,
+      6,248 have the same box, 6,333 the same track and 6,327 the same name, matched by position.
+      Parity bar for adopting: all 6,339 detections match by position, or the run's labels give
+      the same precision. Still to do: one GPU job. 2.1 no longer brings in scikit-learn or
+      `opencv-python-headless`. Carry labels and flags first (see the TODOs "Publish the
+      2026-11-06 runs" and "Carry accepted flags onto a new run").
+- [ ] Test `raccoon_l` and PersonAnalysis (face plus body) on one reel against the 標註 labels.
+      Adopting one means new references, all 5 reels reprocessed, bands recalibrated, and accepted
+      flags re-checked.
+- [ ] Check whether Ultralytics and PyTorch can go: no import in `src`, `scripts/hf` or
+      `scripts/publish`; tests and other scripts not checked.
+- [ ] Run `pip-audit`; advisories not checked.
+- [ ] Licence (see Known state): get it checked if the public site is or may become commercial.
+
+### Code health
+
+- [ ] Data paths are cwd-relative `Path("../...")` (`local_api.py`, `process_video.py`,
+      `mvp-processor/scripts/*`), so they break when run from the repo root. Anchor them on
+      `Path(__file__)` in one shared module.
+- [ ] Not in `processing_config.yaml`: track activation 0.25 (`process_video.py`), cluster
+      `distance_threshold=0.8` (`cluster_unmatched.py`), `det_size` 640 (`face_detector.py`).
+- [ ] `FaceRecognizer.recognize_faces_batch` (`face_detector.py`) has no production caller;
+      [ticket 002](docs/wayfinder/tickets/002-choose-the-matching-strategy.md) chose not to adopt
+      it. Delete it and its tests (`test_face_detector.py`).
+- [ ] `Player.tsx`: `mode === 'admin' | 'viewer'` branches could be capability
+      props; the single and batch flag POSTs are near copies and the batch one awaits
+      sequentially.
+- [ ] `Contestants.tsx`: derive `stats` from `appearances` instead of resetting parallel state
+      in three places.
+- [ ] `ContestantTimeline`: move the playhead into its own component so `currentTime` stops
+      re-rendering every row.
+- [ ] Cache the flag overlay in-isolate, or lower the admin poll rate, and make a failed overlay
+      read visible (a header or the admin UI), not only a log line.
+
+### Tests
+
+- [ ] Root `tests/` has 140 failures and 17 errors, recorded as a baseline in
+      `.github/workflows/test.yml`; `mvp-processor` unit tests pass (124, plus one error where
+      `pytest-benchmark` is missing). Make both suites gating.
+- [ ] No tests for the Player, `apps/admin` or `apps/viewer` pages; `apps/shared` has tests for
+      its `lib/` and a few components only.
+
+### Later
+
+- [ ] Error tracking and retry alerts for processing jobs.
+- [ ] Rate limiting and an input-validation pass on Worker endpoints (`RateLimitError` exists in
+      `worker/src/lib/errors.ts`, nothing applies it).
+- [ ] Touch and accessibility pass on the video player.
