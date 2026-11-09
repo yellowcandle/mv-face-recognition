@@ -452,7 +452,8 @@ export function Processing() {
     }
   }
 
-  const unavailableBecauseProcessing = !jobsAvailable || isProcessing;
+  // Until the mode is known the local and cloud controls differ, so nothing can be started.
+  const unavailableBecauseProcessing = !jobsAvailable || isProcessing || edge === undefined;
   const startingLabel = '啟動中…';
 
   return (

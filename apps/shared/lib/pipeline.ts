@@ -33,13 +33,16 @@ export function jobStatusLabel(status: string): string {
 
 /** The line under a job's name: which reel, and how far through the batch. */
 export function jobProgressLine(job: {
+  mode?: string;
   current_video?: string | null;
   videos_processed?: number;
   total_videos?: number;
 }): string | null {
   const parts: string[] = [];
   if (job.current_video) parts.push(videoShortName(job.current_video));
-  if (job.videos_processed !== undefined && job.total_videos) {
+  // Only a reel job processes videos; the others inherit a total of 1 and would read "0 / 1".
+  const countsVideos = !job.mode || job.mode === 'initial';
+  if (countsVideos && job.videos_processed !== undefined && job.total_videos) {
     parts.push(`${job.videos_processed} / ${job.total_videos} 部影片`);
   }
   return parts.length > 0 ? parts.join(' · ') : null;
