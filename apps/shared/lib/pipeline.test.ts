@@ -46,7 +46,12 @@ describe('jobProgressLine', () => {
       jobProgressLine({ mode: 'embedding-update', videos_processed: 0, total_videos: 1 }),
     ).toBeNull();
     expect(
-      jobProgressLine({ mode: 'initial', current_video: name, videos_processed: 1, total_videos: 1 }),
+      jobProgressLine({
+        mode: 'initial',
+        current_video: name,
+        videos_processed: 1,
+        total_videos: 1,
+      }),
     ).toBe('次部曲 · 1 / 1 部影片');
   });
 
