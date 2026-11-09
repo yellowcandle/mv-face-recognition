@@ -41,6 +41,15 @@ describe('jobProgressLine', () => {
     expect(jobProgressLine({ videos_processed: 0, total_videos: 5 })).toBe('0 / 5 部影片');
   });
 
+  it('has no count for a job that processes no videos', () => {
+    expect(
+      jobProgressLine({ mode: 'embedding-update', videos_processed: 0, total_videos: 1 }),
+    ).toBeNull();
+    expect(
+      jobProgressLine({ mode: 'initial', current_video: name, videos_processed: 1, total_videos: 1 }),
+    ).toBe('次部曲 · 1 / 1 部影片');
+  });
+
   it('has no line when neither is known, or the total is zero', () => {
     expect(jobProgressLine({})).toBeNull();
     expect(jobProgressLine({ videos_processed: 0, total_videos: 0 })).toBeNull();
