@@ -40,7 +40,7 @@ export function Cast() {
   const withPhoto = all.filter((c) => c.portrait_url || c.reference_count > 0).length;
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-4 px-14 pb-5 pt-8">
+    <div className="flex min-h-full flex-1 flex-col gap-4 px-4 pb-5 pt-6 sm:px-14 sm:pt-8">
       <Masthead title="名冊" hint="參賽者、參考照與出場次數">
         <span className="tabular-nums text-carbon-soft">
           {all.length} 位 · {withPhoto} 有相
@@ -48,8 +48,8 @@ export function Cast() {
         <Stamp tone="muted">唯讀</Stamp>
       </Masthead>
 
-      <div className="flex flex-row items-center gap-3">
-        <div className="relative w-[420px]">
+      <div className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="relative w-full sm:w-[420px]">
           <Search
             size={16}
             aria-hidden="true"
@@ -142,7 +142,7 @@ export function Cast() {
         </div>
       )}
 
-      <div className="mt-auto flex flex-row items-center justify-between font-kai text-[12px] text-ink-muted">
+      <div className="mt-auto flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 font-kai text-[12px] text-ink-muted">
         <span>相片來源：精選歷史相片集 · 臉部裁切為衍生縮圖</span>
         <span>唯讀檢視 · 所有改動在後台</span>
       </div>

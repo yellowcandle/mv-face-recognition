@@ -27,10 +27,12 @@ const BAND_DOT: Record<Band, string> = {
 const LOOK = {
   admin: {
     root: 'px-8',
+    scroller: 'min-h-0 flex-1 overflow-y-auto',
     select: 'field field-select w-[260px]',
     figures: 'border-b pb-4',
     head: ['編號', '參賽者', '出場次數', '平均分', '最高分', '出場時段'],
     widths: ['w-11', '', 'w-[88px]', 'w-28', 'w-28', 'w-61'],
+    narrow: '',
     row: 'h-10',
     who: 'gap-2',
     realName: 'text-[12px]',
@@ -39,11 +41,22 @@ const LOOK = {
     dash: '–',
   },
   viewer: {
-    root: 'px-14',
-    select: 'field field-select h-10 w-[260px] text-[14px] text-carbon-deep',
-    figures: 'border-y py-3',
+    // Phones let the page scroll instead of boxing the table into a few rows.
+    root: 'px-4 max-sm:h-auto max-sm:pt-6 sm:px-14',
+    scroller: 'sm:min-h-0 sm:flex-1 sm:overflow-y-auto',
+    select: 'field field-select h-10 w-[260px] max-w-full text-[14px] text-carbon-deep',
+    figures: 'border-y py-3 max-sm:grid-cols-2 max-sm:gap-y-3',
     head: ['編號', '參賽者', '出場', '平均', '最高', '出現時段'],
-    widths: ['w-13', '', 'w-25', 'w-35', 'w-35', 'w-45'],
+    // 最高 and 出現時段 drop on phones so 參賽者 keeps room for a name.
+    widths: [
+      'w-10 sm:w-13',
+      '',
+      'w-12 sm:w-25',
+      'w-24 sm:w-35',
+      'max-sm:hidden sm:w-35',
+      'max-sm:hidden sm:w-45',
+    ],
+    narrow: 'max-sm:hidden',
     row: 'h-9',
     who: 'gap-2.5',
     realName: 'text-[13px]',
@@ -276,7 +289,7 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
           這卷影片沒有可核對的紀錄。
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className={look.scroller}>
           <table className="w-full table-fixed border-separate border-spacing-0">
             <thead className="sticky top-0 z-10 bg-ground">
               <tr className="h-7">
@@ -332,7 +345,7 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
                         decided={r.decided}
                       />
                     </td>
-                    <td className={cell}>
+                    <td className={`${cell} ${look.narrow}`}>
                       <Score
                         value={r.maxMatchScore}
                         label="最高"
@@ -340,7 +353,7 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
                         decided={r.decided}
                       />
                     </td>
-                    <td className={cell}>
+                    <td className={`${cell} ${look.narrow}`}>
                       <span className="flex items-center justify-end gap-2">
                         {span ? (
                           <span className="relative h-2 w-[120px] shrink-0 overflow-hidden rounded-xs bg-tint">
@@ -371,11 +384,11 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
 
       {variant === 'viewer' ? (
         <>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
             <span className="font-kai text-[12px] text-ink-muted">分級</span>
             {legend}
           </div>
-          <div className="flex justify-between font-kai text-[12px] text-ink-muted">
+          <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 font-kai text-[12px] text-ink-muted">
             <span>分級為暫定值，依實測誤配率調整</span>
             <span>唯讀檢視 · 所有改動在後台</span>
           </div>

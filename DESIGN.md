@@ -198,6 +198,10 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
   fails on any public write.
 - No spine, folio numbers or tracked Latin labels. Page hints sit under the title.
 - Icons: `lucide-react`.
+- The viewer is mobile-first down to 320 px (2026-11-12). Gutters are `px-4` and become `sm:px-14`.
+  Side columns (首頁 tally, 播放 queue) stack below the main column until `lg`. The header shows
+  `MV` and drops the nav icons below `sm`. 紀錄 drops 最高 and 出現時段 on phones, and the page
+  scrolls instead of the table. The admin stays desktop-only. `Masthead` wraps its right slot.
 - The 標註 sheet is docked, so it is a labelled region, not a modal: no focus trap, and closing it
   moves focus nowhere, so that Esc then Backspace can't clear a tile's label.
 

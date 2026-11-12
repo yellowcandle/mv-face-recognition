@@ -14,7 +14,7 @@ interface MastheadProps {
 export function Masthead({ title, hint, align = 'end', children }: MastheadProps) {
   return (
     <div
-      className={`flex flex-row justify-between gap-6 ${
+      className={`flex flex-row flex-wrap justify-between gap-x-6 gap-y-3 ${
         align === 'center' ? 'items-center' : 'items-end'
       }`}
     >
