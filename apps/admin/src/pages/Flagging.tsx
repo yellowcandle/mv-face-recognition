@@ -380,12 +380,13 @@ export function Flagging() {
   const midWidth = rulerPercent(BAND_CUTOFFS.high) - lowEnd;
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-row">
+    <div className="flex h-full min-h-0 flex-1 flex-row max-lg:h-auto max-lg:flex-none max-lg:flex-col">
       {/* Tray */}
-      <div className="flex w-[392px] shrink-0 flex-col border-r border-carbon-deep/13">
-        <div className="flex flex-col gap-4 px-5 pt-8">
+      <div className="flex w-[392px] shrink-0 flex-col border-r border-carbon-deep/13 max-lg:w-full max-lg:border-r-0 max-lg:border-b">
+        <div className="flex flex-col gap-4 px-4 pt-8 sm:px-5">
           <Masthead title="待核" hint="核對系統標記的人臉" align="center">
             <Button
+              className="max-sm:h-11"
               size="sm"
               onClick={() => void queryClient.invalidateQueries({ queryKey: ['flaggedFaces'] })}
             >
@@ -445,11 +446,12 @@ export function Flagging() {
           </div>
 
           {selected.size > 0 && (
-            <div className="flex flex-row items-center gap-2">
+            <div className="flex flex-row flex-wrap items-center gap-2">
               <span className="flex-1 font-kai text-[13px] text-carbon-soft">
                 已選 <span className="font-mono tabular-nums">{selected.size}</span>
               </span>
               <Button
+                className="max-sm:h-11"
                 size="sm"
                 variant="primary"
                 disabled={busy}
@@ -458,6 +460,7 @@ export function Flagging() {
                 全部蓋印
               </Button>
               <Button
+                className="max-sm:h-11"
                 size="sm"
                 disabled={busy}
                 onClick={() => {
@@ -466,7 +469,12 @@ export function Flagging() {
               >
                 全部作廢
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              <Button
+                className="max-sm:h-11"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelected(new Set())}
+              >
                 取消
               </Button>
             </div>
@@ -476,18 +484,21 @@ export function Flagging() {
         {isLoading ? (
           <div className="py-16 text-center font-kai text-[13px] text-carbon-soft">正在調閱…</div>
         ) : error ? (
-          <div className="mx-5 mt-4">
+          <div className="mx-4 mt-4 sm:mx-5">
             <AdminErrorNotice error={error} label="讀不到待核紀錄" onRetry={() => void refetch()} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-5 py-14 text-center">
+          <div className="px-4 py-14 text-center sm:px-5">
             <div className="font-kai text-[15px] text-carbon-deep">這一疊是空的</div>
             <div className="mt-1 font-kai text-[13px] text-ink-muted">
               沒有符合目前條件的待核紀錄。
             </div>
           </div>
         ) : (
-          <div ref={trayRef} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3">
+          <div
+            ref={trayRef}
+            className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3 max-lg:max-h-[50vh]"
+          >
             {filtered.slice(0, 200).map((face) => {
               const isFocused = focused?.id === face.id;
               const c = contestantOf(face.contestant_id);
@@ -533,7 +544,7 @@ export function Flagging() {
                     checked={selected.has(face.id)}
                     onChange={() => toggleSelection(face.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-4 w-4 shrink-0 cursor-pointer accent-stamp"
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-stamp max-sm:h-5 max-sm:w-5"
                     aria-label={`選取 ${c?.nickname ?? `#${face.contestant_id}`} ${formatMmSs(face.timestamp)}`}
                   />
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-tint">
@@ -609,7 +620,7 @@ export function Flagging() {
         {/* Every write reports here: the server's reason on failure, the stamp word on success.
             The line stays mounted so `aria-live` announces each change, and sits under the tray so
             it survives the slip being filtered out without pushing the rows. */}
-        <div className="mt-auto flex shrink-0 flex-col gap-1 px-5 pb-3 pt-1">
+        <div className="mt-auto flex shrink-0 flex-col gap-1 px-4 pb-3 pt-1 sm:px-5">
           {writeError ? <AdminErrorNotice error={writeError} label="寫入失敗" /> : null}
           <p aria-live="polite" className="min-h-[18px] font-kai text-[13px] text-carbon-soft">
             {notice}
@@ -631,11 +642,11 @@ export function Flagging() {
       </div>
 
       {/* Review sheet */}
-      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pb-6 pt-8">
+      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-6 pt-8 sm:px-8">
         {focused ? (
           <>
             <div className="flex shrink-0 flex-col gap-1">
-              <div className="flex flex-row items-end justify-between gap-6">
+              <div className="flex flex-row flex-wrap items-end justify-between gap-x-6 gap-y-1">
                 <div className="flex min-w-0 flex-row items-end gap-2.5">
                   <h2 className="truncate font-kai text-[32px] font-normal leading-tight text-carbon-deep">
                     {focusedContestant?.nickname ?? `#${focused.contestant_id}`}
@@ -656,7 +667,7 @@ export function Flagging() {
 
             {/* 畫面偵測 against 參考相. The only reference route serves the contestant's first
                 photo by filename: no endpoint ranks references for a flag, hence 未按相似度排序. */}
-            <div className="flex min-h-[260px] max-h-[428px] flex-[1_1_428px] flex-row gap-4">
+            <div className="flex min-h-[260px] max-h-[428px] flex-[1_1_428px] flex-row gap-4 max-sm:max-h-[300px] max-sm:gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="relative min-h-0 flex-1 overflow-hidden rounded bg-carbon-deep">
                   {focused.thumbnail ? (
@@ -671,7 +682,7 @@ export function Flagging() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-row justify-between">
+                <div className="flex flex-row justify-between max-sm:flex-col">
                   <span className="font-kai text-[14px] text-carbon">畫面偵測</span>
                   <span className="font-kai text-[12px] text-ink-muted">
                     檢出分數{' '}
@@ -696,7 +707,7 @@ export function Flagging() {
                     }}
                   />
                 </div>
-                <div className="flex flex-row justify-between">
+                <div className="flex flex-row justify-between max-sm:flex-col">
                   <span className="font-kai text-[14px] text-carbon">參考相</span>
                   <span className="font-kai text-[12px] text-ink-muted">
                     共 {focusedContestant?.reference_count ?? 0} 張 · 未按相似度排序
@@ -709,7 +720,7 @@ export function Flagging() {
                 flagged detection's match score, carried as context for the claim. */}
             {flagScore(focused.confidence) != null && (
               <div className="flex shrink-0 flex-col gap-2">
-                <div className="flex flex-row items-end justify-between gap-6">
+                <div className="flex flex-row flex-wrap items-end justify-between gap-x-6 gap-y-1">
                   <div className="flex flex-row items-end gap-2">
                     <span className="font-mono text-[28px] leading-none tabular-nums text-carbon-deep">
                       {flagScore(focused.confidence)?.toFixed(3)}
@@ -785,8 +796,8 @@ export function Flagging() {
 
             {reassignOpen && (
               <div className="flex shrink-0 flex-col gap-1">
-                <div className="flex flex-row items-center gap-2">
-                  <label className="flex min-w-0 flex-1 flex-row items-center gap-2 font-kai text-[14px] text-carbon">
+                <div className="flex flex-row flex-wrap items-center gap-2">
+                  <label className="flex min-w-0 flex-1 max-sm:basis-full flex-row items-center gap-2 font-kai text-[14px] text-carbon">
                     <span className="shrink-0">改派給</span>
                     <select
                       ref={reassignRef}
@@ -802,13 +813,19 @@ export function Flagging() {
                     </select>
                   </label>
                   <Button
+                    className="max-sm:h-11"
                     size="sm"
                     disabled={reassignTo === String(focused.contestant_id)}
                     onClick={() => void reassignFace()}
                   >
                     確定改派
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setReassignOpen(false)}>
+                  <Button
+                    className="max-sm:h-11"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setReassignOpen(false)}
+                  >
                     取消
                   </Button>
                 </div>
@@ -820,8 +837,9 @@ export function Flagging() {
               </div>
             )}
 
-            <div className="flex shrink-0 flex-row items-center gap-2">
+            <div className="flex shrink-0 flex-row flex-wrap items-center gap-2">
               <Button
+                className="max-sm:h-11"
                 variant="primary"
                 keycap="1"
                 disabled={focused.status !== 'pending'}
@@ -830,17 +848,18 @@ export function Flagging() {
                 蓋印確認
               </Button>
               <Button
+                className="max-sm:h-11"
                 keycap="2"
                 disabled={focused.status !== 'pending'}
                 onClick={() => rejectOne(focused.id)}
               >
                 作廢
               </Button>
-              <Button keycap="3" onClick={openReassign}>
+              <Button className="max-sm:h-11" keycap="3" onClick={openReassign}>
                 改派給…
               </Button>
               <span className="flex-1" />
-              <Button variant="ghost" keycap="↓" onClick={goNext}>
+              <Button className="max-sm:h-11" variant="ghost" keycap="↓" onClick={goNext}>
                 下一張
               </Button>
             </div>
@@ -890,7 +909,7 @@ function RowAction({ label, onClick }: { label: string; onClick: () => void }) {
         e.stopPropagation();
         onClick();
       }}
-      className="h-7 rounded-md border border-carbon-deep/33 bg-ground px-2 font-kai text-[12px] text-carbon hover:bg-tint"
+      className="h-11 rounded-md border sm:h-7 border-carbon-deep/33 bg-ground px-2 font-kai text-[12px] text-carbon hover:bg-tint"
     >
       {label}
     </button>

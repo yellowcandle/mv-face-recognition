@@ -275,7 +275,7 @@ function ContestantPicker({
         <div className="relative border-b border-carbon-deep/13">
           <Search
             aria-hidden
-            className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-carbon-soft"
+            className="pointer-events-none absolute left-2.5 top-3.5 size-4 text-carbon-soft sm:top-2.5"
           />
           <input
             autoFocus
@@ -291,7 +291,7 @@ function ContestantPicker({
               }
             }}
             placeholder="參賽者編號、暱稱或姓名…"
-            className="h-9 w-full rounded-t-md bg-transparent pl-8.5 pr-2.5 font-kai text-[14px] text-carbon-deep placeholder:text-ink-muted"
+            className="h-11 w-full rounded-t-md sm:h-9 bg-transparent pl-8.5 pr-2.5 font-kai text-[14px] text-carbon-deep placeholder:text-ink-muted"
           />
         </div>
         <div className="max-h-[140px] overflow-y-auto">
@@ -306,7 +306,7 @@ function ContestantPicker({
                 type="button"
                 disabled={busy}
                 onClick={() => onPick(String(c.id))}
-                className={`flex h-7 w-full items-center gap-2 px-2.5 text-left font-kai transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex h-11 w-full items-center gap-2 px-2.5 sm:h-7 text-left font-kai transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50 ${
                   i === 0 ? 'bg-tint' : ''
                 }`}
               >
@@ -1087,7 +1087,7 @@ export function Labelling() {
   return (
     <div className="flex min-h-full flex-1 flex-col xl:flex-row">
       {/* Tracks */}
-      <div className="flex min-w-0 flex-col gap-3 pb-5 pl-8 pr-5 pt-8 xl:flex-1 xl:overflow-y-auto">
+      <div className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-8 sm:pl-8 sm:pr-5 xl:flex-1 xl:overflow-y-auto">
         <div className="pb-1">
           <Masthead title="標註" hint="替未認出的臉指定參賽者">
             {/* Autosave is otherwise silent: this is what tells AT the write landed. */}
@@ -1206,7 +1206,7 @@ export function Labelling() {
               savedJsonRef.current = null;
               closeSheet();
             }}
-            className="field field-select w-28"
+            className="field field-select w-28 max-sm:h-11"
           >
             {videos.length === 0 && (
               <option value="">{videosLoading ? '載入中…' : '沒有已處理的影片'}</option>
@@ -1225,7 +1225,7 @@ export function Labelling() {
                 aria-label="判定"
                 value={verdictFilter}
                 onChange={(e) => setVerdictFilter(e.target.value as 'all' | Verdict)}
-                className="field field-select w-[124px]"
+                className="field field-select w-[124px] max-sm:h-11"
               >
                 <option value="all">全部判定</option>
                 {VERDICTS.map((v) => (
@@ -1238,7 +1238,7 @@ export function Labelling() {
               <div className="relative min-w-40 flex-1">
                 <Search
                   aria-hidden
-                  className="pointer-events-none absolute left-2.5 top-2 size-4 text-carbon-soft"
+                  className="pointer-events-none absolute left-2.5 top-2 size-4 text-carbon-soft max-sm:top-3.5"
                 />
                 <input
                   type="search"
@@ -1246,7 +1246,7 @@ export function Labelling() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="軌跡、姓名或編號…"
-                  className="field w-full pl-8 placeholder:text-ink-muted"
+                  className="field w-full pl-8 placeholder:text-ink-muted max-sm:h-11"
                 />
               </div>
             </>
@@ -1257,7 +1257,7 @@ export function Labelling() {
           <>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-kai text-[13px]">
               <label
-                className={`flex cursor-pointer items-center gap-1.5 ${
+                className={`flex cursor-pointer items-center gap-1.5 max-sm:min-h-11 ${
                   unlabelledOnly ? 'text-carbon' : 'text-carbon-soft'
                 }`}
               >
@@ -1270,7 +1270,7 @@ export function Labelling() {
                 只看未標註
               </label>
               <label
-                className={`flex cursor-pointer items-center gap-1.5 ${
+                className={`flex cursor-pointer items-center gap-1.5 max-sm:min-h-11 ${
                   claimedOnly ? 'text-carbon' : 'text-carbon-soft'
                 }`}
                 title="只列系統已命名的軌跡，按配對分數排序，風險最高的先看"
@@ -1469,6 +1469,7 @@ export function Labelling() {
                 <Button
                   variant="secondary"
                   size="sm"
+                  className="max-sm:h-11"
                   onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
                 >
                   再顯示 {Math.min(PAGE_SIZE, filtered.length - visibleCount)} 張（尚餘{' '}
@@ -1486,7 +1487,7 @@ export function Labelling() {
         // and closing it moves focus nowhere, so Esc then Backspace can't clear a tile's label.
         <aside
           aria-labelledby="label-sheet-title"
-          className="order-first flex shrink-0 flex-col gap-4 border-b border-carbon-deep/13 px-6 pb-5 pt-8 xl:order-none xl:w-[416px] xl:overflow-y-auto xl:border-b-0 xl:border-l"
+          className="order-first flex shrink-0 flex-col gap-4 border-b border-carbon-deep/13 px-4 pb-5 pt-8 sm:px-6 xl:order-none xl:w-[416px] xl:overflow-y-auto xl:border-b-0 xl:border-l"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
@@ -1508,7 +1509,7 @@ export function Labelling() {
               type="button"
               onClick={closeSheet}
               aria-label="關閉"
-              className="shrink-0 rounded-md text-carbon-soft hover:text-stamp"
+              className="shrink-0 rounded-md text-carbon-soft hover:text-stamp max-sm:-m-3 max-sm:p-3"
             >
               <X aria-hidden className="size-5" />
             </button>
@@ -1523,7 +1524,7 @@ export function Labelling() {
               bbox={openTrack.representative.bbox}
               streamUrl={streamUrl}
               width={512}
-              className={`${CROP_FILL} !w-[200px] shrink-0`}
+              className={`${CROP_FILL} !w-[120px] shrink-0 max-sm:self-start sm:!w-[200px]`}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-1 text-[12px] text-ink-muted">
               <div className="flex flex-wrap items-center gap-2">
@@ -1572,7 +1573,12 @@ export function Labelling() {
               {chipText(openTrack.key) && (
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Stamp tilt>{chipText(openTrack.key)}</Stamp>
-                  <Button variant="ghost" size="sm" onClick={() => clearLabel(openTrack.key)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="max-sm:h-11"
+                    onClick={() => clearLabel(openTrack.key)}
+                  >
                     清除標註
                   </Button>
                 </div>
@@ -1580,7 +1586,12 @@ export function Labelling() {
               {/* The sheet stays open after a clear, so the undo has to live here as well. */}
               {!labels[openTrack.key] && clearedLabels[openTrack.key] && (
                 <div className="pt-1">
-                  <Button variant="ghost" size="sm" onClick={() => undoClear(openTrack.key)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="max-sm:h-11"
+                    onClick={() => undoClear(openTrack.key)}
+                  >
                     已清除 · 復原
                   </Button>
                 </div>
@@ -1592,7 +1603,7 @@ export function Labelling() {
             <Button
               variant="primary"
               size="md"
-              className="w-full"
+              className="w-full max-sm:h-auto max-sm:min-h-11 max-sm:whitespace-normal max-sm:py-2"
               onClick={() => commitOne(openTrack, 'contestant', openTrack.claim?.contestant_id)}
               title={`接受系統對整條軌跡的判定：${claimText(openTrack, contestantsById)}`}
             >
@@ -1615,7 +1626,7 @@ export function Labelling() {
                 type="button"
                 disabled={committing}
                 onClick={() => commitOne(openTrack, v)}
-                className="flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-col gap-0.5 rounded-md border border-carbon-deep/33 px-2.5 py-1.5 text-left font-kai transition-colors hover:bg-tint"
+                className="flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-col gap-0.5 rounded-md border border-carbon-deep/33 px-2.5 py-1.5 text-left max-sm:min-h-11 font-kai transition-colors hover:bg-tint"
               >
                 <span className="text-[14px] text-carbon-deep">{VERDICT_LABEL[v]}</span>
                 <span className="text-[12px] text-carbon-soft">{VERDICT_BLURB[v]}</span>
@@ -1634,7 +1645,7 @@ export function Labelling() {
       {labelable && (
         <aside
           aria-label="標註統計"
-          className="flex shrink-0 flex-col gap-6 border-t border-carbon-deep/13 px-5 pb-5 pt-8 xl:w-[248px] xl:overflow-y-auto xl:border-l xl:border-t-0"
+          className="flex shrink-0 flex-col gap-6 border-t border-carbon-deep/13 px-4 pb-5 pt-8 sm:px-5 xl:w-[248px] xl:overflow-y-auto xl:border-l xl:border-t-0"
         >
           <section className="flex flex-col gap-1.5">
             <h2 className="font-kai text-[18px] font-normal leading-tight text-carbon-deep">

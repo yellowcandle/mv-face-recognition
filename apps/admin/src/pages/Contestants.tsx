@@ -115,13 +115,14 @@ export function Contestants() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-row">
-      <div className="flex min-w-0 flex-1 flex-col px-8 pb-5 pt-8">
+    <div className="flex min-h-0 flex-1 flex-row max-lg:flex-none max-lg:flex-col">
+      <div className="flex min-w-0 flex-1 flex-col px-4 pb-5 pt-8 sm:px-8">
         <div className="pb-5">
           <Masthead title="參賽者" hint="名冊、參考照與出場次數" align="center">
             <Button
               variant="secondary"
               size="sm"
+              className="max-sm:h-11"
               onClick={() => {
                 void refetch();
                 void refetchCoverage();
@@ -140,7 +141,7 @@ export function Contestants() {
           <div className="relative w-full max-w-[360px]">
             <Search
               aria-hidden
-              className="pointer-events-none absolute left-2.5 top-2 size-4 text-carbon-soft"
+              className="pointer-events-none absolute left-2.5 top-2 size-4 max-sm:top-3.5 text-carbon-soft"
             />
             <input
               type="search"
@@ -148,7 +149,7 @@ export function Contestants() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜尋編號、姓名或暱稱"
-              className="field w-full pl-8 placeholder:text-ink-muted"
+              className="field w-full pl-8 placeholder:text-ink-muted max-sm:h-11"
             />
           </div>
           <span className="shrink-0 font-mono text-[13px] tabular-nums text-carbon-soft">
@@ -166,8 +167,8 @@ export function Contestants() {
           <span className="w-10">編號</span>
           <span className="w-[52px]" />
           <span className="flex-1">姓名</span>
-          <span className="w-16 text-right">參考相</span>
-          <span className="w-16 text-right">出場</span>
+          <span className="w-16 text-right max-sm:hidden">參考相</span>
+          <span className="w-16 text-right max-sm:hidden">出場</span>
           <span className="w-[72px] text-center">品質</span>
         </div>
 
@@ -207,10 +208,10 @@ export function Contestants() {
                 </span>
                 <span className="truncate text-[12px] text-ink-muted">{c.name}</span>
               </span>
-              <span className="w-16 text-right font-mono text-[13px] tabular-nums text-carbon-soft">
+              <span className="w-16 text-right font-mono text-[13px] tabular-nums text-carbon-soft max-sm:hidden">
                 {c.reference_count}
               </span>
-              <span className="w-16 text-right font-mono text-[13px] tabular-nums text-carbon-soft">
+              <span className="w-16 text-right font-mono text-[13px] tabular-nums text-carbon-soft max-sm:hidden">
                 {countText(c.detection_count)}
               </span>
               <span className="flex w-[72px] justify-center">
@@ -232,7 +233,9 @@ export function Contestants() {
       {/* Filing card */}
       <aside
         aria-label="參賽者檔案"
-        className="flex min-h-0 w-[400px] shrink-0 flex-col border-l border-carbon-deep/13 pb-5 pl-6 pr-8 pt-8"
+        className={`flex min-h-0 w-[400px] shrink-0 flex-col border-l border-carbon-deep/13 pb-5 pl-6 pr-8 pt-8 max-lg:fixed max-lg:inset-0 max-lg:z-30 max-lg:w-auto max-lg:border-l-0 max-lg:bg-ground max-lg:px-4 max-lg:pt-4 sm:max-lg:px-8 ${
+          selectedContestant ? '' : 'max-lg:hidden'
+        }`}
       >
         {selectedContestant ? (
           <>
@@ -243,14 +246,14 @@ export function Contestants() {
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
-                className="rounded-md font-kai text-[13px] text-carbon-soft hover:text-stamp"
+                className="rounded-md font-kai text-[13px] text-carbon-soft hover:text-stamp max-lg:h-11 max-lg:px-3"
               >
                 收起
               </button>
             </div>
 
             <div className="flex flex-row gap-4 pb-4">
-              <div className="h-48 w-40 shrink-0 overflow-hidden rounded bg-paper-dark">
+              <div className="h-48 w-40 shrink-0 overflow-hidden rounded bg-paper-dark max-sm:h-36 max-sm:w-30">
                 <img
                   src={
                     selectedContestant.portrait_url ??

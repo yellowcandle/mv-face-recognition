@@ -650,9 +650,9 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
   const contestantList = contestants as Array<{ number: number; name: string; nickname: string }>;
 
   return (
-    <div className="relative flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
-      <Masthead title="播放" hint={canFlag ? '播放影片並標記人臉' : '看片、人臉框與時間軸'}>
-        <div className="flex items-center gap-2">
+    <div className="relative flex min-h-full flex-1 flex-col gap-6 px-4 pb-5 pt-8 sm:px-8">
+      <Masthead fill title="播放" hint={canFlag ? '播放影片並標記人臉' : '看片、人臉框與時間軸'}>
+        <div className="flex items-center gap-2 max-sm:w-full">
           {canFlag && (
             <Button
               size="sm"
@@ -664,7 +664,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           )}
           <select
             aria-label="影片"
-            className="field field-select w-[220px]"
+            className="field field-select w-[220px] max-sm:w-auto max-sm:min-w-0 max-sm:flex-1"
             value={selectedVideo?.id ?? ''}
             onChange={(e) => {
               const v = videos.find((v) => v.id === e.target.value);
@@ -745,7 +745,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
         />
       </div>
 
-      <div className="flex flex-1 gap-6">
+      <div className="flex flex-1 flex-col gap-6 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-6">
           <DetectionBar
             faceCount={displayFaces.length}
@@ -776,7 +776,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
           {/* Batch controls — admin only: every button in here ends in a flag */}
           {canFlag && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 className={batchMode ? 'bg-tint font-bold text-carbon-deep' : ''}
                 aria-pressed={batchMode}
@@ -811,7 +811,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           {/* Timeline filter (admin mode only) */}
           {mode === 'admin' && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <label
                   htmlFor="contestant-filter"
                   className="font-kai text-[13px] text-carbon-soft"
@@ -868,7 +868,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           )}
         </div>
 
-        <div className="flex w-[300px] shrink-0 flex-col gap-0.5 border-l border-carbon-deep/13 pl-6">
+        <div className="flex flex-col gap-0.5 border-t border-carbon-deep/13 pt-6 lg:w-[300px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <h3 className="pb-2 font-kai text-[18px] font-normal text-carbon-deep">目前畫格人臉</h3>
           {displayFaces.length === 0 ? (
             <p className="font-kai text-[13px] text-ink-muted">這個時間點沒有偵測到人臉。</p>
@@ -905,7 +905,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
           )}
         </div>
 
-        <div className="flex w-[236px] shrink-0 flex-col gap-4 border-l border-carbon-deep/13 pl-6">
+        <div className="flex flex-col gap-4 border-t border-carbon-deep/13 pt-6 lg:w-[236px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           {selectedVideo && (
             <>
               <InfoBlock
@@ -963,7 +963,7 @@ export function Player({ mode, apiBase, initialVideoId = null }: PlayerProps) {
 
       {/* Flagged Faces Panel */}
       {canFlag && showFlaggedPanel && (
-        <div className="absolute right-0 top-0 z-40 flex h-full w-80 flex-col border-l border-carbon-deep/33 bg-ground">
+        <div className="absolute right-0 top-0 z-40 flex h-full w-80 max-w-full flex-col border-l border-carbon-deep/33 bg-ground">
           <div className="flex items-center justify-between border-b border-carbon-deep/13 px-4 py-3">
             <h3 className="font-kai text-[18px] font-normal text-carbon-deep">已標記人臉</h3>
             <button

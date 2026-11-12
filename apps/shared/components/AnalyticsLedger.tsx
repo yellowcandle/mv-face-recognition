@@ -26,13 +26,21 @@ const BAND_DOT: Record<Band, string> = {
 /** The two designs share one table; only these measures and words differ. */
 const LOOK = {
   admin: {
-    root: 'px-8',
-    scroller: 'min-h-0 flex-1 overflow-y-auto',
-    select: 'field field-select w-[260px]',
-    figures: 'border-b pb-4',
+    // Phones scroll the page, as the viewer does; 最高分 and 出場時段 drop below sm.
+    root: 'px-4 max-sm:h-auto sm:px-8',
+    scroller: 'sm:min-h-0 sm:flex-1 sm:overflow-y-auto',
+    select: 'field field-select w-[260px] max-w-full max-sm:h-11',
+    figures: 'border-b pb-4 max-sm:grid-cols-2 max-sm:gap-y-3',
     head: ['編號', '參賽者', '出場次數', '平均分', '最高分', '出場時段'],
-    widths: ['w-11', '', 'w-[88px]', 'w-28', 'w-28', 'w-61'],
-    narrow: '',
+    widths: [
+      'w-8 sm:w-11',
+      '',
+      'w-12 sm:w-[88px]',
+      'w-23 sm:w-28',
+      'max-sm:hidden sm:w-28',
+      'max-sm:hidden sm:w-61',
+    ],
+    narrow: 'max-sm:hidden',
     row: 'h-10',
     who: 'gap-2',
     realName: 'text-[12px]',
@@ -244,7 +252,7 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
               type="button"
               aria-pressed={sortBy === key}
               onClick={() => setSortBy(key)}
-              className={`h-8 rounded-md border px-3 font-kai text-[13px] transition-colors ${
+              className={`h-11 rounded-md border px-3 sm:h-8 font-kai text-[13px] transition-colors ${
                 sortBy === key
                   ? 'border-carbon-deep/33 bg-tint font-bold text-carbon-deep'
                   : 'border-carbon-deep/13 text-carbon-soft hover:bg-tint'
@@ -394,8 +402,8 @@ export function AnalyticsLedger({ variant }: { variant: Variant }) {
           </div>
         </>
       ) : (
-        <div className="flex items-center justify-between gap-4 font-kai text-[12px] text-ink-muted">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-kai text-[12px] text-ink-muted">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>分級</span>
             {legend}
             <span>分級為暫定值，依實測誤配率調整</span>

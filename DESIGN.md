@@ -201,7 +201,12 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
 - The viewer is mobile-first down to 320 px (2026-11-12). Gutters are `px-4` and become `sm:px-14`.
   Side columns (首頁 tally, 播放 queue) stack below the main column until `lg`. The header shows
   `MV` and drops the nav icons below `sm`. 紀錄 drops 最高 and 出現時段 on phones, and the page
-  scrolls instead of the table. The admin stays desktop-only. `Masthead` wraps its right slot.
+  scrolls instead of the table. `Masthead` wraps its right slot; `fill` gives it a full line on
+  phones (for selects and button rows).
+- The admin is mobile-first too (2026-11-12). Below `lg` the sidebar is a top bar with a 選單
+  disclosure (`AdminLayout`), and two-pane pages stack. Phone-hidden columns: 紀錄 最高分/出場時段,
+  參賽者 參考相/出場 (both still in the filing card), 管理 長度/尺寸 (串流 below `xl`). 參賽者's
+  filing card is a full-screen sheet below `lg`. 向量's heatmap scrolls sideways (fixed canvas).
 - The 標註 sheet is docked, so it is a labelled region, not a modal: no focus trap, and closing it
   moves focus nowhere, so that Esc then Backspace can't clear a tile's label.
 

@@ -147,11 +147,11 @@ function ActionColumn({
 }) {
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      <div className="flex h-[72px] flex-col gap-1">
+      <div className="flex flex-col gap-1 xl:h-[72px]">
         <h2 className="font-kai text-[18px] font-normal text-carbon-deep">{title}</h2>
         <p className="font-kai text-[14px] leading-[1.4] text-carbon-soft">{description}</p>
       </div>
-      <div className="flex h-[108px] flex-col justify-end gap-2">{controls}</div>
+      <div className="flex flex-col justify-end gap-2 xl:h-[108px]">{controls}</div>
       {note && <p className="font-kai text-[12px] leading-[1.4] text-ink-muted">{note}</p>}
       <ul className="flex flex-col gap-1 font-kai text-[12px] text-ink-muted">
         {does.map((line) => (
@@ -457,7 +457,7 @@ export function Processing() {
   const startingLabel = '啟動中…';
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-4 pb-5 pt-8 sm:px-8">
       <Masthead title="處理" hint="觸發影片處理、查看進度">
         {activeCount > 0 && (
           <span role="status" className="flex items-center gap-2 text-carbon">
@@ -486,9 +486,9 @@ export function Processing() {
         </div>
       )}
 
-      <div className="flex flex-row border-y border-carbon-deep/13 py-5">
+      <div className="flex flex-col border-y border-carbon-deep/13 py-5 xl:flex-row">
         <ActionColumn
-          className="min-w-0 flex-1 border-r border-carbon-deep/13 pr-5"
+          className="min-w-0 flex-1 border-b border-carbon-deep/13 pb-5 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-5"
           title="首次處理"
           description={
             isEdge ? '在雲端工作上重新處理一部影片' : '用本機流程處理這台機器上的所有影片'
@@ -519,7 +519,7 @@ export function Processing() {
                   value={selectedVideo}
                   onChange={(e) => setSelectedVideo(e.target.value)}
                   disabled={!jobsAvailable}
-                  className="field field-select h-10 w-full disabled:opacity-45"
+                  className="field field-select h-10 w-full disabled:opacity-45 max-sm:h-11"
                 >
                   <option value="" disabled={isEdge}>
                     {isEdge ? '請揀選影片' : '全部來源影片'}
@@ -534,6 +534,7 @@ export function Processing() {
               </div>
               <Button
                 variant="primary"
+                className="max-sm:h-11"
                 onClick={startInitialProcessing}
                 // Each reel on the edge is a paid run, so it must be named (ADR 0006).
                 disabled={unavailableBecauseProcessing || (isEdge && !selectedVideo)}
@@ -545,7 +546,7 @@ export function Processing() {
         />
 
         <ActionColumn
-          className="w-[232px] shrink-0 border-r border-carbon-deep/13 px-5"
+          className="w-full shrink-0 border-b border-carbon-deep/13 py-5 xl:w-[232px] xl:border-b-0 xl:border-r xl:px-5 xl:py-0"
           title="更新向量"
           description={
             isEdge ? '由 bucket 內的參考相重建參考向量' : '由硬碟上揀選好的參考相重建參考向量'
@@ -562,7 +563,7 @@ export function Processing() {
           }
           controls={
             <Button
-              className="w-full"
+              className="w-full max-sm:h-11"
               onClick={startEmbeddingUpdate}
               disabled={unavailableBecauseProcessing}
             >
@@ -572,7 +573,7 @@ export function Processing() {
         />
 
         <ActionColumn
-          className="w-[232px] shrink-0 pl-5"
+          className="w-full shrink-0 pt-5 xl:w-[232px] xl:pl-5 xl:pt-0"
           title="覆蓋率與相似度"
           description="重新計算向量覆蓋率、餘弦矩陣與最相近的配對"
           does={[
@@ -583,7 +584,7 @@ export function Processing() {
           ]}
           controls={
             <Button
-              className="w-full"
+              className="w-full max-sm:h-11"
               onClick={startCoverageRefresh}
               disabled={unavailableBecauseProcessing || isEdge}
             >
@@ -602,7 +603,7 @@ export function Processing() {
       </div>
 
       <section className="flex flex-col gap-2">
-        <div className="flex flex-row items-center justify-between">
+        <div className="flex flex-row flex-wrap items-center justify-between gap-x-4">
           <h2 className="font-kai text-[18px] font-normal text-carbon-deep">處理工作</h2>
           <div className="flex h-8 flex-row items-center gap-4 font-kai text-[13px] text-carbon-soft">
             <span>
@@ -612,7 +613,7 @@ export function Processing() {
               <span className="font-mono tabular-nums">{completedCount}</span> 已完成
             </span>
             {completedCount > 0 && (
-              <Button size="sm" onClick={clearCompleted}>
+              <Button size="sm" className="max-sm:h-11" onClick={clearCompleted}>
                 清除已完成
               </Button>
             )}
@@ -632,9 +633,9 @@ export function Processing() {
               return (
                 <div
                   key={job.id}
-                  className="flex flex-row items-center gap-6 border-t border-carbon-deep/13 py-2"
+                  className="flex flex-col gap-2 border-t border-carbon-deep/13 py-2 sm:flex-row sm:items-center sm:gap-6"
                 >
-                  <div className="flex w-[280px] shrink-0 flex-col gap-0.5">
+                  <div className="flex shrink-0 flex-col gap-0.5 sm:w-[280px]">
                     <div className="flex flex-row items-end gap-2">
                       <h3 className="font-kai text-[15px] font-normal text-carbon-deep">
                         {jobModeLabel(job.mode)}
@@ -659,7 +660,7 @@ export function Processing() {
                           onClick={() =>
                             setOpenFailures((prev) => ({ ...prev, [job.id]: !prev[job.id] }))
                           }
-                          className="flex h-8 w-full cursor-pointer items-center justify-between gap-2 px-2 text-left font-kai text-[12px] text-stamp"
+                          className="flex h-11 w-full cursor-pointer sm:h-8 items-center justify-between gap-2 px-2 text-left font-kai text-[12px] text-stamp"
                         >
                           <span>
                             <span className="font-mono tabular-nums">{job.failures.length}</span>{' '}
@@ -706,16 +707,21 @@ export function Processing() {
                     {job.error && <p className="font-kai text-[12px] text-stamp">{job.error}</p>}
                   </div>
 
-                  <div className="flex w-[136px] shrink-0 flex-col items-end gap-0.5 whitespace-nowrap font-mono text-[12px] tabular-nums text-ink-muted">
+                  <div className="flex shrink-0 flex-row flex-wrap gap-x-3 gap-y-0.5 whitespace-nowrap sm:w-[136px] sm:flex-col sm:items-end sm:gap-0.5 font-mono text-[12px] tabular-nums text-ink-muted">
                     {job.created_at && <span>建立 {formatJobCreated(job.created_at)}</span>}
                     {job.started_at && (
                       <span>歷時 {formatDuration(job.started_at, job.completed_at)}</span>
                     )}
                   </div>
 
-                  <div className="flex h-8 w-16 shrink-0 flex-row justify-end">
+                  <div className="flex shrink-0 flex-row justify-end max-sm:empty:hidden sm:h-8 sm:w-16">
                     {(job.status === 'queued' || job.status === 'running') && (
-                      <Button variant="destructive" size="sm" onClick={() => cancelJob(job)}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="max-sm:h-11"
+                        onClick={() => cancelJob(job)}
+                      >
                         取消
                       </Button>
                     )}

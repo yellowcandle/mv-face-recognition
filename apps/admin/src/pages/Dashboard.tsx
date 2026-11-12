@@ -78,13 +78,13 @@ export function Dashboard() {
   ];
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-4 pb-5 pt-8 sm:px-8">
       <Masthead title="儀表" hint="待辦、數量與捷徑總覽">
         {isEdge === false && '所有寫入只在這一台機器上發生'}
       </Masthead>
 
       <section className="flex flex-col gap-3">
-        <div className="flex flex-row items-end justify-between gap-6">
+        <div className="flex flex-row flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="flex flex-row items-end gap-2">
             <span className="font-mono text-[32px] leading-tight tabular-nums text-carbon-deep">
               {summary?.good ?? '—'}
@@ -94,7 +94,7 @@ export function Dashboard() {
             </span>
           </div>
           {summary ? (
-            <div className="flex flex-row items-center gap-4 font-kai text-[13px] text-carbon-soft">
+            <div className="flex flex-row flex-wrap items-center gap-x-4 gap-y-1 font-kai text-[13px] text-carbon-soft">
               <LegendKey fill={QUALITY_FILL.good}>
                 {QUALITY_WORD.good} {summary.good}
               </LegendKey>
@@ -122,20 +122,20 @@ export function Dashboard() {
                 ? `參考相齊全 ${summary.good}、偏弱 ${summary.weak}、缺 ${summary.missing}`
                 : '參考相覆蓋率'
             }
-            className="flex h-7 flex-row gap-0.5"
+            className="flex h-7 flex-row gap-0.5 max-sm:grid max-sm:h-auto max-sm:grid-cols-[repeat(48,minmax(0,1fr))] max-sm:gap-px"
           >
             {roster.map((c) => (
               <span
                 key={c.id}
                 title={`#${c.id} ${c.nickname} · ${QUALITY_WORD[c.quality]}`}
-                className={`min-w-0 flex-1 ${QUALITY_FILL[c.quality]}`}
+                className={`min-w-0 flex-1 max-sm:h-7 ${QUALITY_FILL[c.quality]}`}
               />
             ))}
           </div>
         )}
       </section>
 
-      <section className="flex flex-row border-y border-carbon-deep/13 py-4">
+      <section className="flex flex-row border-y border-carbon-deep/13 py-4 max-sm:grid max-sm:grid-cols-2 max-sm:gap-y-3">
         {stats.map((s) => (
           <div key={s.label} className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="font-kai text-[13px] text-carbon-soft">{s.label}</span>
@@ -147,7 +147,7 @@ export function Dashboard() {
         ))}
       </section>
 
-      <div className="flex flex-1 flex-row gap-10">
+      <div className="flex flex-1 flex-row gap-10 max-lg:flex-col">
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-row items-center justify-between pb-2">
             <div className="flex flex-row items-end gap-2 text-[18px]">
@@ -156,7 +156,7 @@ export function Dashboard() {
             </div>
             <Link
               to="/flagging"
-              className="rounded-md font-kai text-[14px] text-stamp hover:underline"
+              className="rounded-md font-kai text-[14px] text-stamp hover:underline max-sm:py-3"
             >
               前往待核 →
             </Link>
@@ -215,7 +215,7 @@ export function Dashboard() {
           )}
         </section>
 
-        <div className="flex w-[360px] shrink-0 flex-col gap-3">
+        <div className="flex w-[360px] shrink-0 flex-col gap-3 max-lg:w-full">
           <div className="flex h-7 flex-row items-baseline justify-between">
             <h2 className="font-kai text-[18px] font-normal text-carbon-deep">最近核對</h2>
             <span className="font-kai text-[12px] text-ink-muted">依標記時間排序</span>
@@ -248,7 +248,11 @@ export function Dashboard() {
             className="mt-auto flex flex-row flex-wrap gap-x-3 gap-y-1 border-t border-carbon-deep/13 pt-3 font-kai text-[13px]"
           >
             {SHORTCUTS.map((l) => (
-              <Link key={l.to} to={l.to} className="rounded-md text-carbon-soft hover:text-stamp">
+              <Link
+                key={l.to}
+                to={l.to}
+                className="rounded-md text-carbon-soft hover:text-stamp max-sm:py-3"
+              >
                 {l.label}
               </Link>
             ))}
@@ -256,7 +260,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="flex flex-row justify-between font-kai text-[12px] text-ink-muted">
+      <div className="flex flex-row flex-wrap justify-between gap-x-4 gap-y-1 font-kai text-[12px] text-ink-muted">
         <span>分級為暫定值，依實測誤配率調整</span>
         <span>存根 · 可寫</span>
       </div>

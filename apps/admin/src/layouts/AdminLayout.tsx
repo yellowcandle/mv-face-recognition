@@ -1,10 +1,11 @@
-import { Outlet, NavLink } from 'react-router';
+import { Outlet, NavLink, useLocation } from 'react-router';
 import { useState, useEffect } from 'react';
 import {
   BookOpen,
   Cpu,
   Inbox,
   LayoutDashboard,
+  Menu,
   Play,
   ScanFace,
   Tag,
@@ -48,6 +49,10 @@ export function AdminLayout() {
   const [mode, setMode] = useState<ApiMode>('local');
   const { data: flagged = [] } = useFlaggedFaces();
   const pending = flagged.filter((f) => f.status === 'pending').length;
+  // Below lg the sidebar collapses into a disclosure under the top bar; a route change closes it.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   useEffect(() => {
     const check = async () => {
@@ -74,16 +79,39 @@ export function AdminLayout() {
   }, []);
 
   return (
-    <div className="flex h-full flex-row bg-ground">
-      <nav className="flex w-60 shrink-0 flex-col gap-6 border-r border-carbon-deep/13 bg-tint px-3 pb-4 pt-6">
-        <div className="flex flex-col gap-1 px-2.5">
-          <span className="font-kai text-[16px] font-bold leading-tight text-carbon-deep">
-            MV Face Recognition
-          </span>
-          <span className="font-kai text-[12px] leading-tight text-ink-muted">後台 · 存根</span>
+    <div className="flex h-full flex-col bg-ground lg:flex-row">
+      <nav
+        aria-label="後台選單"
+        className="flex shrink-0 flex-col border-b border-carbon-deep/13 bg-tint px-3 py-2 lg:w-60 lg:gap-6 lg:border-b-0 lg:border-r lg:pb-4 lg:pt-6"
+      >
+        <div className="flex flex-row items-center justify-between gap-3 px-2.5 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="truncate font-kai text-[16px] font-bold leading-tight text-carbon-deep">
+              MV Face Recognition
+            </span>
+            <span className="font-kai text-[12px] leading-tight text-ink-muted">後台 · 存根</span>
+          </div>
+          <button
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="admin-menu"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex h-11 shrink-0 flex-row items-center gap-2 rounded-md px-3 font-kai text-[14px] text-carbon hover:bg-ground/60 lg:hidden"
+          >
+            <Menu size={16} aria-hidden="true" className="text-carbon-soft" />
+            選單
+            {pending > 0 ? (
+              <span className="font-mono text-[12px] tabular-nums text-stamp">{pending}</span>
+            ) : null}
+          </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+        <div
+          id="admin-menu"
+          className={`min-h-0 flex-1 flex-col gap-6 overflow-y-auto max-lg:max-h-[70dvh] max-lg:pb-2 max-lg:pt-4 lg:flex ${
+            menuOpen ? 'flex' : 'hidden'
+          }`}
+        >
           {sections.map((section) => (
             <div key={section.group} className="flex flex-col gap-0.5">
               <div className="px-2.5 pb-1.5 font-kai text-[12px] leading-tight text-ink-muted">
@@ -95,7 +123,7 @@ export function AdminLayout() {
                   to={item.to}
                   end={item.to === '/'}
                   className={({ isActive }) =>
-                    `flex h-9 shrink-0 flex-row items-center gap-2.5 rounded-md px-2.5 font-kai text-[14px] ${
+                    `flex h-11 shrink-0 flex-row items-center gap-2.5 rounded-md px-2.5 font-kai text-[14px] lg:h-9 ${
                       isActive
                         ? 'bg-ground font-bold text-carbon-deep'
                         : 'text-carbon hover:bg-ground/60'
@@ -106,6 +134,7 @@ export function AdminLayout() {
                     <>
                       <item.icon
                         size={16}
+                        aria-hidden="true"
                         className={isActive ? 'text-stamp' : 'text-carbon-soft'}
                       />
                       <span className="flex-1">{item.label}</span>
@@ -122,7 +151,11 @@ export function AdminLayout() {
           ))}
         </div>
 
-        <div className="flex flex-row items-center gap-2 border-t border-carbon-deep/13 px-2.5 pt-3">
+        <div
+          className={`flex flex-row items-center gap-2 border-t border-carbon-deep/13 px-2.5 pt-3 ${
+            menuOpen ? 'max-lg:pb-2' : 'max-lg:hidden'
+          }`}
+        >
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               status === 'online'

@@ -103,7 +103,7 @@ export function FlagDialog({
     >
       <div
         ref={dialogRef}
-        className="mx-4 flex w-full max-w-[448px] flex-col gap-5 rounded-md border border-carbon-deep/33 bg-ground p-6"
+        className="mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(448px,calc(100vw-2rem))] flex-col gap-5 overflow-y-auto rounded-md border border-carbon-deep/33 bg-ground p-6"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -198,7 +198,7 @@ export function FlagDialog({
 
         {error ? <AdminErrorNotice error={error} label="送出失敗" /> : null}
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button onClick={onClose} disabled={isSubmitting}>
             取消
           </Button>

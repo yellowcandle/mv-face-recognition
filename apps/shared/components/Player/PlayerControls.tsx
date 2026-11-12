@@ -21,7 +21,7 @@ interface PlayerControlsProps {
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const STEP =
-  'inline-flex h-8 items-center justify-center rounded-md px-2 font-mono text-[13px] text-carbon transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-45';
+  'inline-flex h-11 min-w-11 sm:h-8 sm:min-w-0 items-center justify-center rounded-md px-2 font-mono text-[13px] text-carbon transition-colors hover:bg-tint disabled:cursor-not-allowed disabled:opacity-45';
 
 /** A native range for input and keyboard, invisible over a drawn track. */
 function Slider({
@@ -85,7 +85,7 @@ export function PlayerControls({
   disabled,
 }: PlayerControlsProps) {
   return (
-    <div className="flex h-10 items-center gap-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:h-10 sm:flex-nowrap">
       <div className="flex items-center gap-1">
         <button
           className={STEP}
@@ -106,7 +106,7 @@ export function PlayerControls({
           <ChevronLeft size={16} aria-hidden />
         </button>
         <button
-          className="inline-flex size-10 items-center justify-center rounded-md bg-carbon-deep text-paper-light transition-colors hover:bg-carbon disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex size-11 sm:size-10 items-center justify-center rounded-md bg-carbon-deep text-paper-light transition-colors hover:bg-carbon disabled:cursor-not-allowed disabled:opacity-45"
           onClick={onTogglePlay}
           disabled={disabled}
           aria-label={isPlaying ? '暫停' : '播放'}
@@ -137,7 +137,7 @@ export function PlayerControls({
         {formatMmSs(currentTime)} / {formatMmSs(duration)}
       </span>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 max-sm:order-first max-sm:basis-full">
         <Slider
           label="播放位置"
           value={currentTime}
