@@ -132,12 +132,14 @@ export function SystemAdmin() {
   ];
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-6 px-8 pb-5 pt-8">
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-4 pb-5 pt-8 sm:px-8">
       <Masthead title="管理" hint="服務狀態與資料檢查">
-        <Button onClick={refreshAll}>重新檢查</Button>
+        <Button className="max-sm:h-11" onClick={refreshAll}>
+          重新檢查
+        </Button>
       </Masthead>
 
-      <div className="flex flex-row border-y border-carbon-deep/13 py-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-y border-carbon-deep/13 py-4 sm:flex sm:flex-row sm:gap-0">
         {counters.map((c) => (
           <div key={c.label} className="flex flex-1 flex-col gap-1">
             <span className="font-kai text-[13px] text-carbon-soft">{c.label}</span>
@@ -171,11 +173,11 @@ export function SystemAdmin() {
         <table className="w-full table-fixed border-collapse text-left">
           <thead>
             <tr className="h-7 border-b border-carbon-deep/33 font-kai text-[12px] text-ink-muted">
-              <th className="w-[264px] pr-4 font-normal">影片</th>
-              <th className="w-[100px] pr-4 font-normal">長度</th>
-              <th className="w-[128px] pr-4 font-normal">尺寸</th>
-              <th className="pr-4 font-normal">串流</th>
-              <th className="w-[108px] pr-4 text-right font-normal">已標註</th>
+              <th className="pr-4 font-normal sm:w-[264px]">影片</th>
+              <th className="pr-4 font-normal max-sm:hidden sm:w-[100px]">長度</th>
+              <th className="pr-4 font-normal max-sm:hidden sm:w-[128px]">尺寸</th>
+              <th className="pr-4 font-normal max-xl:hidden">串流</th>
+              <th className="w-[88px] pr-4 text-right font-normal sm:w-[108px]">已標註</th>
               <th className="w-[84px] font-normal">
                 <span className="sr-only">操作</span>
               </th>
@@ -192,16 +194,16 @@ export function SystemAdmin() {
                   >
                     {videoShortName(v.name)}
                   </td>
-                  <td className="pr-4 font-mono text-[12px] tabular-nums text-carbon-soft">
+                  <td className="pr-4 font-mono text-[12px] tabular-nums text-carbon-soft max-sm:hidden">
                     {typeof v.duration === 'number' && v.duration > 0
                       ? formatMmSs(v.duration)
                       : '—'}
                   </td>
-                  <td className="whitespace-nowrap pr-4 font-mono text-[12px] tabular-nums text-carbon-soft">
+                  <td className="whitespace-nowrap pr-4 font-mono text-[12px] tabular-nums text-carbon-soft max-sm:hidden">
                     {v.width && v.height ? `${v.width} × ${v.height}` : '—'}
                   </td>
                   <td
-                    className="truncate pr-4 font-mono text-[12px] text-carbon-soft"
+                    className="truncate pr-4 font-mono text-[12px] text-carbon-soft max-xl:hidden"
                     title={v.stream_url}
                   >
                     {v.stream_url || '—'}
@@ -240,7 +242,7 @@ export function SystemAdmin() {
         </table>
       </section>
 
-      <div className="flex flex-row gap-10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
         <section className="flex min-w-0 flex-1 flex-col gap-2">
           <h2 className="font-kai text-[18px] font-normal text-carbon-deep">發佈與部署</h2>
           <p className="font-kai text-[14px] text-carbon-soft">
@@ -261,7 +263,7 @@ export function SystemAdmin() {
           </ol>
         </section>
 
-        <section className="flex w-[360px] shrink-0 flex-col gap-2">
+        <section className="flex w-full shrink-0 flex-col gap-2 lg:w-[360px]">
           <h2 className="font-kai text-[18px] font-normal text-carbon-deep">讀取模型狀態</h2>
           <dl className="flex flex-col">
             {statusRows.map((row) => (
@@ -278,7 +280,7 @@ export function SystemAdmin() {
       </div>
 
       <div className="flex-1" />
-      <div className="flex flex-row items-center justify-between font-kai text-[12px] text-ink-muted">
+      <div className="flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 font-kai text-[12px] text-ink-muted">
         <span>{isEdge === false && '所有寫入只在這一台機器上發生'}</span>
         <span>存根 · 唯讀檢查</span>
       </div>

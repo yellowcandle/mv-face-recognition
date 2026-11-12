@@ -459,14 +459,19 @@ export function EmbeddingWorkbench() {
       : idle;
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-5 px-8 pb-5 pt-8">
-      <Masthead title="向量" hint="檢查覆蓋率、重建參考向量">
-        <div className="flex flex-row items-center gap-2">
-          <Button onClick={() => void runRefresh('embedding-update')} disabled={running !== null}>
+    <div className="flex min-h-full flex-1 flex-col gap-5 px-4 pb-5 pt-8 sm:px-8">
+      <Masthead fill title="向量" hint="檢查覆蓋率、重建參考向量">
+        <div className="flex flex-row flex-wrap items-center gap-2 max-sm:w-full">
+          <Button
+            className="max-sm:h-11 max-sm:grow"
+            onClick={() => void runRefresh('embedding-update')}
+            disabled={running !== null}
+          >
             {refreshLabel('embedding-update', '重建全部參考向量')}
           </Button>
           <Button
             variant="primary"
+            className="max-sm:h-11 max-sm:grow"
             onClick={() => void runRefresh('coverage-refresh')}
             disabled={running !== null || isEdge}
           >
@@ -497,8 +502,8 @@ export function EmbeddingWorkbench() {
 
       {/* Live job progress: the polled percent, the reel in flight, and elapsed time. */}
       {running && (
-        <div className="flex flex-row items-center gap-3 rounded-md border border-carbon-deep/13 px-4 py-2">
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-carbon-deep/13">
+        <div className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-carbon-deep/13 px-4 py-2">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-carbon-deep/13 max-sm:basis-full">
             <div
               className="h-full rounded-full bg-carbon-deep transition-[width] duration-300"
               style={{ width: `${jobProgress.percent}%` }}
@@ -512,7 +517,7 @@ export function EmbeddingWorkbench() {
           </span>
           {jobProgress.video && (
             <span
-              className="max-w-[220px] truncate font-kai text-[13px] text-carbon-soft"
+              className="min-w-0 max-w-[220px] truncate font-kai text-[13px] text-carbon-soft"
               title={jobProgress.video}
             >
               {videoShortName(jobProgress.video)}
@@ -528,7 +533,7 @@ export function EmbeddingWorkbench() {
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={`-mb-px cursor-pointer border-b-2 pb-2 font-kai text-[14px] leading-tight ${
+            className={`-mb-px cursor-pointer border-b-2 pb-2 font-kai max-sm:py-3 text-[14px] leading-tight ${
               activeTab === tab.id
                 ? 'border-stamp font-bold text-carbon-deep'
                 : 'border-transparent text-carbon-soft hover:text-carbon-deep'
@@ -553,15 +558,15 @@ export function EmbeddingWorkbench() {
           {/* 覆蓋率 */}
           {activeTab === 'coverage' && summary && figures && (
             <>
-              <div className="flex flex-row border-b border-carbon-deep/13 pb-4">
+              <div className="flex flex-col gap-4 border-b border-carbon-deep/13 pb-4 sm:flex-row sm:gap-0">
                 <Figure label="覆蓋率" value={figures.covered} note={figures.coveredNote} />
                 <Figure label="平均配對分數" value={figures.average} note="全部配對的餘弦平均" />
                 <Figure label="辨識率" value={figures.rate} note={figures.rateNote} />
               </div>
 
-              <div className="flex flex-row items-end justify-between">
+              <div className="flex flex-row flex-wrap items-end justify-between gap-x-4 gap-y-2">
                 <h2 className="font-kai text-[18px] font-normal text-carbon-deep">參賽者</h2>
-                <div className="flex flex-row items-center gap-4 font-kai text-[12px] text-carbon-soft">
+                <div className="flex flex-row flex-wrap items-center gap-x-4 gap-y-1 font-kai text-[12px] text-carbon-soft">
                   {QUALITIES.map((q) => (
                     <span key={q} className="flex flex-row items-center gap-1.5">
                       <span aria-hidden className={`size-2 ${QUALITY_SWATCH[q]}`} />
@@ -617,11 +622,11 @@ export function EmbeddingWorkbench() {
           {activeTab === 'detail' &&
             (selectedContestant ? (
               <>
-                <div className="flex flex-row items-center gap-3">
+                <div className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="-ml-3"
+                    className="-ml-3 max-sm:h-11"
                     onClick={() => setActiveTab('coverage')}
                   >
                     <ArrowLeft aria-hidden className="size-4" />
@@ -637,6 +642,7 @@ export function EmbeddingWorkbench() {
                   <Button
                     variant="primary"
                     size="sm"
+                    className="max-sm:h-11 max-sm:w-full"
                     onClick={() => void runRefresh('coverage-refresh')}
                     disabled={running !== null || isEdge}
                     title={
@@ -649,8 +655,8 @@ export function EmbeddingWorkbench() {
                   </Button>
                 </div>
 
-                <div className="flex flex-row gap-10">
-                  <div className="flex w-[340px] shrink-0 flex-col gap-5">
+                <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+                  <div className="flex w-full shrink-0 flex-col gap-5 max-lg:order-last lg:w-[340px]">
                     <section className="flex flex-col gap-2">
                       <h3 className="font-kai text-[18px] font-normal text-carbon-deep">
                         參考來源
@@ -729,7 +735,7 @@ export function EmbeddingWorkbench() {
                         沒有可對應到影片的面孔紀錄。
                       </p>
                     ) : (
-                      <div className="grid grid-cols-4 gap-x-3 gap-y-4 border-t border-carbon-deep/13 pt-3">
+                      <div className="grid grid-cols-2 gap-x-3 sm:grid-cols-4 gap-y-4 border-t border-carbon-deep/13 pt-3">
                         {detections.map((r, i) => {
                           const video = videoById.get(r.video_id);
                           return (
@@ -791,13 +797,16 @@ export function EmbeddingWorkbench() {
                 正在讀取相似度資料…
               </div>
             ) : similarityData ? (
-              <div className="flex flex-row gap-10">
-                <section className="flex shrink-0 flex-col gap-2">
+              <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+                <section className="flex min-w-0 shrink-0 flex-col gap-2">
                   <h2 className="font-kai text-[18px] font-normal text-carbon-deep">
                     參賽者兩兩相似度（{similarityData.stats.contestant_count} ×{' '}
                     {similarityData.stats.contestant_count}）
                   </h2>
-                  <div className="relative self-start" onMouseLeave={hideHeatmapTooltip}>
+                  <div
+                    className="relative max-w-full self-start max-lg:overflow-x-auto"
+                    onMouseLeave={hideHeatmapTooltip}
+                  >
                     <canvas
                       ref={heatmapCanvasRef}
                       className="block outline-1 outline-carbon-deep/33"
@@ -852,7 +861,7 @@ export function EmbeddingWorkbench() {
                       <button
                         key={`${pair.contestant_a.id}-${pair.contestant_b.id}`}
                         type="button"
-                        className={`flex h-8 w-full cursor-pointer flex-row items-center gap-2 rounded border-b border-carbon-deep/13 px-2 text-left hover:bg-tint ${
+                        className={`flex h-11 w-full cursor-pointer sm:h-8 flex-row items-center gap-2 rounded border-b border-carbon-deep/13 px-2 text-left hover:bg-tint ${
                           hoveredLabels && isPair(pair, hoveredLabels[0].id, hoveredLabels[1].id)
                             ? 'bg-tint'
                             : ''
