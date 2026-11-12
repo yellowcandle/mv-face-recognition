@@ -145,8 +145,8 @@ export function PlayerPage() {
   const rendition = renditionLabel(video?.height);
 
   return (
-    <div className="flex min-h-full flex-1 flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-4 pb-5 pl-14 pr-8 pt-8">
+    <div className="flex min-h-full flex-1 flex-col lg:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 px-4 pb-5 pt-6 sm:pl-14 sm:pr-8 sm:pt-8">
         <div className="flex flex-row items-center gap-3">
           <Link
             to="/"
@@ -206,7 +206,7 @@ export function PlayerPage() {
           ))}
         </div>
 
-        <div className="flex flex-row items-center gap-4">
+        <div className="flex flex-row items-center gap-3 sm:gap-4">
           <Button
             variant="primary"
             onClick={togglePlay}
@@ -243,11 +243,11 @@ export function PlayerPage() {
             <span className="font-mono text-[13px] tabular-nums text-carbon-deep">
               {faces.length} · {matched.length}
             </span>
-            <span className="font-kai text-[12px] text-ink-muted">偵測 / 配對</span>
+            <span className="font-kai text-[12px] text-ink-muted max-sm:hidden">偵測 / 配對</span>
           </span>
         </div>
 
-        <div className="grid grid-cols-5 gap-4 border-t border-carbon-deep/13 pt-4">
+        <div className="grid grid-cols-2 gap-4 border-t border-carbon-deep/13 pt-4 sm:grid-cols-3 lg:grid-cols-5">
           {matched.map((face, i) => (
             <div key={i} className="flex min-w-0 flex-row items-center gap-2.5">
               <div className="flex h-20 w-[60px] shrink-0 justify-center overflow-hidden rounded bg-tint">
@@ -273,13 +273,13 @@ export function PlayerPage() {
             </div>
           ))}
           {matched.length === 0 && (
-            <span className="col-span-5 font-kai text-[13px] text-ink-muted">
+            <span className="col-span-full font-kai text-[13px] text-ink-muted">
               這一格沒有已核對的人臉
             </span>
           )}
         </div>
 
-        <div className="mt-auto flex flex-row items-center justify-between font-kai text-[12px] tabular-nums text-ink-muted">
+        <div className="mt-auto flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 font-kai text-[12px] tabular-nums text-ink-muted">
           <span>
             影格 {summary?.frames_processed.toLocaleString('en-US') ?? '—'} · 偵測{' '}
             {summary?.total_faces_detected.toLocaleString('en-US') ?? '—'} · 辨識{' '}
@@ -292,7 +292,7 @@ export function PlayerPage() {
       </div>
 
       {/* 第二聯 — the carbon copy carries the queue, never a write. */}
-      <aside className="flex w-[330px] shrink-0 flex-col gap-4 border-l border-carbon-deep/13 bg-tint px-6 pb-5 pt-8">
+      <aside className="flex shrink-0 flex-col gap-4 border-t border-carbon-deep/13 bg-tint px-4 pb-5 pt-6 sm:px-6 lg:w-[330px] lg:border-l lg:border-t-0 lg:pt-8">
         <div className="flex flex-col gap-1">
           <span className="font-kai text-[13px] text-carbon-soft">本卷出場</span>
           <div className="flex flex-row items-end gap-2">

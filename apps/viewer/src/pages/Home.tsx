@@ -40,10 +40,10 @@ export function Home() {
   ];
 
   return (
-    <div className="flex min-h-full flex-1 flex-col gap-6 px-14 pb-5 pt-8">
+    <div className="flex min-h-full flex-1 flex-col gap-6 px-4 pb-5 pt-6 sm:px-14 sm:pt-8">
       <Masthead title="點唱單" hint="選片入口 · 點唱單" />
 
-      <div className="flex flex-row gap-14">
+      <div className="flex flex-col gap-8 lg:flex-row lg:gap-14">
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-row items-end justify-between border-b border-carbon-deep/33 pb-3 font-kai text-[13px] leading-tight tabular-nums text-carbon-soft">
             <span>{isLoading ? '—' : reelRange(videos.length)}</span>
@@ -98,7 +98,7 @@ export function Home() {
           )}
         </div>
 
-        <aside className="flex w-[360px] shrink-0 flex-col gap-3">
+        <aside className="flex shrink-0 flex-col gap-3 lg:w-[360px]">
           <span className="font-kai text-[13px] text-carbon-soft">此刻</span>
           <span className="font-mono text-[28px] leading-tight tabular-nums text-carbon-deep">
             {summary ? summary.total_faces_recognized.toLocaleString('en-US') : '—'}
@@ -127,7 +127,7 @@ export function Home() {
             <h2 className="font-kai text-[18px] font-normal text-carbon-deep">常駐面孔</h2>
             <span className="font-kai text-[12px] text-ink-muted">全部影片合計出場最多</span>
           </div>
-          <div className="flex flex-row gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {regulars.map((c) => (
               <div key={c.id} className="flex min-w-0 flex-1 flex-row items-center gap-4">
                 <div className="relative h-[204px] w-[152px] shrink-0 overflow-hidden rounded bg-tint">
