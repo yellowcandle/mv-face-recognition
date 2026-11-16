@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router';
-import { BookOpen, House, Play, Users } from 'lucide-react';
+import { BookOpen, Camera, House, Play, Users } from 'lucide-react';
 
 const NAV = [
   { to: '/', label: '首頁', icon: House },
   { to: '/player', label: '播放', icon: Play },
   { to: '/analytics', label: '紀錄', icon: BookOpen },
   { to: '/cast', label: '名冊', icon: Users },
+  { to: '/street', label: '街拍', icon: Camera },
 ];
 
 export function ViewerLayout() {
