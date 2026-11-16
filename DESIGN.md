@@ -270,6 +270,11 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
   contestant as a candidate *below* the acceptance threshold. The page carries the source, the
   copyright note and an instruction to ask for removal by replying to the original post; the photos
   are copies in R2 under `reports/street-photos-2026-11-15/` and are removed with the page.
+- The publish reads `source/photo/contestants/reference_manifest.json` for every contestant's
+  reference count, unless `MV_REFERENCE_MANIFEST` names another manifest. Use the deployed one when
+  publishing for the deployed gallery: the local manifest describes this machine's cache (756 on
+  2026-11-17), the bucket one describes what the HF cache job wrote (952), and 名冊 shows the number
+  it is given.
 - Human verdicts feed the reference cache. An accepted **flag** and a `contestant` **label** both
   assert whose face a detection is, so `mvp-processor/scripts/promote_flags.py` resolves each one to
   that detection's stored embedding (box and timestamp must match a detection the run produced; a
@@ -318,7 +323,6 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
 - [ ] The local API's `/api/contestants/N/thumb/face` returns full 2048 px stills, and returns
       HTTP 200 even for a contestant with no references, so 缺 contestants get an image (the
       deployed copy is a 512px WebP crop).
-- [ ] 名冊 counts 67 (Sarah) and 77 (TABI) as 有相 although they have no references.
 - [ ] Viewer 播放 queue re-lists anyone absent for one frame; its `R2` footer is hardcoded.
 - [ ] Viewer 首頁 treats a videos error as empty. Similarity errors show the no-data message.
 - [ ] 標註 rail keeps the previous video's labels while blocked. Appearance errors on 參賽者 read
