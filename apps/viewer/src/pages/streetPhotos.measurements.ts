@@ -12,8 +12,8 @@ import type { MeasuredImage, NamedContestant } from './streetPhotos.data';
 export const JOB_THRESHOLD = 0.35;
 export const SITE_THRESHOLD = 0.412;
 
-export const REFERENCE_COUNT = 759;
-export const CONTESTANT_COUNT = 94;
+export const REFERENCE_COUNT = 952;
+export const CONTESTANT_COUNT = 96;
 
 export const STREET_IMAGES: MeasuredImage[] = [
   {
@@ -27,9 +27,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.0462, 0.3626, 0.0656, 0.3976],
         px: [21, 28],
         det_score: 0.746,
-        top1: 0.169,
+        top1: 0.17,
         top2: 0.165,
-        margin: 0.004,
+        margin: 0.005,
         candidate: null,
       },
       {
@@ -37,9 +37,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.186, 0.3242, 0.2107, 0.3897],
         px: [26, 53],
         det_score: 0.568,
-        top1: 0.153,
+        top1: 0.154,
         top2: 0.125,
-        margin: 0.027,
+        margin: 0.029,
         candidate: null,
       },
       {
@@ -47,9 +47,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.2784, 0.2628, 0.3114, 0.3174],
         px: [35, 44],
         det_score: 0.891,
-        top1: 0.388,
-        top2: 0.169,
-        margin: 0.218,
+        top1: 0.389,
+        top2: 0.251,
+        margin: 0.138,
         candidate: { id: '22', name: '林暐翹', nickname: '暐翹' },
       },
       {
@@ -57,8 +57,8 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.3627, 0.317, 0.3939, 0.3722],
         px: [33, 44],
         det_score: 0.853,
-        top1: 0.264,
-        top2: 0.229,
+        top1: 0.267,
+        top2: 0.232,
         margin: 0.035,
         candidate: null,
       },
@@ -77,9 +77,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.5047, 0.293, 0.5338, 0.3491],
         px: [31, 45],
         det_score: 0.84,
-        top1: 0.227,
-        top2: 0.213,
-        margin: 0.014,
+        top1: 0.231,
+        top2: 0.214,
+        margin: 0.017,
         candidate: null,
       },
       {
@@ -87,9 +87,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.574, 0.2746, 0.6061, 0.3349],
         px: [34, 49],
         det_score: 0.891,
-        top1: 0.325,
-        top2: 0.235,
-        margin: 0.09,
+        top1: 0.327,
+        top2: 0.224,
+        margin: 0.103,
         candidate: null,
       },
       {
@@ -97,9 +97,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.6453, 0.2714, 0.6775, 0.3328],
         px: [34, 49],
         det_score: 0.852,
-        top1: 0.317,
+        top1: 0.319,
         top2: 0.242,
-        margin: 0.074,
+        margin: 0.076,
         candidate: null,
       },
       {
@@ -107,9 +107,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.7033, 0.2941, 0.7292, 0.3488],
         px: [28, 44],
         det_score: 0.802,
-        top1: 0.248,
-        top2: 0.19,
-        margin: 0.058,
+        top1: 0.247,
+        top2: 0.194,
+        margin: 0.053,
         candidate: null,
       },
       {
@@ -117,9 +117,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.7289, 0.2874, 0.7635, 0.3479],
         px: [37, 49],
         det_score: 0.881,
-        top1: 0.276,
-        top2: 0.255,
-        margin: 0.022,
+        top1: 0.279,
+        top2: 0.264,
+        margin: 0.014,
         candidate: null,
       },
       {
@@ -127,9 +127,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.7881, 0.313, 0.8194, 0.3713],
         px: [33, 47],
         det_score: 0.837,
-        top1: 0.212,
-        top2: 0.205,
-        margin: 0.007,
+        top1: 0.214,
+        top2: 0.21,
+        margin: 0.004,
         candidate: null,
       },
       {
@@ -139,7 +139,7 @@ export const STREET_IMAGES: MeasuredImage[] = [
         det_score: 0.534,
         top1: 0.213,
         top2: 0.185,
-        margin: 0.029,
+        margin: 0.027,
         candidate: null,
       },
       {
@@ -147,8 +147,8 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.8791, 0.3035, 0.9157, 0.3636],
         px: [39, 48],
         det_score: 0.736,
-        top1: 0.186,
-        top2: 0.172,
+        top1: 0.187,
+        top2: 0.173,
         margin: 0.014,
         candidate: null,
       },
@@ -165,9 +165,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.2976, 0.3921, 0.3107, 0.4167],
         px: [14, 20],
         det_score: 0.793,
-        top1: 0.233,
-        top2: 0.219,
-        margin: 0.013,
+        top1: 0.247,
+        top2: 0.233,
+        margin: 0.014,
         candidate: null,
       },
       {
@@ -176,8 +176,8 @@ export const STREET_IMAGES: MeasuredImage[] = [
         px: [15, 19],
         det_score: 0.801,
         top1: 0.207,
-        top2: 0.171,
-        margin: 0.036,
+        top2: 0.175,
+        margin: 0.032,
         candidate: null,
       },
       {
@@ -185,9 +185,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.364, 0.3989, 0.3736, 0.4211],
         px: [10, 18],
         det_score: 0.667,
-        top1: 0.224,
+        top1: 0.226,
         top2: 0.212,
-        margin: 0.012,
+        margin: 0.014,
         candidate: null,
       },
       {
@@ -195,9 +195,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.413, 0.4039, 0.4259, 0.4271],
         px: [13, 18],
         det_score: 0.758,
-        top1: 0.227,
+        top1: 0.23,
         top2: 0.195,
-        margin: 0.032,
+        margin: 0.035,
         candidate: null,
       },
       {
@@ -205,9 +205,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.4371, 0.3978, 0.4517, 0.4238],
         px: [15, 21],
         det_score: 0.732,
-        top1: 0.202,
-        top2: 0.198,
-        margin: 0.003,
+        top1: 0.222,
+        top2: 0.202,
+        margin: 0.02,
         candidate: null,
       },
       {
@@ -216,8 +216,8 @@ export const STREET_IMAGES: MeasuredImage[] = [
         px: [15, 21],
         det_score: 0.825,
         top1: 0.245,
-        top2: 0.222,
-        margin: 0.023,
+        top2: 0.224,
+        margin: 0.021,
         candidate: null,
       },
       {
@@ -225,9 +225,9 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.5036, 0.3821, 0.5158, 0.4067],
         px: [13, 19],
         det_score: 0.762,
-        top1: 0.326,
-        top2: 0.186,
-        margin: 0.14,
+        top1: 0.327,
+        top2: 0.218,
+        margin: 0.109,
         candidate: null,
       },
       {
@@ -255,8 +255,8 @@ export const STREET_IMAGES: MeasuredImage[] = [
         box: [0.6343, 0.3964, 0.649, 0.42],
         px: [15, 19],
         det_score: 0.643,
-        top1: 0.164,
-        top2: 0.16,
+        top1: 0.166,
+        top2: 0.162,
         margin: 0.004,
         candidate: null,
       },
@@ -265,11 +265,11 @@ export const STREET_IMAGES: MeasuredImage[] = [
 ];
 
 export const CUTOFF_SWEEP = [
-  { cutoff: 0.25, rate: 0.8906 },
-  { cutoff: 0.3, rate: 0.4928 },
-  { cutoff: 0.35, rate: 0.1186 },
-  { cutoff: 0.38, rate: 0.0461 },
-  { cutoff: 0.412, rate: 0.0119 },
+  { cutoff: 0.25, rate: 0.9244 },
+  { cutoff: 0.3, rate: 0.5462 },
+  { cutoff: 0.35, rate: 0.1292 },
+  { cutoff: 0.38, rate: 0.0525 },
+  { cutoff: 0.412, rate: 0.0168 },
 ];
 
 export const FACE_SIZE_CEILING = [
@@ -281,11 +281,11 @@ export const FACE_SIZE_CEILING = [
 ];
 
 export const MATCHER_CHECK = {
-  genuineMean: 0.6,
-  genuineP05: 0.377,
-  genuineAboveThreshold: 0.925,
-  impostorMax: 0.445,
-  impostorAboveThreshold: 0.015,
+  genuineMean: 0.628,
+  genuineP05: 0.441,
+  genuineAboveThreshold: 0.955,
+  impostorMax: 0.43,
+  impostorAboveThreshold: 0.02,
 };
 
 export const NAMED_PRESENT: NamedContestant[] = [
@@ -293,7 +293,7 @@ export const NAMED_PRESENT: NamedContestant[] = [
     id: '22',
     nickname: '暐翹',
     name: '林暐翹',
-    best: 0.388,
+    best: 0.389,
     rank: 1,
     face: '一-3',
     px: [35, 44],
@@ -304,8 +304,8 @@ export const NAMED_PRESENT: NamedContestant[] = [
     id: '15',
     nickname: 'Carina',
     name: '李晞彤',
-    best: 0.325,
-    rank: 3,
+    best: 0.327,
+    rank: 2,
     face: '一-7',
     px: [34, 49],
     aboveNoise: true,
@@ -315,7 +315,7 @@ export const NAMED_PRESENT: NamedContestant[] = [
     id: '83',
     nickname: '何佩',
     name: '何佩婷',
-    best: 0.264,
+    best: 0.267,
     rank: 6,
     face: '一-4',
     px: [33, 44],
@@ -327,7 +327,7 @@ export const NAMED_PRESENT: NamedContestant[] = [
     nickname: '咖喱',
     name: '黃雅慧',
     best: 0.261,
-    rank: 7,
+    rank: 8,
     face: '一-5',
     px: [35, 47],
     aboveNoise: true,
@@ -337,8 +337,8 @@ export const NAMED_PRESENT: NamedContestant[] = [
     id: '14',
     nickname: 'Elka',
     name: '鄭芷淇',
-    best: 0.238,
-    rank: 15,
+    best: 0.239,
+    rank: 17,
     face: '一-10',
     px: [37, 49],
     aboveNoise: false,
@@ -349,7 +349,7 @@ export const NAMED_PRESENT: NamedContestant[] = [
     nickname: 'Karen',
     name: '余嘉熙',
     best: 0.219,
-    rank: 24,
+    rank: 26,
     face: '二-1',
     px: [14, 20],
     aboveNoise: false,
@@ -360,9 +360,20 @@ export const NAMED_PRESENT: NamedContestant[] = [
     nickname: '馬欣',
     name: '馬彩欣',
     best: 0.212,
-    rank: 29,
+    rank: 32,
     face: '二-3',
     px: [10, 18],
+    aboveNoise: false,
+    maybe: false,
+  },
+  {
+    id: '5',
+    nickname: '莎莎',
+    name: '坂部佩莎',
+    best: 0.208,
+    rank: 35,
+    face: '一-8',
+    px: [34, 49],
     aboveNoise: false,
     maybe: false,
   },
@@ -371,20 +382,9 @@ export const NAMED_PRESENT: NamedContestant[] = [
     nickname: '蘇菲',
     name: '陳莉詩',
     best: 0.207,
-    rank: 32,
+    rank: 36,
     face: '二-9',
     px: [13, 17],
-    aboveNoise: false,
-    maybe: false,
-  },
-  {
-    id: '5',
-    nickname: '莎莎',
-    name: '坂部佩莎',
-    best: 0.206,
-    rank: 33,
-    face: '一-8',
-    px: [34, 49],
     aboveNoise: false,
     maybe: false,
   },
@@ -392,8 +392,8 @@ export const NAMED_PRESENT: NamedContestant[] = [
     id: '27',
     nickname: 'Ada 仔',
     name: '姜咏鑫',
-    best: 0.186,
-    rank: 44,
+    best: 0.187,
+    rank: 48,
     face: '二-1',
     px: [14, 20],
     aboveNoise: false,
@@ -404,7 +404,7 @@ export const NAMED_PRESENT: NamedContestant[] = [
     nickname: 'Ivy So',
     name: '蘇雅琳',
     best: 0.143,
-    rank: 73,
+    rank: 81,
     face: '一-5',
     px: [35, 47],
     aboveNoise: false,
@@ -412,17 +412,16 @@ export const NAMED_PRESENT: NamedContestant[] = [
   },
 ];
 
-export const ROSTER_NOISE = { mean: 0.18, p90: 0.241, max: 0.326 };
+export const ROSTER_NOISE = { mean: 0.185, p90: 0.245, max: 0.327 };
 
 export const OPEN_TOP1 = {
   boxes: 23,
-  distinct: 16,
+  distinct: 17,
   repeated: [
     { nickname: '嘉嘉', times: 3 },
     { nickname: 'Carina', times: 2 },
     { nickname: 'Sica', times: 2 },
     { nickname: '暐翹', times: 2 },
-    { nickname: '阿 Yo', times: 2 },
     { nickname: '阿蛋', times: 2 },
   ],
 };
@@ -434,17 +433,17 @@ export const RESOLUTION_LADDER = {
     { label: '4032 px 原檔', width: 4032, faces: 13, facePx: '74–140' },
   ],
   rows: [
-    { nickname: '暐翹', scores: [0.388, 0.375, 0.392] },
-    { nickname: 'Carina', scores: [0.325, 0.323, 0.325] },
-    { nickname: '何佩', scores: [0.264, 0.291, 0.226] },
+    { nickname: '暐翹', scores: [0.389, 0.376, 0.393] },
+    { nickname: 'Carina', scores: [0.327, 0.326, 0.327] },
+    { nickname: '何佩', scores: [0.267, 0.294, 0.228] },
     { nickname: '咖喱', scores: [0.261, 0.309, 0.265] },
   ],
 };
 
 export const POST_PHOTOS = [
-  { n: 1, served: '4032×3024', faces: 13, facePx: '74–140', best: 0.392 },
+  { n: 1, served: '4032×3024', faces: 13, facePx: '74–140', best: 0.393 },
   { n: 2, served: '640×480', faces: 12, facePx: '12–23', best: 0.334 },
-  { n: 3, served: '640×480', faces: 8, facePx: '8–9', best: 0.24 },
+  { n: 3, served: '640×480', faces: 8, facePx: '8–9', best: 0.242 },
 ];
 
 export const VIVA_COVERAGE = { members: 4, inRoster: 2 };

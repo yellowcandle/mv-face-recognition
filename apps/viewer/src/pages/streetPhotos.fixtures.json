@@ -1,10 +1,11 @@
 {
   "note": "Frames are not committed: they are a third party's photographs. Fetch these URLs, check the sha256, then run scripts/street_snapshot.py --frames <dir>.",
   "gallery": {
-    "path": "../source/photo/contestants/reference_embeddings.npz",
-    "sha256": "4d19fef76cfadd67f41f2570824acd1c6677f75e25a5f41af689fdf76fa545c8",
-    "reference_count": 759,
-    "contestant_count": 94
+    "label": "hf://buckets/yellowcandle/mv-face-recognition/models/reference/reference_embeddings.npz",
+    "sha256": "a0a15f0f6de6b57140513e190d7feea547595b81f7c3dad1cd251256df3d5d38",
+    "measured_from": "the file given by --gallery",
+    "reference_count": 952,
+    "contestant_count": 96
   },
   "frames": [
     {

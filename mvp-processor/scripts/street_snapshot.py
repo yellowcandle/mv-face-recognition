@@ -337,6 +337,21 @@ def main() -> int:
     )
     parser.add_argument("--check", action="store_true", help="diff against the committed module; write nothing")
     parser.add_argument("--config", type=Path, default=Path(__file__).resolve().parents[1] / "config/processing_config.yaml")
+    parser.add_argument(
+        "--gallery-label",
+        default=None,
+        help="stable name for --gallery in the fixtures (a bucket URI, say). Without it the path is "
+        "recorded, which is wrong for a file outside the repo: the sha256 is the identity, the "
+        "label is where to fetch it.",
+    )
+    parser.add_argument(
+        "--gallery",
+        type=Path,
+        default=None,
+        help="reference_embeddings.npz to measure against; defaults to the one in the config's "
+        "photo_dir. Point this at the deployed cache (bucket models/reference) to publish numbers "
+        "that describe what the site actually serves, not what this machine happens to hold.",
+    )
     args = parser.parse_args()
 
     config = yaml.safe_load(args.config.read_text())
@@ -346,7 +361,7 @@ def main() -> int:
     # whose manifest count disagrees with the file. That gate is right for a reel run — matching
     # against a half-rebuilt gallery is how a reel gets silently wrong names — but this script
     # snapshots a gallery and records its hash, so the counts are evidence, not a precondition.
-    gallery_path = Path(config["contestants"]["photo_dir"]) / "reference_embeddings.npz"
+    gallery_path = args.gallery or (Path(config["contestants"]["photo_dir"]) / "reference_embeddings.npz")
     with np.load(gallery_path, allow_pickle=False) as cache:
         if "embeddings" not in cache.files or "contestant_ids" not in cache.files:
             raise SystemExit(
@@ -543,8 +558,9 @@ def main() -> int:
         # The gallery decides every cosine here, and it is rebuilt independently of this page, so
         # the snapshot names the exact vector file it measured.
         "gallery": {
-            "path": str(gallery_path),
+            "label": args.gallery_label or _describe_gallery(gallery_path),
             "sha256": gallery_digest,
+            "measured_from": "the file given by --gallery" if args.gallery else "the config's photo_dir",
             "reference_count": int(len(references)),
             "contestant_count": int(len(set(ids))),
         },
@@ -576,6 +592,15 @@ def main() -> int:
     args.manifest.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     print(f"wrote {args.out} and {args.manifest}")
     return 0
+
+
+def _describe_gallery(path: Path) -> str:
+    """A name that survives the machine: repo-relative when it can, the bare name otherwise."""
+    repo = Path(__file__).resolve().parents[2]
+    try:
+        return str(path.resolve().relative_to(repo))
+    except ValueError:
+        return path.name
 
 
 def _literals(text: str) -> list[str]:
