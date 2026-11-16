@@ -3,7 +3,8 @@ import type { PropsWithChildren, ButtonHTMLAttributes, ReactNode } from 'react';
 interface ButtonProps extends PropsWithChildren<ButtonHTMLAttributes<HTMLButtonElement>> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
-  /** The keyboard shortcut shown after the label, e.g. `1` or `↓`. Display only: bind it yourself. */
+  /** The keyboard shortcut shown after the label, e.g. `1` or `↓`. Display only: bind it yourself.
+   *  Hidden on phones. */
   keycap?: ReactNode;
 }
 
@@ -36,7 +37,8 @@ export function Button({
       {children}
       {keycap != null ? (
         <kbd
-          className={`font-mono text-[12px] font-normal ${
+          // Phones have no keyboard to press it on.
+          className={`font-mono text-[12px] font-normal max-sm:hidden ${
             variant === 'primary' ? 'text-paper-light/80' : 'text-ink-muted'
           }`}
         >

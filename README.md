@@ -8,7 +8,7 @@ pipeline that turns reels into per-detection metadata.
 
 | Surface | Where | Port / host | Notes |
 | --- | --- | --- | --- |
-| Viewer (read-only) | `apps/viewer` | `localhost:5180` | 圖庫, 點唱單, 名冊, 紀錄 |
+| Viewer (read-only) | `apps/viewer` | `localhost:5180` | 首頁, 播放, 紀錄, 名冊, 街拍 |
 | Admin (writable) | `apps/admin` | `localhost:5173` | 儀表, 待核, 標註, 參賽者, 播放, 處理, 向量 |
 | Local API | `mvp-processor/src/local_api.py` | `localhost:8000` | dense metadata, faces at a timestamp, labels, flag tray |
 | Worker | `worker/` | Cloudflare | serves KV; advertises `GET, OPTIONS` only ([ADR 0003](docs/adr/0003-the-deployed-worker-is-read-only.md)) |

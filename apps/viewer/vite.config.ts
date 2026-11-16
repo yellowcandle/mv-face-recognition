@@ -21,6 +21,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Report images live in R2 and are served by the Worker; the local API has no /videos.
+      '/videos': {
+        target: 'https://mv.herballemon.dev',
+        changeOrigin: true,
+      },
     },
     fs: {
       allow: ['..'],

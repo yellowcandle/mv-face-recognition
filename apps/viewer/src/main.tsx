@@ -7,6 +7,7 @@ import { Home } from '@/pages/Home';
 import { PlayerPage } from '@/pages/PlayerPage';
 import { Analytics } from '@/pages/Analytics';
 import { Cast } from '@/pages/Cast';
+import { StreetPhotos } from '@/pages/StreetPhotos';
 import './app.css';
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<Home />} />
             <Route path="player" element={<PlayerPage />} />
             <Route path="cast" element={<Cast />} />
+            <Route path="street" element={<StreetPhotos />} />
             <Route path="analytics" element={<Analytics />} />
           </Route>
         </Routes>

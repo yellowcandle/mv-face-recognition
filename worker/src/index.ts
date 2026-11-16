@@ -349,7 +349,7 @@ export default {
 
       // Static frontend files
       logger.debug(`Routing to static handler: ${pathname}`);
-      return await handleStaticRequest(pathname, corsHeaders);
+      return await handleStaticRequest(pathname, corsHeaders, new URL(request.url).origin);
     } catch (error) {
       // Use structured error handling
       if (error instanceof AppError) {
@@ -3391,9 +3391,16 @@ async function handleVideoRequest(
       });
     }
 
+    // The bucket holds stills as well as reels (report images), so the type cannot be a constant.
+    const storedType = object.httpMetadata?.contentType;
     const headers: Record<string, string> = {
       ...corsHeaders,
-      'Content-Type': 'video/mp4',
+      // `put` records `application/octet-stream` when it cannot infer a type; that is not a type
+      // worth serving, so fall through to the key's extension for stills and reels alike.
+      'Content-Type':
+        storedType && !/^(application|binary)\/octet-stream$/.test(storedType)
+          ? storedType
+          : getContentType(object.key),
       'Cache-Control': 'public, max-age=86400',
     };
 
@@ -3436,7 +3443,48 @@ async function handleVideoRequest(
 /**
  * Handle static frontend files
  */
-async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): Promise<Response> {
+/**
+ * Per-route document heads for the one SPA shell.
+ *
+ * A reader arriving from a shared link gets whatever the shell promises them: the browser tab
+ * needs the route's title, and a link unfurl needs `og:title`, `og:description` and an image.
+ * Only routes listed here are rewritten; everything else keeps the shell's own head.
+ */
+const ROUTE_HEADS: Record<string, { title: string; description: string; image?: string }> = {
+  street: {
+    title: '銅鑼灣呢隊係咩團？全民造星 IV / VIVA · 街拍判讀 | MV Face Recognition',
+    description:
+      '帖文問「呢隊係咩團」，答案：全民造星 IV 的參賽者，其中 Carina、Ada 屬 VIVA。逐個臉框對過 638 個參考向量——人手認得九位，系統只認得一位，附完整數字與原因。',
+    image: '/videos/reports/street-photos-2026-11-15/frame-1.jpg',
+  },
+};
+
+function applyRouteHead(html: string, assetKey: string, origin: string): string {
+  const head = ROUTE_HEADS[assetKey.replace(/\.html$/, '')];
+  if (!head) return html;
+  const attr = (value: string) =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const tags = [
+    `<meta name="description" content="${attr(head.description)}" />`,
+    `<meta property="og:type" content="article" />`,
+    `<meta property="og:url" content="${attr(`${origin}/${assetKey}`)}" />`,
+    `<meta property="og:title" content="${attr(head.title)}" />`,
+    `<meta property="og:description" content="${attr(head.description)}" />`,
+    head.image ? `<meta property="og:image" content="${attr(origin + head.image)}" />` : '',
+    `<meta name="twitter:card" content="summary_large_image" />`,
+  ]
+    .filter(Boolean)
+    .join('\n    ');
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${attr(head.title)}</title>`)
+    .replace('</head>', `    ${tags}\n  </head>`);
+}
+
+async function handleStaticRequest(
+  pathname: string,
+  corsHeaders: CorsHeaders,
+  origin: string,
+): Promise<Response> {
   logger.debug(`Static request for: ${pathname}`);
 
   let finalPath = pathname;
@@ -3444,6 +3492,12 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
   // Handle root path
   if (finalPath === '/') {
     finalPath = 'index.html';
+  }
+
+  // `/street/` and `/street` are the same page: without this the route head would be looked up
+  // under `street/` and the shell would answer with its own title.
+  if (finalPath.length > 1 && finalPath.endsWith('/')) {
+    finalPath = finalPath.replace(/\/+$/, '');
   }
 
   // Remove leading slash for asset lookup
@@ -3481,7 +3535,7 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
     const pageKey = `${assetKey}.html`;
     if (embeddedAssets[pageKey]) {
       logger.debug(`SPA route, serving specific page: ${pageKey}`);
-      return new Response(embeddedAssets[pageKey], {
+      return new Response(applyRouteHead(embeddedAssets[pageKey], assetKey, origin), {
         headers: {
           ...corsHeaders,
           'Content-Type': 'text/html; charset=utf-8',
@@ -3496,7 +3550,7 @@ async function handleStaticRequest(pathname: string, corsHeaders: CorsHeaders): 
       assetKey === 'admin' || assetKey.startsWith('admin/') ? 'admin/index.html' : 'index.html';
 
     logger.debug(`SPA route detected, serving ${spaFallback} for: ${finalPath}`);
-    return new Response(embeddedAssets[spaFallback], {
+    return new Response(applyRouteHead(embeddedAssets[spaFallback], assetKey, origin), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/html; charset=utf-8',
@@ -3537,9 +3591,15 @@ function getContentType(filePath: string): string {
     png: 'image/png',
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
+    webp: 'image/webp',
     gif: 'image/gif',
     svg: 'image/svg+xml',
     ico: 'image/x-icon',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    webm: 'video/webm',
+    m4a: 'audio/mp4',
+    mp3: 'audio/mpeg',
     woff: 'font/woff',
     woff2: 'font/woff2',
     ttf: 'font/ttf',
