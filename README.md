@@ -29,7 +29,10 @@ pnpm --filter @mv/admin dev
 ```
 
 The Vite apps proxy `/api` to `localhost:8000`. Video ids are accepted as the numeric
-編號 (`/player?video=4`) or the verbatim stem. Full detail: [START_APP.md](START_APP.md).
+編號 (`/player?video=4`) or the verbatim stem. The viewer also proxies `/videos` to the deployed
+Worker, since report stills live in R2 and the local API has no `/videos`; point it at another
+deployment with `VIEWER_VIDEOS_ORIGIN=https://… pnpm --filter @mv/viewer dev`. Full detail:
+[START_APP.md](START_APP.md).
 
 Toolchain: Node **≥22.22**, pnpm **12.14** (pinned in `package.json`), and **Vite+** —
 `vp dev`, `vp build`, `vp check` (Oxfmt + Oxlint + type-aware checks) and `vp test`
