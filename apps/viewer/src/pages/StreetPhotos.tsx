@@ -33,7 +33,11 @@ import {
  * in ten matches a stranger, so the candidate is a candidate, never an identification.
  */
 
-const STREET_TITLE = '銅鑼灣呢隊係咩團？全民造星 IV · 街拍判讀';
+/**
+ * The worker serves this exact string in the `/street` document head (`ROUTE_HEADS`) so a shared
+ * link unfurls with it; the browser tab must not contradict what the link promised.
+ */
+const STREET_TITLE = '銅鑼灣呢隊係咩團？全民造星 IV / VIVA · 街拍判讀 | MV Face Recognition';
 const CELL = 'border-b border-carbon-deep/13 px-2 py-1.5 text-left align-baseline';
 const NUM = 'font-mono text-[13px] tabular-nums';
 
@@ -220,14 +224,14 @@ export function StreetPhotos() {
             </caption>
             <thead>
               <tr className="font-kai text-[12px] text-ink-muted">
-                <th className={CELL}>圖</th>
-                <th className={CELL}>#</th>
-                <th className={CELL}>框（像素）</th>
-                <th className={CELL}>偵測分</th>
-                <th className={CELL}>最高餘弦</th>
-                <th className={CELL}>次高</th>
-                <th className={CELL}>相差</th>
-                <th className={CELL}>判定</th>
+                <th scope="col" className={CELL}>圖</th>
+                <th scope="col" className={CELL}>#</th>
+                <th scope="col" className={CELL}>框（像素）</th>
+                <th scope="col" className={CELL}>偵測分</th>
+                <th scope="col" className={CELL}>最高餘弦</th>
+                <th scope="col" className={CELL}>次高</th>
+                <th scope="col" className={CELL}>相差</th>
+                <th scope="col" className={CELL}>判定</th>
               </tr>
             </thead>
             <tbody>
@@ -327,13 +331,13 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th className={CELL}>編號</th>
-                  <th className={CELL}>暱稱</th>
-                  <th className={CELL}>姓名</th>
-                  <th className={CELL}>最高餘弦</th>
-                  <th className={CELL}>排名</th>
-                  <th className={CELL}>出分框</th>
-                  <th className={CELL}>高於雜訊</th>
+                  <th scope="col" className={CELL}>編號</th>
+                  <th scope="col" className={CELL}>暱稱</th>
+                  <th scope="col" className={CELL}>姓名</th>
+                  <th scope="col" className={CELL}>最高餘弦</th>
+                  <th scope="col" className={CELL}>排名</th>
+                  <th scope="col" className={CELL}>出分框</th>
+                  <th scope="col" className={CELL}>高於雜訊</th>
                 </tr>
               </thead>
               <tbody>
@@ -427,10 +431,10 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th className={CELL}>參賽者</th>
-                  <th className={CELL}>1085 px 截圖</th>
-                  <th className={CELL}>4032 px 原檔</th>
-                  <th className={CELL}>差</th>
+                  <th scope="col" className={CELL}>參賽者</th>
+                  <th scope="col" className={CELL}>1085 px 截圖</th>
+                  <th scope="col" className={CELL}>4032 px 原檔</th>
+                  <th scope="col" className={CELL}>差</th>
                 </tr>
               </thead>
               <tbody>
@@ -475,11 +479,11 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th className={CELL}>相片</th>
-                  <th className={CELL}>取得解像度</th>
-                  <th className={CELL}>人臉</th>
-                  <th className={CELL}>臉闊</th>
-                  <th className={CELL}>最高餘弦</th>
+                  <th scope="col" className={CELL}>相片</th>
+                  <th scope="col" className={CELL}>取得解像度</th>
+                  <th scope="col" className={CELL}>人臉</th>
+                  <th scope="col" className={CELL}>臉闊</th>
+                  <th scope="col" className={CELL}>最高餘弦</th>
                 </tr>
               </thead>
               <tbody>
@@ -514,10 +518,10 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th className={CELL}>門檻</th>
-                  <th className={CELL}>錯配陌生人</th>
-                  <th className={CELL}>本批過檻</th>
-                  <th className={CELL}>相對</th>
+                  <th scope="col" className={CELL}>門檻</th>
+                  <th scope="col" className={CELL}>錯配陌生人</th>
+                  <th scope="col" className={CELL}>本批過檻</th>
+                  <th scope="col" className={CELL}>相對</th>
                 </tr>
               </thead>
               <tbody>
@@ -591,10 +595,10 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th className={CELL}>臉高</th>
-                  <th className={CELL}>平均餘弦</th>
-                  <th className={CELL}>最差</th>
-                  <th className={CELL}>餘弦相對原生</th>
+                  <th scope="col" className={CELL}>臉高</th>
+                  <th scope="col" className={CELL}>平均餘弦</th>
+                  <th scope="col" className={CELL}>最差</th>
+                  <th scope="col" className={CELL}>餘弦相對原生</th>
                 </tr>
               </thead>
               <tbody>
