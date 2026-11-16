@@ -29,6 +29,9 @@ source/photo/historical/
 # mvp-processor/scripts/build_reference_cache.py (see docs/adr/0001).
 # The committed reference_manifest.json is what detects staleness.
 source/photo/contestants/reference_embeddings.npz
+# Derived from accepted flags and labels by scripts/promote_flags.py; the verdicts live in KV
+# and the vectors are staged to the bucket at photos/promoted/, so these are regenerable.
+source/photo/contestants/flagged/
 *.pkl
 *.joblib
 *.h5

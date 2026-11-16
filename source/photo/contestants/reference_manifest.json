@@ -1,9 +1,12 @@
 {
-  "generated_at": "2026-11-03T08:26:32+00:00",
+  "generated_at": "2026-11-16T11:52:22+00:00",
   "photo_count": 964,
-  "reference_count": 638,
+  "reference_count": 756,
   "contestant_count": 94,
-  "photo_list_sha256": "e1336c52516586f58ba7a2d918b99384c1c696cf808a64ce8d342ca0e7706c78",
+  "photo_trees": [
+    "/Users/yellowcandle/dev/mv-face-recognition/source/photo/contestants/ig_photos"
+  ],
+  "photo_list_sha256": "ef9014086f5a3edb6d17be3a81513b2403343cd05661ed9ca12dba3474b0aa93",
   "dropped": {
     "unreadable": 0,
     "no_face": 69,
@@ -12,58 +15,58 @@
     "outlier": 25
   },
   "references_per_contestant": {
-    "1": 4,
-    "2": 8,
-    "3": 7,
+    "1": 9,
+    "2": 10,
+    "3": 12,
     "4": 5,
-    "5": 6,
+    "5": 7,
     "6": 2,
     "7": 2,
     "8": 8,
     "9": 9,
-    "10": 16,
-    "11": 10,
-    "12": 12,
+    "10": 19,
+    "11": 12,
+    "12": 13,
     "13": 5,
     "14": 15,
-    "15": 15,
+    "15": 24,
     "16": 16,
-    "17": 12,
-    "18": 15,
-    "19": 15,
+    "17": 16,
+    "18": 18,
+    "19": 16,
     "20": 10,
-    "21": 10,
+    "21": 11,
     "22": 12,
-    "23": 4,
+    "23": 5,
     "24": 16,
     "25": 8,
     "26": 16,
     "27": 13,
-    "28": 5,
+    "28": 6,
     "29": 5,
     "30": 6,
     "31": 4,
     "32": 6,
-    "33": 6,
+    "33": 12,
     "34": 3,
     "35": 4,
     "36": 8,
     "37": 6,
-    "38": 2,
+    "38": 3,
     "39": 3,
     "40": 3,
     "41": 1,
     "42": 1,
     "43": 6,
-    "44": 8,
+    "44": 12,
     "45": 8,
     "46": 7,
     "47": 1,
-    "48": 4,
+    "48": 9,
     "49": 4,
     "50": 7,
     "51": 7,
-    "52": 6,
+    "52": 12,
     "53": 8,
     "54": 8,
     "55": 9,
@@ -73,38 +76,157 @@
     "59": 4,
     "60": 1,
     "61": 8,
-    "62": 8,
+    "62": 14,
     "63": 6,
     "64": 5,
     "65": 2,
     "66": 8,
     "68": 7,
-    "69": 8,
+    "69": 9,
     "70": 6,
     "71": 4,
     "72": 2,
-    "73": 7,
+    "73": 8,
     "74": 2,
     "75": 5,
     "76": 5,
     "78": 8,
     "79": 3,
     "80": 2,
-    "81": 8,
-    "82": 8,
-    "83": 2,
+    "81": 10,
+    "82": 11,
+    "83": 7,
     "84": 4,
     "85": 4,
     "86": 12,
-    "87": 9,
-    "88": 8,
+    "87": 27,
+    "88": 9,
     "89": 3,
     "90": 5,
-    "91": 4,
-    "92": 4,
+    "91": 11,
+    "92": 13,
     "93": 4,
     "94": 8,
-    "95": 9,
+    "95": 13,
     "96": 7
+  },
+  "promoted": {
+    "count": 118,
+    "conflicts": [
+      {
+        "path": "flagged/contestant_1/track_1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_275.npy",
+        "contestant_id": "1",
+        "own": 0.087,
+        "stranger": 0.476
+      },
+      {
+        "path": "flagged/contestant_15/track_1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_54.npy",
+        "contestant_id": "15",
+        "own": 0.158,
+        "stranger": 0.338
+      },
+      {
+        "path": "flagged/contestant_28/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_228.npy",
+        "contestant_id": "28",
+        "own": 0.091,
+        "stranger": 0.428
+      },
+      {
+        "path": "flagged/contestant_3/flag_a8e06308e5f8.npy",
+        "contestant_id": "3",
+        "own": 0.288,
+        "stranger": 0.322
+      },
+      {
+        "path": "flagged/contestant_44/track_4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650_636.npy",
+        "contestant_id": "44",
+        "own": 0.01,
+        "stranger": 0.451
+      },
+      {
+        "path": "flagged/contestant_52/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_81.npy",
+        "contestant_id": "52",
+        "own": 0.236,
+        "stranger": 0.248
+      },
+      {
+        "path": "flagged/contestant_52/track_4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650_23.npy",
+        "contestant_id": "52",
+        "own": 0.169,
+        "stranger": 0.223
+      },
+      {
+        "path": "flagged/contestant_52/track_4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650_46.npy",
+        "contestant_id": "52",
+        "own": 0.186,
+        "stranger": 0.246
+      },
+      {
+        "path": "flagged/contestant_60/track_3-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_2.npy",
+        "contestant_id": "60",
+        "own": 0.129,
+        "stranger": 0.286
+      },
+      {
+        "path": "flagged/contestant_73/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_6.npy",
+        "contestant_id": "73",
+        "own": 0.051,
+        "stranger": 0.334
+      },
+      {
+        "path": "flagged/contestant_73/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_7.npy",
+        "contestant_id": "73",
+        "own": 0.088,
+        "stranger": 0.241
+      },
+      {
+        "path": "flagged/contestant_79/track_1-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_222.npy",
+        "contestant_id": "79",
+        "own": 0.072,
+        "stranger": 0.462
+      },
+      {
+        "path": "flagged/contestant_81/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_71.npy",
+        "contestant_id": "81",
+        "own": 0.145,
+        "stranger": 0.391
+      },
+      {
+        "path": "flagged/contestant_82/track_4-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u6975\u9650_572.npy",
+        "contestant_id": "82",
+        "own": 0.035,
+        "stranger": 0.578
+      },
+      {
+        "path": "flagged/contestant_87/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_210.npy",
+        "contestant_id": "87",
+        "own": 0.079,
+        "stranger": 0.455
+      },
+      {
+        "path": "flagged/contestant_87/track_5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d_880.npy",
+        "contestant_id": "87",
+        "own": 0.359,
+        "stranger": 0.369
+      },
+      {
+        "path": "flagged/contestant_91/track_2-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u4e3b\u984c_69.npy",
+        "contestant_id": "91",
+        "own": 0.169,
+        "stranger": 0.491
+      },
+      {
+        "path": "flagged/contestant_92/track_5-\u300a\u5168\u6c11\u9020\u661fIV\u300b\u64ad\u524d_798.npy",
+        "contestant_id": "92",
+        "own": 0.114,
+        "stranger": 0.275
+      },
+      {
+        "path": "flagged/contestant_95/flag_3c9d9f82d352.npy",
+        "contestant_id": "95",
+        "own": 0.252,
+        "stranger": 0.286
+      }
+    ]
   }
 }

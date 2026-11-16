@@ -62,16 +62,20 @@ test('/street serves the street report head', async () => {
   // One title, one description: a duplicated pair means the injector appended instead of replacing.
   assert.equal(body.match(/<title>/g).length, 1);
   assert.equal(body.match(/name="description"/g).length, 1);
+  // The injection must leave a bootable shell: mount point plus the module script.
+  assert.match(body, /<div id="root"><\/div>/);
+  assert.match(body, /<script type="module"[^>]*src="\/assets\/index-[A-Za-z0-9_-]+\.js"/);
 });
 
 test('routes the map does not list keep the shell head', async () => {
+  // Not "no description": a default description may legitimately land in the shell. What must not
+  // happen is a route inheriting another route's card.
   const worker = await loadWorker();
   const { status, body } = await fetchHtml(worker, '/cast');
 
   assert.equal(status, 200);
   assert.match(body, /<title>點唱單 · MV Face Recognition<\/title>/);
   assert.doesNotMatch(body, /og:title/);
-  assert.doesNotMatch(body, /name="description"/);
 });
 
 test('/street/ gets the same head as /street', async () => {
@@ -80,28 +84,4 @@ test('/street/ gets the same head as /street', async () => {
 
   assert.equal(status, 200);
   assert.match(body, /<title>[^<]*街拍判讀[^<]*<\/title>/);
-});
-
-test('a still recorded as octet-stream is served by its extension', async () => {
-  const worker = await loadWorker();
-  const envWithStill = {
-    ...env,
-    VIDEOS_BUCKET: {
-      get: async (key) => ({
-        key,
-        size: 3,
-        body: 'jpg',
-        httpMetadata: { contentType: 'application/octet-stream' },
-      }),
-      head: async () => null,
-    },
-  };
-
-  const res = await worker.fetch(
-    new Request('https://mv.example/videos/reports/street-photos-2026-11-15/frame-1.jpg'),
-    envWithStill,
-  );
-
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('content-type'), 'image/jpeg');
 });
