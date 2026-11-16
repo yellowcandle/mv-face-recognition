@@ -91,6 +91,15 @@ entry, never a default verdict. Labelling is an **admin** act.
 _Avoid_: flag, correction, annotation — a flag changes what is *shown* for one detection; a label
 changes nothing shown and only *measures*.
 
+**Promoted reference**:
+A vector added to the **reference set** from a human verdict — an accepted **flag** or a
+`contestant` **label** — rather than from a reference photo. Its identity is settled by the person
+who ruled, so photo curation cannot drop it, but a promoted vector whose own contestant scores
+lower than a stranger is **refused**: the verdict and the gallery disagree, and that is a review,
+not an addition.
+_Avoid_: flag photo, pseudo-reference, self-training sample — the vector is the detection's
+existing embedding, not a new observation.
+
 **Label set**:
 All the labels for one reel, stamped with the metadata run they were made on (`processing_date`
 and detection count). A reprocess renumbers tracks, so a label set is refused against any other

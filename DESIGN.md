@@ -49,6 +49,7 @@ Screen names (viewer: 首頁, 播放, 紀錄, 名冊; admin adds the rest):
 | 播放 | player with face overlays | 待核 | flag review queue |
 | 紀錄 | per-reel appearance record | 參賽者 | contestant detail |
 | 名冊 | cast roster | 處理 | processing jobs |
+| 街拍 | a street-photo report (below) | | |
 | 儀表 | admin dashboard | 向量 | embedding workbench |
 | 管理 | system admin | | |
 
@@ -196,6 +197,13 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
 - Red means action, selection or missing. 偏弱 is muted.
 - The viewer is read-only: it carries a 唯讀 stamp, and `worker/tests/worker-is-read-only.test.mjs`
   fails on any public write.
+- 街拍 is a published report, not a product screen: two third-party street photos, every face box,
+  and the measurement of why nothing clears the acceptance threshold. It is the landing page for a
+  link posted in reply to the photograph's original Threads post, so it opens with the answer and
+  three exits into the site; its exits are links, not buttons, and the Worker gives the route its
+  own title and Open Graph card (`ROUTE_HEADS` in `worker/src/index.ts`). Its numbers are generated
+  by `mvp-processor/scripts/street_snapshot.py` into `streetPhotos.measurements.ts`; the prose lives
+  in `streetPhotos.data.ts` and reads those numbers, never repeats them.
 - No spine, folio numbers or tracked Latin labels. Page hints sit under the title.
 - Icons: `lucide-react`.
 - The viewer is mobile-first down to 320 px (2026-11-12). Gutters are `px-4` and become `sm:px-14`.
@@ -257,7 +265,31 @@ stub. Values live in the CSS (`apps/viewer/src/app.css`, `apps/admin/src/app.css
   non-commercial research, and commercial use needs a licence from InsightFace (its code is MIT).
 - Privacy: the reference photos are public (contestants' public Instagram), and the people named
   are contestants on a broadcast show. A misidentification is corrected with a flag; there is no
-  separate takedown route. The public `/embedding/coverage`, `/embedding/similarity` and
+  separate takedown route.
+- 街拍 republishes two photographs taken by a member of the public (a Threads post), and names one
+  contestant as a candidate *below* the acceptance threshold. The page carries the source, the
+  copyright note and an instruction to ask for removal by replying to the original post; the photos
+  are copies in R2 under `reports/street-photos-2026-11-15/` and are removed with the page.
+- Human verdicts feed the reference cache. An accepted **flag** and a `contestant` **label** both
+  assert whose face a detection is, so `mvp-processor/scripts/promote_flags.py` resolves each one to
+  that detection's stored embedding (box and timestamp must match a detection the run produced; a
+  tray thumbnail is not usable — two of three accepted flags had no detectable face in theirs) and
+  writes it under `source/photo/contestants/flagged/contestant_<id>/`. A label contributes one
+  vector per track, its clearest detection, so a long track cannot outweigh ten people.
+  `build_reference_cache.py --promoted` merges them **after** photo curation, because a human has
+  already ruled on their identity, and **refuses** any vector that matches another contestant
+  better than its own: on 2026-11-16 that was 19 of 137, including Marf's own flag (own 0.288,
+  stranger 0.322) — a disagreement worth reviewing rather than injecting. Refused vectors are listed
+  in `reference_manifest.json` under `promoted.conflicts`; `--include-conflicting` overrides.
+  The HF cache job stages them from `photos/promoted/`, so the deployed gallery is built from the
+  same verdicts as the local one.
+- 街拍's numbers are pinned, not live: `streetPhotos.fixtures.json` records the sha256 of each source
+  frame and of `reference_embeddings.npz`. The gallery is gitignored and rebuilt independently, so
+  the snapshot identifies the exact vector file it measured; re-running `street_snapshot.py` after
+  a rebuild is a deliberate act that changes the published numbers.
+- `worker/embedded-assets.js` was 913,959 B on 2026-11-16, 87% of the Worker's 1 MiB script limit;
+  `worker/tests/bundle-size.test.mjs` fails past a 95% budget. Move an asset to R2 or split the
+  admin before adding another bundled page. The public `/embedding/coverage`, `/embedding/similarity` and
   `/embedding/top-pairs` routes serve only aggregates (`embedding_coverage`,
   `embedding_similarity_matrix`, `embedding_top_pairs`); no per-photo vectors are served.
 - Cloudflare runs on the herballemon account (the `herballemon.workers.dev` subdomain). The plan is
