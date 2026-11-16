@@ -1,4 +1,4 @@
-export { Button } from './Button';
+export { Button, buttonClasses } from './Button';
 export { Badge } from './Badge';
 export { Card } from './Card';
 export { DetectionStamp, Stamp } from './Stamp';

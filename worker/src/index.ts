@@ -3441,20 +3441,20 @@ async function handleVideoRequest(
 }
 
 /**
- * Handle static frontend files
- */
-/**
  * Per-route document heads for the one SPA shell.
  *
  * A reader arriving from a shared link gets whatever the shell promises them: the browser tab
  * needs the route's title, and a link unfurl needs `og:title`, `og:description` and an image.
  * Only routes listed here are rewritten; everything else keeps the shell's own head.
+ *
+ * Keep measured values out of these strings. The route's page renders its numbers from data it
+ * owns; a count repeated here would go stale silently, in the one place nobody re-reads.
  */
 const ROUTE_HEADS: Record<string, { title: string; description: string; image?: string }> = {
   street: {
     title: '銅鑼灣呢隊係咩團？全民造星 IV / VIVA · 街拍判讀 | MV Face Recognition',
     description:
-      '帖文問「呢隊係咩團」，答案：全民造星 IV 的參賽者，其中 Carina、Ada 屬 VIVA。逐個臉框對過 638 個參考向量——人手認得九位，系統只認得一位，附完整數字與原因。',
+      '帖文問「呢隊係咩團」，答案：全民造星 IV 的參賽者，其中 Carina、Ada 屬 VIVA。本頁把街拍逐個臉框對過參考向量，並列出人眼與機器的差別、以及門檻的代價。',
     image: '/videos/reports/street-photos-2026-11-15/frame-1.jpg',
   },
 };
@@ -3480,6 +3480,9 @@ function applyRouteHead(html: string, assetKey: string, origin: string): string 
     .replace('</head>', `    ${tags}\n  </head>`);
 }
 
+/**
+ * Handle static frontend files
+ */
 async function handleStaticRequest(
   pathname: string,
   corsHeaders: CorsHeaders,

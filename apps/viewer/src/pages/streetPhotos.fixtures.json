@@ -1,0 +1,42 @@
+{
+  "note": "Frames are not committed: they are a third party's photographs. Fetch these URLs, check the sha256, then run scripts/street_snapshot.py --frames <dir>.",
+  "gallery": {
+    "label": "hf://buckets/yellowcandle/mv-face-recognition/models/reference/reference_embeddings.npz",
+    "sha256": "a0a15f0f6de6b57140513e190d7feea547595b81f7c3dad1cd251256df3d5d38",
+    "measured_from": "the file given by --gallery",
+    "reference_count": 952,
+    "contestant_count": 96
+  },
+  "frames": [
+    {
+      "name": "original.jpg",
+      "source": "https://www.threads.com/@zisha_1001/post/DfuWFhMH-4X (og:image, full size)",
+      "sha256": "84e04a14c473fd95a0cc1df9659125b7e6c909b5cc9014cd9b1f1a4be8601558"
+    },
+    {
+      "name": "post-2.jpg",
+      "source": "https://www.threads.com/@zisha_1001/post/DfuWFhMH-4X (second photo, 640px)",
+      "sha256": "977cc5fa25be1851fb57e24a6441ba0428b01049b92b8a58dd87c7f8bd6de626"
+    },
+    {
+      "name": "post-3.jpg",
+      "source": "https://www.threads.com/@zisha_1001/post/DfuWFhMH-4X (third photo, 640px)",
+      "sha256": "44bfa2904a11a710d49b1ee2fb465ba49d08b475c2647ffe24e89234306f4441"
+    },
+    {
+      "name": "post-r1.jpg",
+      "source": "https://www.threads.com/@rinrinrin1666/post/DfzERn0k9HS (og:image, 1600px) — the same crossing frame as post_1, reposted",
+      "sha256": "3affd6483f0526f018b34f2a1371f538ea816631e58ef01b13c8e40572db97ed"
+    },
+    {
+      "name": "paste-a.png",
+      "source": "same photograph as original.jpg, re-encoded at 1085 px by the paste",
+      "sha256": "3f5e167ae51025fa5e47a586e8415cc1f942e460ccd4fd93e679fa15b7672215"
+    },
+    {
+      "name": "paste-b.png",
+      "source": "same photograph as post-3.jpg, re-encoded at 1085 px by the paste",
+      "sha256": "a7861c184c56d87c54eb71d30fe7f95c0a25ddbecb54413eb22074598ae5fca0"
+    }
+  ]
+}

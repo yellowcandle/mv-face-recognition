@@ -183,24 +183,53 @@ def stage_video(video_id: str) -> Path:
     return target
 
 
+def stage_promoted() -> Path | None:
+    """Human-verified vectors: accepted flags and labelled tracks.
+
+    They are not photos — each is the embedding of a detection a person ruled on — so they are
+    staged as their own tree and passed to the builder, which refuses any vector that matches a
+    stranger better than its own contestant. Missing from the bucket means a cache built from
+    photos alone, which is the old behaviour and is reported.
+    """
+    promoted = WORK / "promoted"
+    source = BUCKET / "photos/promoted"
+    if not source.is_dir():
+        print("no photos/promoted in the bucket; cache will hold photos only", flush=True)
+        return None
+    vectors = sorted(source.glob("contestant_*/**/*.npy"))
+    if not vectors:
+        print("photos/promoted holds no vectors; cache will hold photos only", flush=True)
+        return None
+    for vector in vectors:
+        target = promoted / vector.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(vector, target)
+    manifest = source / "manifest.json"
+    if manifest.is_file():
+        shutil.copy(manifest, promoted / "manifest.json")
+    print(f"staged {len(vectors)} human-verified vectors", flush=True)
+    return promoted
+
+
 def cache_stage() -> None:
     prepare_home()
     repo = fetch_repo()
     python = install(repo)
     photos = stage_photos()
+    promoted = stage_promoted()
     out = BUCKET / "models/reference"
     out.mkdir(parents=True, exist_ok=True)
-    run(
-        [
-            str(python),
-            "scripts/build_reference_cache.py",
-            "--photos",
-            str(photos),
-            "--out",
-            str(out),
-        ],
-        cwd=repo / "mvp-processor",
-    )
+    command = [
+        str(python),
+        "scripts/build_reference_cache.py",
+        "--photos",
+        str(photos),
+        "--out",
+        str(out),
+    ]
+    if promoted is not None:
+        command += ["--promoted", str(promoted)]
+    run(command, cwd=repo / "mvp-processor")
 
 
 def video_stage(video_id: str) -> None:

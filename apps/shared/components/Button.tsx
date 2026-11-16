@@ -21,6 +21,23 @@ const sizeStyles: Record<string, string> = {
   lg: 'h-11 px-5 text-[15px]',
 };
 
+/**
+ * The button's classes, for callers that must render something other than a `<button>` — a route
+ * link, say, which needs a real `href` so it can be opened in a new tab and crawled. One style
+ * source, so the two cannot drift.
+ */
+export function buttonClasses({
+  variant = 'secondary',
+  size = 'md',
+  className = '',
+}: {
+  variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
+  className?: string;
+} = {}): string {
+  return `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-kai transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
+}
+
 export function Button({
   variant = 'secondary',
   size = 'md',
@@ -30,10 +47,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   return (
-    <button
-      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-kai transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
-      {...props}
-    >
+    <button className={buttonClasses({ variant, size, className })} {...props}>
       {children}
       {keycap != null ? (
         <kbd

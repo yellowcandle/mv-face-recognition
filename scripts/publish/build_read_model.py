@@ -430,8 +430,17 @@ def load_roster() -> list[dict[str, Any]]:
 
 
 def load_reference_counts() -> dict[str, int]:
-    """References per contestant, keyed by 編號 (ADR 0001: the manifest is the record)."""
-    path = os.path.join(REPO, "source/photo/contestants/reference_manifest.json")
+    """References per contestant, keyed by 編號 (ADR 0001: the manifest is the record).
+
+    `MV_REFERENCE_MANIFEST` names another manifest — the deployed one, say, which records what the
+    HF cache job actually wrote. Publishing this machine's counts while the site matches against
+    the deployed gallery is how 名冊 ends up claiming 9 references for someone whose vector count
+    is 27.
+    """
+    path = os.environ.get(
+        "MV_REFERENCE_MANIFEST",
+        os.path.join(REPO, "source/photo/contestants/reference_manifest.json"),
+    )
     try:
         with open(path, encoding="utf-8") as f:
             manifest = json.load(f)
