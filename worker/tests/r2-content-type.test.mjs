@@ -51,13 +51,20 @@ const contentTypeOf = async (key, stored) => {
   const worker = await loadWorker();
   const res = await worker.fetch(
     new Request(`https://mv.example/videos/${encodeURIComponent(key)}`),
-    { METADATA_KV: { get: async () => null }, JOB_STORE: { get: async () => null }, VIDEOS_BUCKET: bucketWith(key, stored) },
+    {
+      METADATA_KV: { get: async () => null },
+      JOB_STORE: { get: async () => null },
+      VIDEOS_BUCKET: bucketWith(key, stored),
+    },
   );
   return { status: res.status, type: res.headers.get('content-type') };
 };
 
 test('a still is served as an image even when the upload recorded octet-stream', async () => {
-  const { status, type } = await contentTypeOf('reports/street/frame-1.jpg', 'application/octet-stream');
+  const { status, type } = await contentTypeOf(
+    'reports/street/frame-1.jpg',
+    'application/octet-stream',
+  );
   assert.equal(status, 200);
   assert.equal(type, 'image/jpeg');
 });
