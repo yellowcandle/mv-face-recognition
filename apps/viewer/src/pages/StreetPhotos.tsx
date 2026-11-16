@@ -224,14 +224,30 @@ export function StreetPhotos() {
             </caption>
             <thead>
               <tr className="font-kai text-[12px] text-ink-muted">
-                <th scope="col" className={CELL}>圖</th>
-                <th scope="col" className={CELL}>#</th>
-                <th scope="col" className={CELL}>框（像素）</th>
-                <th scope="col" className={CELL}>偵測分</th>
-                <th scope="col" className={CELL}>最高餘弦</th>
-                <th scope="col" className={CELL}>次高</th>
-                <th scope="col" className={CELL}>相差</th>
-                <th scope="col" className={CELL}>判定</th>
+                <th scope="col" className={CELL}>
+                  圖
+                </th>
+                <th scope="col" className={CELL}>
+                  #
+                </th>
+                <th scope="col" className={CELL}>
+                  框（像素）
+                </th>
+                <th scope="col" className={CELL}>
+                  偵測分
+                </th>
+                <th scope="col" className={CELL}>
+                  最高餘弦
+                </th>
+                <th scope="col" className={CELL}>
+                  次高
+                </th>
+                <th scope="col" className={CELL}>
+                  相差
+                </th>
+                <th scope="col" className={CELL}>
+                  判定
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -331,13 +347,27 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th scope="col" className={CELL}>編號</th>
-                  <th scope="col" className={CELL}>暱稱</th>
-                  <th scope="col" className={CELL}>姓名</th>
-                  <th scope="col" className={CELL}>最高餘弦</th>
-                  <th scope="col" className={CELL}>排名</th>
-                  <th scope="col" className={CELL}>出分框</th>
-                  <th scope="col" className={CELL}>高於雜訊</th>
+                  <th scope="col" className={CELL}>
+                    編號
+                  </th>
+                  <th scope="col" className={CELL}>
+                    暱稱
+                  </th>
+                  <th scope="col" className={CELL}>
+                    姓名
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最高餘弦
+                  </th>
+                  <th scope="col" className={CELL}>
+                    排名
+                  </th>
+                  <th scope="col" className={CELL}>
+                    出分框
+                  </th>
+                  <th scope="col" className={CELL}>
+                    高於雜訊
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -431,10 +461,18 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th scope="col" className={CELL}>參賽者</th>
-                  <th scope="col" className={CELL}>1085 px 截圖</th>
-                  <th scope="col" className={CELL}>4032 px 原檔</th>
-                  <th scope="col" className={CELL}>差</th>
+                  <th scope="col" className={CELL}>
+                    參賽者
+                  </th>
+                  <th scope="col" className={CELL}>
+                    1085 px 截圖
+                  </th>
+                  <th scope="col" className={CELL}>
+                    4032 px 原檔
+                  </th>
+                  <th scope="col" className={CELL}>
+                    差
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -479,11 +517,21 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th scope="col" className={CELL}>相片</th>
-                  <th scope="col" className={CELL}>取得解像度</th>
-                  <th scope="col" className={CELL}>人臉</th>
-                  <th scope="col" className={CELL}>臉闊</th>
-                  <th scope="col" className={CELL}>最高餘弦</th>
+                  <th scope="col" className={CELL}>
+                    相片
+                  </th>
+                  <th scope="col" className={CELL}>
+                    取得解像度
+                  </th>
+                  <th scope="col" className={CELL}>
+                    人臉
+                  </th>
+                  <th scope="col" className={CELL}>
+                    臉闊
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最高餘弦
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -518,10 +566,18 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th scope="col" className={CELL}>門檻</th>
-                  <th scope="col" className={CELL}>錯配陌生人</th>
-                  <th scope="col" className={CELL}>本批過檻</th>
-                  <th scope="col" className={CELL}>相對</th>
+                  <th scope="col" className={CELL}>
+                    門檻
+                  </th>
+                  <th scope="col" className={CELL}>
+                    錯配陌生人
+                  </th>
+                  <th scope="col" className={CELL}>
+                    本批過檻
+                  </th>
+                  <th scope="col" className={CELL}>
+                    相對
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -595,10 +651,18 @@ export function StreetPhotos() {
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
-                  <th scope="col" className={CELL}>臉高</th>
-                  <th scope="col" className={CELL}>平均餘弦</th>
-                  <th scope="col" className={CELL}>最差</th>
-                  <th scope="col" className={CELL}>餘弦相對原生</th>
+                  <th scope="col" className={CELL}>
+                    臉高
+                  </th>
+                  <th scope="col" className={CELL}>
+                    平均餘弦
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最差
+                  </th>
+                  <th scope="col" className={CELL}>
+                    餘弦相對原生
+                  </th>
                 </tr>
               </thead>
               <tbody>
