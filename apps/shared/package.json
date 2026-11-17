@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",
+    "@ui-sdk/core": "0.1.0-beta.7",
+    "@ui-sdk/react": "0.1.0-beta.7",
     "lucide-react": "^1.67.0"
   },
   "devDependencies": {

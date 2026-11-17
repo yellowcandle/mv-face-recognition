@@ -75,3 +75,18 @@ body {
     background-size: 1rem;
   }
 }
+
+/* ui-sdk ships no positioning or backdrop styles: a popover panel is consumer CSS.
+   Unlayered on purpose — it must beat the library's runtime `@layer ui-sdk` reset. */
+[data-slot='dialog-backdrop'] {
+  position: fixed;
+  inset: 0;
+  background-color: color-mix(in srgb, var(--color-carbon-deep) 47%, transparent);
+}
+
+[data-slot='dialog-content'] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+}

@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@ui-sdk/react/dialog';
 import type { FaceDetection } from '../../types';
 import { bandFor, isFlagDecision } from '../../lib/bands';
 import { AdminErrorNotice } from '../AdminErrorNotice';
@@ -37,49 +44,6 @@ export function FlagDialog({
 }: FlagDialogProps) {
   const [contestantId, setContestantId] = useState<number | null>(null);
   const [userLabel, setUserLabel] = useState('');
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const contestantSelectRef = useRef<HTMLSelectElement>(null);
-
-  // Opening the dialog lands the caret on the contestant picker: it is the only field
-  // the operator came here to fill.
-  useEffect(() => {
-    contestantSelectRef.current?.focus();
-  }, []);
-
-  // The dialog is modal, so Tab stays inside it, and Escape is the Cancel button: it
-  // closes only while there is nothing in flight.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (!isSubmitting) onClose();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const container = dialogRef.current;
-      if (!container) return;
-      const focusable = Array.from(
-        container.querySelectorAll<HTMLElement>(
-          'button, select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((el) => !el.hasAttribute('disabled') && el.getClientRects().length > 0);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      const inside = active !== null && container.contains(active);
-      if (e.shiftKey) {
-        if (!inside || active === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (!inside || active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isSubmitting, onClose]);
 
   const handleSubmit = () => {
     if (contestantId === null) return;
@@ -94,30 +58,29 @@ export function FlagDialog({
       ? `標記 ${selectedFaces.length} 張臉`
       : '標記此臉';
 
+  // The dialog owns focus, Escape and outside presses. `dismissible` keeps Escape the Cancel
+  // button while a submit is in flight; the select is marked autofocus because it is the only
+  // field the operator came here to fill.
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-carbon-deep/47"
-      onClick={() => {
-        if (!isSubmitting) onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
+      dismissible={!isSubmitting}
+      closeOnOutsidePress={!isSubmitting}
     >
-      <div
-        ref={dialogRef}
-        className="mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(448px,calc(100vw-2rem))] flex-col gap-5 overflow-y-auto rounded-md border border-carbon-deep/33 bg-ground p-6"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="flag-dialog-title"
-      >
+      <DialogBackdrop />
+      <DialogContent className="mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(448px,calc(100vw-2rem))] flex-col gap-5 overflow-y-auto rounded-md border border-carbon-deep/33 bg-ground p-6">
         <div className="flex flex-col gap-1">
-          <h3 id="flag-dialog-title" className="font-kai text-[18px] font-normal text-carbon-deep">
+          <DialogTitle className="font-kai text-[18px] font-normal text-carbon-deep">
             {title}
-          </h3>
-          <p className="font-kai text-[14px] text-carbon-soft">
+          </DialogTitle>
+          <DialogDescription className="font-kai text-[14px] text-carbon-soft">
             {batch
               ? '把所選的臉全部指定給同一位參賽者，送入待核，由人覆核。'
               : '把這張偵測到的臉指定給參賽者，送入待核，由人覆核。'}
-          </p>
+          </DialogDescription>
         </div>
 
         {!batch && face && (
@@ -166,7 +129,7 @@ export function FlagDialog({
           </label>
           <select
             id="flag-contestant-select"
-            ref={contestantSelectRef}
+            data-autofocus
             className="field field-select h-10 w-full text-[14px] text-carbon-deep"
             value={contestantId ?? ''}
             onChange={(e) => setContestantId(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -210,7 +173,7 @@ export function FlagDialog({
             {submitLabel}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

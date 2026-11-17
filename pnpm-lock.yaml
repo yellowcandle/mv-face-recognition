@@ -236,6 +236,12 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.1)
+      '@ui-sdk/core':
+        specifier: 0.1.0-beta.7
+        version: 0.1.0-beta.7
+      '@ui-sdk/react':
+        specifier: 0.1.0-beta.7
+        version: 0.1.0-beta.7(@types/react@19.3.0)(@ui-sdk/core@0.1.0-beta.7)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       lucide-react:
         specifier: ^1.67.0
         version: 1.67.0(@types/react@19.3.0)(react@19.3.1)
@@ -1274,6 +1280,20 @@ packages:
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
+
+  '@ui-sdk/core@0.1.0-beta.7':
+    resolution: {integrity: sha512-f6Dotk5kwwiH2BRT6THRrn/Lv7eoG6Y+TWboCl9rQ4fHw4h3OliOSHF4kl4PzJEgaLyWSQFczRMvGm+YCpn77Q==}
+
+  '@ui-sdk/react@0.1.0-beta.7':
+    resolution: {integrity: sha512-zC+0EvV4wj0VpowK56yqGJqZzKa4PbHogTlmsnzbsl19FTRovhLstuJEN2/RCUZwC/vpkDvTGOmFAych+wD5NA==}
+    peerDependencies:
+      '@types/react': '>=19.2.10'
+      '@ui-sdk/core': ^0.1.0-beta.7
+      react: '>=19'
+      react-dom: '>=19'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@vitejs/plugin-react@6.1.2':
     resolution: {integrity: sha512-fhJNGUdscQa4HkI0xFxwonWyhnVReCPDbXI7FH7jmzpnVCrFQI7PRrhWecO263610vOrs9tr2Y4xcf8uAdFxbw==}
@@ -2664,6 +2684,16 @@ snapshots:
 
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
+
+  '@ui-sdk/core@0.1.0-beta.7': {}
+
+  '@ui-sdk/react@0.1.0-beta.7(@types/react@19.3.0)(@ui-sdk/core@0.1.0-beta.7)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@ui-sdk/core': 0.1.0-beta.7
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+    optionalDependencies:
+      '@types/react': 19.3.0
 
   '@vitejs/plugin-react@6.1.2(@voidzero-dev/vite-plus-core@1.3.0(@types/node@26.6.5)(esbuild@0.27.3)(jiti@2.7.0)(typescript@7.0.2))':
     dependencies:

@@ -1,18 +1,22 @@
-import { StrictMode } from 'react';
+import { StrictMode, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AdminLayout } from '@/layouts/AdminLayout';
 import { Dashboard } from '@/pages/Dashboard';
-import { Player } from '@/pages/Player';
-import { EmbeddingWorkbench } from '@/pages/EmbeddingWorkbench';
-import { Contestants } from '@/pages/Contestants';
-import { Flagging } from '@/pages/Flagging';
-import { Labelling } from '@/pages/Labelling';
-import { Processing } from '@/pages/Processing';
-import { Analytics } from '@/pages/Analytics';
-import { SystemAdmin } from '@/pages/SystemAdmin';
 import './app.css';
+
+// Every route except the landing Dashboard is code-split so the entry chunk stays small.
+const Player = lazy(() => import('@/pages/Player').then((m) => ({ default: m.Player })));
+const EmbeddingWorkbench = lazy(() =>
+  import('@/pages/EmbeddingWorkbench').then((m) => ({ default: m.EmbeddingWorkbench })),
+);
+const Contestants = lazy(() => import('@/pages/Contestants').then((m) => ({ default: m.Contestants })));
+const Flagging = lazy(() => import('@/pages/Flagging').then((m) => ({ default: m.Flagging })));
+const Labelling = lazy(() => import('@/pages/Labelling').then((m) => ({ default: m.Labelling })));
+const Processing = lazy(() => import('@/pages/Processing').then((m) => ({ default: m.Processing })));
+const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
+const SystemAdmin = lazy(() => import('@/pages/SystemAdmin').then((m) => ({ default: m.SystemAdmin })));
 
 const queryClient = new QueryClient({
   defaultOptions: {

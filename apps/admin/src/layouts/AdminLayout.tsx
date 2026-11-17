@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import {
   BookOpen,
   Cpu,
@@ -183,7 +183,9 @@ export function AdminLayout() {
       </nav>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <Outlet />
+        <Suspense fallback={<div className="p-6 font-kai text-[13px] text-ink-muted">載入中…</div>}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

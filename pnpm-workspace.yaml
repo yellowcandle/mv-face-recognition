@@ -16,3 +16,13 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+# Two packages installed on 2026-11-17 predate the default 1440-minute release-age window, so pnpm
+# recorded them here at install time. The entries are version-scoped: a new @ui-sdk/core or
+# @ui-sdk/react version re-enters the age check and needs its own review. Delete an entry once its
+# version is more than a day old; never replace one with a bare package name.
+minimumReleaseAgeExclude:
+  - '@ui-sdk/core@0.1.0-beta.7'
+  - '@ui-sdk/react@0.1.0-beta.7'
+permissions:
+  '@ui-sdk/core':
+    skills: false
