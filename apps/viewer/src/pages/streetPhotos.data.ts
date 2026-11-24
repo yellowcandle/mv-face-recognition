@@ -111,6 +111,36 @@ export const POSED_POST = {
   image: '/videos/reports/street-photos-2026-11-15/posed.jpg',
 };
 
+/** One contestant's showing in a reel: how often, and how well. */
+export interface VideoRow {
+  id: string;
+  nickname: string;
+  name: string;
+  count: number;
+  best: number;
+  median: number;
+  p90: number;
+}
+
+/** A processed reel, summarised (see `streetPhotos.video.ts`). */
+export interface VideoReport {
+  duration: number;
+  frames: number;
+  detections: number;
+  recognitions: number;
+  contestants: number;
+  threshold: number;
+  rows: VideoRow[];
+}
+
+/** The reel the shoot itself was filmed for: same people, 23 seconds of them. */
+export const VIDEO_POST = {
+  handle: 'carinalxt',
+  url: 'https://www.instagram.com/reel/DgH25YfT995/',
+  caption:
+    'FINGERS CROSSED #walkchallenge with my 造星4 girls!!!\nROUND ONE with @geungada @lezona_b @curry_wnw @ho_pui @karen.yeeeee @kilbychan @superaggiieee @sophiee1116 @myyoann @wyllislwk',
+};
+
 /** The prose that belongs to each measured frame, keyed by the frame it describes. */
 const FRAME_PROSE: Record<string, { src: string; alt: string; caption: string }> = {
   a: {
@@ -186,6 +216,7 @@ export const TOTALS = {
 };
 
 export { POSED_FRAME } from './streetPhotos.posed';
+export { VIDEO_REPORT } from './streetPhotos.video';
 
 export {
   CONTESTANT_COUNT,

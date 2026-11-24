@@ -11,6 +11,8 @@ import {
   OPEN_TOP1,
   POSED_FRAME,
   POSED_POST,
+  VIDEO_POST,
+  VIDEO_REPORT,
   POST_PHOTOS,
   POST_REPLIES,
   REPORTED_REPLY_AUTHORS,
@@ -441,6 +443,93 @@ export function StreetPhotos() {
             </p>
             <p>
               更值得看的是順序：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」。
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <h2 className="font-kai text-[18px] leading-tight text-carbon-deep">
+            同一班人，一段 23 秒的片
+          </h2>
+
+          <div className="flex max-w-[76ch] flex-col gap-1 border-l-2 border-carbon-deep/20 pl-3">
+            <a
+              href={VIDEO_POST.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="font-mono text-[12px] text-carbon-soft underline decoration-carbon-deep/20 underline-offset-2 hover:decoration-carbon-deep"
+            >
+              Instagram Reel · @{VIDEO_POST.handle}
+            </a>
+            <span className="whitespace-pre-line font-kai text-[14px] leading-relaxed text-carbon">
+              {VIDEO_POST.caption}
+            </span>
+          </div>
+
+          <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
+            同一晚同一個街口，這一段是當晚拍的片。用同一套管線跑（6 fps、det_size 640、同一個 0.412
+            門檻）： <span className={NUM}>{VIDEO_REPORT.frames}</span> 個影格、{' '}
+            <span className={NUM}>{VIDEO_REPORT.detections}</span> 張臉、{' '}
+            <span className={NUM}>{VIDEO_REPORT.recognitions}</span> 次過檻，認出{' '}
+            <span className={NUM}>{VIDEO_REPORT.contestants}</span> 位參賽者。
+          </p>
+
+          <Card padding="none" className="max-w-[640px] overflow-x-auto">
+            <table className="w-full border-collapse">
+              <caption className="px-3 py-2 text-left font-kai text-[13px] text-carbon-soft">
+                影片逐位統計 · 過檻次數與最高餘弦
+              </caption>
+              <thead>
+                <tr className="font-kai text-[12px] text-ink-muted">
+                  <th scope="col" className={CELL}>
+                    編號
+                  </th>
+                  <th scope="col" className={CELL}>
+                    暱稱
+                  </th>
+                  <th scope="col" className={CELL}>
+                    過檻次數
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最高
+                  </th>
+                  <th scope="col" className={CELL}>
+                    中位
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {VIDEO_REPORT.rows.map((row) => (
+                  <tr key={row.id} className="hover:bg-tint">
+                    <td className={`${CELL} ${NUM} text-carbon-soft`}>{row.id}</td>
+                    <td className={`${CELL} font-kai text-[13px] text-carbon-deep`}>
+                      {row.nickname}
+                    </td>
+                    <td className={`${CELL} ${NUM} text-carbon-soft`}>{row.count}</td>
+                    <td className={`${CELL} ${NUM} text-carbon`}>{row.best.toFixed(3)}</td>
+                    <td className={`${CELL} ${NUM} text-ink-muted`}>{row.median.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <div className="flex max-w-[76ch] flex-col gap-3 font-kai text-[14px] leading-relaxed text-carbon">
+            <p>
+              這才是重點：同一班人、同一套向量，靜態相片全批只有一格過檻（0.456），影片的最高分是{' '}
+              <span className={NUM}>
+                {Math.max(...VIDEO_REPORT.rows.map((r) => r.best)).toFixed(3)}
+              </span>
+              ，十一位每人都有二十至五十幾幀過檻。分別不在解像度——影片的臉一樣細——而在同一個人出現幾十次：一幀影得差，下一幀影得好，管線只需要其中幾幀。
+            </p>
+            <p>
+              名單也吻合：帖文標註十個帳號、加作者本人共十一人，影片認出的正好十一位。其中八位可由暱稱對上（Carina、Ada、暐翹、何佩、咖喱、Karen、莎莎、蘇菲），餘下三位是
+              超酸（79 號）、阿杰（31 號）與 馬欣（78
+              號）——帳號與名字對不上，但人數與名單對得齊。所以「人手認得、機器認不得」只在單張相片成立；有片就另一回事。
+            </p>
+            <p>
+              影片沒有複製到本站：只在原帖觀看（Instagram
+              Reel，上面有連結）。相片是為了逐框核對才複製，影片不必。
             </p>
           </div>
         </div>
