@@ -133,6 +133,24 @@ export interface VideoReport {
   rows: VideoRow[];
 }
 
+/**
+ * Handle → contestant, read off each account's own profile (public bios, 2026-11-24). The reel
+ * tags ten of these and its author is the eleventh, so the caption plus the author names the whole
+ * group without anyone's eye — which is what makes the reel's 11-for-11 worth stating.
+ */
+export const VIDEO_HANDLES = [
+  { handle: 'geungada', id: '27', note: 'Geung Ada' },
+  { handle: 'lezona_b', id: '5', note: 'LEZONA SAKABE | 莎莎' },
+  { handle: 'curry_wnw', id: '2', note: 'Kelly Wong（咖喱）' },
+  { handle: 'ho_pui', id: '83', note: 'HOPUI 何佩' },
+  { handle: 'karen.yeeeee', id: '20', note: 'KAREN YEE' },
+  { handle: 'kilbychan', id: '79', note: '💧🍋超酸🍋💧' },
+  { handle: 'superaggiieee', id: '31', note: '阿杰 Aggie C' },
+  { handle: 'sophiee1116', id: '18', note: 'SOPHIE 蘇菲' },
+  { handle: 'myyoann', id: '78', note: 'mayan 馬欣' },
+  { handle: 'wyllislwk', id: '22', note: '暐翹 WK' },
+] as const;
+
 /** The reel the shoot itself was filmed for: same people, 23 seconds of them. */
 export const VIDEO_POST = {
   handle: 'carinalxt',
@@ -180,7 +198,7 @@ export const POST_REPLIES = [
   {
     handle: 'waiwaiwai9413',
     text: '超酸story好似見到elka同ivyso同carina',
-    verdict: '兩人在同一張相裡，一個排第 10，一個排第 90——名單要逐位核，不能整句當真。',
+    verdict: '兩人在同一張相裡，一個排第 10，一個排第 90。名單要逐位核，不能整句當真。',
   },
   {
     handle: 'pang_fred',
@@ -190,7 +208,7 @@ export const POST_REPLIES = [
   {
     handle: 'lezona_b',
     text: '期待吓先🤪',
-    verdict: '這是坂部佩莎（莎莎，5 號）本人的帳號——相中人自己回覆，她的在場不靠辨識。',
+    verdict: '這是坂部佩莎（莎莎，5 號）本人的帳號，相中人自己回覆，她的在場不靠辨識。',
   },
 ];
 

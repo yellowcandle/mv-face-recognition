@@ -128,15 +128,15 @@ export function StreetPhotos() {
         <div className="flex flex-col gap-3 rounded-md border border-stamp/40 bg-stamp/5 p-4 sm:p-5">
           <span className="font-kai text-[13px] font-bold tracking-wide text-stamp">答案</span>
           <p className="font-kai text-[18px] leading-snug text-carbon-deep sm:text-[28px]">
-            銅鑼灣那一隊「疑似女團」，是《全民造星 IV》的參賽者——2021 年那一屆，96 位。
+            銅鑼灣那一隊「疑似女團」，是《全民造星 IV》的參賽者。2021 年那一屆，96 位。
           </p>
           <p className="max-w-[68ch] font-kai text-[14px] leading-relaxed text-carbon">
-            帖文下面兩種答法都對：其中 Carina（李晞彤）與 Ada（姜咏鑫）已於 2024 年以英皇女團 VIVA
-            出道，所以「造星 IV」與「VIVA 拍 MV」說的是同一批人。
+            帖文下面吵的兩種答法，其實都對。Carina（李晞彤）同 Ada（姜咏鑫）2024 年以英皇女團 VIVA
+            出道，「造星 IV」同「VIVA 拍 MV」講緊同一批人。
           </p>
           <p className="max-w-[68ch] font-kai text-[14px] leading-relaxed text-carbon">
-            這個站用同一套臉部辨識，把《前傳》三部曲等 MV 逐格認人：每個框對過 {REFERENCE_COUNT}{' '}
-            個參考向量，分數是原始餘弦，逐條可以覆核。下面是我拿這幾張街拍去跑的結果，最後一節講為什麼人眼一望就認得、機器卻幾乎認不出。
+            站本身用同一套臉部辨識去認《前傳》三部曲的 MV：每個框對過 {REFERENCE_COUNT}{' '}
+            個參考向量，分數是原始餘弦，可以逐條覆核。下面是我拿這幾張街拍去跑的結果。
           </p>
           {/* Real links, not buttons: a funnel's exits must open in a new tab and be crawlable. */}
           <div className="flex flex-row flex-wrap gap-2">
@@ -178,7 +178,7 @@ export function StreetPhotos() {
           >
             @zisha_1001
           </a>
-          ）。答案看過節目的人都認得——都是《全民造星
+          ）。答案看過節目的人都認得。都是《全民造星
           IV》的人。人手一眼認得九位；同一個場景交給管線，只認得一位，而且要在下調門檻之下。
         </p>
 
@@ -218,7 +218,7 @@ export function StreetPhotos() {
               ），但仍低於本站接受門檻 <span className={NUM}>{SITE_THRESHOLD.toFixed(3)}</span>
               ，差{' '}
               <span className={NUM}>{(SITE_THRESHOLD - bestCandidate.face.top1).toFixed(3)}</span>
-              ——本站的定義裡，未過門檻的不叫辨識。它之所以列出來，只因為本頁把門檻降到{' '}
+              。本站的定義裡，未過門檻的不叫辨識。它之所以列出來，只因為本頁把門檻降到{' '}
               <span className={NUM}>{JOB_THRESHOLD.toFixed(3)}</span>，而那條線有約{' '}
               {((CUTOFF_SWEEP.find((r) => r.cutoff === JOB_THRESHOLD)?.rate ?? 0) * 100).toFixed(0)}
               % 的錯配率。
@@ -326,7 +326,7 @@ export function StreetPhotos() {
             <span className={NUM}>{POSED_FRAME.faces.length}</span> 張臉，其中{' '}
             <span className={NUM}>{POSED_FRAME.recognitionCount}</span> 位過本站門檻（0.412），另有{' '}
             <span className={NUM}>{POSED_FRAME.candidateCount - POSED_FRAME.recognitionCount}</span>{' '}
-            位過本頁的 0.35。臉依然只是 29–41 像素——跟上面那張行走中的相差不多大。
+            位過本頁的 0.35。臉依然只是 29–41 像素，跟上面那張行走中的差不多大。
           </p>
 
           <figure className="relative overflow-hidden rounded-md border border-carbon-deep/13 bg-tint">
@@ -424,7 +424,7 @@ export function StreetPhotos() {
               <span className={NUM}>
                 {POSED_FRAME.faces.find((f) => f.verdict === 'recognition')?.score.toFixed(3)}
               </span>
-              ），全頁唯一過本站門檻的一格——而它的臉只有 32×41 像素，比上面行走那張的 36×44
+              ），全頁唯一過本站門檻的一格，而它的臉只有 32×41 像素，比上面行走那張的 36×44
               還要細。像素多少不是關鍵：正面、無遮擋、光線夠，同一個人在同一套向量下可以由 0.267
               升到 0.456。
             </p>
@@ -439,10 +439,10 @@ export function StreetPhotos() {
                 {POSED_FRAME.faces.length - POSED_FRAME.candidateCount}
               </span>{' '}
               未過檻。真正過本站 0.412 的只有何佩；其餘最高分那幾位（Karen 0.411、Carina 0.406、暐翹
-              0.380、咖喱 0.363）差一點而未夠——不及就不叫辨識。
+              0.380、咖喱 0.363）差一點而未夠。不及就不叫辨識。
             </p>
             <p>
-              更值得看的是順序：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」。
+              順序也值得一看：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」。
             </p>
           </div>
         </div>
@@ -516,16 +516,16 @@ export function StreetPhotos() {
 
           <div className="flex max-w-[76ch] flex-col gap-3 font-kai text-[14px] leading-relaxed text-carbon">
             <p>
-              這才是重點：同一班人、同一套向量，靜態相片全批只有一格過檻（0.456），影片的最高分是{' '}
+              同一班人、同一套向量，靜態相片全批只有一格過檻（0.456），影片的最高分是{' '}
               <span className={NUM}>
                 {Math.max(...VIDEO_REPORT.rows.map((r) => r.best)).toFixed(3)}
               </span>
-              ，十一位每人都有二十至五十幾幀過檻。分別不在解像度——影片的臉一樣細——而在同一個人出現幾十次：一幀影得差，下一幀影得好，管線只需要其中幾幀。
+              ，十一位每人都有二十至五十幾幀過檻。分別不在解像度，影片的臉一樣細。差別在同一個人出現幾十次：一幀影得差，下一幀影得好，管線只需要其中幾幀。
             </p>
             <p>
               名單也吻合：帖文標註十個帳號、加作者本人共十一人，影片認出的正好十一位。其中八位可由暱稱對上（Carina、Ada、暐翹、何佩、咖喱、Karen、莎莎、蘇菲），餘下三位是
               超酸（79 號）、阿杰（31 號）與 馬欣（78
-              號）——帳號與名字對不上，但人數與名單對得齊。所以「人手認得、機器認不得」只在單張相片成立；有片就另一回事。
+              號）。帳號與名字對不上，但人數與名單對得齊。所以「人手認得、機器認不得」只在單張相片成立；有片就另一回事。
             </p>
             <p>
               影片沒有複製到本站：只在原帖觀看（Instagram
@@ -539,7 +539,7 @@ export function StreetPhotos() {
 
           <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
             63 個回覆之中，未登入只讀到五個。三種答案：造星
-            IV、VIVA、Cookies。前兩種其實同指一批人——VIVA 的 {VIVA_COVERAGE.members} 位成員之中，
+            IV、VIVA、Cookies。前兩種其實同指一批人。VIVA 的 {VIVA_COVERAGE.members} 位成員之中，
             {VIVA_COVERAGE.inRoster} 位（Carina 15 號、Ada 27 號）本身就是造星 IV
             的人；其餘兩位（馬思惠、張鈊貽）不在這 96
             人名冊裡，所以本站對她們連一個參考向量都沒有，永遠認不出。
@@ -572,7 +572,7 @@ export function StreetPhotos() {
           <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
             讀者另指出，回覆之中還有{' '}
             {REPORTED_REPLY_AUTHORS.map((c) => `${c.name}（${c.nickname}，${c.id} 號）`).join('、')}
-            ——未登入讀不到內容，所以這裡只記錄「有人這樣認出」，不引述。連同莎莎，即是有兩位當事人與帖文有關：這比任何餘弦都直接。
+            。未登入讀不到內容，所以這裡只記錄「有人這樣認出」，不引述。連同莎莎，即是有兩位當事人與帖文有關：這比任何餘弦都直接。
           </p>
         </div>
 
@@ -585,7 +585,7 @@ export function StreetPhotos() {
             個框的最大值，「排名」是這個分數在 {CONTESTANT_COUNT}{' '}
             位之中的位置；「高於雜訊」比較的是名單以外的 {CONTESTANT_COUNT - 9} 位參賽者第 90
             百分位（<span className="font-mono tabular-nums">{ROSTER_NOISE.p90.toFixed(3)}</span>
-            ）——過了這條線，分數才算有可能是這個人而不是任何人。
+            ）。過了這條線，分數才算有可能是這個人而不是任何人。
           </p>
 
           <Card padding="none" className="overflow-x-auto">
@@ -665,14 +665,14 @@ export function StreetPhotos() {
               ，與名單以外的 {CONTESTANT_COUNT - named.length} 位（平均{' '}
               <span className={NUM}>{ROSTER_NOISE.mean.toFixed(3)}</span>
               ）分不開。Ivy So 更低到 <span className={NUM}>{ivy.best.toFixed(3)}</span>
-              、第 {ivy.rank} 名——若她真在框內，管線對她等於全無訊號。
+              、第 {ivy.rank} 名。若她真在框內，管線對她等於全無訊號。
             </p>
             <p>
               最硬的一組對照是莎莎與蘇菲。莎莎的帳號在帖文下親自回覆，蘇菲亦有回覆（讀者指出，見上節）；兩人在場毋庸置疑，而系統給莎莎{' '}
               <span className={NUM}>{sasa.best.toFixed(3)}</span>（第 {sasa.rank}）、蘇菲{' '}
               <span className={NUM}>{sophie.best.toFixed(3)}</span>（第 {sophie.rank}
               ），都在雜訊線 <span className={NUM}>{ROSTER_NOISE.p90.toFixed(3)}</span>
-              之下。人在場，分數卻落在「誰都可能」的區間——低分不能讀成「唔在場」。
+              之下。人在場，分數卻落在「誰都可能」的區間。低分不能讀成「唔在場」。
             </p>
             <p>
               差別在人眼的先驗：看過整個節目的人，靠髮型、身形、衣着與同行名單，在 14×19
@@ -680,7 +680,7 @@ export function StreetPhotos() {
               只看那幾十個像素之間的向量角度。同一個場景，一邊是全中，一邊是三位半。
             </p>
             <p>
-              上面九位只是認得的部分——其餘兩位認不出，也可能有未列出來的參賽者。所以要另一邊試：把名單全部拿掉，讓管線自己在{' '}
+              上面九位只是認得的部分。其餘兩位認不出，也可能有未列出來的參賽者。另一邊試：把名單全部拿掉，讓管線自己在{' '}
               {CONTESTANT_COUNT} 位裡挑。
               {OPEN_TOP1.boxes} 個框的 top-1 落在{' '}
               <span className="font-mono text-[13px]">{OPEN_TOP1.distinct}</span> 位不同參賽者身上（
@@ -691,7 +691,7 @@ export function StreetPhotos() {
                   {r.times > 2 ? ` ×${r.times}` : ''}
                 </span>
               ))}
-              ）。十一個人左右的隊，機器認出十幾個人，而且同一位被認到三處不同位置——多出來的就是噪聲。所以這一頁不逐框標名。
+              ）。十一個人左右的隊，機器認出十幾個人，而且同一位被認到三處不同位置。多出來的就是噪聲。所以這一頁不逐框標名。
             </p>
           </div>
         </div>
@@ -759,10 +759,10 @@ export function StreetPhotos() {
                 .map((row) => row.nickname)
                 .join('、')}
               的擺幅在 0.02
-              以內——臉放大十幾倍，向量幾乎不動。所以「低分因為像素太少」是錯的推論：真正的限制在參考集與現場（妝、光、角度、遮擋）。
+              以內。臉放大十幾倍，向量幾乎不動。所以「低分因為像素太少」是錯的推論：真正的限制在參考集與現場（妝、光、角度、遮擋）。
             </p>
             <p>
-              其餘兩位擺幅更大，但方向不一致：同一個人在三張圖上被切在不同的框位，分數跟框走而不是跟解像度走。框位與姿態帶來的波動，比解像度帶來的增益大一個數量級——「換張靚相再試」不會令結果穩定。
+              其餘兩位擺幅大，方向卻不一致：同一個人在三張圖上被切在不同的框位，分數跟框走，不跟解像度走。框位的影響大一個數量級，所以換張更清的相也穩定不下來。
             </p>
             <p>
               {RESOLUTION_LADDER.frames
@@ -901,7 +901,7 @@ export function StreetPhotos() {
                     放寬到 <span className={NUM}>{loosen.cutoff.toFixed(2)}</span> 會多出{' '}
                     {passes(loosen.cutoff) - TOTALS.accepted} 個名字，代價是{' '}
                     <span className={NUM}>{(loosen.rate * 100).toFixed(0)}%</span>
-                    的參考向量都會錯配陌生人——那樣的名單等於抽籤。守在{' '}
+                    的參考向量都會錯配陌生人。那樣的名單等於抽籤。守在{' '}
                     <span className={NUM}>{JOB_THRESHOLD.toFixed(2)}</span> 只剩 {TOTALS.accepted}{' '}
                     個，錯配率約 <span className={NUM}>{(jobRate * 100).toFixed(0)}%</span>
                     ，仍然只是「候選」。
@@ -912,7 +912,7 @@ export function StreetPhotos() {
             <p>
               為何分數普遍偏低，要看像素本身。第二張在原生解像度下一個框都不出：臉只有 14×19
               像素，低於 <span className="font-mono text-[13px]">min_face_size: 20</span>
-              ，偵測器把每一張都丟掉。以 4× 分格重跑才有十個框——分格救回的是「偵測」，不是「資訊」。
+              ，偵測器把每一張都丟掉。以 4× 分格重跑才有十個框。分格救回的是「偵測」，不是「資訊」。
             </p>
             <p>
               餘弦是 512
