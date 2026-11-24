@@ -11,12 +11,18 @@ const Player = lazy(() => import('@/pages/Player').then((m) => ({ default: m.Pla
 const EmbeddingWorkbench = lazy(() =>
   import('@/pages/EmbeddingWorkbench').then((m) => ({ default: m.EmbeddingWorkbench })),
 );
-const Contestants = lazy(() => import('@/pages/Contestants').then((m) => ({ default: m.Contestants })));
+const Contestants = lazy(() =>
+  import('@/pages/Contestants').then((m) => ({ default: m.Contestants })),
+);
 const Flagging = lazy(() => import('@/pages/Flagging').then((m) => ({ default: m.Flagging })));
 const Labelling = lazy(() => import('@/pages/Labelling').then((m) => ({ default: m.Labelling })));
-const Processing = lazy(() => import('@/pages/Processing').then((m) => ({ default: m.Processing })));
+const Processing = lazy(() =>
+  import('@/pages/Processing').then((m) => ({ default: m.Processing })),
+);
 const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
-const SystemAdmin = lazy(() => import('@/pages/SystemAdmin').then((m) => ({ default: m.SystemAdmin })));
+const SystemAdmin = lazy(() =>
+  import('@/pages/SystemAdmin').then((m) => ({ default: m.SystemAdmin })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
