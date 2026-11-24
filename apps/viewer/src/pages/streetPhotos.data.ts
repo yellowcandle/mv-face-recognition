@@ -164,13 +164,13 @@ const FRAME_PROSE: Record<string, { src: string; alt: string; caption: string }>
   a: {
     src: '/videos/reports/street-photos-2026-11-15/frame-1.jpg',
     alt: '街拍一：一班人橫過馬路，臉部框出十三個',
-    caption: '一 · 過路 — 原生解像度直接偵測。十三張臉，框 21×28 至 40×49 像素。',
+    caption: '一 · 過路 · 原生解像度直接偵測，抓到 13 張臉，框寬 21×28 到 40×49 像素。',
   },
   b: {
     src: '/videos/reports/street-photos-2026-11-15/frame-2.jpg',
     alt: '街拍二：一排人在 Sogo 門外排隊合照，臉部框出十個',
     caption:
-      '二 · 排隊 — 原生解像度零偵測（臉只有 14×19 像素，低於 min_face_size 20）。同一個區帶以 4× 分格（220 px 窗、150 px 步長）重跑，得十張臉。',
+      '二 · 排隊 · 原生解像度零偵測（臉只有 14×19 像素，小於 20 px 下限）。改將該區域放大 4 倍分格重掃，抓出 10 張臉。',
   },
 };
 
@@ -188,27 +188,27 @@ export const POST_REPLIES = [
   {
     handle: 'nicole_s.h.y',
     text: '好似唔係同一個團？見有VIVA嘅Carina Ada，之前有人見過ivyso Elka會唔會系造星4嘅野？',
-    verdict: '對：Carina、Ada 屬於 VIVA；兩人同時是造星 IV 參賽者。',
+    verdict: 'Carina 和 Ada 確實屬於 VIVA，而兩人本來也是造星 IV 參賽者。',
   },
   {
     handle: 'kkkcywww',
     text: '全部都係造星4（？見好似有 karen 暐翹 咖哩 carina ada 馬欣 其他認唔出😂',
-    verdict: '本頁採用的名單來源；九位之中過雜訊線的幾位見下表。',
+    verdict: '本頁採用的觀眾名單來源，九位裡有四位在 1085 px 街拍過了雜訊線。',
   },
   {
     handle: 'waiwaiwai9413',
     text: '超酸story好似見到elka同ivyso同carina',
-    verdict: '兩人在同一張相裡，一個排第 10，一個排第 90。名單要逐位核，不能整句當真。',
+    verdict: '同一張街拍裡 Elka 排第 17，Ivy So 排第 81，而 23 秒原片裡也沒有見到 Ivy So。',
   },
   {
     handle: 'pang_fred',
     text: '似係Cookies',
-    verdict: 'Cookies 是 2002 年的組合，不在本站名冊。',
+    verdict: 'Cookies 是 2002 年出道的女團，不在這份 2021 年名冊內。',
   },
   {
     handle: 'lezona_b',
     text: '期待吓先🤪',
-    verdict: '這是坂部佩莎（莎莎，5 號）本人的帳號，相中人自己回覆，她的在場不靠辨識。',
+    verdict: '這是坂部佩莎（莎莎，5 號）本人的帳號，相中人自己留在帖文下面。',
   },
 ];
 
