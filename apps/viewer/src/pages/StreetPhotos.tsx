@@ -9,6 +9,7 @@ import {
   MATCHER_CHECK,
   NAMED_PRESENT,
   OPEN_TOP1,
+  POSED_FRAME,
   POST_PHOTOS,
   POST_REPLIES,
   REPORTED_REPLY_AUTHORS,
@@ -299,6 +300,122 @@ export function StreetPhotos() {
             </tbody>
           </table>
         </Card>
+
+        <div className="flex flex-col gap-4">
+          <h2 className="font-kai text-[18px] leading-tight text-carbon-deep">另一張：正面合照</h2>
+
+          <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
+            同一位樓主後來貼了另一張：十一人排排企、正面、有補光。同一套向量庫、同一個門檻，這一張有{' '}
+            <span className={NUM}>{POSED_FRAME.faces.length}</span> 張臉，其中{' '}
+            <span className={NUM}>{POSED_FRAME.recognitionCount}</span> 位過本站門檻（0.412），另有{' '}
+            <span className={NUM}>{POSED_FRAME.candidateCount - POSED_FRAME.recognitionCount}</span>{' '}
+            位過本頁的 0.35。臉依然只是 29–41 像素——跟上面那張行走中的相差不多大。
+          </p>
+
+          <figure className="relative overflow-hidden rounded-md border border-carbon-deep/13 bg-tint">
+            <img
+              src="/videos/reports/street-photos-2026-11-15/posed.jpg"
+              alt="正面合照：十一人排排企，逐個框出面孔"
+              width={POSED_FRAME.width}
+              height={POSED_FRAME.height}
+              loading="lazy"
+              className="block w-full"
+            />
+            {POSED_FRAME.faces.map((face) => {
+              const [x1, y1, x2, y2] = face.box;
+              return (
+                <span
+                  key={face.i}
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute border ${
+                    face.verdict === 'recognition'
+                      ? 'border-2 border-carbon-deep'
+                      : 'border border-carbon-deep/60'
+                  }`}
+                  style={{
+                    left: `${x1 * 100}%`,
+                    top: `${y1 * 100}%`,
+                    width: `${(x2 - x1) * 100}%`,
+                    height: `${(y2 - y1) * 100}%`,
+                  }}
+                >
+                  <span className="absolute -top-[16px] left-0 font-mono text-[12px] leading-none text-carbon-deep">
+                    {face.i}
+                  </span>
+                </span>
+              );
+            })}
+          </figure>
+
+          <Card padding="none" className="max-w-[720px] overflow-x-auto">
+            <table className="w-full border-collapse">
+              <caption className="px-3 py-2 text-left font-kai text-[13px] text-carbon-soft">
+                正面合照 · 逐臉最高餘弦（{POSED_FRAME.width}×{POSED_FRAME.height}，det_size 640）
+              </caption>
+              <thead>
+                <tr className="font-kai text-[12px] text-ink-muted">
+                  <th scope="col" className={CELL}>
+                    #
+                  </th>
+                  <th scope="col" className={CELL}>
+                    框（像素）
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最高餘弦
+                  </th>
+                  <th scope="col" className={CELL}>
+                    最佳候選
+                  </th>
+                  <th scope="col" className={CELL}>
+                    判定
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {POSED_FRAME.faces.map((face) => (
+                  <tr
+                    key={face.i}
+                    className={face.verdict === 'recognition' ? 'bg-stamp/5' : 'hover:bg-tint'}
+                  >
+                    <td className={`${CELL} ${NUM} text-carbon-soft`}>{face.i}</td>
+                    <td className={`${CELL} ${NUM} text-carbon-soft`}>
+                      {face.px[0]}×{face.px[1]}
+                    </td>
+                    <td className={`${CELL} ${NUM} text-carbon-deep`}>{face.score.toFixed(3)}</td>
+                    <td className={`${CELL} font-kai text-[13px] text-carbon`}>
+                      {face.nickname}
+                      <span className="ml-2 font-mono text-[12px] text-ink-muted">{face.id}</span>
+                    </td>
+                    <td className={CELL}>
+                      {face.verdict === 'recognition' ? (
+                        <Stamp tone="carbon">認定</Stamp>
+                      ) : face.verdict === 'candidate' ? (
+                        <Stamp band="low">候選</Stamp>
+                      ) : (
+                        <span className="font-kai text-[12px] text-ink-muted">未過檻</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <div className="flex max-w-[76ch] flex-col gap-3 font-kai text-[14px] leading-relaxed text-carbon">
+            <p>
+              第一位是 {POSED_FRAME.faces.find((f) => f.verdict === 'recognition')?.nickname}（
+              <span className={NUM}>
+                {POSED_FRAME.faces.find((f) => f.verdict === 'recognition')?.score.toFixed(3)}
+              </span>
+              ），全頁唯一過本站門檻的一格——而它的臉只有 32×41 像素，比上面行走那張的 36×44
+              還要細。像素多少不是關鍵：正面、無遮擋、光線夠，同一個人在同一套向量下可以由 0.267
+              升到 0.456。
+            </p>
+            <p>
+              更值得看的是順序：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」——所以只有一格標認定，其餘標候選或未過檻。
+            </p>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-4">
           <h2 className="font-kai text-[18px] leading-tight text-carbon-deep">帖文下的回覆</h2>

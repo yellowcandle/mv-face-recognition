@@ -75,6 +75,30 @@ export interface NamedContestant {
   maybe: boolean;
 }
 
+/** A single measured frame from a stand-alone photo (see `streetPhotos.posed.ts`). */
+export interface PosedFace {
+  i: number;
+  /** Frame fractions `[x1, y1, x2, y2]`, canonical order. */
+  box: [number, number, number, number];
+  px: [number, number];
+  det_score: number;
+  score: number;
+  id: string;
+  name: string;
+  nickname: string;
+  /** `recognition` at or above `SITE_THRESHOLD`; `candidate` above `JOB_THRESHOLD`; else `none`. */
+  verdict: 'recognition' | 'candidate' | 'none';
+}
+
+export interface PosedFrame {
+  width: number;
+  height: number;
+  mode: string;
+  faces: PosedFace[];
+  recognitionCount: number;
+  candidateCount: number;
+}
+
 /** The prose that belongs to each measured frame, keyed by the frame it describes. */
 const FRAME_PROSE: Record<string, { src: string; alt: string; caption: string }> = {
   a: {
@@ -148,6 +172,8 @@ export const TOTALS = {
     ...STREET_IMAGES.flatMap((image) => image.faces.map((face) => face.margin)),
   ),
 };
+
+export { POSED_FRAME } from './streetPhotos.posed';
 
 export {
   CONTESTANT_COUNT,

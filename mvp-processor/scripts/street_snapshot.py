@@ -320,9 +320,60 @@ def open_top_one(images: list[dict[str, Any]], references, ids, db) -> dict[str,
     return {"boxes": len(labels), "distinct": len(set(labels)), "repeated": repeated}
 
 
+def posed_section(app, path: Path, references, ids, database, threshold: float) -> dict:
+    """A single frame measured on its own, for photos that are not part of the resolution ladder.
+
+    Faces are called what they are: a **recognition** at or above the site threshold, a
+    **candidate** above the job threshold, and nothing worth printing below that.
+    """
+    image = cv2.imread(str(path))
+    if image is None:
+        raise SystemExit(f"cannot read {path}")
+    height, width = image.shape[:2]
+    native = detect_native(app, image)
+    faces, mode = (native, "native") if len(native) >= 6 else (
+        detect_tiled(app, image, (0.0, 0.0, 1.0, 1.0), SMALL_TILE),
+        "tiled 4x",
+    )
+    faces.sort(key=lambda item: item["box"][0])
+    rows = []
+    for index, face in enumerate(faces, start=1):
+        ranked = per_contestant_best(references, ids, face["embedding"])
+        top_id, top_score = ranked[0]
+        info = database.contestants_info[top_id]
+        rows.append(
+            {
+                "i": index,
+                "box": box_fraction(face["box"], width, height),
+                "px": [int(face["box"][2] - face["box"][0]), int(face["box"][3] - face["box"][1])],
+                "det_score": round(float(face["det_score"]), 3),
+                "score": round(top_score, 3),
+                "id": top_id,
+                "name": info["name"],
+                "nickname": info["nickname"],
+                "verdict": "recognition" if top_score >= threshold else (
+                    "candidate" if top_score >= JOB_THRESHOLD else "none"
+                ),
+            }
+        )
+    return {
+        "width": width,
+        "height": height,
+        "mode": mode,
+        "faces": rows,
+        "recognitionCount": sum(1 for row in rows if row["verdict"] == "recognition"),
+        "candidateCount": sum(1 for row in rows if row["verdict"] != "none"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--frames", type=Path, required=True, help="directory holding the five source frames")
+    parser.add_argument(
+        "--frames",
+        type=Path,
+        required=False,
+        help="directory holding the five source frames (not needed with --posed)",
+    )
     parser.add_argument(
         "--out",
         type=Path,
@@ -336,6 +387,18 @@ def main() -> int:
         help="source URLs and hashes for the frames this run used",
     )
     parser.add_argument("--check", action="store_true", help="diff against the committed module; write nothing")
+    parser.add_argument(
+        "--posed",
+        type=Path,
+        default=None,
+        help="a stand-alone frame to measure (a posed group shot, say); emits its own module instead "
+        "of the ladder, so an ephemeral frame never blocks regenerating the rest",
+    )
+    parser.add_argument(
+        "--posed-out",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "apps/viewer/src/pages/streetPhotos.posed.ts",
+    )
     parser.add_argument("--config", type=Path, default=Path(__file__).resolve().parents[1] / "config/processing_config.yaml")
     parser.add_argument(
         "--gallery-label",
@@ -388,6 +451,27 @@ def main() -> int:
             )
     site_threshold = float(config["face_recognition"]["acceptance_threshold"])
     app = create_face_app(["CPUExecutionProvider"])
+
+    if args.posed is None and args.frames is None:
+        raise SystemExit("either --frames or --posed is required")
+
+    if args.posed is not None:
+        section = posed_section(app, args.posed, references, ids, database, site_threshold)
+        import hashlib as _hash
+
+        digest = _hash.sha256(args.posed.read_bytes()).hexdigest()
+        rendered = render_posed(section, digest)
+        if args.check:
+            current = args.posed_out.read_text() if args.posed_out.exists() else ""
+            if _literals(current) != _literals(rendered):
+                print(f"{args.posed_out} is out of date", file=sys.stderr)
+                return 1
+            print(f"{args.posed_out} matches a fresh run")
+            return 0
+        args.posed_out.write_text(rendered)
+        print(f"wrote {args.posed_out} ({len(section['faces'])} faces, "
+              f"{section['recognitionCount']} recognition, {section['candidateCount']} candidate)")
+        return 0
 
     paths = {name: args.frames / name for name in SOURCES}
     missing = [str(path) for path in paths.values() if not path.is_file()]
@@ -592,6 +676,48 @@ def main() -> int:
     args.manifest.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     print(f"wrote {args.out} and {args.manifest}")
     return 0
+
+
+def render_posed(section: dict[str, Any], digest: str) -> str:
+    out = [
+        "/**",
+        " * A posed group shot, measured on its own. **Generated by mvp-processor/scripts/street_snapshot.py --posed.**",
+        " * Do not hand-edit. The frame is not committed; this sha256 identifies it.",
+        f" * frame sha256: {digest}",
+        " */",
+        "",
+        "import type { PosedFrame } from './streetPhotos.data';",
+        "",
+        "export const POSED_FRAME: PosedFrame = {",
+        f"  width: {section['width']},",
+        f"  height: {section['height']},",
+        f"  mode: '{section['mode']}',",
+        f"  recognitionCount: {section['recognitionCount']},",
+        f"  candidateCount: {section['candidateCount']},",
+        "  faces: [",
+    ]
+    for face in section["faces"]:
+        out.append(
+            "    {{ i: {i}, box: [{b}], px: [{w}, {h}], det_score: {d}, score: {s}, id: '{cid}', "
+            "name: '{name}', nickname: '{nick}', verdict: '{verdict}' }},".format(
+                i=face["i"],
+                b=", ".join(
+                    f"{value:.4f}".rstrip("0").rstrip(".") for value in face["box"]
+                ),
+                w=face["px"][0],
+                h=face["px"][1],
+                d=face["det_score"],
+                s=face["score"],
+                cid=face["id"],
+                name=face["name"],
+                nick=face["nickname"],
+                verdict=face["verdict"],
+            )
+        )
+    out.append("  ],")
+    out.append("};")
+    out.append("")
+    return "\n".join(out)
 
 
 def _describe_gallery(path: Path) -> str:
