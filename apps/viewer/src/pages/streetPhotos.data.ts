@@ -99,6 +99,18 @@ export interface PosedFrame {
   candidateCount: number;
 }
 
+/**
+ * The post the posed frame came from, quoted verbatim. Its own words are the reason the frame is
+ * worth publishing: the poster set out to make a guessing game easier, and it is the first photo in
+ * this thread that the matcher could actually answer.
+ */
+export const POSED_POST = {
+  handle: 'rinrinrin1666',
+  url: 'https://www.threads.com/@rinrinrin1666/post/DgH5FprE51B',
+  caption: '又來猜猜我是誰的環節🤣\n今次張相易沽好多',
+  image: '/videos/reports/street-photos-2026-11-15/posed.jpg',
+};
+
 /** The prose that belongs to each measured frame, keyed by the frame it describes. */
 const FRAME_PROSE: Record<string, { src: string; alt: string; caption: string }> = {
   a: {

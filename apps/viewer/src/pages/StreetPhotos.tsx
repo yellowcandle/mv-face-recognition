@@ -10,6 +10,7 @@ import {
   NAMED_PRESENT,
   OPEN_TOP1,
   POSED_FRAME,
+  POSED_POST,
   POST_PHOTOS,
   POST_REPLIES,
   REPORTED_REPLY_AUTHORS,
@@ -304,6 +305,20 @@ export function StreetPhotos() {
         <div className="flex flex-col gap-4">
           <h2 className="font-kai text-[18px] leading-tight text-carbon-deep">另一張：正面合照</h2>
 
+          <div className="flex max-w-[76ch] flex-col gap-1 border-l-2 border-carbon-deep/20 pl-3">
+            <a
+              href={POSED_POST.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="font-mono text-[12px] text-carbon-soft underline decoration-carbon-deep/20 underline-offset-2 hover:decoration-carbon-deep"
+            >
+              Threads · @{POSED_POST.handle}
+            </a>
+            <span className="whitespace-pre-line font-kai text-[14px] leading-relaxed text-carbon">
+              {POSED_POST.caption}
+            </span>
+          </div>
+
           <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
             同一位樓主後來貼了另一張：十一人排排企、正面、有補光。同一套向量庫、同一個門檻，這一張有{' '}
             <span className={NUM}>{POSED_FRAME.faces.length}</span> 張臉，其中{' '}
@@ -412,7 +427,20 @@ export function StreetPhotos() {
               升到 0.456。
             </p>
             <p>
-              更值得看的是順序：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」——所以只有一格標認定，其餘標候選或未過檻。
+              十一格的判定分佈：
+              <span className={NUM}>{POSED_FRAME.recognitionCount}</span> 認定、
+              <span className={NUM}>
+                {POSED_FRAME.candidateCount - POSED_FRAME.recognitionCount}
+              </span>{' '}
+              候選、
+              <span className={NUM}>
+                {POSED_FRAME.faces.length - POSED_FRAME.candidateCount}
+              </span>{' '}
+              未過檻。真正過本站 0.412 的只有何佩；其餘最高分那幾位（Karen 0.411、Carina 0.406、暐翹
+              0.380、咖喱 0.363）差一點而未夠——不及就不叫辨識。
+            </p>
+            <p>
+              更值得看的是順序：這十一格的最佳候選，左至右很大程度對得上帖文裡逐個認人的次序（Karen、暐翹、何佩、咖喱、Ada、Carina、莎莎……蘇菲）。單格分數未過檻不等於認錯人，只是證據不足以下一個「認定」。
             </p>
           </div>
         </div>
@@ -897,7 +925,8 @@ export function StreetPhotos() {
             >
               原帖
             </a>
-            回覆一句即可，本頁會連相一併下架。四張之中，1600 px 的一張取自另一則轉貼：
+            回覆一句即可，本頁會連相一併下架。五張之中，1600 px
+            的一張與正面合照，取自同一位樓主的另外兩則帖文：
             <a
               href="https://www.threads.com/@rinrinrin1666/post/DfzERn0k9HS"
               target="_blank"
