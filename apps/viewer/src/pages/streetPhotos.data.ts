@@ -151,6 +151,15 @@ export const VIDEO_HANDLES = [
   { handle: 'sophiee1116', id: '18', note: 'SOPHIE 蘇菲' },
   { handle: 'myyoann', id: '78', note: 'mayan 馬欣' },
   { handle: 'wyllislwk', id: '22', note: '暐翹 WK' },
+  // ROUND TWO's tags, matched to the roster's 姓名: the matcher found exactly these nine.
+  { handle: 'huii_alice', id: '95', note: '許寶恆 Alice' },
+  { handle: 'hsiaksueudidi', id: '33', note: '黃敏蕎 阿妹' },
+  { handle: 'taniackc', id: '73', note: '陳紀澄 Tania' },
+  { handle: 'yannyhaha', id: '48', note: '劉綺婷 Yanny' },
+  { handle: 'zoe_yuying', id: '10', note: '余潔瀅 Zoe' },
+  { handle: 'valentina_cct', id: '84', note: '趙展彤 VAL' },
+  { handle: 'natsiennaho', id: '62', note: '何榛綦 榛綦' },
+  { handle: 'samanthaliu614', id: '93', note: '廖雪蕎 Liu 哥' },
 ] as const;
 
 /** The two reels the shoot was filmed for, with the cast each one tags. */
