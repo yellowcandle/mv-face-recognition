@@ -122,8 +122,10 @@ export interface VideoRow {
   p90: number;
 }
 
-/** A processed reel, summarised (see `streetPhotos.video.ts`). */
-export interface VideoReport {
+/** One processed reel; the project published two rounds (see `streetPhotos.video.ts`). */
+export interface VideoRound {
+  key: string;
+  label: string;
   duration: number;
   frames: number;
   detections: number;
@@ -151,7 +153,27 @@ export const VIDEO_HANDLES = [
   { handle: 'wyllislwk', id: '22', note: '暐翹 WK' },
 ] as const;
 
-/** The reel the shoot itself was filmed for: same people, 23 seconds of them. */
+/** The two reels the shoot was filmed for, with the cast each one tags. */
+export const VIDEO_POSTS = [
+  {
+    key: 'round-one',
+    handle: 'carinalxt',
+    url: 'https://www.instagram.com/reel/DgH25YfT995/',
+    caption:
+      'FINGERS CROSSED #walkchallenge with my 造星4 girls!!!\nROUND ONE with @geungada @lezona_b @curry_wnw @ho_pui @karen.yeeeee @kilbychan @superaggiieee @sophiee1116 @myyoann @wyllislwk',
+    tags: 10,
+  },
+  {
+    key: 'round-two',
+    handle: 'carinalxt',
+    url: 'https://www.instagram.com/reel/DgKbw6Yzj4O/',
+    caption:
+      'FINGERS CROSSED #walkchallenge with my 造星4 girls!!!\nROUND TWO with @huii_alice @hsiaksueudidi @taniackc @yannyhaha @zoe_yuying @valentina_cct @natsiennaho @samanthaliu614',
+    tags: 8,
+  },
+] as const;
+
+/** Kept for the copy that still refers to the first reel alone. */
 export const VIDEO_POST = {
   handle: 'carinalxt',
   url: 'https://www.instagram.com/reel/DgH25YfT995/',
@@ -234,7 +256,7 @@ export const TOTALS = {
 };
 
 export { POSED_FRAME } from './streetPhotos.posed';
-export { VIDEO_REPORT } from './streetPhotos.video';
+export { VIDEO_ROUNDS } from './streetPhotos.video';
 
 export {
   CONTESTANT_COUNT,

@@ -12,8 +12,8 @@ import {
   POSED_FRAME,
   POSED_POST,
   VIDEO_HANDLES,
-  VIDEO_POST,
-  VIDEO_REPORT,
+  VIDEO_POSTS,
+  VIDEO_ROUNDS,
   POST_PHOTOS,
   POST_REPLIES,
   REPORTED_REPLY_AUTHORS,
@@ -451,36 +451,48 @@ export function StreetPhotos() {
 
         <div className="flex flex-col gap-4">
           <h2 className="font-kai text-[18px] leading-tight text-carbon-deep">
-            同一班人，一段 23 秒的片
+            同一個 project · 兩段街拍片
           </h2>
 
-          <div className="flex max-w-[76ch] flex-col gap-1 border-l-2 border-carbon-deep/20 pl-3">
-            <a
-              href={VIDEO_POST.url}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="font-mono text-[12px] text-carbon-soft underline decoration-carbon-deep/20 underline-offset-2 hover:decoration-carbon-deep"
+          {VIDEO_POSTS.map((post) => (
+            <div
+              key={post.key}
+              className="flex max-w-[76ch] flex-col gap-1 border-l-2 border-carbon-deep/20 pl-3"
             >
-              Instagram Reel · @{VIDEO_POST.handle}
-            </a>
-            <span className="whitespace-pre-line font-kai text-[14px] leading-relaxed text-carbon">
-              {VIDEO_POST.caption}
-            </span>
-          </div>
+              <a
+                href={post.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-mono text-[12px] text-carbon-soft underline decoration-carbon-deep/20 underline-offset-2 hover:decoration-carbon-deep"
+              >
+                Instagram Reel · @{post.handle} · 標註 {post.tags} 個帳號
+              </a>
+              <span className="whitespace-pre-line font-kai text-[14px] leading-relaxed text-carbon">
+                {post.caption}
+              </span>
+            </div>
+          ))}
 
           <p className="max-w-[76ch] font-kai text-[14px] leading-relaxed text-carbon">
-            當晚在現場拍好的 23 秒短片後來也找到了。交給同一套管線跑（每秒取 6 格、det_size
-            640、門檻 {SITE_THRESHOLD.toFixed(3)}），共抽了{' '}
-            <span className={NUM}>{VIDEO_REPORT.frames}</span> 個影格、偵測到{' '}
-            <span className={NUM}>{VIDEO_REPORT.detections}</span> 張臉，其中{' '}
-            <span className={NUM}>{VIDEO_REPORT.recognitions}</span> 次過檻，認出{' '}
-            <span className={NUM}>{VIDEO_REPORT.contestants}</span> 位參賽者。
+            同一個發起人、同一個街口，拍了兩段。兩段都交給同一套管線（每秒取 6 格、det_size
+            640、門檻 {SITE_THRESHOLD.toFixed(3)}）：
+            {VIDEO_ROUNDS.map((round, index) => (
+              <span key={round.key}>
+                {index > 0 ? '；' : ''}
+                {round.label} {round.duration.toFixed(0)} 秒抽了{' '}
+                <span className={NUM}>{round.frames}</span> 個影格、偵測到{' '}
+                <span className={NUM}>{round.detections}</span> 張臉，
+                <span className={NUM}>{round.recognitions}</span> 次過檻，認出{' '}
+                <span className={NUM}>{round.contestants}</span> 位
+              </span>
+            ))}
+            。第二段人數少但過檻次數更多，因為它幾乎全程正面排排企。
           </p>
 
-          <Card padding="none" className="max-w-[640px] overflow-x-auto">
+          <Card padding="none" className="max-w-[760px] overflow-x-auto">
             <table className="w-full border-collapse">
               <caption className="px-3 py-2 text-left font-kai text-[13px] text-carbon-soft">
-                影片逐位統計 · 過檻次數與最高餘弦
+                兩段片逐位統計 · 過檻次數與最高餘弦
               </caption>
               <thead>
                 <tr className="font-kai text-[12px] text-ink-muted">
@@ -493,55 +505,86 @@ export function StreetPhotos() {
                   <th scope="col" className={CELL}>
                     帳號
                   </th>
+                  {VIDEO_ROUNDS.map((round) => (
+                    <th key={round.key} scope="col" className={CELL}>
+                      {round.key === 'round-one' ? '一 · 次數' : '二 · 次數'}
+                    </th>
+                  ))}
                   <th scope="col" className={CELL}>
-                    過檻次數
-                  </th>
-                  <th scope="col" className={CELL}>
-                    最高
-                  </th>
-                  <th scope="col" className={CELL}>
-                    中位
+                    最佳
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {VIDEO_REPORT.rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-tint">
-                    <td className={`${CELL} ${NUM} text-carbon-soft`}>{row.id}</td>
-                    <td className={`${CELL} font-kai text-[13px] text-carbon-deep`}>
-                      {row.nickname}
-                    </td>
-                    <td className={`${CELL} font-mono text-[12px] text-ink-muted`}>
-                      {(() => {
-                        if (row.id === '15') return `@${VIDEO_POST.handle}`;
-                        const handle = VIDEO_HANDLES.find((entry) => entry.id === row.id);
-                        return handle ? `@${handle.handle}` : '—';
-                      })()}
-                    </td>
-                    <td className={`${CELL} ${NUM} text-carbon-soft`}>{row.count}</td>
-                    <td className={`${CELL} ${NUM} text-carbon`}>{row.best.toFixed(3)}</td>
-                    <td className={`${CELL} ${NUM} text-ink-muted`}>{row.median.toFixed(3)}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const ids = [
+                    ...new Set(VIDEO_ROUNDS.flatMap((round) => round.rows.map((row) => row.id))),
+                  ];
+                  const overall = ids
+                    .map((id) => {
+                      const hits = VIDEO_ROUNDS.map(
+                        (round) => round.rows.find((row) => row.id === id) ?? null,
+                      );
+                      const present = hits.filter((row): row is NonNullable<typeof row> => !!row);
+                      return {
+                        id,
+                        hits,
+                        best: Math.max(...present.map((row) => row.best)),
+                        present,
+                      };
+                    })
+                    .sort((a, b) => b.best - a.best);
+                  return overall.map(({ id, hits, best, present }) => (
+                    <tr key={id} className="hover:bg-tint">
+                      <td className={`${CELL} ${NUM} text-carbon-soft`}>{id}</td>
+                      <td className={`${CELL} font-kai text-[13px] text-carbon-deep`}>
+                        {present[0].nickname}
+                      </td>
+                      <td className={`${CELL} font-mono text-[12px] text-ink-muted`}>
+                        {(() => {
+                          if (id === '15') return '@carinalxt';
+                          const handle = VIDEO_HANDLES.find((entry) => entry.id === id);
+                          return handle ? `@${handle.handle}` : '—';
+                        })()}
+                      </td>
+                      {hits.map((row, index) => (
+                        <td
+                          key={VIDEO_ROUNDS[index].key}
+                          className={`${CELL} ${NUM} ${row ? 'text-carbon-soft' : 'text-ink-muted'}`}
+                        >
+                          {row ? row.count : '—'}
+                        </td>
+                      ))}
+                      <td className={`${CELL} ${NUM} text-carbon`}>{best.toFixed(3)}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </Card>
 
           <div className="flex max-w-[76ch] flex-col gap-3 font-kai text-[14px] leading-relaxed text-carbon">
             <p>
-              靜態相片跑了幾張才認出一位，換成這段 23 秒的片，十一位每人都有 21 至 56
-              個影格過線，最高去到{' '}
+              兩段合共{' '}
               <span className={NUM}>
-                {Math.max(...VIDEO_REPORT.rows.map((r) => r.best)).toFixed(3)}
+                {VIDEO_ROUNDS.reduce((sum, round) => sum + round.recognitions, 0)}
+              </span>{' '}
+              次過檻，最高{' '}
+              <span className={NUM}>
+                {Math.max(
+                  ...VIDEO_ROUNDS.flatMap((round) => round.rows.map((row) => row.best)),
+                ).toFixed(3)}
               </span>
-              。影片裡的臉跟相片一樣細，但每個人在鏡頭前出現了幾十次，有幾格總會影得正面又清楚。
+              。相比之下，整批靜態相片只有一格過線。臉的大小其實差不多，分別在影片裡同一個人出現幾十次，總有幾格影得正面又清楚。
             </p>
             <p>
-              帖文裡 @carinalxt 標註了十個帳號，連同她自己正好十一人。逐個對過各自的 IG
-              簡介，就跟上表認出來的十一位完全吻合，包括之前認不齊的超酸（79 號）、阿杰（31
-              號）和馬欣（78 號）。
+              兩段的班底不同，只有 @carinalxt 兩段都在（
+              {VIDEO_ROUNDS.map(
+                (round) => round.rows.find((row) => row.id === '15')?.count ?? 0,
+              ).join(' + ')}{' '}
+              次）。第一段的十個標註對得回帳號，第二段有四個帳號在名冊裡找不到對應名字，但認出來的九位剛好等於「八個標註加作者」。
             </p>
-            <p>這條 6.3 MB 的片沒有複製到本站伺服器，想看原片直接點上面的 Instagram 連結就可以。</p>
+            <p>兩條片都沒有複製到本站，想看原片直接點上面的 Instagram 連結。</p>
           </div>
         </div>
 
@@ -1035,7 +1078,7 @@ export function StreetPhotos() {
             </a>
             ，23 秒短片連結自{' '}
             <a
-              href={VIDEO_POST.url}
+              href={VIDEO_POSTS[0].url}
               target="_blank"
               rel="noreferrer noopener"
               className="underline decoration-carbon-deep/30 underline-offset-2 hover:decoration-carbon-deep"
